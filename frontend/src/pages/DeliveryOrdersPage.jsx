@@ -55,6 +55,8 @@ export default function DeliveryOrdersPage() {
   const [createAccountError, setCreateAccountError] = useState('')
   const createAccountNameRef = useRef(null)
   const createAccountPhoneRef = useRef(null)
+  const inflightRef = useRef(new Map())
+  const lastClickRef = useRef(new Map())
   const [veresiyeAmount, setVeresiyeAmount] = useState('')
   const [veresiyeNote, setVeresiyeNote] = useState('')
   const [payMethods, setPayMethods] = useState([])
@@ -76,6 +78,26 @@ export default function DeliveryOrdersPage() {
   const [printingReceipt, setPrintingReceipt] = useState(false)
   const [tempQty, setTempQty] = useState({})
   const [cartViewMode, setCartViewMode] = useState('grouped')
+
+  const withLock = async (key, fn) => {
+    if (!key) return null
+    if (inflightRef.current.get(key)) return null
+    inflightRef.current.set(key, true)
+    try {
+      return await fn()
+    } finally {
+      inflightRef.current.delete(key)
+    }
+  }
+
+  const isDebounced = (key, ms = 250) => {
+    if (!key) return true
+    const now = Date.now()
+    const last = Number(lastClickRef.current.get(key) || 0)
+    if (now - last < ms) return true
+    lastClickRef.current.set(key, now)
+    return false
+  }
 
   // Create Modal State
   const [createOpen, setCreateOpen] = useState(false)
@@ -358,7 +380,9 @@ export default function DeliveryOrdersPage() {
     if (tab === 'delivered') return
     setError('')
     const orderId = selectedId || getOrderId(order)
-    const result = await safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, { method: 'POST', body: JSON.stringify({ menuItemId }), signal, silent: true }))
+    const key = `${orderId}:${menuItemId}:add`
+    if (isDebounced(key, 200)) return
+    const result = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, { method: 'POST', body: JSON.stringify({ menuItemId }), signal, silent: true })))
     const fresh = pickOrder(result)
     if (fresh) setNote(fresh.note || '')
   }
@@ -747,14 +771,14 @@ export default function DeliveryOrdersPage() {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            className="btn"
+            className="btn btn--toggle"
             onClick={() => setTab('active')}
             aria-pressed={tab === 'active'}
           >
             Aktif Siparişler
           </button>
           <button
-            className="btn"
+            className="btn btn--toggle"
             onClick={() => setTab('delivered')}
             aria-pressed={tab === 'delivered'}
           >
@@ -771,7 +795,7 @@ export default function DeliveryOrdersPage() {
               {deliveredHourPresets.map(p => (
                 <button
                   key={p.value}
-                  className="btn"
+                  className="btn btn--toggle"
                   onClick={() => setDeliveredOnlyLastHours(p.value)}
                   disabled={loading}
                   aria-pressed={deliveredOnlyLastHours === p.value}
@@ -948,10 +972,10 @@ export default function DeliveryOrdersPage() {
               <div className="card salePanel" style={{ gap: 12 }}>
                 <div className="saleCartHeader" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
+                    <button className="btn btn--toggle" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
                       ✓ Toplu
                     </button>
-                    <button className="btn" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
+                    <button className="btn btn--toggle" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
                       Ayrı
                     </button>
                   </div>

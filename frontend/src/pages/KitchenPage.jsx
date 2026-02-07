@@ -3,7 +3,9 @@ import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import InputModal from '../components/InputModal.jsx'
+import MenuItemFilterDrawer from '../components/MenuItemFilterDrawer.jsx'
 import { trServingTypeLabel } from '../i18n/tr.js'
+import { useKitchenMenuFilters } from '../lib/useKitchenMenuFilters.js'
 
 export default function KitchenPage() {
   const STATUS_LABELS_TR = {
@@ -63,6 +65,8 @@ export default function KitchenPage() {
 
   const pickOrder = (res) => res?.data?.order ?? res?.order ?? null
   const { allowedBranchIds } = useAuth()
+  const [filterOpen, setFilterOpen] = useState(false)
+  const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_normal' })
 
   const ensureAudioUnlocked = async () => {
     try {
@@ -268,28 +272,60 @@ export default function KitchenPage() {
     return out
   }, [orders])
 
+  const visibleCards = useMemo(() => {
+    const hidden = menuFilters.hiddenSet
+    return (Array.isArray(cards) ? cards : [])
+      .map(c => {
+        const items = (Array.isArray(c?.items) ? c.items : []).filter(it => {
+          const menuItemId = String(it?.menuItemId || '').trim()
+          if (!menuItemId) return true
+          return !hidden.has(menuItemId)
+        })
+        return { ...c, items }
+      })
+      .filter(c => (Array.isArray(c?.items) ? c.items.length : 0) > 0)
+  }, [cards, menuFilters.hiddenSet])
+
+  const filteredOut = useMemo(() => {
+    const hasAny = (Array.isArray(cards) ? cards : []).some(c => (Array.isArray(c?.items) ? c.items.length : 0) > 0)
+    const hasVisible = (Array.isArray(visibleCards) ? visibleCards : []).length > 0
+    return hasAny && !hasVisible
+  }, [cards, visibleCards])
+
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="stickyTop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingBottom: 12 }}>
         <h3 style={{ margin: 0 }}>Mutfağa Gelen Siparişler</h3>
-        <button
-          type="button"
-          className="btn"
-          onClick={async () => {
-            const next = !soundEnabled
-            setSoundEnabled(next)
-            if (next) {
-              await ensureAudioUnlocked()
-            }
-          }}
-          title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapalı (Aç)'}
-        >
-          {soundIcon}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn" onClick={() => setFilterOpen(true)}>Filtre</button>
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              const next = !soundEnabled
+              setSoundEnabled(next)
+              if (next) {
+                await ensureAudioUnlocked()
+              }
+            }}
+            title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapalı (Aç)'}
+          >
+            {soundIcon}
+          </button>
+        </div>
       </div>
       {error && <div style={{ color: '#ef4444' }}>{error}</div>}
+      {filteredOut && (
+        <div className="card" style={{ borderColor: '#f59e0b', color: '#111827' }}>
+          Filtreler tüm ürünleri gizliyor.
+          <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn" type="button" onClick={() => setFilterOpen(true)}>Filtreyi Aç</button>
+            <button className="btn" type="button" onClick={() => menuFilters.resetAllVisible()}>Hepsini Aç</button>
+          </div>
+        </div>
+      )}
       <div className="kitchenOrdersGrid">
-        {cards.map(o => (
+        {visibleCards.map(o => (
           <div key={`${o._id || o.id}-${String(o.batchId || 'legacy')}`} className="card kitchenOrderCard" style={{ borderColor: ageColor(o.batchSentAt || o.createdAt) }}>
             {(() => {
               const titleLeft = o?.tableName
@@ -408,6 +444,16 @@ export default function KitchenPage() {
         initialValue={cancelReason}
         placeholder="İptal sebebi..."
         onSubmit={submitCancel}
+      />
+
+      <MenuItemFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        categories={menuFilters.menuCategories}
+        menuItems={menuFilters.menuItems}
+        hiddenSet={menuFilters.hiddenSet}
+        onToggleMenuItem={menuFilters.toggleMenuItem}
+        onReset={menuFilters.resetAllVisible}
       />
     </div>
   )

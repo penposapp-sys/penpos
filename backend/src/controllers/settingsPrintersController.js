@@ -1,8 +1,22 @@
 export const getPrintersSettings = async (req, res) => {
-  const downloadUrl = String(
-    process.env.PRINT_AGENT_WINDOWS_URL ||
-      'http://localhost:4000/public/downloads/PenPOS_PrintAgent_Setup_0.1.0.exe'
-  ).trim()
+  const buildBaseUrl = () => {
+    const envBase = String(process.env.BASE_URL || '').trim()
+    if (envBase) return envBase.replace(/\/+$/, '')
+    try {
+      const xfProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
+      const xfHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim()
+      const proto = xfProto || String(req.protocol || 'http')
+      const host = xfHost || String(req.get('host') || '')
+      if (!host) return ''
+      return `${proto}://${host}`
+    } catch {
+      return ''
+    }
+  }
+
+  const fallbackPath = '/public/downloads/PenPOS_PrintAgent_Setup_0.1.0.exe'
+  const base = buildBaseUrl()
+  const downloadUrl = String(process.env.PRINT_AGENT_WINDOWS_URL || (base ? new URL(fallbackPath, base).toString() : fallbackPath)).trim()
   res.json({
     success: true,
     printAgent: {

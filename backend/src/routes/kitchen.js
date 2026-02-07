@@ -10,6 +10,8 @@ import * as ctrl from '../controllers/kitchenController.js'
 const router = Router()
 
 router.get('/orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.list)
+router.get('/bulk-items', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.bulkList)
+router.post('/bulk-items/:rowKey/done', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.bulkDone)
 router.put('/orders/:id/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.complete)
 router.put('/orders/:orderId/batches/:batchId/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.batchComplete)
 router.put('/orders/:id/items/:itemId/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemComplete)

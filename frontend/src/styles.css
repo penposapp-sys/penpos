@@ -18,6 +18,8 @@
   --ui-btn-py: 8px;
   --ui-btn-minh: 44px;
   --ui-card-pad: 16px;
+
+  --pos-item-w: 160px;
 }
 * { box-sizing: border-box }
 html, body, #root { height: 100dvh }
@@ -664,7 +666,7 @@ body.scroll-lock { overflow: hidden !important }
 }
 
 .posCategoryBar > * { flex: 0 0 auto }
-.posItemsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px }
+.posItemsGrid { display: grid; grid-template-columns: repeat(auto-fill, var(--pos-item-w)); gap: 12px; justify-content: start }
 .posMiniBar { border-top: 1px solid var(--border); padding: 10px; background: rgba(255, 255, 255, 0.98) }
 .posMiniBarInner { display: grid; grid-template-columns: 1fr; gap: 8px }
 .posDrawerBackdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50; display: grid; align-items: end }
@@ -673,7 +675,13 @@ body.scroll-lock { overflow: hidden !important }
 .posDrawerBody { padding: 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; max-height: calc(85dvh - 54px) }
 
 .kasaLayout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; align-items: start }
-.kasaProductGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px }
+.kasaProductGrid { display: grid; grid-template-columns: repeat(auto-fill, var(--pos-item-w)); gap: 10px; justify-content: start }
+
+@media (max-width: 1024px) {
+  :root {
+    --pos-item-w: 120px;
+  }
+}
 .kasaProductGridScroll { max-height: 66vh; overflow-y: auto; padding-right: 6px }
 .kasaCartList { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; padding-right: 6px }
 .kasaBottomBar { border-top: 1px solid var(--border); padding: 10px; background: rgba(255, 255, 255, 0.98) }
@@ -752,6 +760,15 @@ body.scroll-lock { overflow: hidden !important }
   border-color: #bfc5cf;
   color: #111827;
   font-weight: 600;
+}
+
+.btn.btn--toggle.active,
+.btn.btn--toggle.is-active,
+.btn.btn--toggle[aria-pressed="true"],
+.btn.btn--toggle[data-active="true"] {
+  background: #616161;
+  border-color: #616161;
+  color: #ffffff;
 }
 .btn:disabled,
 .btn[aria-disabled="true"] {

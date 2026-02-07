@@ -329,10 +329,12 @@ export default function WalkInPosPage() {
       setError('Sipariş bulunamadı')
       return
     }
-    const result = await safeAction(
+    const key = `${orderId}:${menuItemId}:add`
+    if (isDebounced(key, 200)) return
+    const result = await withLock(key, () => safeAction(
       (signal) => api(`/api/pos/orders/${orderId}/items`, { method: 'POST', data: { menuItemId }, signal, silent: true }),
       { reload: false }
-    )
+    ))
     const fresh = pickOrder(result)
     if (fresh) {
       setNote(fresh.note || '')
@@ -956,21 +958,21 @@ export default function WalkInPosPage() {
 
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn--xs" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
+                  <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
                     ✓ Toplu
                   </button>
-                  <button className="btn btn--xs" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
+                  <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
                     Ayrı
                   </button>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn--xs" onClick={() => setServingType('tray')} disabled={busy} aria-pressed={servingType === 'tray'}>
+                  <button className="btn btn--xs btn--toggle" onClick={() => setServingType('tray')} disabled={busy} aria-pressed={servingType === 'tray'}>
                     TEPSİDE
                   </button>
-                  <button className="btn btn--xs" onClick={() => setServingType('plate')} disabled={busy} aria-pressed={servingType === 'plate'}>
+                  <button className="btn btn--xs btn--toggle" onClick={() => setServingType('plate')} disabled={busy} aria-pressed={servingType === 'plate'}>
                     TABAKTA
                   </button>
-                  <button className="btn btn--xs" onClick={() => setServingType('package')} disabled={busy} aria-pressed={servingType === 'package'}>
+                  <button className="btn btn--xs btn--toggle" onClick={() => setServingType('package')} disabled={busy} aria-pressed={servingType === 'package'}>
                     PAKET
                   </button>
                 </div>
@@ -978,34 +980,22 @@ export default function WalkInPosPage() {
 
               <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar’a Düşsün</div>
-                <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     type="button"
+                    className="btn btn--toggle btn--xs"
+                    aria-pressed={effectiveKitchenEnabled !== false}
                     onClick={() => setKitchenMode(true)}
                     disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
-                    style={{
-                      padding: '8px 12px',
-                      border: 'none',
-                      cursor: busy ? 'not-allowed' : 'pointer',
-                      fontWeight: 700,
-                      background: (effectiveKitchenEnabled !== false) ? '#d1d5db' : '#e5e7eb',
-                      color: '#111827'
-                    }}
                   >
                     Açık
                   </button>
                   <button
                     type="button"
+                    className="btn btn--toggle btn--xs"
+                    aria-pressed={effectiveKitchenEnabled === false}
                     onClick={() => setKitchenMode(false)}
                     disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
-                    style={{
-                      padding: '8px 12px',
-                      border: 'none',
-                      cursor: busy ? 'not-allowed' : 'pointer',
-                      fontWeight: 700,
-                      background: (effectiveKitchenEnabled === false) ? '#d1d5db' : '#e5e7eb',
-                      color: '#111827'
-                    }}
                   >
                     Kapalı
                   </button>

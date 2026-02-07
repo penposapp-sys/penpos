@@ -328,6 +328,15 @@ export const updateDeliveryStatusService = async (tenantId, id, deliveryStatus) 
     const now = new Date()
     updates.deliveryAt = now
     updates.deliveredAt = now
+
+    const fin = computePaymentSummary(order)
+    const canClose = fin.netTotal <= 0 || fin.balanceDue <= 0.01
+    if (canClose) {
+      updates.status = order.status === 'cancelled' ? 'closed' : 'completed'
+      updates.closedAt = order.closedAt || now
+      updates.paymentStatus = 'paid'
+      updates.paidAt = order.paidAt || now
+    }
   }
 
   const updated = await updateById(id, updates)

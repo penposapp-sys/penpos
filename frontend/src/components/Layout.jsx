@@ -157,7 +157,10 @@ export default function Layout() {
       items.push({ path: '/kermes/app/dashboard', label: 'Anasayfa', icon: IconHome, show: true })
     }
     if (user.role === 'tenant_admin' || (user.permissions || []).includes('manage_tables')) items.push({ path: '/kermes/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
-    if (!isExpired && (user.role === 'tenant_admin' || (user.permissions || []).includes('kitchen_access'))) items.push({ path: '/kermes/app/kitchen', label: 'Hazırlanacaklar', icon: IconUtensils, show: true })
+    if (!isExpired && (user.role === 'tenant_admin' || (user.permissions || []).includes('kitchen_access'))) {
+      items.push({ path: '/kermes/app/kitchen', label: 'Hazırlanacaklar', icon: IconUtensils, show: true })
+      items.push({ path: '/kermes/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
+    }
     if (!isExpired && (user.role === 'tenant_admin' || ((user.permissions || []).includes('pos_access') && (user.permissions || []).includes('walkin_access')))) items.push({ path: '/kermes/app/walkin', label: 'Masasız Satış', icon: IconShoppingCart, show: true })
     if (!isExpired && (user.role === 'tenant_admin' || ((user.permissions || []).includes('pos_access') && (user.permissions || []).includes('view_delivery')))) items.push({ path: '/kermes/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true })
     if (!isExpired && (user.role === 'tenant_admin' || (user.permissions || []).includes('closed_tables_page_view'))) {
@@ -174,7 +177,7 @@ export default function Layout() {
         to: i.path,
         label: i.label,
         icon: i.icon,
-        active: pathname === i.path || pathname.startsWith(i.path + '/')
+        active: pathname === i.path || (i.path !== '/kermes/app/kitchen' && pathname.startsWith(i.path + '/'))
       }))
   }, [pathname, items])
 

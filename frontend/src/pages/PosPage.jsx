@@ -411,12 +411,14 @@ export default function PosPage() {
       setError('Sipariş bulunamadı')
       return
     }
-    const result = await safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, {
+    const lockKey = `${orderId}:${menuItemId}:add`
+    if (isDebounced(lockKey, 200)) return
+    const result = await withLock(lockKey, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, {
       method: 'POST',
       body: JSON.stringify({ menuItemId }),
       signal,
       silent: true
-    }))
+    })))
     const fresh = pickOrder(result)
     if (fresh) {
       setNote(fresh.note || '')
@@ -859,21 +861,21 @@ export default function PosPage() {
 
       <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn--xs" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
+          <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
             ✓ Toplu
           </button>
-          <button className="btn btn--xs" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
+          <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
             Ayrı
           </button>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn--xs" onClick={() => setServingType('tray')} disabled={busy} aria-pressed={servingType === 'tray'}>
+          <button className="btn btn--xs btn--toggle" onClick={() => setServingType('tray')} disabled={busy} aria-pressed={servingType === 'tray'}>
             TEPSİDE
           </button>
-          <button className="btn btn--xs" onClick={() => setServingType('plate')} disabled={busy} aria-pressed={servingType === 'plate'}>
+          <button className="btn btn--xs btn--toggle" onClick={() => setServingType('plate')} disabled={busy} aria-pressed={servingType === 'plate'}>
             TABAKTA
           </button>
-          <button className="btn btn--xs" onClick={() => setServingType('package')} disabled={busy} aria-pressed={servingType === 'package'}>
+          <button className="btn btn--xs btn--toggle" onClick={() => setServingType('package')} disabled={busy} aria-pressed={servingType === 'package'}>
             PAKET
           </button>
         </div>

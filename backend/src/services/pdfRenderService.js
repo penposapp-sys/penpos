@@ -52,6 +52,36 @@ const useFont = (doc, key) => {
   }
 }
 
+const textMediumFlow = (doc, text, options = {}) => {
+  const x0 = doc.x
+  const y0 = doc.y
+  useFont(doc, 'tr')
+  doc.text(String(text || ''), options)
+  const x1 = doc.x
+  const y1 = doc.y
+  try {
+    useFont(doc, 'tr')
+    doc.text(String(text || ''), x0, y0, options)
+  } catch {
+  }
+  doc.x = x1
+  doc.y = y1
+}
+
+const textMediumAt = (doc, text, x, y, options = {}) => {
+  useFont(doc, 'tr')
+  doc.text(String(text || ''), x, y, options)
+  const x1 = doc.x
+  const y1 = doc.y
+  try {
+    useFont(doc, 'tr')
+    doc.text(String(text || ''), x, y, options)
+  } catch {
+  }
+  doc.x = x1
+  doc.y = y1
+}
+
 const measureReceiptHeightPt = ({
   widthPt,
   margins,
@@ -72,8 +102,12 @@ const measureReceiptHeightPt = ({
   tmp.lineGap(0)
 
   const w = widthPt - margins.left - margins.right
-  const leftWidth = Math.max(40, Math.floor(w * 0.72))
-  const rightWidth = Math.max(40, w - leftWidth)
+  const gapPt = mmToPt(2)
+  const priceColWidth = mmToPt(34)
+  const rightWidth = Math.max(40, Math.min(priceColWidth, w - 40 - gapPt))
+  const leftWidth = Math.max(40, w - rightWidth - gapPt)
+  const itemGap = 3
+  const subLineGap = 1
 
   const hText = (text, { font, size, align } = {}) => {
     useFont(tmp, font || 'tr')
@@ -83,12 +117,35 @@ const measureReceiptHeightPt = ({
     return tmp.heightOfString(s, { width: w, align: align || 'left' })
   }
 
-  const hRow = ({ left, right, size = 10 }) => {
+  const hMoney = (text, { size = 10 } = {}) => {
     useFont(tmp, 'tr')
     tmp.fontSize(Number(size || 10))
-    const hl = tmp.heightOfString(String(left || ''), { width: leftWidth, align: 'left' })
-    const hr = tmp.heightOfString(String(right || ''), { width: rightWidth, align: 'right' })
-    return Math.max(hl, hr)
+    const s = String(text || '')
+    if (!s) return 0
+    return tmp.heightOfString(s, { width: rightWidth, align: 'right', lineBreak: false })
+  }
+
+  const hLeftBlock = ({ name, note, qty }) => {
+    let hh = 0
+
+    useFont(tmp, 'tr')
+    tmp.fontSize(10)
+    hh += tmp.heightOfString(String(name || ''), { width: leftWidth, align: 'left' })
+
+    const n = safeText(note)
+    if (n) {
+      hh += subLineGap
+      useFont(tmp, 'tr')
+      tmp.fontSize(9)
+      hh += tmp.heightOfString(n, { width: leftWidth, align: 'left' })
+    }
+
+    hh += subLineGap
+    useFont(tmp, 'tr')
+    tmp.fontSize(9)
+    hh += tmp.heightOfString(`x${Math.max(1, Number(qty || 1))}`, { width: leftWidth, align: 'left' })
+
+    return hh
   }
 
   let h = 0
@@ -122,8 +179,10 @@ const measureReceiptHeightPt = ({
     const name = safeText(it?.nameSnapshot) || '-'
     const qty = Math.max(1, Number(it?.qty || 1))
     const subtotal = safeMoney(it?.subtotal)
-    h += hRow({ left: `${name} x${qty}`, right: `${subtotal.toFixed(2)} TL`, size: 10 })
-    h += 2
+    const leftH = hLeftBlock({ name, note: it?.note, qty })
+    const rightH = hMoney(`${subtotal.toFixed(2)}\u00A0TL`, { size: 10 })
+    h += Math.max(leftH, rightH)
+    h += itemGap
   }
 
   h += 8
@@ -182,14 +241,15 @@ export const renderReceiptPdfBase64 = async ({
   const tNo = safeText(tableName)
   const its = Array.isArray(items) ? items : []
   const requestedMm = Math.max(58, Number(widthMm || 80))
-  const paperMm = Math.max(58, Math.min(76, requestedMm))
+  const paperMm = Math.max(58, Math.min(80, requestedMm))
   const widthPt = mmToPt(paperMm)
   const pkg = isPackage === true || String(isPackage || '') === 'true'
   const pkgCustomer = safeText(customerName)
   const pkgPhone = safeText(customerPhone)
   const pkgAddress = safeText(customerAddress)
 
-  const margins = { top: 4, left: 6, right: 6, bottom: 6 }
+  const marginPt = mmToPt(8)
+  const margins = { top: marginPt, left: marginPt, right: marginPt, bottom: marginPt }
   const measuredHeightPt = measureReceiptHeightPt({
     widthPt,
     margins,
@@ -246,11 +306,12 @@ export const renderReceiptPdfBase64 = async ({
     doc.y += 2
 
     doc.fontSize(11)
-    if (pkgCustomer) doc.text(`Müşteri: ${pkgCustomer}`)
-    if (pkgPhone) doc.text(`Telefon: ${pkgPhone}`)
+    if (pkgCustomer) textMediumFlow(doc, `Müşteri: ${pkgCustomer}`)
+    if (pkgPhone) textMediumFlow(doc, `Telefon: ${pkgPhone}`)
     if (pkgAddress) {
-      doc.text('Adres:')
-      doc.fontSize(10).text(pkgAddress, { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'left' })
+      textMediumFlow(doc, 'Adres:')
+      doc.fontSize(10)
+      textMediumFlow(doc, pkgAddress, { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'left' })
       doc.fontSize(11)
     }
 
@@ -264,35 +325,70 @@ export const renderReceiptPdfBase64 = async ({
   }
 
   if (dateStr) {
-    doc.fontSize(10).fillColor('#111').text(dateStr, { align: 'center' })
+    doc.fontSize(10)
+    doc.fillColor('#111')
+    textMediumFlow(doc, dateStr, { align: 'center' })
     doc.fillColor('#000')
     doc.y += 4
   }
 
   doc.fontSize(11)
-  doc.text(`Sipariş: ${oNo || '-'}`)
-  if (tNo) doc.text(`Masa: ${tNo}`)
-  doc.text(`Durum: ${paidStatus === 'paid' ? 'ÖDENDİ' : 'ÖDENMEDİ'}`)
+  textMediumFlow(doc, `Sipariş: ${oNo || '-'}`)
+  if (tNo) textMediumFlow(doc, `Masa: ${tNo}`)
+  textMediumFlow(doc, `Durum: ${paidStatus === 'paid' ? 'ÖDENDİ' : 'ÖDENMEDİ'}`)
   doc.y += 3
   doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke()
   doc.y += 4
 
   doc.fontSize(10)
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
-  const leftWidth = Math.max(40, Math.floor(contentWidth * 0.72))
-  const rightWidth = Math.max(40, contentWidth - leftWidth)
+  const gapPt = mmToPt(2)
+  const priceColWidth = mmToPt(34)
+  const rightWidth = Math.max(40, Math.min(priceColWidth, contentWidth - 40 - gapPt))
+  const leftWidth = Math.max(40, contentWidth - rightWidth - gapPt)
   const leftX = doc.page.margins.left
   const rightX = doc.page.width - doc.page.margins.right - rightWidth
+  const itemGap = 3
+  const subLineGap = 1
 
   for (const it of its) {
     const name = safeText(it?.nameSnapshot) || '-'
     const qty = Math.max(1, Number(it?.qty || 1))
     const subtotal = safeMoney(it?.subtotal)
     const y0 = doc.y
-    doc.text(`${name} x${qty}`, leftX, y0, { width: leftWidth, align: 'left' })
-    doc.text(`${subtotal.toFixed(2)} TL`, rightX, y0, { width: rightWidth, align: 'right' })
-    const y1 = Math.max(doc.y, y0)
-    doc.y = y1 + 2
+
+    const rightText = `${subtotal.toFixed(2)}\u00A0TL`
+    useFont(doc, 'tr')
+    doc.fontSize(10)
+    const priceH = doc.heightOfString(rightText, { width: rightWidth, align: 'right', lineBreak: false })
+    textMediumAt(doc, rightText, rightX, y0, { width: rightWidth, align: 'right', lineBreak: false })
+
+    useFont(doc, 'tr')
+    doc.fontSize(10)
+    const nameH = doc.heightOfString(name, { width: leftWidth, align: 'left' })
+    textMediumAt(doc, name, leftX, y0, { width: leftWidth, align: 'left' })
+    let leftEndY = y0 + nameH
+
+    const note = safeText(it?.note)
+    if (note) {
+      leftEndY += subLineGap
+      useFont(doc, 'tr')
+      doc.fontSize(9)
+      const noteH = doc.heightOfString(note, { width: leftWidth, align: 'left' })
+      textMediumAt(doc, note, leftX, leftEndY, { width: leftWidth, align: 'left' })
+      leftEndY += noteH
+    }
+
+    leftEndY += subLineGap
+    useFont(doc, 'tr')
+    doc.fontSize(9)
+    const qtyText = `x${qty}`
+    const qtyH = doc.heightOfString(qtyText, { width: leftWidth, align: 'left' })
+    textMediumAt(doc, qtyText, leftX, leftEndY, { width: leftWidth, align: 'left' })
+    leftEndY += qtyH
+
+    const rowH = Math.max(leftEndY - y0, priceH)
+    doc.y = y0 + rowH + itemGap
   }
 
   doc.y += 2
@@ -301,7 +397,15 @@ export const renderReceiptPdfBase64 = async ({
 
   const net = safeMoney(totals?.grandTotal ?? totals?.netTotal ?? totals?.total)
   useFont(doc, 'trBold')
-  doc.fontSize(12).text(`TOPLAM: ${net.toFixed(2)} TL`, { width: contentWidth, align: 'right' })
+  doc.fontSize(12)
+  const totalY = doc.y
+  const totalLabel = 'TOPLAM:'
+  const totalValue = `${net.toFixed(2)}\u00A0TL`
+  const totalLabelH = doc.heightOfString(totalLabel, { width: leftWidth, align: 'right', lineBreak: false })
+  const totalValueH = doc.heightOfString(totalValue, { width: rightWidth, align: 'right', lineBreak: false })
+  doc.text(totalLabel, leftX, totalY, { width: leftWidth, align: 'right', lineBreak: false })
+  doc.text(totalValue, rightX, totalY, { width: rightWidth, align: 'right', lineBreak: false })
+  doc.y = totalY + Math.max(totalLabelH, totalValueH) + 2
   useFont(doc, 'tr')
 
   if (process.env.NODE_ENV !== 'production') {

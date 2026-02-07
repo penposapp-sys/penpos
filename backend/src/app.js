@@ -25,6 +25,8 @@ import paymentsRouter from './routes/payments.js'
 import accountsRouter from './routes/accounts.js'
 import settingsProductsRouter from './routes/settingsProducts.js'
 import settingsLogoRouter from './routes/settingsLogo.js'
+import settingsMenuRouter from './routes/settingsMenu.js'
+import userPreferencesRouter from './routes/userPreferences.js'
 import printingRouter from './routes/printing.js'
 import { sendError } from './utils/errors.js'
 import debugRouter from './routes/debug.js'
@@ -152,7 +154,9 @@ export const createServer = () => {
   app.use('/api/payments', paymentsRouter)
   app.use('/api/printing', printingRouter)
   app.use('/api/settings/products', settingsProductsRouter)
+  app.use('/api/settings/menu', settingsMenuRouter)
   app.use('/api/settings', settingsLogoRouter)
+  app.use('/api/user/preferences', userPreferencesRouter)
   app.use('/api/canteen', canteenRouter)
   try {
     const routes = (canteenRouter.stack || [])
