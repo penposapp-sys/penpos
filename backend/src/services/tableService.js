@@ -3,6 +3,7 @@ import { listTables, createTable, confirmNameAvailable, updateById, findByIdAndT
 import { createOrder } from '../repositories/orderRepository.js'
 import Table from '../models/Table.js'
 import Order from '../models/Order.js'
+import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { getTenantPlan, ensureNotExpired } from './planService.js'
 import mongoose from 'mongoose'
 import { applyBranchFilter } from '../utils/branchFilter.js'
@@ -227,8 +228,9 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
     const e = new Error('Table not closable')
     e.status = 409
     e.payload = {
-      code: 'table_not_closable',
-      message: 'Table has no active order',
+      error: 'conflict',
+      code: (t.status === 'empty' ? 'already_closed' : 'no_active_order'),
+      message: (t.status === 'empty' ? 'Masa zaten kapalı' : 'Masada aktif sipariş yok'),
       details: { status: null }
     }
     throw e
@@ -240,24 +242,25 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
     const e = new Error('Table not closable')
     e.status = 409
     e.payload = {
-      code: 'table_not_closable',
-      message: 'Table has unpaid or invalid order',
+      error: 'conflict',
+      code: 'no_active_order',
+      message: 'Masada aktif sipariş bulunamadı',
       details: { status: null, paymentStatus: null, remaining: null }
     }
     throw e
   }
 
-  const paidTotal = (order.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0)
-  const grandTotal = order.totals?.grandTotal || 0
-  const remaining = Math.max(0, grandTotal - paidTotal)
+  const fin = computePaymentSummary(order)
+  const remaining = Number(fin.balanceDue) || 0
   const hasLegacyPaid = (!order.payments || order.payments.length === 0) && order.paymentStatus === 'paid'
 
   if (remaining > 0.01 && !hasLegacyPaid) {
     const e = new Error('Table not closable')
     e.status = 409
     e.payload = {
-      code: 'table_not_closable',
-      message: 'Table has unpaid or invalid order',
+      error: 'conflict',
+      code: 'remaining_unsettled',
+      message: 'Kalan tutar var, masa kapatılamaz',
       details: { status: order.status || null, paymentStatus: order.paymentStatus || null, remaining }
     }
     throw e
@@ -269,8 +272,9 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
     const e = new Error('Kitchen not finished')
     e.status = 409
     e.payload = {
-      code: 'table_not_closable',
-      message: 'Kitchen not finished',
+      error: 'conflict',
+      code: 'kitchen_not_completed',
+      message: 'Mutfak tamamlanmadı',
       details: { status: order.status, hasPendingItems: true }
     }
     throw e

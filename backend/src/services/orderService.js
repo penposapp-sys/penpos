@@ -11,6 +11,7 @@ import { isMongoTransactionsSupported } from '../config/db.js'
 import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
+import { computePaymentSummary } from '../utils/orderFinancial.js'
 
 const toMoney = (v) => {
   const n = Number(v)
@@ -43,28 +44,6 @@ const normalizeLegacyItemStatuses = (order) => {
     const normalized = s === 'preparing' ? 'sent' : (s === 'ready' ? 'completed' : s)
     return { ...it, status: normalized }
   })
-}
-
-const computePaymentSummary = (order) => {
-  if (!order) {
-    return { total: 0, discountTotal: 0, netTotal: 0, paidTotal: 0, balanceDue: 0 }
-  }
-  const items = Array.isArray(order.items) ? order.items : []
-  const total = items
-    .filter(it => it && it.status !== 'cancelled')
-    .reduce((sum, it) => sum + toMoney(it.subtotal), 0)
-  const discountPercent = Math.max(0, Math.min(100, toMoney(order.discountPercent)))
-  const discountTotal = toMoney((total * discountPercent) / 100)
-  const netTotal = toMoney(Math.max(0, total - discountTotal))
-  const payments = Array.isArray(order.payments) ? order.payments : []
-  const paidTotal = payments.reduce((sum, p) => {
-    const amount = toMoney(p && p.amount)
-    return sum + amount
-  }, 0)
-  const veresiyePaid = order.settlementType === 'veresiye' ? toMoney(order.veresiyeAmount) : 0
-  const paid = toMoney(paidTotal + veresiyePaid)
-  const balanceDue = toMoney(Math.max(0, netTotal - paid))
-  return { total, discountTotal, netTotal, paidTotal: paid, balanceDue }
 }
 
 const normalizeOpenDuplicatesForResponse = (items) => {
@@ -430,7 +409,36 @@ export const getDeliveryOrdersService = async (tenantId, branchFilter, { status,
 export const getOrderService = async (tenantId, id) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  const obj = decorateOrder(order)
+  const rawCollections = await AccountTransaction.find({
+    tenantId,
+    branchId: order.branchId,
+    orderId: order._id,
+    source: 'collection',
+    type: 'credit',
+    isDeleted: { $ne: true }
+  }).sort({ createdAt: -1 }).lean()
+
+  const accountIds = Array.from(new Set((rawCollections || []).map(t => String(t?.accountId || '')).filter(Boolean)))
+  const accounts = accountIds.length > 0
+    ? await CustomerAccount.find({ tenantId, branchId: order.branchId, _id: { $in: accountIds } }).select('_id name').lean()
+    : []
+  const accountNameById = new Map((accounts || []).map(a => [String(a?._id), String(a?.name || '').trim()]))
+
+  const linkedCollections = (rawCollections || []).map((t) => ({
+    id: String(t?._id),
+    amount: Number(t?.amount) || 0,
+    method: String(t?.method || 'other'),
+    note: String(t?.note || ''),
+    accountId: String(t?.accountId || ''),
+    accountName: accountNameById.get(String(t?.accountId || '')) || '',
+    createdAt: t?.createdAt || null,
+    source: 'collection'
+  }))
+
+  const obj = decorateOrder({
+    ...(typeof order.toObject === 'function' ? order.toObject({ virtuals: true }) : { ...order }),
+    collectionEntries: linkedCollections
+  })
   const actor = await User.findById(obj.createdBy).select('name').lean()
   const createdByUser = actor ? { id: String(obj.createdBy), name: actor.name } : { id: String(obj.createdBy), name: '' }
   const normalizedItems = normalizeOpenDuplicatesForResponse(obj.items)
@@ -462,6 +470,8 @@ export const getOrderService = async (tenantId, id) => {
     veresiyeAmount: obj.veresiyeAmount,
     veresiyeNote: obj.veresiyeNote,
     veresiyeAt: obj.veresiyeAt,
+    veresiyeEntries: obj.veresiyeEntries || [],
+    linkedCollections,
     orderNo: obj.orderNo ?? null,
     orderDayKey: obj.orderDayKey || '',
     createdBy: obj.createdBy,
@@ -1211,33 +1221,48 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
   if (['closed', 'cancelled', 'merged'].includes(order.status)) {
-    const e = new Error('Order is not editable')
+    const e = new Error('Order closed')
     e.status = 409
-    e.payload = { code: 'order_not_editable', message: 'Order is not editable' }
-    throw e
-  }
-  if (order.settlementType === 'veresiye') {
-    const e = new Error('Order already settled')
-    e.status = 409
-    e.payload = { code: 'already_settled', message: 'Order already settled' }
+    e.payload = { error: 'conflict', code: 'order_closed', message: 'Sipariş kapalı' }
     throw e
   }
 
   const finBefore = computePaymentSummary(order)
   if (finBefore.balanceDue <= 0.01) {
-    throw error('nothing_to_settle', 'Nothing to settle', 400)
+    const e = new Error('Remaining is zero')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'remaining_zero', message: 'Kalan tutar 0, veresiye yapılamaz.' }
+    throw e
   }
 
-  const settleAmount = amount !== undefined && amount !== null && Number(amount) > 0 ? Number(amount) : finBefore.balanceDue
+  const hasBodyAmount = amount !== undefined && amount !== null && String(amount).trim() !== ''
+  const settleAmount = hasBodyAmount ? Number(amount) : finBefore.balanceDue
   if (!Number.isFinite(settleAmount) || settleAmount <= 0) {
-    throw error('invalid_amount', 'Invalid amount', 400)
+    const e = new Error('Invalid amount')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'invalid_amount', message: 'Geçersiz tutar' }
+    throw e
+  }
+  if (settleAmount - finBefore.balanceDue > 0.01) {
+    const e = new Error('Amount exceeds remaining')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'amount_exceeds_remaining', message: 'Girilen tutar kalan tutardan büyük.' }
+    throw e
   }
   if (!mongoose.Types.ObjectId.isValid(accountId)) {
-    throw error('invalid_request', 'Invalid accountId', 400)
+    const e = new Error('Invalid account')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'invalid_account', message: 'Cari seçimi geçersiz.' }
+    throw e
   }
 
   const acc = await CustomerAccount.findOne({ _id: accountId, tenantId, branchId, isActive: true })
-  if (!acc) throw error('not_found', 'Account not found', 404)
+  if (!acc) {
+    const e = new Error('Invalid account')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'invalid_account', message: 'Cari bulunamadı veya pasif.' }
+    throw e
+  }
 
   const now = new Date()
   const verNote = String(note || '').trim()
@@ -1266,9 +1291,23 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
           }
         ], { session })
 
-        order.settlementType = 'veresiye'
+        const entries = Array.isArray(order.veresiyeEntries) ? order.veresiyeEntries : []
+        if (entries.length === 0 && order.settlementType === 'veresiye' && Number(order.veresiyeAmount || 0) > 0) {
+          const legacyAccId = order.veresiyeAccountId || acc.id
+          entries.push({
+            accountId: legacyAccId,
+            accountName: String(acc?.name || '').trim(),
+            amount: Number(order.veresiyeAmount || 0),
+            note: String(order.veresiyeNote || '').trim(),
+            createdBy: actorUserId,
+            createdAt: order.veresiyeAt || now
+          })
+        }
+        entries.push({ accountId: acc.id, accountName: String(acc?.name || '').trim(), amount: settleAmount, note: verNote, createdBy: actorUserId, createdAt: now })
+        order.veresiyeEntries = entries
+        order.veresiyeAmount = entries.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0)
+        order.settlementType = order.veresiyeAmount > 0 ? 'veresiye' : 'none'
         order.veresiyeAccountId = acc.id
-        order.veresiyeAmount = settleAmount
         order.veresiyeNote = verNote
         order.veresiyeAt = now
 
@@ -1302,9 +1341,23 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
         orderId: order.id
       })
 
-      order.settlementType = 'veresiye'
+      const entries = Array.isArray(order.veresiyeEntries) ? order.veresiyeEntries : []
+      if (entries.length === 0 && order.settlementType === 'veresiye' && Number(order.veresiyeAmount || 0) > 0) {
+        const legacyAccId = order.veresiyeAccountId || acc.id
+        entries.push({
+          accountId: legacyAccId,
+          accountName: String(acc?.name || '').trim(),
+          amount: Number(order.veresiyeAmount || 0),
+          note: String(order.veresiyeNote || '').trim(),
+          createdBy: actorUserId,
+          createdAt: order.veresiyeAt || now
+        })
+      }
+      entries.push({ accountId: acc.id, accountName: String(acc?.name || '').trim(), amount: settleAmount, note: verNote, createdBy: actorUserId, createdAt: now })
+      order.veresiyeEntries = entries
+      order.veresiyeAmount = entries.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0)
+      order.settlementType = order.veresiyeAmount > 0 ? 'veresiye' : 'none'
       order.veresiyeAccountId = acc.id
-      order.veresiyeAmount = settleAmount
       order.veresiyeNote = verNote
       order.veresiyeAt = now
 
@@ -1334,6 +1387,220 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
   await (await import('./auditService.js')).log(tenantId, actorUserId, 'order_veresiye', 'Order', order.id, { accountId: acc.id, amount: settleAmount })
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }
+}
+
+export const deleteOrderVeresiyeEntryService = async (tenantId, branchId, actorUserId, orderId, entryId) => {
+  const order = await findByIdAndTenant(orderId, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+  if (['closed', 'cancelled', 'merged'].includes(order.status)) {
+    const e = new Error('Order closed')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'order_closed', message: 'Sipariş kapalı' }
+    throw e
+  }
+
+  const entries = Array.isArray(order.veresiyeEntries) ? order.veresiyeEntries : []
+  const idx = entries.findIndex(e => String(e?._id) === String(entryId))
+  if (idx === -1) throw error('not_found', 'Veresiye entry not found', 404)
+
+  const removed = entries[idx]
+  const amount = Number(removed?.amount) || 0
+  const accountId = removed?.accountId
+  if (!accountId || !mongoose.Types.ObjectId.isValid(String(accountId)) || amount <= 0) {
+    throw error('invalid_request', 'Invalid veresiye entry', 400)
+  }
+
+  const acc = await CustomerAccount.findOne({ _id: accountId, tenantId, branchId, isActive: true })
+  if (!acc) {
+    const e = new Error('Invalid account')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'invalid_account', message: 'Cari bulunamadı veya pasif.' }
+    throw e
+  }
+
+  const now = new Date()
+  const txnSupported = isMongoTransactionsSupported()
+  const applyOrderUpdate = async (session) => {
+    const list = Array.isArray(order.veresiyeEntries) ? order.veresiyeEntries : []
+    const i = list.findIndex(e => String(e?._id) === String(entryId))
+    if (i === -1) throw error('not_found', 'Veresiye entry not found', 404)
+    list.splice(i, 1)
+    order.veresiyeEntries = list
+    order.veresiyeAmount = list.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0)
+    order.settlementType = order.veresiyeAmount > 0 ? 'veresiye' : 'none'
+    if (order.veresiyeAmount <= 0) {
+      order.veresiyeAccountId = null
+      order.veresiyeNote = ''
+      order.veresiyeAt = null
+    }
+    const finAfter = computePaymentSummary(order)
+    if (finAfter.netTotal > 0 && finAfter.balanceDue <= 0.01) {
+      order.paymentStatus = 'paid'
+      order.paidAt = order.paidAt || now
+    } else {
+      order.paymentStatus = 'unpaid'
+      order.paidAt = null
+    }
+    if (session) await order.save({ session })
+    else await order.save()
+  }
+
+  if (txnSupported) {
+    const session = await mongoose.startSession()
+    try {
+      await session.withTransaction(async () => {
+        await CustomerAccount.updateOne(
+          { _id: acc.id, tenantId, branchId },
+          { $inc: { balance: -amount } },
+          { session }
+        )
+        await AccountTransaction.create([
+          {
+            tenantId,
+            branchId,
+            accountId: acc.id,
+            type: 'credit',
+            amount,
+            method: 'other',
+            note: `Veresiye silindi${removed?.note ? `: ${String(removed.note).trim()}` : ''}`,
+            source: 'order_veresiye_delete',
+            orderId: order.id
+          }
+        ], { session })
+        await applyOrderUpdate(session)
+      })
+    } finally {
+      await session.endSession().catch(() => {})
+    }
+  } else {
+    await CustomerAccount.updateOne({ _id: acc.id, tenantId, branchId }, { $inc: { balance: -amount } })
+    await AccountTransaction.create({
+      tenantId,
+      branchId,
+      accountId: acc.id,
+      type: 'credit',
+      amount,
+      method: 'other',
+      note: `Veresiye silindi${removed?.note ? `: ${String(removed.note).trim()}` : ''}`,
+      source: 'order_veresiye_delete',
+      orderId: order.id
+    })
+    await applyOrderUpdate(undefined)
+  }
+
+  await (await import('./auditService.js')).log(tenantId, actorUserId, 'order_veresiye_delete', 'Order', order.id, { entryId: String(entryId), amount })
+  const fresh = await Order.findById(order.id).lean()
+  return { order: decorateOrder(fresh) }
+}
+
+export const deleteOrderCollectionTransactionService = async (tenantId, orderId, txId) => {
+  if (!mongoose.Types.ObjectId.isValid(String(orderId))) {
+    throw error('invalid_request', 'Invalid orderId', 400)
+  }
+  if (!mongoose.Types.ObjectId.isValid(String(txId))) {
+    throw error('invalid_request', 'Invalid transaction id', 400)
+  }
+
+  const order = await findByIdAndTenant(orderId, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+
+  if (['closed', 'cancelled', 'merged'].includes(order.status)) {
+    const e = new Error('Order is not editable')
+    e.status = 409
+    e.payload = { error: 'conflict', code: 'order_not_editable', message: 'Order is not editable' }
+    throw e
+  }
+
+  const branchId = order.branchId
+  if (!branchId) throw error('invalid_request', 'Order branch required', 400)
+
+  const computeAccountBalance = async (accountId, session) => {
+    const cursor = AccountTransaction.aggregate([
+      {
+        $match: {
+          tenantId: new mongoose.Types.ObjectId(tenantId),
+          branchId: new mongoose.Types.ObjectId(branchId),
+          accountId: new mongoose.Types.ObjectId(accountId),
+          isDeleted: { $ne: true }
+        }
+      },
+      { $group: { _id: '$type', sum: { $sum: '$amount' } } }
+    ])
+    if (session) cursor.session(session)
+    const rows = await cursor
+    const debit = rows.find(r => r._id === 'debit')?.sum || 0
+    const credit = rows.find(r => r._id === 'credit')?.sum || 0
+    return toMoney(debit) - toMoney(credit)
+  }
+
+  const runFallback = async () => {
+    const tx = await AccountTransaction.findOne({ _id: txId, tenantId, branchId })
+    if (!tx) throw error('not_found', 'Transaction not found', 404)
+    if (tx.isDeleted) throw error('already_deleted', 'Transaction already deleted', 409)
+    if (!(tx.source === 'collection' && tx.type === 'credit')) {
+      throw error('invalid_request', 'Only collection transactions can be deleted', 409)
+    }
+    if (String(tx.orderId || '') !== String(order._id)) {
+      throw error('payment_locked', 'Bu tahsilat bu siparişe bağlı değil', 409)
+    }
+
+    const deletedTx = await AccountTransaction.findOneAndUpdate(
+      { _id: txId, tenantId, branchId, isDeleted: false },
+      { $set: { isDeleted: true, deletedAt: new Date() } },
+      { new: true }
+    )
+    if (!deletedTx) throw error('already_deleted', 'Transaction already deleted', 409)
+
+    const nextBalance = await computeAccountBalance(tx.accountId)
+    const acc = await CustomerAccount.findOneAndUpdate(
+      { _id: tx.accountId, tenantId, branchId },
+      { $set: { balance: nextBalance } },
+      { new: true }
+    )
+    if (!acc) throw error('account_not_found_after_delete', 'Account not found', 409)
+
+    const dto = await getOrderService(tenantId, orderId)
+    return { success: true, order: dto, txId: deletedTx.id, accountId: acc.id }
+  }
+
+  const supported = isMongoTransactionsSupported()
+  if (!supported) return runFallback()
+
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const tx = await AccountTransaction.findOne({ _id: txId, tenantId, branchId }).session(session)
+      if (!tx) throw error('not_found', 'Transaction not found', 404)
+      if (tx.isDeleted) throw error('already_deleted', 'Transaction already deleted', 409)
+      if (!(tx.source === 'collection' && tx.type === 'credit')) {
+        throw error('invalid_request', 'Only collection transactions can be deleted', 409)
+      }
+      if (String(tx.orderId || '') !== String(order._id)) {
+        throw error('payment_locked', 'Bu tahsilat bu siparişe bağlı değil', 409)
+      }
+
+      const acc = await CustomerAccount.findOne({ _id: tx.accountId, tenantId, branchId }).session(session)
+      if (!acc) throw error('not_found', 'Account not found', 404)
+
+      tx.isDeleted = true
+      tx.deletedAt = new Date()
+      await tx.save({ session })
+
+      acc.balance = await computeAccountBalance(tx.accountId, session)
+      await acc.save({ session })
+    })
+  } catch (err) {
+    const msg = String(err?.message || '')
+    if (msg.includes('Transaction numbers are only allowed')) {
+      return runFallback()
+    }
+    throw err
+  } finally {
+    await session.endSession().catch(() => {})
+  }
+
+  const dto = await getOrderService(tenantId, orderId)
+  return { success: true, order: dto, txId: String(txId) }
 }
 
 export const payOrderService = async (tenantId, id, paymentMethod, amount) => {

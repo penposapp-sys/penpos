@@ -37,9 +37,18 @@ export const useSafeOrderActions = ({
       const map = {
         table_in_use: 'Bu masada zaten aktif sipariş var. Liste yenilendi.',
         order_not_editable: 'Bu sipariş artık düzenlenemez. Liste yenilendi.',
+        order_closed: 'Sipariş kapalı. Liste yenilendi.',
         invalid_state: 'İşlem yapılamadı (durum uyuşmuyor). Liste yenilendi.',
         item_already_cancelled: 'Ürün zaten iptal edilmiş. Liste yenilendi.',
-        item_already_completed: 'Ürün zaten hazır. Liste yenilendi.'
+        item_already_completed: 'Ürün zaten hazır. Liste yenilendi.',
+        remaining_zero: 'Kalan tutar 0, veresiye yapılamaz.',
+        amount_exceeds_remaining: 'Girilen tutar kalan tutardan büyük.',
+        invalid_account: 'Cari seçimi geçersiz.',
+        payment_locked: 'Bu tahsilat silinemez.',
+        remaining_unsettled: 'Kalan tutar var, masa kapatılamaz.',
+        kitchen_not_completed: 'Mutfak tamamlanmadı, masa kapatılamaz.',
+        no_active_order: 'Masada aktif sipariş yok. Liste yenilendi.',
+        already_closed: 'Masa zaten kapalı. Liste yenilendi.'
       }
       return map[code] || 'İşlem yapılamadı. Liste yenilendi.'
     }

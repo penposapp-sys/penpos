@@ -1,5 +1,5 @@
 import { sendError, error } from '../utils/errors.js'
-import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, getWalkInOrdersService, setKitchenModeService } from '../services/orderService.js'
+import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService } from '../services/orderService.js'
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
@@ -325,7 +325,7 @@ export const setDiscount = async (req, res) => {
 
 export const veresiye = async (req, res) => {
   try {
-    const branchId = req.user?.branchId
+    const branchId = req.branch?.id || req.branchId || req.user?.branchId
     if (!branchId) {
       try {
         logger.warn('MISSING_BRANCH', { userId: req.user?.id || null, tenantId: req.user?.tenantId || null, route: req.path })
@@ -339,6 +339,30 @@ export const veresiye = async (req, res) => {
     const { accountId, amount, note } = req.body || {}
     const { order } = await setOrderVeresiyeService(req.user.tenantId, branchId, req.user.id, id, { accountId, amount, note })
     res.json({ success: true, order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const deleteVeresiye = async (req, res) => {
+  try {
+    const branchId = req.branch?.id || req.branchId || req.user?.branchId
+    if (!branchId) {
+      return res.status(403).json({ status: 403, code: 'missing_branch', message: 'Branch required' })
+    }
+    const { id, entryId } = req.params
+    const { order } = await deleteOrderVeresiyeEntryService(req.user.tenantId, branchId, req.user.id, id, entryId)
+    res.json({ success: true, order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const deleteCollection = async (req, res) => {
+  try {
+    const { id, txId } = req.params
+    const result = await deleteOrderCollectionTransactionService(req.user.tenantId, id, txId)
+    res.json({ success: true, order: result?.order || null })
   } catch (err) {
     sendError(res, err)
   }

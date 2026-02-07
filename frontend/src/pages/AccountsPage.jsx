@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
@@ -11,8 +11,19 @@ import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 
 export default function AccountsPage() {
   const nav = useNavigate()
+  const loc = useLocation()
   const { isMobilePortrait } = useResponsiveFlags()
   const { user, logout, allowedBranchIds } = useAuth()
+
+  const orderIdFromUrl = useMemo(() => {
+    try {
+      const qs = new URLSearchParams(String(loc?.search || ''))
+      const v = String(qs.get('orderId') || '').trim()
+      return v || ''
+    } catch {
+      return ''
+    }
+  }, [loc?.search])
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canManage = hasPerm('manage_accounts') || hasPerm('accounts_manage')
   const canCollect = hasPerm('collect_debt')
@@ -258,7 +269,7 @@ export default function AccountsPage() {
     try {
       await api(`/api/accounts/${selected.id}/collect`, {
         method: 'POST',
-        body: JSON.stringify({ amount: amt, method: collectForm.method, note: collectForm.note })
+        body: JSON.stringify({ amount: amt, method: collectForm.method, note: collectForm.note, orderId: orderIdFromUrl || undefined })
       })
       setCollectOpen(false)
       setCollectForm({ amount: '', method: 'cash', note: '' })

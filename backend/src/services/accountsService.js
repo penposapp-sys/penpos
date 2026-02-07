@@ -300,6 +300,7 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
   if (amount <= 0) throw error('invalid_amount', 'Invalid amount', 400)
   const method = ['cash', 'card', 'transfer', 'other'].includes(body.method) ? body.method : 'cash'
   const note = String(body.note || '').trim()
+  const orderId = body?.orderId && mongoose.Types.ObjectId.isValid(String(body.orderId)) ? new mongoose.Types.ObjectId(String(body.orderId)) : null
 
   const acc = await CustomerAccount.findOneAndUpdate(
     { _id: id, tenantId, branchId },
@@ -317,7 +318,7 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
     method,
     note,
     source: 'collection',
-    orderId: null
+    orderId
   })
 
   await auditLog(tenantId, actorUserId, 'cari_tahsilat', 'CustomerAccount', acc.id, { amount, method })

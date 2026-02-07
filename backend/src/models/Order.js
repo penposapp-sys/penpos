@@ -32,6 +32,18 @@ const kitchenBatchSchema = new mongoose.Schema(
   { _id: false }
 )
 
+const veresiyeEntrySchema = new mongoose.Schema(
+  {
+    accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomerAccount', required: true },
+    accountName: { type: String, default: '' },
+    amount: { type: Number, required: true, min: 0 },
+    note: { type: String, default: '' },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    createdAt: { type: Date, default: null }
+  },
+  { timestamps: false }
+)
+
 const orderSchema = new mongoose.Schema(
   {
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
@@ -59,6 +71,7 @@ const orderSchema = new mongoose.Schema(
     veresiyeAmount: { type: Number, default: 0, min: 0 },
     veresiyeNote: { type: String, default: '' },
     veresiyeAt: { type: Date, default: null },
+    veresiyeEntries: { type: [veresiyeEntrySchema], default: [] },
     mergedIntoOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     mergeSourceOrderIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
     saleType: { type: String, enum: ['table', 'walkin', 'delivery'], default: 'table' },

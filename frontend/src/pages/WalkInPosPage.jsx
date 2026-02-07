@@ -695,31 +695,44 @@ export default function WalkInPosPage() {
       return
     }
     setVeresiyeBranchError('')
-    try {
-      const res = await api(`/api/pos/orders/${currentOrderId}/veresiye`, {
-        method: 'POST',
-        data: {
-          accountId: selectedAccount.id,
-          amount: veresiyeAmount ? Number(veresiyeAmount) : undefined,
-          note: veresiyeNote
-        },
-        silent: true
-      })
-      const fresh = pickOrder(res)
-      if (fresh) {
-        setOrder(fresh)
-        setNote(fresh.note || '')
-        setVeresiyeOpen(false)
-      }
-    } catch (err) {
-      const code = err?.data?.code || err?.data?.error || err?.code
-      if (err?.status === 403 && code === 'missing_branch') {
-        const msg = 'Şube seçimi gerekli. Çıkış yapıp tekrar giriş yapın veya admin’den şube yetkisi isteyin.'
-        setVeresiyeBranchError(msg)
-        toast.error(msg)
-        return
-      }
-      toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
+
+    const rawAmount = String(veresiyeAmount || '').trim()
+    const parsedAmount = rawAmount ? Number(rawAmount) : NaN
+    const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined
+
+    const payload = { accountId: selectedAccount.id, note: veresiyeNote }
+    if (amount !== undefined) payload.amount = amount
+
+    const res = await safeAction((signal) => api(`/api/pos/orders/${currentOrderId}/veresiye`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal,
+      silent: true
+    }))
+    const fresh = pickOrder(res)
+    if (fresh) {
+      setNote(fresh.note || '')
+      setVeresiyeOpen(false)
+    }
+  }
+
+  const deleteVeresiyeEntry = async (entryId) => {
+    const currentOrderId = order?._id || order?.id || selectedOrderId
+    if (!currentOrderId || !entryId) return
+    const res = await safeAction((signal) => api(`/api/pos/orders/${currentOrderId}/veresiye/${entryId}`, { method: 'DELETE', signal, silent: true }))
+    const fresh = pickOrder(res)
+    if (fresh) {
+      setNote(fresh.note || '')
+    }
+  }
+
+  const deleteCollection = async (txId) => {
+    const currentOrderId = order?._id || order?.id || selectedOrderId
+    if (!currentOrderId || !txId) return
+    const res = await safeAction((signal) => api(`/api/pos/orders/${currentOrderId}/collections/${txId}`, { method: 'DELETE', signal, silent: true }))
+    const fresh = pickOrder(res)
+    if (fresh) {
+      setNote(fresh.note || '')
     }
   }
 
@@ -769,6 +782,52 @@ export default function WalkInPosPage() {
     : (paymentMethod === 'cash'
       ? Math.max(0, (cashPaidTotal + tenderedCash) - netTotal)
       : 0)
+
+  const previousLines = useMemo(() => {
+    const out = []
+    const payments = Array.isArray(order?.payments) ? order.payments : []
+    for (const p of payments) {
+      out.push({
+        kind: 'payment',
+        id: String(p?._id || p?.id || ''),
+        createdAt: p?.createdAt || p?.paidAt || null,
+        amount: Number(p?.amount || 0) || 0,
+        label: trPaymentMethodLabel(p?.method),
+        note: String(p?.note || ''),
+        accountName: '',
+        canDelete: !!canTakePayment
+      })
+    }
+    const ver = Array.isArray(order?.veresiyeEntries) ? order.veresiyeEntries : []
+    for (const v of ver) {
+      out.push({
+        kind: 'veresiye',
+        id: String(v?._id || v?.id || ''),
+        createdAt: v?.createdAt || null,
+        amount: Number(v?.amount || 0) || 0,
+        label: 'Veresiye',
+        note: String(v?.note || ''),
+        accountName: String(v?.accountName || '-'),
+        canDelete: !!canCreateVeresiye
+      })
+    }
+    const col = Array.isArray(order?.linkedCollections) ? order.linkedCollections : []
+    for (const c of col) {
+      out.push({
+        kind: 'collection',
+        id: String(c?.id || c?._id || ''),
+        createdAt: c?.createdAt || null,
+        amount: Number(c?.amount || 0) || 0,
+        label: 'Cari Tahsilat',
+        note: String(c?.note || ''),
+        accountName: String(c?.accountName || '-'),
+        canDelete: !!canTakePayment
+      })
+    }
+    return out
+      .filter(x => x.id)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+  }, [order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye])
 
   const uiStatusLabels = {
     waiting: 'Bekliyor',
@@ -1416,31 +1475,36 @@ export default function WalkInPosPage() {
           </div>
         </div>
 
-        {(order?.payments || []).length > 0 && (
+        {previousLines.length > 0 && (
           <div className="card" style={{ borderColor: 'var(--border)' }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Önceki Ödemeler</div>
             <div style={{ display: 'grid', gap: 8 }}>
-              {order.payments.map((p) => (
-                <div key={p._id || p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              {previousLines.map((r) => (
+                <div key={`${r.kind}:${r.id}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <div style={{ display: 'grid' }}>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(p.createdAt || p.paidAt || Date.now()).toLocaleString()}</div>
-                    <div style={{ fontWeight: 600 }}>{p.amount} TL • {trPaymentMethodLabel(p.method)}</div>
-                    {!!p.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.note}</div>}
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
+                    <div style={{ fontWeight: 600 }}>
+                      {Number(r.amount || 0).toFixed(2)} TL • {r.label}
+                      {(r.accountName && r.accountName !== '-') ? ` • ${r.accountName}` : ''}
+                    </div>
+                    {!!r.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div>}
                   </div>
-                  {canTakePayment && (
-                    <button className="btn" onClick={() => deletePayment(p._id || p.id)} disabled={busy}>
+                  {r.canDelete && (
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        if (r.kind === 'payment') return deletePayment(r.id)
+                        if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
+                        if (r.kind === 'collection') return deleteCollection(r.id)
+                      }}
+                      disabled={busy}
+                    >
                       Sil
                     </button>
                   )}
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {order?.settlementType === 'veresiye' && (
-          <div className="card" style={{ borderColor: 'var(--border)' }}>
-            <div style={{ fontWeight: 600 }}>Ödendi (Veresiye)</div>
           </div>
         )}
 

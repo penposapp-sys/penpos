@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
@@ -11,6 +11,16 @@ import ConfirmModal from '../components/ConfirmModal.jsx'
 export default function AccountDetailPage() {
   const nav = useNavigate()
   const { id } = useParams()
+  const loc = useLocation()
+  const orderIdFromUrl = useMemo(() => {
+    try {
+      const qs = new URLSearchParams(String(loc?.search || ''))
+      const v = String(qs.get('orderId') || '').trim()
+      return v || ''
+    } catch {
+      return ''
+    }
+  }, [loc?.search])
   const { isMobilePortrait } = useResponsiveFlags()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -134,7 +144,7 @@ export default function AccountDetailPage() {
     try {
       await api(`/api/accounts/${accountId}/collect`, {
         method: 'POST',
-        body: JSON.stringify({ amount: amt, method: collectForm.method, note: collectForm.note })
+        body: JSON.stringify({ amount: amt, method: collectForm.method, note: collectForm.note, orderId: orderIdFromUrl || undefined })
       })
       toast.success('Tahsilat kaydedildi')
       setCollectOpen(false)

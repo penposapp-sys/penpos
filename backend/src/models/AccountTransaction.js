@@ -9,7 +9,7 @@ const accountTransactionSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     method: { type: String, enum: ['cash', 'card', 'transfer', 'other'], default: 'other' },
     note: { type: String, default: '' },
-    source: { type: String, enum: ['order_veresiye', 'collection', 'manual'], required: true },
+    source: { type: String, enum: ['order_veresiye', 'order_veresiye_delete', 'collection', 'manual'], required: true },
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null }
