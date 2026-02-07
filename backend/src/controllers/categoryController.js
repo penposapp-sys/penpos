@@ -1,0 +1,38 @@
+import { listCategories, createCategoryService, updateCategoryService, deleteCategoryService } from '../services/categoryService.js'
+import { sendError } from '../utils/errors.js'
+
+export const list = async (req, res) => {
+  try {
+    const items = await listCategories(req.user.tenantId, req.query || {})
+    res.json({ categories: items })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const create = async (req, res) => {
+  try {
+    const item = await createCategoryService(req.user.tenantId, req.body || {})
+    res.json({ category: item })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const update = async (req, res) => {
+  try {
+    const item = await updateCategoryService(req.user.tenantId, req.params.id, req.body || {})
+    res.json({ category: item })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const remove = async (req, res) => {
+  try {
+    const result = await deleteCategoryService(req.user.tenantId, req.user.id, req.params.id)
+    res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+}

@@ -1,0 +1,22 @@
+import mongoose from 'mongoose'
+
+const accountTransactionSchema = new mongoose.Schema(
+  {
+    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
+    accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomerAccount', required: true, index: true },
+    type: { type: String, enum: ['debit', 'credit'], required: true },
+    amount: { type: Number, required: true, min: 0 },
+    method: { type: String, enum: ['cash', 'card', 'transfer', 'other'], default: 'other' },
+    note: { type: String, default: '' },
+    source: { type: String, enum: ['order_veresiye', 'collection', 'manual'], required: true },
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null }
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+)
+
+accountTransactionSchema.index({ tenantId: 1, branchId: 1, accountId: 1, createdAt: -1 })
+
+export default mongoose.model('AccountTransaction', accountTransactionSchema)

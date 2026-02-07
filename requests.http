@@ -1,0 +1,377 @@
+### Login as superadmin
+POST http://localhost:4000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+
+### Get me
+GET http://localhost:4000/api/auth/me
+Authorization: Bearer {{token}}
+
+### List tenants
+GET http://localhost:4000/api/superadmin/tenants
+Authorization: Bearer {{token}}
+
+### Create tenant
+POST http://localhost:4000/api/superadmin/tenants
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Pendik Sofrası",
+  "slug": "pendik-sofrasi"
+}
+
+### Create tenant admin
+POST http://localhost:4000/api/superadmin/tenants/{{tenantId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Pendik Admin",
+  "email": "pendik.admin@example.com",
+  "password": "admin123"
+}
+
+### Tenant context (tenant_admin)
+GET http://localhost:4000/api/tenant/context
+Authorization: Bearer {{tenant_admin_token}}
+
+### List staff
+GET http://localhost:4000/api/tenant/staff
+Authorization: Bearer {{tenant_admin_token}}
+
+### Create staff
+POST http://localhost:4000/api/tenant/staff
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Garson 1",
+  "email": "garson1@example.com",
+  "password": "staff123"
+}
+
+### Update staff
+PUT http://localhost:4000/api/tenant/staff/{{staffId}}
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Garson 1",
+  "email": "garson1@example.com",
+  "isActive": true
+}
+
+### Reset staff password
+PUT http://localhost:4000/api/tenant/staff/{{staffId}}/password
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "password": "newpass123"
+}
+
+### Disable staff
+DELETE http://localhost:4000/api/tenant/staff/{{staffId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### Update tenant profile
+PUT http://localhost:4000/api/tenant/profile
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Pendik Sofrası",
+  "description": "Aile restoranı"
+}
+
+### Categories - create
+POST http://localhost:4000/api/tenant/categories
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Ana Yemekler",
+  "sortOrder": 1
+}
+
+### Categories - list
+GET http://localhost:4000/api/tenant/categories?q=Ana&active=all
+Authorization: Bearer {{tenant_admin_token}}
+
+### Categories - update
+PUT http://localhost:4000/api/tenant/categories/{{categoryId}}
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Ana Yemekler",
+  "sortOrder": 2,
+  "isActive": true
+}
+
+### Categories - delete (soft)
+DELETE http://localhost:4000/api/tenant/categories/{{categoryId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### --- CANTEEN ISOLATION TESTS ---
+
+### Login as platform admin (platform token)
+POST http://localhost:4000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "platform@admin.com",
+  "password": "Admin12345!"
+}
+
+### platform token -> /api/canteen/branches => 403 forbidden_not_tenant_user
+GET http://localhost:4000/api/canteen/branches
+Authorization: Bearer {{platform_token}}
+
+### Login as kermes tenant admin (restaurant token)
+POST http://localhost:4000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "pendik.admin@example.com",
+  "password": "admin123"
+}
+
+### restaurant token -> /api/canteen/branches => 403 wrong_tenant_type
+GET http://localhost:4000/api/canteen/branches
+Authorization: Bearer {{restaurant_token}}
+
+### Login as kantin tenant admin (canteen token)
+POST http://localhost:4000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "kantin.admin@example.com",
+  "password": "kantin123"
+}
+
+### kantin token -> /api/canteen/branches => 200
+GET http://localhost:4000/api/canteen/branches
+Authorization: Bearer {{canteen_token}}
+
+### kantin token -> /api/canteen/catalog/products (x-branch-id yok) => 403 missing_branch
+GET http://localhost:4000/api/canteen/catalog/products
+Authorization: Bearer {{canteen_token}}
+
+### kantin token + x-branch-id => 200
+GET http://localhost:4000/api/canteen/catalog/products
+Authorization: Bearer {{canteen_token}}
+x-branch-id: {{canteen_branch_id}}
+
+### Categories - error name_in_use
+POST http://localhost:4000/api/tenant/categories
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Ana Yemekler",
+  "sortOrder": 1
+}
+
+### Menu Items - create
+POST http://localhost:4000/api/tenant/menu-items
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "categoryId": "{{categoryId}}",
+  "name": "Kebap",
+  "price": 250,
+  "description": "Lezzetli",
+  "imageUrl": "",
+  "sortOrder": 1
+}
+
+### Menu Items - list
+GET http://localhost:4000/api/tenant/menu-items?categoryId={{categoryId}}&q=&active=all
+Authorization: Bearer {{tenant_admin_token}}
+
+### Menu Items - update
+PUT http://localhost:4000/api/tenant/menu-items/{{itemId}}
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "categoryId": "{{categoryId}}",
+  "name": "Kebap",
+  "price": 260,
+  "description": "Usta işi",
+  "imageUrl": "",
+  "sortOrder": 2,
+  "isActive": true
+}
+
+### Menu Items - delete (soft)
+DELETE http://localhost:4000/api/tenant/menu-items/{{itemId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### Category delete error when has items
+DELETE http://localhost:4000/api/tenant/categories/{{categoryId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – create order
+POST http://localhost:4000/api/pos/orders
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – get order
+GET http://localhost:4000/api/pos/orders/{{orderId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – add item to order
+POST http://localhost:4000/api/pos/orders/{{orderId}}/items
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "menuItemId": "{{itemId}}"
+}
+
+### POS – remove item from order
+DELETE http://localhost:4000/api/pos/orders/{{orderId}}/items/{{itemId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – set note
+PUT http://localhost:4000/api/pos/orders/{{orderId}}/note
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "note": "Az acılı"
+}
+
+### POS – cancel order
+PUT http://localhost:4000/api/pos/orders/{{orderId}}/cancel
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – send to kitchen
+PUT http://localhost:4000/api/pos/orders/{{orderId}}/send
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – pay order
+PUT http://localhost:4000/api/pos/orders/{{orderId}}/pay
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash"
+}
+
+### POS – receipt DTO
+GET http://localhost:4000/api/pos/orders/{{orderId}}/receipt
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – split order (partial payment preparation)
+PUT http://localhost:4000/api/pos/orders/{{orderId}}/split
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "menuItemId": "{{itemId}}", "qty": 1 }
+  ],
+  "targetTableId": "{{emptyTableId}}"
+}
+
+### POS – transfer order to another table
+PUT http://localhost:4000/api/pos/orders/{{orderId}}/transfer
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "targetTableId": "{{targetTableId}}"
+}
+
+### Kitchen – list sent orders
+GET http://localhost:4000/api/kitchen/orders?status=sent
+Authorization: Bearer {{tenant_admin_token}}
+
+### Kitchen – complete order
+PUT http://localhost:4000/api/kitchen/orders/{{orderId}}/complete
+Authorization: Bearer {{tenant_admin_token}}
+
+### Reports – summary
+GET http://localhost:4000/api/reports/summary?from={{from}}&to={{to}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### Reports – paid orders
+GET http://localhost:4000/api/reports/orders?from={{from}}&to={{to}}&status=paid
+Authorization: Bearer {{tenant_admin_token}}
+
+### Onboarding – setup status
+GET http://localhost:4000/api/tenant/setup-status
+Authorization: Bearer {{tenant_admin_token}}
+
+### Tables – list
+GET http://localhost:4000/api/tenant/tables
+Authorization: Bearer {{tenant_admin_token}}
+
+### Tables – create
+POST http://localhost:4000/api/tenant/tables
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Masa 1"
+}
+
+### Tables – update
+PUT http://localhost:4000/api/tenant/tables/{{tableId}}
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Masa 1"
+}
+
+### Tables – delete (soft)
+DELETE http://localhost:4000/api/tenant/tables/{{tableId}}
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – start order from table
+POST http://localhost:4000/api/pos/tables/{{tableId}}/start
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – get table active order
+GET http://localhost:4000/api/pos/tables/{{tableId}}/order
+Authorization: Bearer {{tenant_admin_token}}
+
+### Audit – list with pagination
+GET http://localhost:4000/api/tenant/audit?page=1&limit=20&action=order_pay
+Authorization: Bearer {{tenant_admin_token}}
+
+### POS – merge tables (source into target)
+PUT http://localhost:4000/api/pos/tables/{{targetTableId}}/merge
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "sourceTableIds": ["{{sourceTableId1}}","{{sourceTableId2}}"]
+}
+
+### Merge errors – invalid target (empty)
+PUT http://localhost:4000/api/pos/tables/{{emptyTableId}}/merge
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "sourceTableIds": ["{{occupiedTableId}}"]
+}
+
+### Merge errors – invalid source (empty)
+PUT http://localhost:4000/api/pos/tables/{{occupiedTargetTableId}}/merge
+Authorization: Bearer {{tenant_admin_token}}
+Content-Type: application/json
+
+{
+  "sourceTableIds": ["{{emptyTableId}}"]
+}

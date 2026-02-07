@@ -1,0 +1,18 @@
+import { Router } from 'express'
+import { requireAuth } from '../middlewares/requireAuth.js'
+import { tenantGuard } from '../middlewares/tenantGuard.js'
+import { requireRole } from '../middlewares/requireRole.js'
+import { requirePermission } from '../middlewares/requirePermission.js'
+import { branchGuard } from '../middlewares/branchGuard.js'
+import { branchListGuard } from '../middlewares/branchListGuard.js'
+import * as ctrl from '../controllers/kitchenController.js'
+
+const router = Router()
+
+router.get('/orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.list)
+router.put('/orders/:id/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.complete)
+router.put('/orders/:orderId/batches/:batchId/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.batchComplete)
+router.put('/orders/:id/items/:itemId/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemComplete)
+router.put('/orders/:id/items/:itemId/cancel', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemCancel)
+
+export default router

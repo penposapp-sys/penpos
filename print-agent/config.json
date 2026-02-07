@@ -1,0 +1,9 @@
+{
+  "backendBaseUrl": "http://127.0.0.1:4000",
+  "stationId": "697e68015084d9b21cd25da8",
+  "stationSecret": "JXgcPie_cjzssodgjmYZPYHpVeOyEjVnz_0d2ycPBQk",
+  "pollIntervalMs": 1500,
+  "heartbeatIntervalMs": 5000,
+  "sumatraPath": "C:/Program Files/SumatraPDF/SumatraPDF.exe"
+}
+

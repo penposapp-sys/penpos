@@ -1,0 +1,12 @@
+{
+  "backendBaseUrl": "http://192.168.1.233:4000",
+  "stationId": "PANELDEKİ_STATION_ID",
+  "stationSecret": "PANELDEKİ_SECRET",
+  "httpPort": 17171,
+  "sumatraPath": "C:/Program Files/SumatraPDF/SumatraPDF.exe",
+  "spoolDir": "C:/ProgramData/PenPOS/PrintAgent/spool",
+  "heartbeatIntervalMs": 10000,
+  "jobPollIntervalMs": 1500,
+  "requestTimeoutMs": 20000
+}
+
