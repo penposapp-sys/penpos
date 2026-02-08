@@ -111,7 +111,7 @@ export default function App() {
           <Route
             path="platform/kermes-tenants"
             element={
-              <ProtectedRoute roles={['platform_admin']}>
+              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
                 <PlatformAdminTenants key="kermes" system="kermes" />
               </ProtectedRoute>
             }
@@ -119,7 +119,7 @@ export default function App() {
           <Route
             path="platform/canteen-tenants"
             element={
-              <ProtectedRoute roles={['platform_admin']}>
+              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
                 <PlatformAdminTenants key="canteen" system="canteen" />
               </ProtectedRoute>
             }
@@ -127,7 +127,7 @@ export default function App() {
           <Route
             path="platform/plans"
             element={
-              <ProtectedRoute roles={['platform_admin']}>
+              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
                 <PlatformAdminPlans />
               </ProtectedRoute>
             }
@@ -135,7 +135,7 @@ export default function App() {
           <Route
             path="platform/payments"
             element={
-              <ProtectedRoute roles={['platform_admin']}>
+              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
                 <PlatformAdminPaymentRequests />
               </ProtectedRoute>
             }
@@ -143,7 +143,7 @@ export default function App() {
           <Route
             path="platform/settings/me"
             element={
-              <ProtectedRoute roles={['platform_admin']}>
+              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
                 <SettingsMePage apiBase="/api/platform" />
               </ProtectedRoute>
             }

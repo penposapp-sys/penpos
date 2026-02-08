@@ -18,8 +18,8 @@ export default function PlatformLogin() {
     setError('')
     try {
       const res = await login({ identifier, password, portal: 'platform' })
-      console.log('[PLATFORM_LOGIN_RES]', res)
-      if (res?.role !== 'platform_admin') {
+      const allowed = ['platform_admin', 'superadmin']
+      if (!allowed.includes(res?.role)) {
         logout()
         setError('Bu giriş yalnızca Platform Yöneticisi içindir.')
         toast.error('Bu giriş yalnızca Platform Yöneticisi içindir.')
@@ -30,7 +30,6 @@ export default function PlatformLogin() {
       const msg = err?.code === 'invalid_credentials' ? 'E-posta veya şifre hatalı' : (err?.message || 'Giriş başarısız')
       setError(msg)
       toast.error(msg)
-      return
     } finally {
       setLoading(false)
     }
