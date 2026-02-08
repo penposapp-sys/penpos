@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import BranchSelectorModal from './BranchSelectorModal.jsx'
 import MobileTopSheetNav from './MobileTopSheetNav.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
+import { Users as IconTenant } from 'lucide-react'
 
 export default function Layout() {
   const nav = useNavigate()
@@ -248,7 +249,7 @@ export default function Layout() {
                   onClick={() => nav(i.to)}
                   style={{ justifyContent: desktopCollapsed ? 'center' : 'flex-start', display: 'flex', alignItems: 'center', gap: 8 }}
                 >
-                  <span className="nav-icon"><Icon size={18} /></span>
+                  <span className="nav-icon">{Icon ? <Icon size={18} /> : null}</span>
                   {!desktopCollapsed && <span className="nav-label">{i.label}</span>}
                 </button>
               )
