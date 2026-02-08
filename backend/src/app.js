@@ -98,7 +98,15 @@ export const createServer = () => {
     })
   } catch {}
   const loginLimiter = rateLimit({ windowMs: 60 * 1000, max: 30 })
-  const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 100 })
+  const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: (req) => {
+      const m = String(req.method || 'GET').toUpperCase()
+      if (m === 'GET' || m === 'HEAD') return 600
+      return 120
+    },
+    retryAfterSeconds: 2
+  })
 
   app.use('/api/health', healthRouter)
   app.use('/api/auth', loginLimiter, authRouter)

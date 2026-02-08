@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { api } from '../lib/apiClient.js'
+import { api, clearApiCache } from '../lib/apiClient.js'
 import { normalizePermissions } from '../constants/permissions.js'
 
 const AuthContext = createContext()
@@ -154,6 +154,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('selectedBranchId')
     localStorage.removeItem('activeSystem')
     localStorage.removeItem('lastSystem')
+    clearApiCache()
     setUser(null)
     setTenantCtx(null)
     setAllowedBranchIds([])

@@ -46,6 +46,31 @@ const normalizeLegacyItemStatuses = (order) => {
   })
 }
 
+const normalizeServingType = (value) => {
+  if (value === undefined || value === null) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const simplified = raw
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  if (simplified === 'tray' || simplified === 'plate' || simplified === 'package') return simplified
+  if (simplified === 'tepside') return 'tray'
+  if (simplified === 'tabakta') return 'plate'
+  if (simplified === 'paket') return 'package'
+  return null
+}
+
+const getDefaultServingTypeForOrder = (order) => {
+  return String(order?.saleType || '').trim() === 'delivery' ? 'package' : 'plate'
+}
+
+const getEffectiveServingTypeForOrder = (order) => {
+  const saleType = String(order?.saleType || '').trim()
+  if (saleType === 'delivery') return 'package'
+  return normalizeServingType(order?.servingType) || 'plate'
+}
+
 const normalizeOpenDuplicatesForResponse = (items) => {
   const src = Array.isArray(items) ? items : []
   const map = new Map()
@@ -459,7 +484,7 @@ export const getOrderService = async (tenantId, id) => {
     deliveryNote: obj.deliveryNote,
     deliveryStatus: obj.deliveryStatus,
     deliveryAt: obj.deliveryAt,
-    servingType: obj.servingType ?? null,
+    servingType: getEffectiveServingTypeForOrder(obj),
     servingTypeUpdatedAt: obj.servingTypeUpdatedAt ?? null,
     discountPercent: obj.discountPercent || 0,
     payments: obj.payments || [],
@@ -1025,23 +1050,25 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
     order.sendToKitchen = Boolean(kitchenEnabled)
   }
 
-  if (servingType !== undefined) {
-    const v = servingType === null ? null : String(servingType)
-    if (v === null) {
+  const incomingServingType = servingType !== undefined ? normalizeServingType(servingType) : undefined
+  if (incomingServingType !== undefined) {
+    if (incomingServingType === null) {
       // no-op
-    } else if (!['tray', 'plate', 'package'].includes(v)) {
+    } else if (!['tray', 'plate', 'package'].includes(incomingServingType)) {
       throw error('invalid_request', 'Invalid servingType', 400)
     } else {
-      order.servingType = v
+      order.servingType = incomingServingType
       order.servingTypeUpdatedAt = now
     }
   }
 
-  const normalizedServingType = ['tray', 'plate', 'package'].includes(order.servingType) ? order.servingType : null
-  const itemServingType = (servingType !== undefined && servingType !== null) ? String(servingType) : normalizedServingType
+  const baseServingType = getEffectiveServingTypeForOrder(order)
+  const itemServingType = (incomingServingType !== undefined && incomingServingType !== null)
+    ? incomingServingType
+    : baseServingType
   if (!Array.isArray(order.kitchenBatches)) order.kitchenBatches = []
   if (!order.kitchenBatches.some(b => String(b?.batchId || '') === batchId)) {
-    order.kitchenBatches.push({ batchId, servingType: normalizedServingType, sentAt: now })
+    order.kitchenBatches.push({ batchId, servingType: baseServingType, sentAt: now })
   }
 
   const hasOpenItems = (order.items || []).some(it => it && it.status === 'open')
@@ -1060,7 +1087,12 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
       }
       it.kitchenBatchId = batchId
       it.kitchenSentAt = now
-      it.servingType = ['tray', 'plate', 'package'].includes(itemServingType) ? itemServingType : (normalizedServingType || null)
+      it.servingType = ['tray', 'plate', 'package'].includes(itemServingType) ? itemServingType : baseServingType
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          console.debug('[SERVINGTYPE_DEBUG]', { orderId: String(order.id), itemId: String(it._id || ''), incoming: incomingServingType ?? null, saved: it.servingType, saleType: order.saleType })
+        } catch {}
+      }
       itemsToLabel.push({
         menuItemId: it.menuItemId,
         nameSnapshot: it.nameSnapshot,
@@ -1804,11 +1836,12 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
         const rawBatchId = it.kitchenBatchId ? String(it.kitchenBatchId) : ''
         const key = rawBatchId || '__legacy__'
         const meta = rawBatchId ? batchMetaMap.get(rawBatchId) : null
-        const fallbackServing = ['tray', 'plate', 'package'].includes(o.servingType) ? o.servingType : 'tray'
-        it.servingType = ['tray', 'plate', 'package'].includes(it.servingType) ? it.servingType : (meta?.servingType ?? fallbackServing)
+        const orderServing = getEffectiveServingTypeForOrder(o)
+        const fallbackServing = meta?.servingType ? (normalizeServingType(meta.servingType) || orderServing) : orderServing
+        it.servingType = normalizeServingType(it.servingType) || fallbackServing
         const entry = byBatch.get(key) || {
           batchId: rawBatchId || null,
-          servingType: meta?.servingType ?? fallbackServing,
+          servingType: normalizeServingType(meta?.servingType) || fallbackServing,
           batchSentAt: meta?.sentAt ?? null,
           sentAt: meta?.sentAt ?? null,
           items: [],
@@ -1840,7 +1873,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
         totals: o.totals,
         createdAt: o.createdAt,
         saleType: o.saleType,
-        servingType: o.servingType ?? null,
+        servingType: getEffectiveServingTypeForOrder(o),
         createdByName: String(o.createdByName || userNameById.get(String(o.createdByUserId || o.createdBy)) || ''),
         customerName: o.customerName,
         deliveryStatus: o.deliveryStatus,

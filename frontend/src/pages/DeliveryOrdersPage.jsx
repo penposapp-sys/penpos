@@ -13,6 +13,7 @@ import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 import { trPaymentMethodLabel } from '../i18n/tr.js'
 import ProductCard from '../components/ProductCard.jsx'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
+import { ServingType } from '../utils/servingType.js'
 
 export default function DeliveryOrdersPage() {
   const { user, allowedBranchIds } = useAuth()
@@ -57,6 +58,7 @@ export default function DeliveryOrdersPage() {
   const createAccountPhoneRef = useRef(null)
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
+  const [, setLockTick] = useState(0)
   const [veresiyeAmount, setVeresiyeAmount] = useState('')
   const [veresiyeNote, setVeresiyeNote] = useState('')
   const [payMethods, setPayMethods] = useState([])
@@ -76,17 +78,167 @@ export default function DeliveryOrdersPage() {
   
   const [busy, setBusy] = useState(false)
   const [printingReceipt, setPrintingReceipt] = useState(false)
-  const [tempQty, setTempQty] = useState({})
+  const [qtyDraftByRow, setQtyDraftByRow] = useState(() => ({}))
+  const qtyDraftByRowRef = useRef({})
   const [cartViewMode, setCartViewMode] = useState('grouped')
+
+  const qtyInputRefs = useRef(new Map())
+  const activeQtyRowKeyRef = useRef(null)
+  const activeQtySelectionRef = useRef({ start: null, end: null })
+
+  const qtyPendingRef = useRef(new Map())
+  const qtyTimerRef = useRef(new Map())
+  const qtyInflightRef = useRef(new Set())
+  const qtyCooldownUntilRef = useRef(new Map())
+  const qtyLastToastAtRef = useRef(new Map())
+
+  useEffect(() => {
+    qtyDraftByRowRef.current = qtyDraftByRow || {}
+  }, [qtyDraftByRow])
+
+  const getQtyDraft = (rowKey, fallbackNumber = 1) => {
+    const key = String(rowKey || '')
+    if (!key) return String(fallbackNumber)
+    const v = qtyDraftByRow?.[key]
+    return (v === undefined || v === null) ? String(fallbackNumber) : String(v)
+  }
+
+  const onQtyInputChange = (rowKey, next) => {
+    const key = String(rowKey || '')
+    if (!key) return
+    const cleaned = String(next ?? '').replace(/[^\d]/g, '')
+    setQtyDraftByRow(prev => ({ ...(prev || {}), [key]: cleaned }))
+  }
+
+  const commitQtyDraft = (rowKey, orderId, itemId, fallbackNumber = 1, rawOverride) => {
+    const key = String(rowKey || '')
+    const oId = String(orderId || '')
+    const iId = String(itemId || '')
+    if (!key || !oId || !iId) return
+
+    const raw = rawOverride !== undefined ? String(rawOverride) : String(qtyDraftByRowRef.current?.[key] ?? '')
+    const n = raw === '' ? Number(fallbackNumber) : Number(raw || fallbackNumber)
+    const qty = Number.isFinite(n) ? Math.max(1, Math.min(9999, Math.floor(n))) : Number(fallbackNumber)
+
+    setQtyDraftByRow(prev => ({ ...(prev || {}), [key]: String(qty) }))
+    scheduleQtyUpdate(oId, iId, key, qty, true)
+  }
+
+  useEffect(() => {
+    const key = activeQtyRowKeyRef.current
+    if (!key) return
+    const el = qtyInputRefs.current.get(key)
+    if (!el) return
+    if (document.activeElement !== el) {
+      el.focus()
+    }
+    const { start, end } = activeQtySelectionRef.current || {}
+    if (typeof start === 'number' && typeof end === 'number') {
+      try {
+        el.setSelectionRange(start, end)
+      } catch {}
+    }
+  }, [qtyDraftByRow])
+
+  const flushQtyUpdate = async (itemId) => {
+    const id = String(itemId || '')
+    if (!id) return
+    if (qtyInflightRef.current.has(id)) return
+    const pending = qtyPendingRef.current.get(id)
+    if (!pending) return
+    const cooldownUntil = qtyCooldownUntilRef.current.get(id) || 0
+    if (Date.now() < cooldownUntil) return
+
+    qtyInflightRef.current.add(id)
+    setLockTick(t => t + 1)
+    try {
+      const res = await api(`/api/pos/orders/${pending.orderId}/items/${id}/quantity`, {
+        method: 'PUT',
+        data: { quantity: pending.quantity },
+        silent: true,
+        retryOn429: false
+      })
+
+      if (!res?.ok) {
+        if (res?.status === 429) {
+          const now = Date.now()
+          qtyCooldownUntilRef.current.set(id, now + 2000)
+          const lastToast = qtyLastToastAtRef.current.get(id) || 0
+          if (now - lastToast > 1500) {
+            qtyLastToastAtRef.current.set(id, now)
+            toast.error('Çok fazla istek, 2 sn sonra tekrar dene')
+          }
+          setTimeout(() => flushQtyUpdate(id), 2100)
+          return
+        }
+        toast.error(res?.message || 'İşlem başarısız')
+        await reloadOrder().catch(() => {})
+        return
+      }
+
+      const fresh = pickOrder(res)
+      if (fresh) {
+        setOrder(fresh)
+        setNote(fresh.note || '')
+      }
+
+      qtyPendingRef.current.delete(id)
+      if (pending.rowKey) {
+        setQtyDraftByRow(prev => ({ ...(prev || {}), [pending.rowKey]: String(pending.quantity) }))
+      }
+    } finally {
+      qtyInflightRef.current.delete(id)
+      setLockTick(t => t + 1)
+    }
+  }
+
+  const scheduleQtyUpdate = (orderId, itemId, rowKey, nextQty, flushNow = false) => {
+    const oId = String(orderId || '')
+    const iId = String(itemId || '')
+    if (!oId || !iId) return
+
+    if (rowKey) {
+      setQtyDraftByRow(prev => ({ ...(prev || {}), [String(rowKey)]: String(nextQty) }))
+    }
+    qtyPendingRef.current.set(iId, { orderId: oId, quantity: nextQty, rowKey })
+
+    const tPrev = qtyTimerRef.current.get(iId)
+    if (tPrev) clearTimeout(tPrev)
+    if (flushNow) {
+      flushQtyUpdate(iId)
+      return
+    }
+    const t = setTimeout(() => flushQtyUpdate(iId), 420)
+    qtyTimerRef.current.set(iId, t)
+  }
+
+  useEffect(() => {
+    return () => {
+      try {
+        for (const t of qtyTimerRef.current.values()) clearTimeout(t)
+      } catch {}
+      try {
+        qtyTimerRef.current.clear()
+      } catch {}
+      try {
+        qtyPendingRef.current.clear()
+      } catch {}
+      try {
+        qtyInflightRef.current.clear()
+      } catch {}
+    }
+  }, [])
 
   const withLock = async (key, fn) => {
     if (!key) return null
     if (inflightRef.current.get(key)) return null
     inflightRef.current.set(key, true)
+    setLockTick(t => t + 1)
     try {
       return await fn()
     } finally {
       inflightRef.current.delete(key)
+      setLockTick(t => t + 1)
     }
   }
 
@@ -489,7 +641,7 @@ export default function DeliveryOrdersPage() {
     if (tab === 'delivered') return
     const orderId = selectedId || getOrderId(order)
     if (!orderId) return
-    await safeAction((signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', signal, silent: true }))
+    await safeAction((signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: { servingType: ServingType.PACKAGE }, signal, silent: true }))
     await reloadOrder()
   }
   const payOrder = async () => {
@@ -1057,17 +1209,11 @@ export default function DeliveryOrdersPage() {
                     const sentItems = raw.filter(it => it?.status === 'sent' || it?.status === 'preparing')
                     const otherItems = raw.filter(it => it?.status === 'completed' || it?.status === 'cancelled')
 
-                    const setItemQtyById = async (itemId, nextQty) => {
+                    const setItemQtyById = async (rowKey, itemId, nextQty) => {
                       const orderId = getOrderId(order)
                       if (!orderId) { toast.error('Sipariş bulunamadı'); return }
-                      const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/items/${itemId}/quantity`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ quantity: nextQty }),
-                        signal,
-                        silent: true
-                      }))
-                      const fresh = pickOrder(res)
-                      if (fresh) setNote(fresh.note || '')
+                      if (!itemId) return
+                      scheduleQtyUpdate(orderId, itemId, rowKey, nextQty)
                     }
 
                     const openRender = cartViewMode === 'grouped'
@@ -1083,7 +1229,12 @@ export default function DeliveryOrdersPage() {
                         }
                         return acc
                       }, {}))
-                      : openItems.map((it, idx) => ({ key: it._id || `${it.menuItemId}-${idx}`, menuItemId: it.menuItemId, itemId: it._id, itemIds: [it._id].filter(Boolean), note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }))
+                      : openItems.map((it, idx) => {
+                        const stableId = it?._id || it?.id || it?.itemId || null
+                        const key = stableId ? String(stableId) : `${it.menuItemId}-${idx}`
+                        const itemId = stableId ? String(stableId) : null
+                        return { key, menuItemId: it.menuItemId, itemId, itemIds: [itemId].filter(Boolean), note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
+                      })
 
                     const otherRender = cartViewMode === 'grouped'
                       ? Object.values(otherItems.reduce((acc, it) => {
@@ -1097,7 +1248,12 @@ export default function DeliveryOrdersPage() {
                         }
                         return acc
                       }, {}))
-                      : otherItems.map((it, idx) => ({ key: it._id || `${it.menuItemId}-other-${idx}`, menuItemId: it.menuItemId, itemId: it._id, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }))
+                      : otherItems.map((it, idx) => {
+                        const stableId = it?._id || it?.id || it?.itemId || null
+                        const key = stableId ? String(stableId) : `${it.menuItemId}-other-${idx}`
+                        const itemId = stableId ? String(stableId) : null
+                        return { key, menuItemId: it.menuItemId, itemId, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
+                      })
 
                     const renderLine = (row, opts = {}) => {
                       const it = row.repr
@@ -1106,6 +1262,11 @@ export default function DeliveryOrdersPage() {
                       const isGrouped = opts.grouped === true
                       const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
                       const disableBase = tab === 'delivered' || busy || it?.status === 'completed' || it?.status === 'cancelled'
+                      const itemId = row?.repr?.id || row?.repr?._id || row?.itemId || null
+                      const isQtyLocked = qtyInflightRef.current.has(String(itemId || '')) || (qtyCooldownUntilRef.current.get(String(itemId || '')) || 0) > Date.now()
+                      const rawDraft = getQtyDraft(row.key, row.qty)
+                      const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
+                      const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
 
                       const itemStatusMeta = {
                         open: { label: 'Bekliyor', bg: '#f3f4f6', border: '#d1d5db', color: '#374151' },
@@ -1132,12 +1293,12 @@ export default function DeliveryOrdersPage() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                             {isOpen ? (
                               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                <button className="btn btn--xs" onClick={() => setItemQtyById(row.itemId, Math.max(0, Number(it?.qty || 0) - 1))} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>-</button>
-                                <span>{row.qty}</span>
-                                <button className="btn btn--xs" onClick={() => setItemQtyById(row.itemId, Number(it?.qty || 0) + 1)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>+</button>
+                                <button className="btn btn--xs" onClick={() => setItemQtyById(row.key, itemId, Math.max(0, Number(displayQty || 0) - 1))} disabled={disableBase || isMultiGroup || isQtyLocked} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>-</button>
+                                <span>{displayQty}</span>
+                                <button className="btn btn--xs" onClick={() => setItemQtyById(row.key, itemId, Number(displayQty || 0) + 1)} disabled={disableBase || isMultiGroup || isQtyLocked} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>+</button>
                               </div>
                             ) : (
-                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>x{row.qty}</div>
+                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>x{displayQty}</div>
                             )}
                             {(isOpen || isSent) ? (
                               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -1147,17 +1308,39 @@ export default function DeliveryOrdersPage() {
                                 )}
                                 {!isGrouped && (
                                   <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     min="1"
                                     className="input"
                                     style={{ width: 72 }}
-                                    value={tempQty[row.key] ?? row.qty}
-                                    onChange={(e) => setTempQty({ ...tempQty, [row.key]: Math.max(1, Number(e.target.value) || 1) })}
-                                    onBlur={async (e) => {
-                                      const nextQty = Math.max(1, Number(e.target.value) || 1)
-                                      await setItemQtyById(row.itemId, nextQty)
+                                    value={getQtyDraft(row.key, row.qty)}
+                                    onChange={(e) => onQtyInputChange(row.key, e.target.value)}
+                                    ref={(el) => {
+                                      const m = qtyInputRefs.current
+                                      if (!m) return
+                                      if (el) m.set(row.key, el)
+                                      else m.delete(row.key)
                                     }}
-                                    disabled={disableBase || isMultiGroup || !isOpen}
+                                    onFocus={(e) => {
+                                      activeQtyRowKeyRef.current = row.key
+                                      activeQtySelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
+                                    }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyUp={(e) => {
+                                      activeQtySelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.currentTarget.blur()
+                                      }
+                                    }}
+                                    onBlur={async (e) => {
+                                      activeQtyRowKeyRef.current = null
+                                      commitQtyDraft(row.key, getOrderId(order), itemId, row.qty, e.target.value)
+                                    }}
+                                    disabled={disableBase || isMultiGroup || !isOpen || isQtyLocked}
                                   />
                                 )}
                               </div>
@@ -1167,7 +1350,7 @@ export default function DeliveryOrdersPage() {
                           </div>
                           {isMobilePortrait && inlineNoteItemId === row.itemId && (
                             <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-                              <textarea className="input" rows={3} value={inlineNoteText} onChange={(e) => setInlineNoteText(e.target.value)} />
+                              <textarea className="input" rows={3} value={inlineNoteText} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onChange={(e) => setInlineNoteText(e.target.value)} />
                               <div className="stackRow">
                                 <button className="btn btn--primary btn--full" type="button" disabled={disableBase} onClick={async () => { await submitItemNoteFor(row.itemId, inlineNoteText) }}>
                                   Kaydet
@@ -1180,7 +1363,7 @@ export default function DeliveryOrdersPage() {
                           )}
                           {isMobilePortrait && inlineCancelItemId === row.itemId && (
                             <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-                              <textarea className="input" rows={3} placeholder="İptal sebebi" value={inlineCancelReason} onChange={(e) => setInlineCancelReason(e.target.value)} />
+                              <textarea className="input" rows={3} placeholder="İptal sebebi" value={inlineCancelReason} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onChange={(e) => setInlineCancelReason(e.target.value)} />
                               <div className="stackRow">
                                 <button className="btn btn--danger btn--full" type="button" disabled={disableBase} onClick={async () => { await submitItemCancelFor(row.itemId, inlineCancelReason) }}>
                                   İptal Et
@@ -1530,7 +1713,7 @@ export default function DeliveryOrdersPage() {
         </div>
       </Modal>
       <InputModal open={noteModalOpen} onClose={() => setNoteModalOpen(false)} title="Not" initialValue={itemNote} onSubmit={submitItemNote} />
-      <InputModal open={cancelModalOpen} onClose={() => setCancelModalOpen(false)} title="İptal Sebebi" onSubmit={submitItemCancel} />
+      <InputModal open={cancelModalOpen} onClose={() => setCancelModalOpen(false)} title="İptal Sebebi" onSubmit={submitItemCancel} autoFocus={false} />
       <ConfirmModal open={orderCancelConfirmOpen} onClose={() => setOrderCancelConfirmOpen(false)} title="Siparişi İptal Et?" onConfirm={() => { setOrderCancelConfirmOpen(false); cancelOrder() }} />
       <ConfirmModal open={itemCancelConfirmOpen} onClose={() => setItemCancelConfirmOpen(false)} title="Ürünü İptal Et?" onConfirm={() => { setItemCancelConfirmOpen(false); setCancelModalOpen(true) }} />
     </div>

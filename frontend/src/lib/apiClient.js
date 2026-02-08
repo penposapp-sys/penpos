@@ -1,7 +1,14 @@
 import { toast } from './toast.js'
 
 const inflight = new Map()
+const cache = new Map()
 let lastRateLimitToastAt = 0
+
+export const clearApiCache = () => {
+  try {
+    cache.clear()
+  } catch {}
+}
 
 const normalizeBaseUrl = (value) => {
   const v = String(value || '').replace(/\/+$/, '')
@@ -82,6 +89,9 @@ export const api = async (path, options = {}) => {
   const silent = !!options.silent
   const suppressAuthRedirect = !!options.suppressAuthRedirect
   const portalOverride = String(options.portalOverride || '').trim()
+  const cacheTtlMsOpt = options.cacheTtlMs
+  const cacheMode = String(options.cacheMode || '').trim()
+  const retryOn429 = options.retryOn429 !== false
   const pathname = (() => {
     try {
       return String(window.location?.pathname || '')
@@ -112,7 +122,7 @@ export const api = async (path, options = {}) => {
     ...(!skipBranchHeader && shouldAttachBranch && (branchIdOverride || selectedBranchId) ? { 'x-branch-id': String(branchIdOverride || selectedBranchId) } : {}),
     ...incomingHeaders
   }
-  const { silent: _silent, skipBranchHeader: _skipBranchHeader, branchIdOverride: _branchIdOverride, data: _data, suppressAuthRedirect: _suppressAuthRedirect, portalOverride: _portalOverride, ...fetchOptions } = options
+  const { silent: _silent, skipBranchHeader: _skipBranchHeader, branchIdOverride: _branchIdOverride, data: _data, suppressAuthRedirect: _suppressAuthRedirect, portalOverride: _portalOverride, cacheTtlMs: _cacheTtlMs, cacheMode: _cacheMode, retryOn429: _retryOn429, ...fetchOptions } = options
   const wrap = (ok, status, data) => {
     const basePayload = {
       ok: !!ok,
@@ -124,6 +134,32 @@ export const api = async (path, options = {}) => {
       return { ...basePayload, ...data }
     }
     return basePayload
+  }
+
+  const getDefaultCacheTtlMs = (normalizedPath, method) => {
+    if (method !== 'GET') return 0
+    const p = String(normalizedPath || '')
+    if (p === '/api/tenant/context') return 15000
+    if (p === '/api/tenant/profile') return 15000
+    if (p === '/api/tenant/payment-settings') return 15000
+    if (p === '/api/settings/menu/active-items') return 15000
+    if (p.startsWith('/api/user/preferences/kitchen-filters')) return 15000
+    if (p.startsWith('/api/tenant/categories')) return 10000
+    if (/^\/api\/pos\/orders\/[^/]+$/.test(p)) return 1500
+    return 0
+  }
+
+  const parseRetryAfterMs = (headerValue) => {
+    const raw = String(headerValue || '').trim()
+    if (!raw) return 0
+    const sec = Number(raw)
+    if (Number.isFinite(sec) && sec > 0) return Math.round(sec * 1000)
+    const ts = Date.parse(raw)
+    if (Number.isFinite(ts)) {
+      const diff = ts - Date.now()
+      return diff > 0 ? diff : 0
+    }
+    return 0
   }
 
   const attemptRequest = async (attempt) => {
@@ -166,6 +202,23 @@ export const api = async (path, options = {}) => {
     const bodyKey = bodyIsFormData ? '[formdata]' : String(fetchOptions.body || '')
     const key = `${method} ${url} | ${bodyKey} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')}`
     const canDedupe = !fetchOptions.signal && !bodyIsFormData
+
+    const cacheKey = `${method} ${url} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')}`
+    const shouldCache = method === 'GET' && !fetchOptions.signal && !bodyIsFormData && cacheMode !== 'no-store'
+    const ttl = (() => {
+      if (!shouldCache) return 0
+      if (cacheMode === 'no-cache') return 0
+      const n = Number(cacheTtlMsOpt)
+      if (Number.isFinite(n) && n > 0) return Math.round(n)
+      return getDefaultCacheTtlMs(normalizedPath, method)
+    })()
+
+    if (shouldCache && ttl > 0) {
+      const hit = cache.get(cacheKey)
+      if (hit && hit.expiresAt > Date.now()) {
+        return hit.value
+      }
+    }
     if (canDedupe && inflight.has(key)) {
       return inflight.get(key)
     }
@@ -179,7 +232,16 @@ export const api = async (path, options = {}) => {
         return wrap(false, 0, data)
       }
 
+      const retryAfterMs = res?.status === 429 ? parseRetryAfterMs(res.headers?.get?.('Retry-After')) : 0
       const data = await res.json().catch(() => ({}))
+
+      if (res.status === 429 && retryOn429 && attempt < 1 && (method === 'GET' || method === 'HEAD')) {
+        const baseWait = retryAfterMs > 0 ? retryAfterMs : 1500
+        const jitter = Math.floor(Math.random() * 250)
+        const waitMs = Math.min(8000, baseWait + jitter)
+        await new Promise(r => setTimeout(r, waitMs))
+        return attemptRequest(attempt + 1)
+      }
       if (!res.ok) {
       const code = data.code || data.error || 'error'
       const message = data.message || 'İşlem başarısız'
@@ -225,7 +287,11 @@ export const api = async (path, options = {}) => {
 
         return wrap(false, res.status, { ...data, code, message })
       }
-      return wrap(true, res.status, data)
+      const okPayload = wrap(true, res.status, data)
+      if (shouldCache && ttl > 0) {
+        cache.set(cacheKey, { expiresAt: Date.now() + ttl, value: okPayload })
+      }
+      return okPayload
     })()
 
     if (canDedupe) {

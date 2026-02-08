@@ -111,9 +111,9 @@ export default function KitchenBulkPage() {
           const rows = Array.isArray(card?.rows) ? card.rows : []
           return (
             <div key={String(card?.menuItemId || '')} className="card" style={{ padding: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-                <div style={{ fontWeight: 700 }}>{String(card?.name || '-')}</div>
-                <div style={{ fontWeight: 700 }}>x{Math.max(0, Number(card?.totalQty || 0))}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.25 }}>
+                <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(card?.name || '-')}</div>
+                <div style={{ whiteSpace: 'nowrap' }}>x{Math.max(0, Number(card?.totalQty || 0))}</div>
               </div>
 
               <div style={{ display: 'grid', gap: 8 }}>
@@ -125,7 +125,7 @@ export default function KitchenBulkPage() {
                   return (
                     <div key={rowKey} style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 10 }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tableName || 'Sipariş'}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tableName || 'Sipariş'}</div>
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                           <span>x{qty}</span>
                           {createdAt ? <span> • {new Date(createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span> : null}

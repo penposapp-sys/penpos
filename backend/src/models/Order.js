@@ -16,7 +16,7 @@ const itemSchema = new mongoose.Schema({
   qty: { type: Number, required: true, min: 1 },
   subtotal: { type: Number, required: true, min: 0 },
   note: { type: String, default: '' },
-  servingType: { type: String, enum: ['tray', 'plate', 'package'], default: null },
+  servingType: { type: String, enum: ['tray', 'plate', 'package'], default: 'plate' },
   status: { type: String, enum: ['open', 'sent', 'completed', 'cancelled'], default: 'open' },
   sentAt: { type: Date, default: null },
   kitchenBatchId: { type: String, default: null },
@@ -26,7 +26,7 @@ const itemSchema = new mongoose.Schema({
 const kitchenBatchSchema = new mongoose.Schema(
   {
     batchId: { type: String, required: true },
-    servingType: { type: String, enum: ['tray', 'plate', 'package'], default: null },
+    servingType: { type: String, enum: ['tray', 'plate', 'package'], default: 'plate' },
     sentAt: { type: Date, default: null }
   },
   { _id: false }
@@ -87,7 +87,13 @@ const orderSchema = new mongoose.Schema(
     sendToKitchen: { type: Boolean, default: true },
     currentKitchenBatchId: { type: String, default: null },
     kitchenBatches: { type: [kitchenBatchSchema], default: [] },
-    servingType: { type: String, enum: ['tray', 'plate', 'package'], default: null },
+    servingType: {
+      type: String,
+      enum: ['tray', 'plate', 'package'],
+      default: function () {
+        return String(this.saleType || '') === 'delivery' ? 'package' : 'plate'
+      }
+    },
     servingTypeUpdatedAt: { type: Date, default: null }
   },
   { timestamps: true }

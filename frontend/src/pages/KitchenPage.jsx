@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import InputModal from '../components/InputModal.jsx'
 import MenuItemFilterDrawer from '../components/MenuItemFilterDrawer.jsx'
-import { trServingTypeLabel } from '../i18n/tr.js'
+import { servingTypeLabelTR } from '../utils/servingType.js'
 import { useKitchenMenuFilters } from '../lib/useKitchenMenuFilters.js'
 
 export default function KitchenPage() {
@@ -22,10 +22,10 @@ export default function KitchenPage() {
   }
 
   const trOrderServingType = (order) => {
+    if (String(order?.saleType || '').trim() === 'delivery') return 'package'
     const raw = order?.servingType
     const v = String(raw || '').trim()
     if (v === 'tray' || v === 'plate' || v === 'package') return v
-    if (order?.saleType === 'delivery') return 'package'
     return null
   }
 
@@ -355,9 +355,8 @@ export default function KitchenPage() {
                   </div>
                   <div className="kitchen-card-badges">
                     {servingType && (
-                      <span className="page-pill kitchen-badge kitchen-badge--serving">{trServingTypeLabel(servingType) || '-'}</span>
+                      <span className="page-pill kitchen-badge kitchen-badge--serving">{servingTypeLabelTR(servingType) || '-'}</span>
                     )}
-                    <span className="page-pill kitchen-badge kitchen-badge--status">{orderStatusLabel}</span>
                   </div>
                 </div>
               )
@@ -366,7 +365,7 @@ export default function KitchenPage() {
               {(Array.isArray(o.items) ? o.items : []).map((it, index) => {
                 const orderServingType = trOrderServingType(o)
                 const itemServingType = ['tray', 'plate', 'package'].includes(String(it?.servingType || '').trim()) ? String(it.servingType).trim() : null
-                const showItemServingType = !!orderServingType && !!itemServingType && itemServingType !== orderServingType
+                const showItemServingType = !!orderServingType && orderServingType !== 'package' && !!itemServingType && itemServingType !== orderServingType
                 const showItemStatus = it?.status && String(it.status).trim() !== 'sent'
                 const itemStatusLabel = showItemStatus ? trKitchenStatusLabel(it.status) : ''
                 return (
@@ -382,7 +381,7 @@ export default function KitchenPage() {
                         <div className="kitchenItemAge">{getItemAgeMinutes(o, it)} dk</div>
                         <div className="kitchenItemActions">
                           {showItemServingType && (
-                            <span className="page-pill kitchen-badge kitchen-badge--serving">{trServingTypeLabel(itemServingType) || '-'}</span>
+                            <span className="page-pill kitchen-badge kitchen-badge--serving">{servingTypeLabelTR(itemServingType) || '-'}</span>
                           )}
                           {showItemStatus && (
                             <span className="page-pill kitchen-badge kitchen-badge--item-status">{itemStatusLabel || '-'}</span>
@@ -444,6 +443,7 @@ export default function KitchenPage() {
         initialValue={cancelReason}
         placeholder="İptal sebebi..."
         onSubmit={submitCancel}
+        autoFocus={false}
       />
 
       <MenuItemFilterDrawer
