@@ -95,8 +95,8 @@ export default function KitchenBulkPage() {
     <div className="main">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
         <div>
-          <h3 style={{ margin: 0 }}>Toplu Ürün Hazırlama</h3>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{totalCards} ürün</div>
+          <h3 style={{ margin: 0 }}>{'Toplu Ürün Hazırlama'}</h3>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{`${totalCards} ürün`}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={() => setFilterOpen(true)} type="button">Filtre</button>
@@ -123,21 +123,54 @@ export default function KitchenBulkPage() {
                   const qty = Math.max(1, Number(r?.qty || 1))
                   const createdAt = r?.createdAt || null
                   return (
-                    <div key={rowKey} style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 10 }}>
+                    <div
+                      key={rowKey}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        alignItems: 'center',
+                        gap: 10,
+                        border: '1px solid var(--border)',
+                        borderRadius: 10,
+                        padding: '10px 12px',
+                        background: '#fff'
+                      }}
+                    >
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tableName || 'Sipariş'}</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          <span>x{qty}</span>
-                          {createdAt ? <span> • {new Date(createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span> : null}
+                        <div style={{ marginBottom: 4 }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>
+                            {tableName || 'Sipari\u015f'}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {createdAt ? <span>Saat: {new Date(createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span> : null}
                         </div>
                       </div>
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => doneRow(rowKey, { tableName, qty, createdAt })}
-                      >
-                        HAZIRLA
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minWidth: 52,
+                            padding: '3px 10px',
+                            borderRadius: 999,
+                            background: '#eef2ff',
+                            color: '#1d4ed8',
+                            fontWeight: 800,
+                            fontSize: 14
+                          }}
+                        >
+                          x{qty}
+                        </span>
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => doneRow(rowKey, { tableName, qty, createdAt })}
+                        >
+                          HAZIRLA
+                        </button>
+                      </div>
                     </div>
                   )
                 })}

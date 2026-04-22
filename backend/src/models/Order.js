@@ -15,6 +15,8 @@ const itemSchema = new mongoose.Schema({
   priceSnapshot: { type: Number, required: true, min: 0 },
   qty: { type: Number, required: true, min: 1 },
   subtotal: { type: Number, required: true, min: 0 },
+  isWeightBased: { type: Boolean, default: false },
+  weightGrams: { type: Number, default: null, min: 1 },
   note: { type: String, default: '' },
   servingType: { type: String, enum: ['tray', 'plate', 'package'], default: 'plate' },
   status: { type: String, enum: ['open', 'sent', 'completed', 'cancelled'], default: 'open' },

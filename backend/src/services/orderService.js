@@ -436,7 +436,6 @@ export const getOrderService = async (tenantId, id) => {
   if (!order) throw error('not_found', 'Order not found', 404)
   const rawCollections = await AccountTransaction.find({
     tenantId,
-    branchId: order.branchId,
     orderId: order._id,
     source: 'collection',
     type: 'credit',
@@ -445,7 +444,7 @@ export const getOrderService = async (tenantId, id) => {
 
   const accountIds = Array.from(new Set((rawCollections || []).map(t => String(t?.accountId || '')).filter(Boolean)))
   const accounts = accountIds.length > 0
-    ? await CustomerAccount.find({ tenantId, branchId: order.branchId, _id: { $in: accountIds } }).select('_id name').lean()
+    ? await CustomerAccount.find({ tenantId, _id: { $in: accountIds } }).select('_id name').lean()
     : []
   const accountNameById = new Map((accounts || []).map(a => [String(a?._id), String(a?.name || '').trim()]))
 
@@ -1288,7 +1287,7 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
     throw e
   }
 
-  const acc = await CustomerAccount.findOne({ _id: accountId, tenantId, branchId, isActive: true })
+  const acc = await CustomerAccount.findOne({ _id: accountId, tenantId, isActive: true })
   if (!acc) {
     const e = new Error('Invalid account')
     e.status = 409
@@ -1305,7 +1304,7 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
     try {
       await session.withTransaction(async () => {
         await CustomerAccount.updateOne(
-          { _id: acc.id, tenantId, branchId },
+          { _id: acc.id, tenantId },
           { $inc: { balance: settleAmount } },
           { session }
         )
@@ -1358,7 +1357,7 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
       await session.endSession()
     }
   } else {
-    await CustomerAccount.updateOne({ _id: acc.id, tenantId, branchId }, { $inc: { balance: settleAmount } })
+    await CustomerAccount.updateOne({ _id: acc.id, tenantId }, { $inc: { balance: settleAmount } })
     let tx = null
     try {
       tx = await AccountTransaction.create({
@@ -1410,7 +1409,7 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
         }
       } catch {}
       try {
-        await CustomerAccount.updateOne({ _id: acc.id, tenantId, branchId }, { $inc: { balance: -settleAmount } })
+        await CustomerAccount.updateOne({ _id: acc.id, tenantId }, { $inc: { balance: -settleAmount } })
       } catch {}
       throw err
     }
@@ -1442,7 +1441,7 @@ export const deleteOrderVeresiyeEntryService = async (tenantId, branchId, actorU
     throw error('invalid_request', 'Invalid veresiye entry', 400)
   }
 
-  const acc = await CustomerAccount.findOne({ _id: accountId, tenantId, branchId, isActive: true })
+  const acc = await CustomerAccount.findOne({ _id: accountId, tenantId, isActive: true })
   if (!acc) {
     const e = new Error('Invalid account')
     e.status = 409
@@ -1482,7 +1481,7 @@ export const deleteOrderVeresiyeEntryService = async (tenantId, branchId, actorU
     try {
       await session.withTransaction(async () => {
         await CustomerAccount.updateOne(
-          { _id: acc.id, tenantId, branchId },
+          { _id: acc.id, tenantId },
           { $inc: { balance: -amount } },
           { session }
         )
@@ -1505,7 +1504,7 @@ export const deleteOrderVeresiyeEntryService = async (tenantId, branchId, actorU
       await session.endSession().catch(() => {})
     }
   } else {
-    await CustomerAccount.updateOne({ _id: acc.id, tenantId, branchId }, { $inc: { balance: -amount } })
+    await CustomerAccount.updateOne({ _id: acc.id, tenantId }, { $inc: { balance: -amount } })
     await AccountTransaction.create({
       tenantId,
       branchId,
@@ -1551,7 +1550,6 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
       {
         $match: {
           tenantId: new mongoose.Types.ObjectId(tenantId),
-          branchId: new mongoose.Types.ObjectId(branchId),
           accountId: new mongoose.Types.ObjectId(accountId),
           isDeleted: { $ne: true }
         }
@@ -1566,7 +1564,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
   }
 
   const runFallback = async () => {
-    const tx = await AccountTransaction.findOne({ _id: txId, tenantId, branchId })
+    const tx = await AccountTransaction.findOne({ _id: txId, tenantId })
     if (!tx) throw error('not_found', 'Transaction not found', 404)
     if (tx.isDeleted) throw error('already_deleted', 'Transaction already deleted', 409)
     if (!(tx.source === 'collection' && tx.type === 'credit')) {
@@ -1577,7 +1575,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
     }
 
     const deletedTx = await AccountTransaction.findOneAndUpdate(
-      { _id: txId, tenantId, branchId, isDeleted: false },
+      { _id: txId, tenantId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
       { new: true }
     )
@@ -1585,7 +1583,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
 
     const nextBalance = await computeAccountBalance(tx.accountId)
     const acc = await CustomerAccount.findOneAndUpdate(
-      { _id: tx.accountId, tenantId, branchId },
+      { _id: tx.accountId, tenantId },
       { $set: { balance: nextBalance } },
       { new: true }
     )
@@ -1601,7 +1599,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
   const session = await mongoose.startSession()
   try {
     await session.withTransaction(async () => {
-      const tx = await AccountTransaction.findOne({ _id: txId, tenantId, branchId }).session(session)
+      const tx = await AccountTransaction.findOne({ _id: txId, tenantId }).session(session)
       if (!tx) throw error('not_found', 'Transaction not found', 404)
       if (tx.isDeleted) throw error('already_deleted', 'Transaction already deleted', 409)
       if (!(tx.source === 'collection' && tx.type === 'credit')) {
@@ -1611,7 +1609,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
         throw error('payment_locked', 'Bu tahsilat bu siparişe bağlı değil', 409)
       }
 
-      const acc = await CustomerAccount.findOne({ _id: tx.accountId, tenantId, branchId }).session(session)
+      const acc = await CustomerAccount.findOne({ _id: tx.accountId, tenantId }).session(session)
       if (!acc) throw error('not_found', 'Account not found', 404)
 
       tx.isDeleted = true

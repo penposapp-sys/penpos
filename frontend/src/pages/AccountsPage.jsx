@@ -371,7 +371,6 @@ export default function AccountsPage() {
               <div
                 key={a.id}
                 onClick={() => {
-                  if (a?.branchId) localStorage.setItem('selectedBranchId', String(a.branchId))
                   setSelectedId(a.id)
                   nav(`/kermes/app/accounts/${a.id}`)
                 }}
@@ -398,7 +397,6 @@ export default function AccountsPage() {
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          if (a?.branchId) localStorage.setItem('selectedBranchId', String(a.branchId))
                           setSelectedId(a.id)
                           openEdit(a)
                         }}
@@ -410,7 +408,6 @@ export default function AccountsPage() {
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          if (a?.branchId) localStorage.setItem('selectedBranchId', String(a.branchId))
                           confirmDelete(a)
                         }}
                       >

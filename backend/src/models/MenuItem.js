@@ -11,6 +11,7 @@ const menuItemSchema = new mongoose.Schema(
     barcode: { type: String, default: '' },
     vatRate: { type: Number, default: 0, min: 0 },
     unit: { type: String, default: '' },
+    isWeightBased: { type: Boolean, default: false },
     imageUrl: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 }
