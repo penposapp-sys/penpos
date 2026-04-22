@@ -7,8 +7,11 @@ dotenv.config()
 let transactionsSupported = false
 
 export const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pos_saas'
+  const uri = (process.env.MONGODB_URI || process.env.MONGO_URI || '').trim()
   try {
+    if (!uri) {
+      throw new Error('MONGODB_URI is not configured')
+    }
     await mongoose.connect(uri)
     logger.info('MongoDB connected')
     try {
@@ -28,6 +31,7 @@ export const connectDB = async () => {
     }
   } catch (err) {
     logger.error('MongoDB connection failed', err.message)
+    throw err
   }
 }
 

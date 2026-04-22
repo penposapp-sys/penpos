@@ -21,9 +21,11 @@ export default function PlatformAdminPaymentRequests() {
     setError('')
     try {
       const res = await api(`/api/platform/billing/requests?status=${encodeURIComponent(status)}`)
+      if (!res?.ok) throw new Error(res?.message || 'Talepler yuklenemedi')
       setItems(res?.items || [])
     } catch (err) {
       setError(err.message)
+      setItems([])
     } finally {
       setLoading(false)
     }
@@ -33,7 +35,8 @@ export default function PlatformAdminPaymentRequests() {
   const approve = async (r) => {
     try {
       setSaving(true)
-      await api(`/api/platform/billing/requests/${r.id}/approve`, { method: 'POST' })
+      const res = await api(`/api/platform/billing/requests/${r.id}/approve`, { method: 'POST' })
+      if (!res?.ok) throw new Error(res?.message || 'Talep onaylanamadi')
       setSaving(false)
       await load()
     } catch (err) {
@@ -51,7 +54,8 @@ export default function PlatformAdminPaymentRequests() {
     if (!rejectTarget) return
     try {
       setSaving(true)
-      await api(`/api/platform/billing/requests/${rejectTarget.id}/reject`, { method: 'POST', body: JSON.stringify({ decisionNote }) })
+      const res = await api(`/api/platform/billing/requests/${rejectTarget.id}/reject`, { method: 'POST', body: JSON.stringify({ decisionNote }) })
+      if (!res?.ok) throw new Error(res?.message || 'Talep reddedilemedi')
       setSaving(false)
       setRejectOpen(false)
       await load()

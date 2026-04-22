@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const tokenKey = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/login/platform')
+      const tokenKey = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform')
         ? 'token_platform'
         : 'token_restaurant'
       const token = localStorage.getItem(tokenKey)
@@ -169,7 +169,7 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const portalOverride = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/login/platform')
+      const portalOverride = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform')
         ? 'platform'
         : 'restaurant'
       const meRes = await api('/api/auth/me', { silent: true, portalOverride })

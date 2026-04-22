@@ -47,7 +47,7 @@ const normalizeApiPath = (path) => {
 const inferPortalFromPathname = (pathname) => {
   const p = String(pathname || '')
   if (p.startsWith('/canteen')) return 'canteen'
-  if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/login/platform')) return 'platform'
+  if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/superadmin') || p.startsWith('/login/platform')) return 'platform'
   return 'restaurant'
 }
 

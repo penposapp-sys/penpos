@@ -238,6 +238,12 @@ export default function CanteenCashierPage() {
         return
       }
 
+      const target = e.target
+      if (target?.dataset?.allowManualNumeric === 'true') {
+        resetScanSession()
+        return
+      }
+
       const now = Date.now()
       const key = String(e.key || '')
       const isEnter = key === 'Enter'
@@ -366,6 +372,15 @@ export default function CanteenCashierPage() {
     })
   }
 
+  const setQty = (productId, nextQty) => {
+    const raw = String(nextQty ?? '').replace(/[^\d]/g, '')
+    const qty = raw === '' ? 0 : Math.floor(Number(raw))
+    setCart(prev => {
+      if (!Number.isFinite(qty) || qty < 0) return prev
+      return prev.map(it => it.productId === productId ? { ...it, qty } : it)
+    })
+  }
+
   const removeLine = (productId) => {
     setCart(prev => prev.filter(it => it.productId !== productId))
   }
@@ -445,8 +460,14 @@ export default function CanteenCashierPage() {
       return
     }
 
+    const saleCart = cart.filter(it => Number(it.qty || 0) > 0)
+    if (saleCart.length === 0) {
+      setError('Sepette satışa uygun ürün yok')
+      return
+    }
+
     const groups = new Map()
-    for (const it of cart) {
+    for (const it of saleCart) {
       const bid = String(it.productBranchId || '').trim()
       if (!bid) continue
       if (!groups.has(bid)) groups.set(bid, [])
@@ -618,7 +639,7 @@ export default function CanteenCashierPage() {
           <div className="card" style={{ display: 'grid', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontWeight: 700 }}>Sepet</div>
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Toplam: {money(total)} ₺</div>
+              <div style={{ color: '#111827', fontSize: 18, fontWeight: 800 }}>Toplam: {money(total)} ₺</div>
             </div>
 
             <div className="kasaCartList">
@@ -630,7 +651,18 @@ export default function CanteenCashierPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button className="btn btn--compact" type="button" onClick={() => dec(it.productId)}>-</button>
-                    <div style={{ width: 36, textAlign: 'center', fontWeight: 700 }}>{it.qty}</div>
+                    <input
+                      className="input"
+                      type="text"
+                      data-allow-manual-numeric="true"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={String(it.qty)}
+                      onChange={(e) => setQty(it.productId, e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      onBlur={() => scheduleBarcodeFocus(250)}
+                      style={{ width: 104, height: 36, textAlign: 'right', fontWeight: 700, padding: '6px 10px' }}
+                    />
                     <button className="btn btn--compact" type="button" onClick={() => inc(it.productId)}>+</button>
                     <button className="btn btn--danger btn--compact" type="button" onClick={() => removeLine(it.productId)}>Sil</button>
                   </div>

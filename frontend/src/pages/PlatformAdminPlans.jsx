@@ -31,10 +31,12 @@ export default function PlatformAdminPlans() {
     setLoading(true)
     setError('')
     try {
-      const { plans } = await api(`/api/platform/plans?systemType=${encodeURIComponent(systemType)}`)
-      setItems(plans)
+      const res = await api(`/api/platform/plans?systemType=${encodeURIComponent(systemType)}`)
+      if (!res?.ok) throw new Error(res?.message || 'Planlar yuklenemedi')
+      setItems(Array.isArray(res?.plans) ? res.plans : [])
     } catch (err) {
       setError(err.message)
+      setItems([])
     } finally {
       setLoading(false)
     }
@@ -66,11 +68,13 @@ export default function PlatformAdminPlans() {
     setFormLoading(true)
     setFormError('')
     try {
+      let res
       if (editItem) {
-        await api(`/api/platform/plans/${editItem._id}`, { method: 'PUT', body: JSON.stringify(form) })
+        res = await api(`/api/platform/plans/${editItem._id}`, { method: 'PUT', body: JSON.stringify(form) })
       } else {
-        await api('/api/platform/plans', { method: 'POST', body: JSON.stringify(form) })
+        res = await api('/api/platform/plans', { method: 'POST', body: JSON.stringify(form) })
       }
+      if (!res?.ok) throw new Error(res?.message || 'Plan kaydedilemedi')
       setModalOpen(false)
       await load()
     } catch (err) {
@@ -88,7 +92,8 @@ export default function PlatformAdminPlans() {
   const confirmDelete = async () => {
     if (!deleteTarget) return
     try {
-      await api(`/api/platform/plans/${deleteTarget._id}`, { method: 'DELETE' })
+      const res = await api(`/api/platform/plans/${deleteTarget._id}`, { method: 'DELETE' })
+      if (!res?.ok) throw new Error(res?.message || 'Plan silinemedi')
       await load()
       toast.success('Plan silindi')
       setDeleteConfirmOpen(false)

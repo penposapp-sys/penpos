@@ -118,7 +118,7 @@ router.delete('/tenants/:tenantId', requireAuth, requireRole(['platform_admin'])
   }
 })
 
-router.post('/plans', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.post('/plans', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const plan = await createPlanService(req.body || {}, req.user.id)
     res.json({ success: true, id: plan._id })
@@ -127,7 +127,7 @@ router.post('/plans', requireAuth, requireRole(['platform_admin']), async (req, 
   }
 })
 
-router.get('/plans', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.get('/plans', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const items = await listPlansService(req.query?.systemType)
     res.json({ success: true, items, plans: items })
@@ -136,7 +136,7 @@ router.get('/plans', requireAuth, requireRole(['platform_admin']), async (req, r
   }
 })
 
-router.put('/plans/:id', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/plans/:id', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const plan = await updatePlanService(req.params.id, req.body || {}, req.user.id)
     res.json({ plan })
@@ -145,7 +145,7 @@ router.put('/plans/:id', requireAuth, requireRole(['platform_admin']), async (re
   }
 })
 
-router.delete('/plans/:id', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.delete('/plans/:id', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await deletePlanService(req.params.id, req.user.id)
     res.json(result)
@@ -182,7 +182,7 @@ router.put('/tenants/:tenantId/trial-end', requireAuth, requireRole(['platform_a
   }
 })
 
-router.get('/payments', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.get('/payments', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await listPaymentRequestsService()
     res.json(result)
@@ -191,7 +191,7 @@ router.get('/payments', requireAuth, requireRole(['platform_admin']), async (req
   }
 })
 
-router.put('/payments/:id/approve', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/payments/:id/approve', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await approvePaymentRequestService(req.params.id, req.user.id)
     res.json(result)
@@ -200,7 +200,7 @@ router.put('/payments/:id/approve', requireAuth, requireRole(['platform_admin'])
   }
 })
 
-router.put('/payments/:id/reject', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/payments/:id/reject', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await rejectPaymentRequestService(req.params.id, req.user.id)
     res.json(result)
@@ -209,7 +209,7 @@ router.put('/payments/:id/reject', requireAuth, requireRole(['platform_admin']),
   }
 })
 
-router.get('/billing/requests', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.get('/billing/requests', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await listMembershipRequestsService({ status: req.query?.status, systemType: req.query?.systemType })
     res.json(result)
@@ -218,7 +218,7 @@ router.get('/billing/requests', requireAuth, requireRole(['platform_admin']), as
   }
 })
 
-router.post('/billing/requests/:id/approve', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.post('/billing/requests/:id/approve', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await approveMembershipRequestService(req.params.id, req.user.id, req.body?.decisionNote)
     res.json(result)
@@ -227,7 +227,7 @@ router.post('/billing/requests/:id/approve', requireAuth, requireRole(['platform
   }
 })
 
-router.post('/billing/requests/:id/reject', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.post('/billing/requests/:id/reject', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await rejectMembershipRequestService(req.params.id, req.user.id, req.body?.decisionNote)
     res.json(result)
