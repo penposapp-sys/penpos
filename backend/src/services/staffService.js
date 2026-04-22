@@ -4,14 +4,21 @@ import { findAllByTenant, createStaff, findByIdAndTenant, confirmEmailAvailable,
 import { findByIdAndTenant as findBranchByIdAndTenant } from '../repositories/branchRepository.js'
 import User from '../models/User.js'
 import { getTenantPlan, ensureNotExpired } from './planService.js'
-import { PERMISSION_ALIASES } from '../constants/permissions.js'
+import { PERMISSION_ALIASES, PERMISSIONS } from '../constants/permissions.js'
 
 const canonicalizePermissions = (perms) => {
   const list = Array.isArray(perms) ? perms : []
   const set = new Set()
+  const canonicalValues = new Set(Object.values(PERMISSIONS))
   for (const p of list) {
     if (!p) continue
-    set.add(PERMISSION_ALIASES[p] || p)
+    if (canonicalValues.has(p)) {
+      set.add(p)
+      continue
+    }
+    const mapped = PERMISSION_ALIASES[p]
+    if (Array.isArray(mapped)) set.add(mapped[0] || p)
+    else set.add(mapped || p)
   }
   return Array.from(set)
 }

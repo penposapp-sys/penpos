@@ -260,8 +260,13 @@ export const normalizePermissions = (perms) => {
 export const canonicalizePermissions = (perms) => {
   const list = Array.isArray(perms) ? perms : []
   const set = new Set()
+  const canonicalValues = new Set(Object.values(PERMISSIONS))
   for (const p of list) {
     if (!p) continue
+    if (canonicalValues.has(p)) {
+      set.add(p)
+      continue
+    }
     const aliased = PERMISSION_ALIASES[p]
     if (Array.isArray(aliased)) {
       set.add(aliased[0] || p)

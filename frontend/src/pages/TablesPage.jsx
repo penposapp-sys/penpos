@@ -6,6 +6,16 @@ import { useAuth } from '../context/AuthContext.jsx'
 import Modal from '../components/Modal.jsx'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 
+const inferTableCategory = (table) => {
+  const raw = String(table?.name || '').trim()
+  if (!raw) return 'Diğer'
+  const normalized = raw
+    .replace(/\s+\d+$/u, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return normalized || raw
+}
+
 export default function TablesPage() {
   const { allowedBranchIds } = useAuth()
   const [tables, setTables] = useState([])
@@ -18,6 +28,7 @@ export default function TablesPage() {
   const [mergeSources, setMergeSources] = useState([])
   const [paidByTable, setPaidByTable] = useState({})
   const [activeByTable, setActiveByTable] = useState({})
+  const [activeCategory, setActiveCategory] = useState('')
   const loadingRef = useRef(false)
 
   const { ids: allowed } = buildBranchQueryParams(allowedBranchIds)
@@ -159,9 +170,9 @@ export default function TablesPage() {
 
       const active = activeByTable[tableId]
       if (active?.hasActive && active?.orderId) {
-        nav(`/kermes/app/pos?orderId=${active.orderId}`, { replace: true })
+        nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
       } else {
-        nav(`/kermes/app/pos?tableId=${tableId}`, { replace: true })
+        nav(`/kermes/app/pos?tableId=${tableId}`, { state: { fromTables: true } })
       }
     } catch (err) {
       setError(err.message)
@@ -177,6 +188,25 @@ export default function TablesPage() {
   const toggleSource = (id) => {
     setMergeSources(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
+
+  const groupedTables = tables.reduce((acc, table) => {
+    const category = inferTableCategory(table)
+    if (!acc[category]) acc[category] = []
+    acc[category].push(table)
+    return acc
+  }, {})
+
+  const categories = ['Tümü', ...Object.keys(groupedTables)]
+
+  useEffect(() => {
+    if (categories.length === 0) {
+      setActiveCategory('')
+      return
+    }
+    if (!activeCategory || !categories.includes(activeCategory)) {
+      setActiveCategory(categories[0])
+    }
+  }, [activeCategory, categories])
 
   const submitMerge = async () => {
     try {
@@ -194,7 +224,7 @@ export default function TablesPage() {
 
       const active = latest?.activeByTable?.[targetTable?.id] || null
       if (active?.orderId) {
-        nav(`/kermes/app/pos?orderId=${active.orderId}`, { replace: true })
+        nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
       }
     } catch (err) {
       const msg = parseApiError(err)
@@ -220,43 +250,81 @@ export default function TablesPage() {
 
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
       {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>İşlem sürüyor…</div>}
+      {categories.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+          {categories.map(category => (
+            <button
+              key={category}
+              type="button"
+              className="btn"
+              onClick={() => setActiveCategory(category)}
+              style={{
+                fontWeight: activeCategory === category ? 800 : 700,
+                borderColor: activeCategory === category ? '#111827' : '#d1d5db',
+                background: activeCategory === category ? '#eef2ff' : '#ffffff',
+                color: '#111827',
+                boxShadow: activeCategory === category ? '0 6px 16px rgba(15, 23, 42, 0.10)' : '0 2px 8px rgba(15, 23, 42, 0.06)',
+                borderWidth: 1.5,
+                borderStyle: 'solid',
+                borderRadius: 14,
+                padding: '10px 14px'
+              }}
+            >
+              {category}
+              <span style={{ marginLeft: 6, color: 'var(--muted)' }}>
+                ({category === 'Tümü' ? tables.length : (groupedTables[category]?.length || 0)})
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="tablesGrid">
-        {tables.map(t => {
+        {(activeCategory === 'Tümü' ? tables : (groupedTables[activeCategory] || [])).map(t => {
           const isAnyBusy = busyGlobal || !!busyTableId
           const isBusy = busyGlobal || busyTableId === t.id
           return (
-          <div
-            key={t.id}
-            className="card"
-            style={{ cursor: isAnyBusy ? 'not-allowed' : 'pointer', position: 'relative', borderColor: (() => {
-              const active = activeByTable[t.id]
-              if (!active?.hasActive) return '#22c55e'
-              const createdAt = paidByTable[t.id]?.createdAt
-              if (!createdAt) return '#ef4444'
-              const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
-              if (mins >= 45) return '#ef4444'
-              if (mins >= 30) return '#f59e0b'
-              return '#22c55e'
-            })() }}
-            onClick={() => (isAnyBusy ? null : onTableClick(t))}
-          >
-            {isBusy && (
-              <span className="page-pill" style={{ position: 'absolute', top: 12, left: 12 }}>İşleniyor</span>
-            )}
-            {paidByTable[t.id]?.isPaid && (
-              <span className="page-pill" style={{ position: 'absolute', top: 12, right: 12 }}>Ödendi</span>
-            )}
-            <div style={{ fontWeight: 700 }}>{t.name}</div>
-            {!!paidByTable[t.id]?.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{paidByTable[t.id].note}</div>}
-            <div style={{ color: (!activeByTable[t.id]?.hasActive) ? '#22c55e' : (paidByTable[t.id]?.isPaid ? 'var(--muted)' : '#ef4444') }}>
-              {!activeByTable[t.id]?.hasActive ? 'Boş' : (paidByTable[t.id]?.isPaid ? 'Dolu (Ödendi)' : 'Dolu')}
-            </div>
-            {activeByTable[t.id]?.hasActive && (
-              <div style={{ marginTop: 8 }}>
-                <button className="btn" onClick={(e) => { e.stopPropagation(); openMerge(t) }} disabled={isAnyBusy}>Masa Birleştir</button>
+            <div
+              key={t.id}
+              className="card"
+              style={{
+                cursor: isAnyBusy ? 'not-allowed' : 'pointer',
+                position: 'relative',
+                borderColor: (() => {
+                  const active = activeByTable[t.id]
+                  if (!active?.hasActive) return '#22c55e'
+                  const createdAt = paidByTable[t.id]?.createdAt
+                  if (!createdAt) return '#ef4444'
+                  const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
+                  if (mins >= 45) return '#ef4444'
+                  if (mins >= 30) return '#f59e0b'
+                  return '#22c55e'
+                })(),
+                borderWidth: 1.5,
+                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                borderRadius: 18,
+                background: '#ffffff',
+                padding: 20
+              }}
+              onClick={() => (isAnyBusy ? null : onTableClick(t))}
+            >
+              {isBusy && (
+                <span className="page-pill" style={{ position: 'absolute', top: 12, left: 12 }}>İşleniyor</span>
+              )}
+              {paidByTable[t.id]?.isPaid && (
+                <span className="page-pill" style={{ position: 'absolute', top: 12, right: 12 }}>Ödendi</span>
+              )}
+              <div style={{ fontWeight: 700 }}>{t.name}</div>
+              {!!paidByTable[t.id]?.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{paidByTable[t.id].note}</div>}
+              <div style={{ color: (!activeByTable[t.id]?.hasActive) ? '#22c55e' : (paidByTable[t.id]?.isPaid ? 'var(--muted)' : '#ef4444') }}>
+                {!activeByTable[t.id]?.hasActive ? 'Boş' : (paidByTable[t.id]?.isPaid ? 'Dolu (Ödendi)' : 'Dolu')}
               </div>
-            )}
-          </div>
+              {activeByTable[t.id]?.hasActive && (
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn" onClick={(e) => { e.stopPropagation(); openMerge(t) }} disabled={isAnyBusy}>Masa Birleştir</button>
+                </div>
+              )}
+            </div>
           )
         })}
         {tables.length === 0 && (

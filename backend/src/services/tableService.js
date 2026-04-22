@@ -178,12 +178,10 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
     const grandTotal = ord.totals?.grandTotal || 0
     const remaining = Math.max(0, grandTotal - paidTotal)
     const isPaid = grandTotal > 0 && remaining <= 0.01
-    if (isPaid) {
-      paidByTable[key] = {
-        isPaid: true,
-        note: ord.note || '',
-        createdAt: ord.createdAt
-      }
+    paidByTable[key] = {
+      isPaid,
+      note: ord.note || '',
+      createdAt: ord.createdAt
     }
   }
   return {

@@ -19,6 +19,8 @@ export default function MenuItemsPage() {
   const [editForm, setEditForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isActive: true })
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
+  const [inlineSaving, setInlineSaving] = useState({})
+  const [inlineDrafts, setInlineDrafts] = useState({})
   const isExpired = tenantCtx?.tenant?.plan?.status === 'expired'
 
   const loadCategories = async () => {
@@ -116,6 +118,86 @@ export default function MenuItemsPage() {
 
   const catName = (id) => categories.find(c => c.id === id)?.name || ''
 
+  const getInlineDraft = (item) => {
+    const key = String(item?.id || '')
+    const draft = inlineDrafts[key] || {}
+    return {
+      price: draft.price ?? String(item?.price ?? ''),
+      isActive: draft.isActive ?? !!item?.isActive
+    }
+  }
+
+  const setInlineDraftValue = (itemId, patch) => {
+    const key = String(itemId || '')
+    setInlineDrafts(prev => ({
+      ...(prev || {}),
+      [key]: {
+        ...(prev?.[key] || {}),
+        ...patch
+      }
+    }))
+  }
+
+  const updateInlineItem = async (item, patch) => {
+    const itemId = String(item?.id || '')
+    if (!itemId) return
+    setInlineSaving(prev => ({ ...(prev || {}), [itemId]: true }))
+    setError('')
+    try {
+      const payload = {
+        categoryId: item.categoryId,
+        name: item.name,
+        price: patch.price ?? item.price,
+        description: item.description || '',
+        imageUrl: item.imageUrl || '',
+        sortOrder: item.sortOrder ?? 0,
+        isActive: patch.isActive ?? item.isActive
+      }
+      const { item: updated } = await api(`/api/tenant/menu-items/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      })
+      setItems(prev => prev.map(it => it.id === updated.id ? updated : it))
+      setInlineDrafts(prev => ({
+        ...(prev || {}),
+        [itemId]: {
+          price: String(updated.price ?? ''),
+          isActive: !!updated.isActive
+        }
+      }))
+    } catch (err) {
+      setError(err.message)
+      setInlineDrafts(prev => ({
+        ...(prev || {}),
+        [itemId]: {
+          price: String(item?.price ?? ''),
+          isActive: !!item?.isActive
+        }
+      }))
+    } finally {
+      setInlineSaving(prev => ({ ...(prev || {}), [itemId]: false }))
+    }
+  }
+
+  const commitInlinePrice = async (item) => {
+    const draft = getInlineDraft(item)
+    const normalized = String(draft.price || '').replace(',', '.').trim()
+    const nextPrice = Number(normalized)
+    if (!Number.isFinite(nextPrice) || nextPrice < 0) {
+      setError('Fiyat 0 veya daha büyük bir sayı olmalı')
+      setInlineDraftValue(item.id, { price: String(item?.price ?? '') })
+      return
+    }
+    if (Number(nextPrice) === Number(item?.price ?? 0)) return
+    await updateInlineItem(item, { price: nextPrice })
+  }
+
+  const toggleInlineStatus = async (item, nextIsActive) => {
+    setInlineDraftValue(item.id, { isActive: !!nextIsActive })
+    if (Boolean(item?.isActive) === Boolean(nextIsActive)) return
+    await updateInlineItem(item, { isActive: !!nextIsActive })
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -162,14 +244,48 @@ export default function MenuItemsPage() {
                 </thead>
                 <tbody>
                   {items.map(i => {
-                    const statusLabel = i.isActive ? 'Aktif' : 'Pasif'
                     const categoryLabel = catName(i.categoryId)
+                    const draft = getInlineDraft(i)
+                    const isSaving = !!inlineSaving[String(i.id)]
                     return (
                       <tr key={i.id}>
                         <td>{i.name}</td>
                         <td>{categoryLabel}</td>
-                        <td>{i.price} TL</td>
-                        <td>{statusLabel}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                              className="input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              style={{ width: 120 }}
+                              value={draft.price}
+                              onChange={(e) => setInlineDraftValue(i.id, { price: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  commitInlinePrice(i)
+                                  e.currentTarget.blur()
+                                }
+                              }}
+                              onBlur={() => commitInlinePrice(i)}
+                              disabled={isExpired || isSaving}
+                            />
+                            <span>TL</span>
+                          </div>
+                        </td>
+                        <td>
+                          <select
+                            className="input"
+                            style={{ width: 120 }}
+                            value={draft.isActive ? 'true' : 'false'}
+                            onChange={(e) => toggleInlineStatus(i, e.target.value === 'true')}
+                            disabled={isExpired || isSaving}
+                          >
+                            <option value="true">Aktif</option>
+                            <option value="false">Pasif</option>
+                          </select>
+                        </td>
                         <td className="actions">
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button className="btn" onClick={() => openEdit(i)}>Düzenle</button>
@@ -185,15 +301,50 @@ export default function MenuItemsPage() {
 
             <div className="mobile-only settings-mobile">
               {(items || []).map(i => {
-                const statusLabel = i.isActive ? 'Aktif' : 'Pasif'
                 const categoryLabel = catName(i.categoryId)
+                const draft = getInlineDraft(i)
+                const isSaving = !!inlineSaving[String(i.id)]
                 return (
                   <div key={i.id} className="mobile-list-item">
                     <div className="mobile-item-title breakAny">{i.name}</div>
                     <div className="mobile-item-meta">
                       <span className="breakAny">Kategori: {categoryLabel}</span>
-                      <span>Fiyat: {i.price} TL</span>
-                      <span>Durum: {statusLabel}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        Fiyat:
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          style={{ width: 110 }}
+                          value={draft.price}
+                          onChange={(e) => setInlineDraftValue(i.id, { price: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              commitInlinePrice(i)
+                              e.currentTarget.blur()
+                            }
+                          }}
+                          onBlur={() => commitInlinePrice(i)}
+                          disabled={isExpired || isSaving}
+                        />
+                        TL
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        Durum:
+                        <select
+                          className="input"
+                          style={{ width: 110 }}
+                          value={draft.isActive ? 'true' : 'false'}
+                          onChange={(e) => toggleInlineStatus(i, e.target.value === 'true')}
+                          disabled={isExpired || isSaving}
+                        >
+                          <option value="true">Aktif</option>
+                          <option value="false">Pasif</option>
+                        </select>
+                      </span>
+                      {isSaving && <span>Kaydediliyor...</span>}
                     </div>
                     <div className="mobile-actions-row">
                       <button className="btn" type="button" onClick={() => openEdit(i)}>Düzenle</button>

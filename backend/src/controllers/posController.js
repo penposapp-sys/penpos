@@ -1,5 +1,5 @@
 import { sendError, error } from '../utils/errors.js'
-import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService } from '../services/orderService.js'
+import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService } from '../services/orderService.js'
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
@@ -178,6 +178,25 @@ export const cancelItem = async (req, res) => {
     })
     try {
       await auditLog(req.user.tenantId, req.user.id, 'urun_iptal', 'order', order._id || order.id, { itemId, reason: req.body?.reason || '' })
+    } catch (e) {
+      console.error('Controller audit log failed', e)
+    }
+    res.json({ success: true, order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const completeItem = async (req, res) => {
+  try {
+    const orderId = req.params.orderId
+    const itemId = req.params.itemId
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      throw error('invalid_request', 'Invalid id', 400)
+    }
+    const { order } = await completeItemByItemIdService(req.user.tenantId, orderId, itemId)
+    try {
+      await auditLog(req.user.tenantId, req.user.id, 'urun_hazir', 'order', order._id || order.id, { itemId })
     } catch (e) {
       console.error('Controller audit log failed', e)
     }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
@@ -17,6 +17,7 @@ import { enqueueReceiptPrint } from '../lib/printingClient.js'
 
 export default function PosPage() {
   const nav = useNavigate()
+  const location = useLocation()
   const { user, allowedBranchIds } = useAuth()
   const { isMobilePortrait } = useResponsiveFlags()
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
@@ -658,6 +659,22 @@ export default function PosPage() {
     }
     setCancelModalOpen(false)
   }
+  const completeItem = async (itemId) => {
+    if (!itemId) return
+    const orderId = getOrderId(order)
+    if (!orderId) {
+      toast.error('Sipariş bulunamadı')
+      setError('Sipariş bulunamadı')
+      return
+    }
+    const key = `${orderId}:${itemId}:complete`
+    if (isDebounced(key, 250)) return
+    const res = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items/${itemId}/complete`, { method: 'PUT', signal, silent: true })))
+    const fresh = pickOrder(res)
+    if (fresh) {
+      setNote(fresh.note || '')
+    }
+  }
   const saveNote = async () => {
     const orderId = getOrderId(order)
     if (!orderId) {
@@ -925,6 +942,10 @@ export default function PosPage() {
         nav('/kermes/app/tables', { replace: true })
       }
     } catch {}
+  }
+
+  const backToTables = () => {
+    nav('/kermes/app/tables')
   }
 
   const openTransfer = async () => {
@@ -1226,9 +1247,11 @@ export default function PosPage() {
             const qtyLockKey = rowOrderId && rowItemId ? `${rowOrderId}:${rowItemId}:qty` : null
             const noteLockKey = rowOrderId && rowItemId ? `${rowOrderId}:${rowItemId}:note` : null
             const cancelLockKey = rowOrderId && rowItemId ? `${rowOrderId}:${rowItemId}:cancel` : null
+            const completeLockKey = rowOrderId && rowItemId ? `${rowOrderId}:${rowItemId}:complete` : null
             const isQtyLocked = !!(qtyLockKey && inflightRef.current.get(qtyLockKey)) || qtyInflightRef.current.has(String(rowItemId || '')) || (qtyCooldownUntilRef.current.get(String(rowItemId || '')) || 0) > Date.now()
             const isNoteLocked = !!(noteLockKey && inflightRef.current.get(noteLockKey))
             const isCancelLocked = !!(cancelLockKey && inflightRef.current.get(cancelLockKey))
+            const isCompleteLocked = !!(completeLockKey && inflightRef.current.get(completeLockKey))
             const rawDraft = getQtyDraft(row.key, row.qty)
             const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
             const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
@@ -1358,6 +1381,21 @@ export default function PosPage() {
                         style={isMultiGroup ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                       >
                         Not
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          if (isMultiGroup) {
+                            toast.info('Hazır için Ayrı moduna geç')
+                            return
+                          }
+                          completeItem(row.itemId)
+                        }}
+                        disabled={disableBase || isCompleteLocked}
+                        title={isMultiGroup ? 'Hazır için Ayrı moduna geç' : undefined}
+                        style={{ backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#6ee7b7', ...(isMultiGroup ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                      >
+                        Hazır
                       </button>
                       <button
                         className="btn"
@@ -1509,6 +1547,13 @@ export default function PosPage() {
         <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={setActiveCategory} />
 
         <div className="card salePanel">
+          {(tableName || tableId || location.state?.fromTables) && (
+            <div style={{ marginBottom: 10 }}>
+              <button className="btn" type="button" onClick={backToTables}>
+                Masalara Dön
+              </button>
+            </div>
+          )}
           <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted)' }}>
             {tableName ? `Masa: ${tableName}` : 'Masasız Satış'}
             {order?.orderNo ? ` • Sipariş ${order.orderNo}` : ' • Sipariş —'}
