@@ -1,5 +1,5 @@
 import { sendError, error } from '../utils/errors.js'
-import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService } from '../services/orderService.js'
+import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemWeightByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService } from '../services/orderService.js'
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
@@ -54,7 +54,11 @@ export const addItem = async (req, res) => {
       throw e
     }
     const quantity = Number(req.body?.quantity || 1)
-    const { order } = await addItemService(req.user.tenantId, req.params.id, menuItemId, quantity)
+    const weightGramsRaw = req.body?.weightGrams
+    const weightGrams = weightGramsRaw === undefined || weightGramsRaw === null || weightGramsRaw === ''
+      ? null
+      : Number(weightGramsRaw)
+    const { order } = await addItemService(req.user.tenantId, req.params.id, menuItemId, { quantity, weightGrams })
     try {
       await auditLog(req.user.tenantId, req.user.id, 'hızlı_urun_ekleme', 'order', order._id, { menuItemId: req.body?.menuItemId })
     } catch (e) {
@@ -227,6 +231,22 @@ export const setItemQuantityByItemId = async (req, res) => {
 
     const { order } = await setItemQuantityByItemIdService(req.user.tenantId, req.params.orderId, req.params.itemId, quantity)
     return res.json({ success: true, order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const setItemWeightByItemId = async (req, res) => {
+  try {
+    const weightGrams = Number(req.body?.weightGrams)
+    if (Number.isNaN(weightGrams)) {
+      const e = new Error('Invalid weight')
+      e.status = 400
+      e.payload = { code: 'invalid_weight', message: 'Invalid weight' }
+      throw e
+    }
+    const { order } = await setItemWeightByItemIdService(req.user.tenantId, req.params.orderId, req.params.itemId, weightGrams)
+    res.json({ success: true, order })
   } catch (err) {
     sendError(res, err)
   }

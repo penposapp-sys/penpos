@@ -13,6 +13,7 @@ export default function ProductCard({ item, disabled = false, onClick }) {
   const imageUrl = useMemo(() => pickImageUrl(item), [item])
   const hasImage = !!imageUrl
   const price = item?.price
+  const isWeightBased = !!item?.isWeightBased
   const name = item?.name
 
   return (
@@ -46,7 +47,7 @@ export default function ProductCard({ item, disabled = false, onClick }) {
       <div className="productCard__overlay" />
       <div className="productCard__content">
         <div className="productCard__name">{name}</div>
-        <div className="productCard__price">{price} TL</div>
+        <div className="productCard__price">{price} TL{isWeightBased ? '/KG' : ''}</div>
       </div>
     </div>
   )

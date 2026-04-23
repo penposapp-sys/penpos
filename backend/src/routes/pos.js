@@ -23,6 +23,7 @@ router.put('/orders/:orderId/items/:itemId/note', requireAuth, tenantGuard, reso
 router.put('/orders/:orderId/items/:itemId/cancel', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.cancelItem)
 router.put('/orders/:orderId/items/:itemId/complete', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.completeItem)
 router.put('/orders/:orderId/items/:itemId/quantity', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.setItemQuantityByItemId)
+router.put('/orders/:orderId/items/:itemId/weight', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.setItemWeightByItemId)
 router.put('/orders/:id/cancel', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.cancel)
 router.put('/orders/:id/send', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.send)
 router.put('/orders/:id/kitchen-mode', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.setKitchenMode)

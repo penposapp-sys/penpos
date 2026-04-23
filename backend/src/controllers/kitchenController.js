@@ -139,6 +139,8 @@ export const bulkList = async (req, res) => {
             name: String(it?.nameSnapshot || ''),
             note: String(it?.note || ''),
             tableName: displayName,
+            isWeightBased: !!it?.isWeightBased,
+            weightGrams: Number(it?.weightGrams || 0) || 0,
             qty: Number(it?.qty || 1),
             createdAt
           })
@@ -158,17 +160,26 @@ export const bulkList = async (req, res) => {
 
     const byMenuItemId = new Map()
     for (const r of rows) {
-      const key = String(r.menuItemId || '')
+      const key = `${String(r.menuItemId || '')}|${String(r.weightGrams || '')}`
       if (!key) continue
       const entry = byMenuItemId.get(key) || {
-        menuItemId: key,
+        menuItemId: String(r.menuItemId || ''),
         name: String(r.name || ''),
-        categoryId: categoryIdByMenuItemId.get(key) || '',
+        categoryId: categoryIdByMenuItemId.get(String(r.menuItemId || '')) || '',
+        isWeightBased: !!r.isWeightBased,
+        weightGrams: Number(r.weightGrams || 0) || 0,
         totalQty: 0,
         rows: []
       }
       entry.totalQty += Math.max(1, Number(r.qty || 1))
-      entry.rows.push({ rowKey: r.rowKey, tableName: r.tableName, qty: Math.max(1, Number(r.qty || 1)), createdAt: r.createdAt })
+      entry.rows.push({
+        rowKey: r.rowKey,
+        tableName: r.tableName,
+        qty: Math.max(1, Number(r.qty || 1)),
+        isWeightBased: !!r.isWeightBased,
+        weightGrams: Number(r.weightGrams || 0) || 0,
+        createdAt: r.createdAt
+      })
       byMenuItemId.set(key, entry)
     }
 
@@ -228,6 +239,7 @@ export const bulkDone = async (req, res) => {
     const tableName = String(req.body?.tableName || '').trim()
     const createdAt = req.body?.createdAt ? new Date(req.body.createdAt) : (it?.kitchenSentAt || it?.sentAt || order?.createdAt || null)
     const qty = Math.max(1, Number(req.body?.qty || it?.qty || 1))
+    const weightGrams = Number(req.body?.weightGrams || it?.weightGrams || 0) || 0
     const now = new Date()
 
     await KitchenBulkPrepState.findOneAndUpdate(
@@ -242,6 +254,7 @@ export const bulkDone = async (req, res) => {
           rowKey,
           tableName,
           qty,
+          weightGrams,
           createdAt: createdAt && Number.isFinite(new Date(createdAt).getTime()) ? createdAt : null,
           isDone: true,
           doneAt: now,

@@ -6,6 +6,7 @@ import InputModal from '../components/InputModal.jsx'
 import MenuItemFilterDrawer from '../components/MenuItemFilterDrawer.jsx'
 import { servingTypeLabelTR } from '../utils/servingType.js'
 import { useKitchenMenuFilters } from '../lib/useKitchenMenuFilters.js'
+import { useKitchenAlertSound } from '../lib/useKitchenAlertSound.js'
 
 export default function KitchenPage() {
   const STATUS_LABELS_TR = {
@@ -49,69 +50,11 @@ export default function KitchenPage() {
   const lastIdsRef = useRef([])
   const initialLoadedRef = useRef(false)
 
-  const audioCtxRef = useRef(null)
-  const audioUnlockedRef = useRef(false)
-  const lastBeepRef = useRef(0)
-
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    try {
-      const raw = localStorage.getItem('kitchenSoundEnabled')
-      if (raw == null) return true
-      return raw === '1' || raw === 'true'
-    } catch {
-      return true
-    }
-  })
-
   const pickOrder = (res) => res?.data?.order ?? res?.order ?? null
   const { allowedBranchIds } = useAuth()
   const [filterOpen, setFilterOpen] = useState(false)
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_normal' })
-
-  const ensureAudioUnlocked = async () => {
-    try {
-      if (!audioCtxRef.current) {
-        const Ctx = window.AudioContext || window.webkitAudioContext
-        if (!Ctx) return false
-        audioCtxRef.current = new Ctx()
-      }
-      if (audioCtxRef.current.state !== 'running') {
-        await audioCtxRef.current.resume()
-      }
-      audioUnlockedRef.current = true
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  const beep = async () => {
-    if (!soundEnabled) return
-    const now = Date.now()
-    if (now - Number(lastBeepRef.current || 0) < 5000) return
-    lastBeepRef.current = now
-
-    if (!audioUnlockedRef.current) return
-    const ctx = audioCtxRef.current
-    if (!ctx) return
-    try {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-
-      osc.type = 'sine'
-      osc.frequency.value = 880
-
-      const t = ctx.currentTime
-      gain.gain.setValueAtTime(0.0001, t)
-      gain.gain.exponentialRampToValueAtTime(0.25, t + 0.01)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25)
-
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(t)
-      osc.stop(t + 0.28)
-    } catch {}
-  }
+  const { soundEnabled, setSoundEnabled, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
 
   const load = async () => {
     setError('')
@@ -153,7 +96,7 @@ export default function KitchenPage() {
 
       const newIds = ids.filter(id => !prevIds.includes(id))
       if (newIds.length > 0) {
-        await beep()
+        await playAlert()
       }
     } catch (err) {
       setError(err.message)
@@ -310,7 +253,7 @@ export default function KitchenPage() {
             }}
             title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapalı (Aç)'}
           >
-            {soundIcon}
+            {soundEnabled ? '🔊' : '🔇'}
           </button>
         </div>
       </div>
@@ -377,7 +320,11 @@ export default function KitchenPage() {
                       className={`${getItemBgClass(it.status)} kitchenItemBar`}
                     >
                       <div className="kitchenItemRow">
-                        <div className="kitchenItemName">{it.qty}x {it.nameSnapshot}</div>
+                        <div className="kitchenItemName">
+                          {it?.isWeightBased
+                            ? `${it.nameSnapshot} • ${Number(it?.weightGrams || 0)} gr`
+                            : `${it.qty}x ${it.nameSnapshot}`}
+                        </div>
                         <div className="kitchenItemAge">{getItemAgeMinutes(o, it)} dk</div>
                         <div className="kitchenItemActions">
                           {showItemServingType && (

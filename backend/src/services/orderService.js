@@ -512,7 +512,7 @@ export const getOrderService = async (tenantId, id) => {
 const isEditableStatus = (status) => ['open', 'sent', 'paid'].includes(status)
 const isNotEditableStatus = (status) => ['closed', 'cancelled'].includes(status)
 
-export const addItemService = async (tenantId, id, menuItemId, quantity = 1) => {
+export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
   if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid order id', 400)
   if (!mongoose.Types.ObjectId.isValid(menuItemId)) throw error('invalid_request', 'Invalid menu item', 400)
 
@@ -542,30 +542,49 @@ export const addItemService = async (tenantId, id, menuItemId, quantity = 1) => 
     }
   }
 
-  const qty = Math.max(1, Number(quantity) || 1)
+  const rawQuantity = typeof input === 'object' && input !== null ? input.quantity : input
+  const qty = Math.max(1, Number(rawQuantity) || 1)
   const item = await findMenuItem(menuItemId, tenantId)
   if (!item || !item.isActive) throw error('not_found', 'Menu item not found', 404)
   const price = typeof item.price === 'number' ? item.price : 0
+  const isWeightBased = !!item.isWeightBased
+  const rawWeightGrams = typeof input === 'object' && input !== null ? input.weightGrams : null
+  const weightGrams = rawWeightGrams === undefined || rawWeightGrams === null || rawWeightGrams === ''
+    ? null
+    : Number(rawWeightGrams)
+
+  if (isWeightBased) {
+    if (!Number.isFinite(weightGrams) || weightGrams <= 0) {
+      throw error('invalid_weight', 'Gram bilgisi gerekli', 400)
+    }
+  }
 
   const incomingNote = ''
-  const existingOpen = order.items.find(it =>
-    String(it.menuItemId) === String(menuItemId) &&
-    it.status === 'open' &&
-    String(it.note || '') === String(incomingNote)
-  )
+  const existingOpen = isWeightBased
+    ? null
+    : order.items.find(it =>
+      String(it.menuItemId) === String(menuItemId) &&
+      it.status === 'open' &&
+      String(it.note || '') === String(incomingNote)
+    )
 
   const wasCompleted = order.status === 'completed'
   if (existingOpen) {
     existingOpen.qty += qty
     existingOpen.subtotal = existingOpen.qty * (existingOpen.priceSnapshot || 0)
   } else {
+    const lineSubtotal = isWeightBased
+      ? toMoney((toMoney(weightGrams) / 1000) * price)
+      : toMoney(qty * price)
     // const now = new Date() // Not needed for open item
     const newItem = {
       menuItemId: item.id,
       nameSnapshot: item.name || 'Unknown',
       priceSnapshot: price,
-      qty: qty,
-      subtotal: qty * price,
+      qty: isWeightBased ? 1 : qty,
+      subtotal: lineSubtotal,
+      isWeightBased,
+      weightGrams: isWeightBased ? Math.round(weightGrams) : null,
       note: incomingNote,
       status: 'open',
       sentAt: null
@@ -767,7 +786,11 @@ export const removeItemService = async (tenantId, id, menuItemId) => {
     e.payload = { error: 'invalid_state', message: 'Order not open or sent', details: { currentStatus: order.status, allowed: ['open', 'sent'] } }
     throw e
   }
-  const idx = order.items.findIndex(it => String(it.menuItemId) === String(menuItemId))
+  const key = String(menuItemId)
+  let idx = order.items.findIndex(it => String(it?._id || '') === key || String(it?.id || '') === key)
+  if (idx === -1) {
+    idx = order.items.findIndex(it => String(it.menuItemId) === key)
+  }
   if (idx === -1) throw error('not_found', 'Item not in order', 404)
   const existing = order.items[idx]
   if (existing.qty > 1) {
@@ -867,6 +890,61 @@ export const setItemQuantityByItemIdService = async (tenantId, id, itemId, quant
     it.qty = qty
     it.subtotal = qty * (it.priceSnapshot || 0)
   }
+  order.totals = computeTotals(order.items)
+  normalizeLegacyItemStatuses(order)
+  {
+    const fin = computePaymentSummary(order)
+    if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
+      order.paymentStatus = 'paid'
+      order.paidAt = order.paidAt || new Date()
+    } else {
+      order.paymentStatus = 'unpaid'
+      order.paidAt = null
+    }
+  }
+  await order.save()
+  const freshOrder = await Order.findById(order.id).lean()
+  const dto = decorateOrder(freshOrder)
+  return { order: dto }
+}
+
+export const setItemWeightByItemIdService = async (tenantId, id, itemId, weightGramsInput) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid order id', 400)
+  if (!mongoose.Types.ObjectId.isValid(itemId)) throw error('invalid_request', 'Invalid item id', 400)
+  const order = await findByIdAndTenant(id, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+  if (isNotEditableStatus(order.status)) {
+    const e = new Error('Order is not editable')
+    e.status = 409
+    e.payload = { error: 'order_not_editable', message: 'Order is not editable' }
+    throw e
+  }
+  if (!isEditableStatus(order.status)) {
+    const e = new Error('invalid status')
+    e.status = 400
+    e.payload = { error: 'invalid_state', message: 'Order not open or sent', details: { currentStatus: order.status, allowed: ['open', 'sent'] } }
+    throw e
+  }
+  const it = order.items.id(itemId)
+  if (!it) throw error('item_not_found', 'Item not found', 404)
+  if (!it.isWeightBased) {
+    const e = new Error('Item is not weight based')
+    e.status = 400
+    e.payload = { error: 'invalid_weight_item', message: 'Item is not weight based' }
+    throw e
+  }
+
+  const weightGrams = Math.round(Number(weightGramsInput) || 0)
+  if (weightGrams <= 0) {
+    const idx = order.items.findIndex(x => String(x?._id) === String(itemId))
+    if (idx === -1) throw error('item_not_found', 'Item not found', 404)
+    order.items.splice(idx, 1)
+  } else {
+    it.weightGrams = weightGrams
+    it.qty = 1
+    it.subtotal = toMoney((toMoney(weightGrams) / 1000) * (it.priceSnapshot || 0))
+  }
+
   order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
   {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
@@ -61,6 +61,9 @@ export default function WalkInPosPage() {
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [selectedItemForNote, setSelectedItemForNote] = useState(null)
   const [itemNote, setItemNoteText] = useState('')
+  const [weightModalOpen, setWeightModalOpen] = useState(false)
+  const [pendingWeightItem, setPendingWeightItem] = useState(null)
+  const [weightModalValue, setWeightModalValue] = useState('')
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [selectedItemForCancel, setSelectedItemForCancel] = useState(null)
   const [orderCancelConfirmOpen, setOrderCancelConfirmOpen] = useState(false)
@@ -470,7 +473,7 @@ export default function WalkInPosPage() {
     }
   }
 
-  const addItem = async (menuItemId) => {
+  const addItem = async (menuItem) => {
     setError('')
     const orderId = selectedOrderId || getOrderId(order)
     if (!orderId) {
@@ -478,16 +481,81 @@ export default function WalkInPosPage() {
       setError('Sipariş bulunamadı')
       return
     }
+    const menuItemId = typeof menuItem === 'object' && menuItem !== null ? menuItem.id : menuItem
+    if (menuItem?.isWeightBased) {
+      setPendingWeightItem(menuItem)
+      setWeightModalOpen(true)
+      return
+    }
     const key = `${orderId}:${menuItemId}:add`
     if (isDebounced(key, 200)) return
-    const result = await withLock(key, () => safeAction(
-      (signal) => api(`/api/pos/orders/${orderId}/items`, { method: 'POST', data: { menuItemId }, signal, silent: true }),
-      { reload: false }
-    ))
-    const fresh = pickOrder(result)
+    const result = await withLock(key, () => api(`/api/pos/orders/${orderId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ menuItemId }),
+      silent: true
+    }))
+    if (!result?.ok) {
+      const code = result?.data?.code || result?.code || result?.data?.error || result?.error || ''
+      const message = String(result?.data?.message || result?.message || '')
+      if (menuItem && (code === 'invalid_weight' || /gram/i.test(message))) {
+        setPendingWeightItem(menuItem)
+        setWeightModalOpen(true)
+        return
+      }
+      toast.error(message || 'İşlem başarısız')
+      return
+    }
+    const fresh = pickOrder(result?.data || result)
     if (fresh) {
+      setOrder(fresh)
       setNote(fresh.note || '')
     }
+  }
+
+  const submitWeightItem = async (value) => {
+    const menuItem = pendingWeightItem
+    const menuItemId = menuItem?.id || menuItem?.menuItemId || null
+    const orderId = selectedOrderId || getOrderId(order)
+    if (!orderId || !menuItemId) return false
+
+    const grams = Math.round(Number(String(value || '').replace(',', '.')))
+    if (!Number.isFinite(grams) || grams <= 0) {
+      toast.error('Gram bilgisi geçersiz')
+      return false
+    }
+
+    const isEdit = !!menuItem?.existingItemId
+    const key = isEdit ? `${orderId}:${menuItem.existingItemId}:weight:${grams}` : `${orderId}:${menuItemId}:add:${grams}`
+    if (isDebounced(key, 200)) return false
+    const result = await withLock(key, () => api(isEdit ? `/api/pos/orders/${orderId}/items/${menuItem.existingItemId}/weight` : `/api/pos/orders/${orderId}/items`, {
+      method: isEdit ? 'PUT' : 'POST',
+      body: JSON.stringify(isEdit ? { weightGrams: grams } : { menuItemId, weightGrams: grams }),
+      silent: true
+    }))
+    if (!result?.ok) {
+      toast.error(result?.data?.message || result?.message || 'İşlem başarısız')
+      return false
+    }
+    const fresh = pickOrder(result?.data || result)
+    if (fresh) {
+      setOrder(fresh)
+      setNote(fresh.note || '')
+      setPendingWeightItem(null)
+      setWeightModalValue('')
+      return true
+    }
+    return false
+  }
+
+  const openWeightEditor = (item) => {
+    if (!item) return
+    setPendingWeightItem({
+      id: item.menuItemId || item.id,
+      menuItemId: item.menuItemId || item.id,
+      existingItemId: item.itemId || item._id || null
+    })
+    setWeightModalValue(String(Number(item.weightGrams) || ''))
+    setWeightModalOpen(true)
   }
 
   const removeItem = async (menuItemId) => {
@@ -1148,7 +1216,7 @@ export default function WalkInPosPage() {
               <div className="salePanelScroll" style={{ paddingTop: 10 }}>
                 <div className="posItemsGrid">
                   {items.map(i => (
-                  <ProductCard key={i.id} item={i} onClick={() => addItem(i.id)} />
+                  <ProductCard key={i.id} item={i} onClick={() => addItem(i)} />
                   ))}
                 </div>
               </div>
@@ -1228,7 +1296,7 @@ export default function WalkInPosPage() {
 
                   const otherRender = cartViewMode === 'grouped'
                     ? Object.values(otherItems.reduce((acc, it) => {
-                      const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
                       const prev = acc[k]
                       if (!prev) {
                         acc[k] = { key: `o:${k}`, menuItemId: it.menuItemId, itemId: it._id, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
@@ -1246,7 +1314,7 @@ export default function WalkInPosPage() {
 
                   const openRender = cartViewMode === 'grouped'
                     ? Object.values(openItems.reduce((acc, it) => {
-                      const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
                       const prev = acc[k]
                       if (!prev) {
                         acc[k] = {
@@ -1284,7 +1352,7 @@ export default function WalkInPosPage() {
 
                   const sentRender = cartViewMode === 'grouped'
                     ? Object.values(sentItems.reduce((acc, it) => {
-                      const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
                       const prev = acc[k]
                       if (!prev) {
                         acc[k] = {
@@ -1322,7 +1390,7 @@ export default function WalkInPosPage() {
 
                   const approvedRender = cartViewMode === 'grouped'
                     ? Object.values(approvedItems.reduce((acc, it) => {
-                      const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
                       const prev = acc[k]
                       if (!prev) {
                         acc[k] = {
@@ -1377,12 +1445,14 @@ export default function WalkInPosPage() {
                   }
 
                   const renderLine = (row, opts = {}) => {
-                    const it = row.repr
-                    const isOpen = opts.type === 'open'
-                    const isSent = opts.type === 'sent'
-                    const isGrouped = opts.grouped === true
-                    const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
-                    const disableBase = busy || !getOrderId(order)
+                  const it = row.repr
+                  const isOpen = opts.type === 'open'
+                  const isSent = opts.type === 'sent'
+                  const isGrouped = opts.grouped === true
+                  const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
+                  const isWeightBased = !!it?.isWeightBased
+                  const weightGrams = Number(it?.weightGrams) || 0
+                  const disableBase = busy || !getOrderId(order)
                     const orderId = selectedOrderId || getOrderId(order)
                     const itemId = row?.repr?.id || row?.repr?._id || row?.repr?.itemId || row?.itemId || null
                     const qtyLockKey = orderId && itemId ? `${orderId}:${itemId}:qty` : null
@@ -1390,11 +1460,14 @@ export default function WalkInPosPage() {
                     const cancelLockKey = orderId && itemId ? `${orderId}:${itemId}:cancel` : null
                     const isQtyLocked = !!(qtyLockKey && inflightRef.current.get(qtyLockKey)) || qtyInflightRef.current.has(String(itemId || '')) || (qtyCooldownUntilRef.current.get(String(itemId || '')) || 0) > Date.now()
                     const isNoteLocked = !!(noteLockKey && inflightRef.current.get(noteLockKey))
-                    const isCancelLocked = !!(cancelLockKey && inflightRef.current.get(cancelLockKey))
-                    const rawDraft = getQtyDraft(row.key, row.qty)
-                    const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
-                    const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
-                    return (
+                  const isCancelLocked = !!(cancelLockKey && inflightRef.current.get(cancelLockKey))
+                  const rawDraft = getQtyDraft(row.key, row.qty)
+                  const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
+                  const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
+                  const detailText = isWeightBased
+                    ? `${it?.priceSnapshot} TL/KG • ${weightGrams} gr`
+                    : `${it?.priceSnapshot} TL • x${displayQty}`
+                  return (
                       <div
                         key={row.key}
                         style={{
@@ -1407,7 +1480,12 @@ export default function WalkInPosPage() {
                           opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
                         }}
                       >
-                        <div>
+                        <div
+                          onClick={() => {
+                            if (isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId })
+                          }}
+                          style={isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
+                        >
                           {it?.status === 'sent' && (
                             <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
                               Hazırlanıyor
@@ -1424,7 +1502,7 @@ export default function WalkInPosPage() {
                             </span>
                           )}
                           <div style={{ fontWeight: 600 }}>{it?.nameSnapshot}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{it?.priceSnapshot} TL • x{displayQty}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detailText}</div>
                           {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
                         </div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1437,7 +1515,11 @@ export default function WalkInPosPage() {
                                     toast.info('Bu işlem için Ayrı moduna geç')
                                     return
                                   }
-                                const currentQty = Number(displayQty) || 0
+                                  if (isWeightBased) {
+                                    removeItem(itemId)
+                                    return
+                                  }
+                                  const currentQty = Number(displayQty) || 0
                                   const nextQty = currentQty <= 1 ? 0 : currentQty - 1
                                   setItemQtyByRow(row, nextQty)
                                 }}
@@ -1453,7 +1535,11 @@ export default function WalkInPosPage() {
                                     toast.info('Bu işlem için Ayrı moduna geç')
                                     return
                                   }
-                                const currentQty = Number(displayQty) || 0
+                                  if (isWeightBased) {
+                                    openWeightEditor({ ...it, itemId })
+                                    return
+                                  }
+                                  const currentQty = Number(displayQty) || 0
                                   const nextQty = currentQty + 1
                                   setItemQtyByRow(row, nextQty)
                                 }}
@@ -1510,7 +1596,7 @@ export default function WalkInPosPage() {
                                     activeQtyRowKeyRef.current = null
                                     commitQtyDraft(row.key, selectedOrderId || getOrderId(order), itemId, row.qty, e.target.value)
                                   }}
-                                  disabled={disableBase || isMultiGroup || isQtyLocked}
+                                  disabled={disableBase || isMultiGroup || isQtyLocked || isWeightBased}
                                 />
                               )}
                             </>
@@ -1851,6 +1937,18 @@ export default function WalkInPosPage() {
       initialValue={itemNote}
       placeholder="Not giriniz..."
       onSubmit={submitItemNote}
+    />
+    <InputModal
+      open={weightModalOpen}
+      onClose={() => {
+        setWeightModalOpen(false)
+        setPendingWeightItem(null)
+        setWeightModalValue('')
+      }}
+      title="Kaç Gram?"
+      initialValue={weightModalValue}
+      placeholder="Örn: 350"
+      onSubmit={submitWeightItem}
     />
     <InputModal
       open={cancelModalOpen}

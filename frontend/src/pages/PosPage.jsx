@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
@@ -59,6 +59,9 @@ export default function PosPage() {
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [selectedItemForNote, setSelectedItemForNote] = useState(null)
   const [itemNote, setItemNoteText] = useState('')
+  const [weightModalOpen, setWeightModalOpen] = useState(false)
+  const [pendingWeightItem, setPendingWeightItem] = useState(null)
+  const [weightModalValue, setWeightModalValue] = useState('')
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [selectedItemForCancel, setSelectedItemForCancel] = useState(null)
   const [orderCancelConfirmOpen, setOrderCancelConfirmOpen] = useState(false)
@@ -576,7 +579,7 @@ export default function PosPage() {
     loadPaymentSettings()
   }, [])
 
-  const addItem = async (menuItemId) => {
+  const addItem = async (menuItem) => {
     setError('')
     const orderId = getOrderId(order)
     if (!orderId) {
@@ -584,18 +587,80 @@ export default function PosPage() {
       setError('Sipariş bulunamadı')
       return
     }
+    const menuItemId = typeof menuItem === 'object' && menuItem !== null ? menuItem.id : menuItem
+    if (menuItem?.isWeightBased) {
+      setPendingWeightItem(menuItem)
+      setWeightModalOpen(true)
+      return
+    }
     const lockKey = `${orderId}:${menuItemId}:add`
     if (isDebounced(lockKey, 200)) return
-    const result = await withLock(lockKey, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, {
+    const result = await withLock(lockKey, () => api(`/api/pos/orders/${orderId}/items`, {
       method: 'POST',
       body: JSON.stringify({ menuItemId }),
-      signal,
       silent: true
-    }), { reload: false }))
+    }))
+    if (!result?.ok) {
+      const code = result?.data?.code || result?.code || result?.data?.error || result?.error || ''
+      const message = String(result?.data?.message || result?.message || '')
+      if (menuItem && (code === 'invalid_weight' || /gram/i.test(message))) {
+        setPendingWeightItem(menuItem)
+        setWeightModalOpen(true)
+        return
+      }
+      toast.error(message || 'İşlem başarısız')
+      return
+    }
+    const fresh = pickOrder(result?.data || result)
+    if (fresh) {
+      setOrder(fresh)
+      setNote(fresh.note || '')
+    }
+  }
+
+  const submitWeightItem = async (value) => {
+    const menuItem = pendingWeightItem
+    const menuItemId = menuItem?.id || menuItem?.menuItemId || null
+    const orderId = getOrderId(order)
+    if (!orderId || !menuItemId) return false
+
+    const grams = Math.round(Number(String(value || '').replace(',', '.')))
+    if (!Number.isFinite(grams) || grams <= 0) {
+      toast.error('Gram bilgisi geçersiz')
+      return false
+    }
+
+    const isEdit = !!menuItem?.existingItemId
+    const lockKey = isEdit ? `${orderId}:${menuItem.existingItemId}:weight:${grams}` : `${orderId}:${menuItemId}:add:${grams}`
+    if (isDebounced(lockKey, 200)) return false
+    const result = await withLock(lockKey, () => safeAction((signal) => api(
+      isEdit ? `/api/pos/orders/${orderId}/items/${menuItem.existingItemId}/weight` : `/api/pos/orders/${orderId}/items`,
+      {
+        method: isEdit ? 'PUT' : 'POST',
+        body: JSON.stringify(isEdit ? { weightGrams: grams } : { menuItemId, weightGrams: grams }),
+        signal,
+        silent: true
+      }
+    ), { reload: false }))
     const fresh = pickOrder(result)
     if (fresh) {
       setNote(fresh.note || '')
+      setPendingWeightItem(null)
+      setWeightModalValue('')
+      return true
     }
+    return false
+  }
+
+  const openWeightEditor = (item) => {
+    if (!item) return
+    setPendingWeightItem({
+      id: item.menuItemId || item.id,
+      menuItemId: item.menuItemId || item.id,
+      existingItemId: item.itemId || item._id || null
+    })
+    setWeightModalValue(String(Number(item.weightGrams) || ''))
+    setWeightModalOpen(true)
   }
 
   const removeItem = async (menuItemId) => {
@@ -1163,7 +1228,7 @@ export default function PosPage() {
 
           const otherRender = cartViewMode === 'grouped'
             ? Object.values(otherItems.reduce((acc, it) => {
-              const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+              const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
               const prev = acc[k]
               if (!prev) {
                 acc[k] = { key: `o:${k}`, menuItemId: it.menuItemId, itemId: it._id, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
@@ -1181,7 +1246,7 @@ export default function PosPage() {
 
           const openRender = cartViewMode === 'grouped'
             ? Object.values(openItems.reduce((acc, it) => {
-              const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+              const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
               const prev = acc[k]
               if (!prev) {
                 acc[k] = {
@@ -1241,6 +1306,8 @@ export default function PosPage() {
             const isSent = opts.type === 'sent'
             const isGrouped = opts.grouped === true
             const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
+            const isWeightBased = !!it?.isWeightBased
+            const weightGrams = Number(it?.weightGrams) || 0
             const disableBase = busy || !getOrderId(order)
             const rowOrderId = getOrderId(order)
             const rowItemId = row?.repr?.id || row?.repr?._id || row?.repr?.itemId || row?.itemId || null
@@ -1255,6 +1322,9 @@ export default function PosPage() {
             const rawDraft = getQtyDraft(row.key, row.qty)
             const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
             const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
+            const detailText = isWeightBased
+              ? `${it?.priceSnapshot} TL/KG • ${weightGrams} gr`
+              : `${it?.priceSnapshot} TL • x${displayQty}`
             return (
               <div
                 key={row.key}
@@ -1268,7 +1338,12 @@ export default function PosPage() {
                   opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
                 }}
               >
-                <div>
+                <div
+                  onClick={() => {
+                    if (isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId: rowItemId })
+                  }}
+                  style={isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
+                >
                   {it?.status === 'sent' && (
                     <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
                       Hazırlanıyor
@@ -1285,7 +1360,7 @@ export default function PosPage() {
                     </span>
                   )}
                   <div style={{ fontWeight: 600 }}>{it?.nameSnapshot}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{it?.priceSnapshot} TL • x{displayQty}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detailText}</div>
                   {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -1296,6 +1371,10 @@ export default function PosPage() {
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('Ayrı moda geç')
+                            return
+                          }
+                          if (isWeightBased) {
+                            removeItem(rowItemId)
                             return
                           }
                           const currentQty = Number(displayQty) || 0
@@ -1312,6 +1391,10 @@ export default function PosPage() {
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('Ayrı moda geç')
+                            return
+                          }
+                          if (isWeightBased) {
+                            openWeightEditor({ ...it, itemId: rowItemId })
                             return
                           }
                           const currentQty = Number(displayQty) || 0
@@ -1360,7 +1443,7 @@ export default function PosPage() {
                             activeQtyRowKeyRef.current = null
                             commitQtyDraft(row.key, getOrderId(order), rowItemId, row.qty, e.target.value)
                           }}
-                          disabled={disableBase || isQtyLocked || isMultiGroup}
+                          disabled={disableBase || isQtyLocked || isMultiGroup || isWeightBased}
                         />
                       )}
                     </>
@@ -1422,7 +1505,7 @@ export default function PosPage() {
 
           const sentRender = cartViewMode === 'grouped'
             ? Object.values(sentItems.reduce((acc, it) => {
-              const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
+              const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
               const prev = acc[k]
               if (!prev) {
                 acc[k] = {
@@ -1567,7 +1650,7 @@ export default function PosPage() {
           <div className="salePanelScroll" style={{ paddingTop: 10 }}>
             <div className="posItemsGrid">
               {items.map(i => (
-                <ProductCard key={i.id} item={i} onClick={() => addItem(i.id)} />
+                <ProductCard key={i.id} item={i} onClick={() => addItem(i)} />
               ))}
             </div>
           </div>
@@ -1850,6 +1933,18 @@ export default function PosPage() {
       initialValue={itemNote}
       placeholder="Not giriniz..."
       onSubmit={submitItemNote}
+    />
+    <InputModal
+      open={weightModalOpen}
+      onClose={() => {
+        setWeightModalOpen(false)
+        setPendingWeightItem(null)
+        setWeightModalValue('')
+      }}
+      title="Kaç Gram?"
+      initialValue={weightModalValue}
+      placeholder="Örn: 350"
+      onSubmit={submitWeightItem}
     />
     <InputModal
       open={cancelModalOpen}

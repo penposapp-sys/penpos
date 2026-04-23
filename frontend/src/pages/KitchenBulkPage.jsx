@@ -1,17 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import MenuItemFilterDrawer from '../components/MenuItemFilterDrawer.jsx'
 import { useKitchenMenuFilters } from '../lib/useKitchenMenuFilters.js'
+import { useKitchenAlertSound } from '../lib/useKitchenAlertSound.js'
 
 export default function KitchenBulkPage() {
   const { allowedBranchIds } = useAuth()
   const [items, setItems] = useState([])
   const [error, setError] = useState('')
   const doneLocalRef = useRef(new Set())
+  const lastRowKeysRef = useRef([])
+  const initialLoadedRef = useRef(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_bulk' })
+  const { soundEnabled, setSoundEnabled, soundIcon, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
 
   const load = async () => {
     setError('')
@@ -39,16 +43,34 @@ export default function KitchenBulkPage() {
         .filter(it => (Array.isArray(it?.rows) ? it.rows : []).length > 0)
 
       setItems(filtered)
+
+      const rowKeys = filtered
+        .flatMap(it => (Array.isArray(it?.rows) ? it.rows : []).map(r => String(r?.rowKey || '')))
+        .filter(Boolean)
+      const prevRowKeys = lastRowKeysRef.current || []
+      lastRowKeysRef.current = rowKeys
+
+      if (!initialLoadedRef.current) {
+        initialLoadedRef.current = true
+        return
+      }
+
+      const newRowKeys = rowKeys.filter(key => !prevRowKeys.includes(key))
+      if (newRowKeys.length > 0) {
+        await playAlert()
+      }
     } catch (err) {
       setError(err?.message || 'Yükleme hatası')
     }
   }
 
   useEffect(() => {
+    initialLoadedRef.current = false
+    lastRowKeysRef.current = []
     load()
     const id = setInterval(load, 4000)
     return () => clearInterval(id)
-  }, [(Array.isArray(allowedBranchIds) ? allowedBranchIds : []).join(',')])
+  }, [(Array.isArray(allowedBranchIds) ? allowedBranchIds : []).join(','), playAlert])
 
   const doneRow = async (rowKey, payload) => {
     const key = String(rowKey || '')
@@ -99,6 +121,20 @@ export default function KitchenBulkPage() {
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{`${totalCards} ürün`}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              const next = !soundEnabled
+              setSoundEnabled(next)
+              if (next) {
+                await ensureAudioUnlocked()
+              }
+            }}
+            title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapalı (Aç)'}
+          >
+            {soundIcon}
+          </button>
           <button className="btn" onClick={() => setFilterOpen(true)} type="button">Filtre</button>
           <button className="btn" onClick={load} type="button">Yenile</button>
         </div>
@@ -109,11 +145,15 @@ export default function KitchenBulkPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
         {visibleItems.map(card => {
           const rows = Array.isArray(card?.rows) ? card.rows : []
+          const isWeightBased = !!card?.isWeightBased
+          const cardWeightGrams = Number(card?.weightGrams || 0) || 0
           return (
-            <div key={String(card?.menuItemId || '')} className="card" style={{ padding: 12 }}>
+            <div key={`${String(card?.menuItemId || '')}|${String(cardWeightGrams || '')}`} className="card" style={{ padding: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.25 }}>
                 <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(card?.name || '-')}</div>
-                <div style={{ whiteSpace: 'nowrap' }}>x{Math.max(0, Number(card?.totalQty || 0))}</div>
+                <div style={{ whiteSpace: 'nowrap' }}>
+                  {isWeightBased ? `${cardWeightGrams} gr` : `x${Math.max(0, Number(card?.totalQty || 0))}`}
+                </div>
               </div>
 
               <div style={{ display: 'grid', gap: 8 }}>
@@ -121,6 +161,8 @@ export default function KitchenBulkPage() {
                   const rowKey = String(r?.rowKey || '')
                   const tableName = String(r?.tableName || '')
                   const qty = Math.max(1, Number(r?.qty || 1))
+                  const isWeightBased = !!r?.isWeightBased
+                  const weightGrams = Number(r?.weightGrams || 0) || 0
                   const createdAt = r?.createdAt || null
                   return (
                     <div
@@ -143,6 +185,7 @@ export default function KitchenBulkPage() {
                           </div>
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {isWeightBased ? <span>{weightGrams} gr</span> : null}
                           {createdAt ? <span>Saat: {new Date(createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span> : null}
                         </div>
                       </div>
@@ -166,7 +209,7 @@ export default function KitchenBulkPage() {
                         <button
                           className="btn"
                           type="button"
-                          onClick={() => doneRow(rowKey, { tableName, qty, createdAt })}
+                          onClick={() => doneRow(rowKey, { tableName, qty, weightGrams, createdAt })}
                         >
                           HAZIRLA
                         </button>

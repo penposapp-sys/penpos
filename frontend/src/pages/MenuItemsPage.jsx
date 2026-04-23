@@ -15,8 +15,8 @@ export default function MenuItemsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [createForm, setCreateForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0 })
-  const [editForm, setEditForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isActive: true })
+  const [createForm, setCreateForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false })
+  const [editForm, setEditForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isActive: true, isWeightBased: false })
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [inlineSaving, setInlineSaving] = useState({})
@@ -53,7 +53,7 @@ export default function MenuItemsPage() {
   }
 
   const openCreate = () => {
-    setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0 })
+    setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false })
     setFormError('')
     setCreateOpen(true)
   }
@@ -78,7 +78,7 @@ export default function MenuItemsPage() {
     try {
       const { item } = await api('/api/tenant/menu-items', { method: 'POST', body: JSON.stringify(createForm) })
       setItems([item, ...items])
-      setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0 })
+      setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false })
     } catch (err) {
       setFormError(err.message)
     } finally {
@@ -88,7 +88,7 @@ export default function MenuItemsPage() {
 
   const openEdit = (i) => {
     setSelected(i)
-    setEditForm({ categoryId: i.categoryId, name: i.name, price: i.price, description: i.description || '', imageUrl: i.imageUrl || '', sortOrder: i.sortOrder, isActive: i.isActive })
+    setEditForm({ categoryId: i.categoryId, name: i.name, price: i.price, description: i.description || '', imageUrl: i.imageUrl || '', sortOrder: i.sortOrder, isActive: i.isActive, isWeightBased: !!i.isWeightBased })
     setFormError('')
     setEditOpen(true)
   }
@@ -148,6 +148,7 @@ export default function MenuItemsPage() {
         categoryId: item.categoryId,
         name: item.name,
         price: patch.price ?? item.price,
+        isWeightBased: patch.isWeightBased ?? item.isWeightBased,
         description: item.description || '',
         imageUrl: item.imageUrl || '',
         sortOrder: item.sortOrder ?? 0,
@@ -386,6 +387,10 @@ export default function MenuItemsPage() {
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sort</div>
             <input className="input" type="number" value={createForm.sortOrder} onChange={(e) => setCreateForm({ ...createForm, sortOrder: Number(e.target.value) })} />
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={!!createForm.isWeightBased} onChange={(e) => setCreateForm({ ...createForm, isWeightBased: e.target.checked })} />
+            Kg ile satış
+          </label>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn" onClick={onCreateKeepOpen} disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Ekle'}</button>
@@ -421,6 +426,10 @@ export default function MenuItemsPage() {
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sort</div>
             <input className="input" type="number" value={editForm.sortOrder} onChange={(e) => setEditForm({ ...editForm, sortOrder: Number(e.target.value) })} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={!!editForm.isWeightBased} onChange={(e) => setEditForm({ ...editForm, isWeightBased: e.target.checked })} />
+            Kg ile satış
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
