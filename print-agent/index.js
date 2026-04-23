@@ -183,12 +183,13 @@ const startStatusServer = ({ port, getStatus, log }) => {
   return server
 }
 
-const printPdf = async ({ sumatraPath, printerName, pdfPath }) => {
+const printPdf = async ({ sumatraPath, printerName, pdfPath, orientation = 'portrait' }) => {
   const exe = String(sumatraPath || '').trim()
   const prn = String(printerName || '').trim()
+  const dir = String(orientation || '').trim().toLowerCase() === 'landscape' ? 'landscape' : 'portrait'
   if (!exe) throw new Error('sumatraPath missing')
   if (!prn) throw new Error('printerName missing')
-  await run(exe, ['-print-to', prn, '-print-settings', 'noscale,portrait', '-silent', pdfPath], { timeoutMs: 30000 })
+  await run(exe, ['-print-to', prn, '-print-settings', `noscale,${dir}`, '-silent', pdfPath], { timeoutMs: 30000 })
 }
 
 const main = async () => {
@@ -346,6 +347,7 @@ const main = async () => {
     try {
       const printerName = String(job.printerName || job.printer || job?.printSettings?.printerName || '').trim()
       const copies = Math.max(1, Math.min(10, Number(job.copies || job?.printSettings?.copies || 1)))
+      const orientation = String(job?.type || '').trim().toLowerCase() === 'label' ? 'landscape' : 'portrait'
       const pdfBase64 = String(job?.content?.data || job?.pdfBase64 || '')
       if (!printerName) throw new Error('printerName missing')
 
@@ -362,7 +364,7 @@ const main = async () => {
       await fs.writeFile(tmp, pdfBuf)
       try {
         for (let i = 0; i < copies; i++) {
-          await printPdf({ sumatraPath, printerName, pdfPath: tmp })
+          await printPdf({ sumatraPath, printerName, pdfPath: tmp, orientation })
         }
         await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
       } finally {

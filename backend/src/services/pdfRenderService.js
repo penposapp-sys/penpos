@@ -436,12 +436,15 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
   const top = safeText(topText)
   const product = safeText(productText)
   const q = Math.max(1, Number(qty || 1))
-  const w = Math.max(20, Number(widthMm || 50))
-  const h = Math.max(20, Number(heightMm || 30))
+  const rawW = Math.max(20, Number(widthMm || 50))
+  const rawH = Math.max(20, Number(heightMm || 30))
+  const w = Math.max(rawW, rawH)
+  const h = Math.min(rawW, rawH)
   const marginMm = Math.max(1.5, Math.min(4, Math.min(w, h) * 0.06))
 
   const doc = new PDFDocument({
     size: [mmToPt(w), mmToPt(h)],
+    layout: 'landscape',
     margins: { top: mmToPt(marginMm), left: mmToPt(marginMm), right: mmToPt(marginMm), bottom: mmToPt(marginMm) }
   })
   applyTrFont(doc)
@@ -455,14 +458,11 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
   const contentHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom
   const qtyText = `x${q}`
-  const topBlockHeight = top ? Math.max(mmToPt(4), contentHeight * 0.18) : 0
-  const verticalGap = top ? Math.max(2, contentHeight * 0.04) : 0
-  const bottomBandHeight = Math.max(mmToPt(6), contentHeight * 0.28)
-  const productHeight = Math.max(mmToPt(6), contentHeight - topBlockHeight - verticalGap - bottomBandHeight)
-  const qtyWidth = Math.min(contentWidth * 0.34, mmToPt(Math.max(12, w * 0.28)))
-  const productWidth = Math.max(mmToPt(10), contentWidth - qtyWidth - Math.max(4, contentWidth * 0.04))
+  const topBlockHeight = top ? Math.max(mmToPt(4), contentHeight * 0.16) : 0
+  const verticalGap = top ? Math.max(2, contentHeight * 0.03) : 0
+  const qtyBandHeight = Math.max(mmToPt(6), contentHeight * 0.18)
+  const productHeight = Math.max(mmToPt(10), contentHeight - topBlockHeight - verticalGap - qtyBandHeight)
   const leftX = doc.page.margins.left
-  const qtyX = doc.page.width - doc.page.margins.right - qtyWidth
 
   let y = doc.page.margins.top
 
@@ -474,17 +474,17 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
     y += topBlockHeight + verticalGap
   }
 
-  const productSize = fitFontSize(doc, product || '-', productWidth, productHeight, { min: 9, max: Math.min(24, h * 0.72) })
+  const productSize = fitFontSize(doc, product || '-', contentWidth, productHeight, { min: 10, max: Math.min(26, h * 0.8) })
   useFont(doc, 'trBold')
   doc.fontSize(productSize)
-  textMediumAt(doc, product || '-', leftX, y, { width: productWidth, height: productHeight, align: 'left' })
+  textMediumAt(doc, product || '-', leftX, y, { width: contentWidth, height: productHeight, align: 'left' })
 
-  const qtySize = fitFontSize(doc, qtyText, qtyWidth, bottomBandHeight, { min: 14, max: Math.min(28, h * 0.85) })
-  useFont(doc, 'trBold')
+  const qtySize = fitFontSize(doc, qtyText, contentWidth, qtyBandHeight, { min: 13, max: Math.min(24, h * 0.55) })
+  useFont(doc, 'tr')
   doc.fontSize(qtySize)
-  const qtyHeight = doc.heightOfString(qtyText, { width: qtyWidth, align: 'right', lineBreak: false })
+  const qtyHeight = doc.heightOfString(qtyText, { width: contentWidth, align: 'left' })
   const qtyY = doc.page.height - doc.page.margins.bottom - qtyHeight
-  textMediumAt(doc, qtyText, qtyX, qtyY, { width: qtyWidth, align: 'right', lineBreak: false })
+  textMediumAt(doc, qtyText, leftX, qtyY, { width: contentWidth, align: 'left' })
 
   doc.end()
   await done
