@@ -10,6 +10,7 @@ import * as logger from '../utils/logger.js'
 import Order from '../models/Order.js'
 import Table from '../models/Table.js'
 import Tenant from '../models/Tenant.js'
+import PrintProfile from '../models/PrintProfile.js'
 import { renderLabelPdfBase64, renderReceiptPdfBase64, renderTextPdfBase64 } from '../services/pdfRenderService.js'
 
 const normalizePrinters = (value) => {
@@ -44,6 +45,14 @@ const getStationScope = async (stationId) => {
 
 const getJobPdfBase64 = async ({ job, tenantId, system }) => {
   const type = String(job?.type || '')
+  const profileId = String(job?.profileId || '').trim()
+  const profile = mongoose.isValidObjectId(profileId)
+    ? await PrintProfile.findOne({ _id: profileId, tenantId, system }).select('options').lean()
+    : null
+  const profileOptions = profile?.options && typeof profile.options === 'object' ? profile.options : {}
+  const labelWidthMm = Math.max(20, Number(profileOptions.widthMm || 50))
+  const labelHeightMm = Math.max(20, Number(profileOptions.heightMm || 30))
+  const receiptWidthMm = Math.max(58, Number(profileOptions.widthMm || 80))
 
   if (String(job?.payload?.type || '') === 'pdf_base64') {
     return String(job?.payload?.content || '')
@@ -69,7 +78,7 @@ const getJobPdfBase64 = async ({ job, tenantId, system }) => {
         items,
         totals: order?.totals || { grandTotal: order?.netTotal || 0 },
         paidStatus: String(order?.paymentStatus || ''),
-        widthMm: 80,
+        widthMm: receiptWidthMm,
         isPackage,
         customerName: order?.customerName,
         customerPhone: order?.customerPhone,
@@ -77,7 +86,7 @@ const getJobPdfBase64 = async ({ job, tenantId, system }) => {
       })
     }
     const payloadText = String(job?.payload?.content || '')
-    return await renderTextPdfBase64({ text: payloadText, widthMm: 80, heightMm: 300, fontSize: 10, marginMm: 4 })
+    return await renderTextPdfBase64({ text: payloadText, widthMm: receiptWidthMm, heightMm: 300, fontSize: 10, marginMm: 4 })
   }
 
   if (type === 'label') {
@@ -87,7 +96,7 @@ const getJobPdfBase64 = async ({ job, tenantId, system }) => {
     const productLine = String(lines[1] || '')
     const productText = productLine.replace(/\s+x\d+\s*$/i, '').trim() || productLine
     const qty = Number(job?.meta?.qty || 1)
-    return await renderLabelPdfBase64({ topText, productText, qty, widthMm: 50, heightMm: 30 })
+    return await renderLabelPdfBase64({ topText, productText, qty, widthMm: labelWidthMm, heightMm: labelHeightMm })
   }
 
   const payloadText = String(job?.payload?.content || '')
