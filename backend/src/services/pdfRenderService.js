@@ -474,31 +474,39 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
   const qtyText = `x${q}`
   const topBlockHeight = top ? Math.max(mmToPt(4), contentHeight * 0.17) : 0
   const verticalGap = top ? Math.max(2, contentHeight * 0.03) : 0
-  const qtyBandHeight = Math.max(mmToPt(6), contentHeight * 0.16)
+  const qtyBandHeight = Math.max(mmToPt(6), contentHeight * 0.18)
   const productHeight = Math.max(mmToPt(10), contentHeight - topBlockHeight - verticalGap - qtyBandHeight)
   const leftX = doc.page.margins.left
+  const qtyColWidth = Math.min(mmToPt(16), Math.max(mmToPt(11), contentWidth * 0.22))
+  const productWidth = Math.max(mmToPt(18), contentWidth - qtyColWidth - mmToPt(2))
+  const qtyX = doc.page.width - doc.page.margins.right - qtyColWidth
 
   let y = doc.page.margins.top
+  const uniformMaxSize = Math.min(18, h * 0.42)
+  const uniformMinSize = Math.min(11, uniformMaxSize)
+  const topSize = top
+    ? fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: Math.max(7, uniformMinSize - 2), max: uniformMaxSize, maxLines: 2 })
+    : uniformMaxSize
+  const productSize = fitFontSizeWithLineLimit(doc, product || '-', productWidth, productHeight, { min: uniformMinSize, max: uniformMaxSize, maxLines: 3 })
+  const qtySize = fitFontSizeWithLineLimit(doc, qtyText, qtyColWidth, qtyBandHeight, { min: uniformMinSize, max: uniformMaxSize, maxLines: 1 })
+  const sharedSize = Math.max(uniformMinSize, Math.min(top ? topSize : productSize, productSize, qtySize))
 
   if (top) {
-    const topSize = fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: 7, max: Math.min(13, h * 0.32), maxLines: 2 })
-    useFont(doc, 'tr')
-    doc.fontSize(topSize)
-    textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'center' })
+    useFont(doc, 'trBold')
+    doc.fontSize(sharedSize)
+    textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'left' })
     y += topBlockHeight + verticalGap
   }
 
-  const productSize = fitFontSizeWithLineLimit(doc, product || '-', contentWidth, productHeight, { min: 11, max: Math.min(22, h * 0.58), maxLines: 3 })
   useFont(doc, 'trBold')
-  doc.fontSize(productSize)
-  textMediumAt(doc, product || '-', leftX, y, { width: contentWidth, height: productHeight, align: 'center' })
+  doc.fontSize(sharedSize)
+  textMediumAt(doc, product || '-', leftX, y, { width: productWidth, height: productHeight, align: 'left' })
 
-  const qtySize = fitFontSizeWithLineLimit(doc, qtyText, contentWidth, qtyBandHeight, { min: 12, max: Math.min(18, h * 0.42), maxLines: 1 })
   useFont(doc, 'trBold')
-  doc.fontSize(qtySize)
-  const qtyHeight = doc.heightOfString(qtyText, { width: contentWidth, align: 'center' })
+  doc.fontSize(sharedSize)
+  const qtyHeight = doc.heightOfString(qtyText, { width: qtyColWidth, align: 'right' })
   const qtyY = doc.page.height - doc.page.margins.bottom - qtyHeight
-  textMediumAt(doc, qtyText, leftX, qtyY, { width: contentWidth, align: 'center' })
+  textMediumAt(doc, qtyText, qtyX, qtyY, { width: qtyColWidth, align: 'right' })
 
   doc.end()
   await done
