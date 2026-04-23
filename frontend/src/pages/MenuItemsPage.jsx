@@ -15,8 +15,8 @@ export default function MenuItemsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [createForm, setCreateForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false })
-  const [editForm, setEditForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isActive: true, isWeightBased: false })
+  const [createForm, setCreateForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false, printLabelEnabled: false })
+  const [editForm, setEditForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isActive: true, isWeightBased: false, printLabelEnabled: false })
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [inlineSaving, setInlineSaving] = useState({})
@@ -53,7 +53,7 @@ export default function MenuItemsPage() {
   }
 
   const openCreate = () => {
-    setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false })
+    setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false, printLabelEnabled: false })
     setFormError('')
     setCreateOpen(true)
   }
@@ -78,7 +78,7 @@ export default function MenuItemsPage() {
     try {
       const { item } = await api('/api/tenant/menu-items', { method: 'POST', body: JSON.stringify(createForm) })
       setItems([item, ...items])
-      setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false })
+      setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false, printLabelEnabled: false })
     } catch (err) {
       setFormError(err.message)
     } finally {
@@ -88,7 +88,7 @@ export default function MenuItemsPage() {
 
   const openEdit = (i) => {
     setSelected(i)
-    setEditForm({ categoryId: i.categoryId, name: i.name, price: i.price, description: i.description || '', imageUrl: i.imageUrl || '', sortOrder: i.sortOrder, isActive: i.isActive, isWeightBased: !!i.isWeightBased })
+    setEditForm({ categoryId: i.categoryId, name: i.name, price: i.price, description: i.description || '', imageUrl: i.imageUrl || '', sortOrder: i.sortOrder, isActive: i.isActive, isWeightBased: !!i.isWeightBased, printLabelEnabled: i.printLabelEnabled === true })
     setFormError('')
     setEditOpen(true)
   }
@@ -123,7 +123,8 @@ export default function MenuItemsPage() {
     const draft = inlineDrafts[key] || {}
     return {
       price: draft.price ?? String(item?.price ?? ''),
-      isActive: draft.isActive ?? !!item?.isActive
+      isActive: draft.isActive ?? !!item?.isActive,
+      printLabelEnabled: draft.printLabelEnabled ?? (item?.printLabelEnabled === true)
     }
   }
 
@@ -149,6 +150,7 @@ export default function MenuItemsPage() {
         name: item.name,
         price: patch.price ?? item.price,
         isWeightBased: patch.isWeightBased ?? item.isWeightBased,
+        printLabelEnabled: patch.printLabelEnabled ?? item.printLabelEnabled,
         description: item.description || '',
         imageUrl: item.imageUrl || '',
         sortOrder: item.sortOrder ?? 0,
@@ -163,7 +165,8 @@ export default function MenuItemsPage() {
         ...(prev || {}),
         [itemId]: {
           price: String(updated.price ?? ''),
-          isActive: !!updated.isActive
+          isActive: !!updated.isActive,
+          printLabelEnabled: updated.printLabelEnabled === true
         }
       }))
     } catch (err) {
@@ -172,7 +175,8 @@ export default function MenuItemsPage() {
         ...(prev || {}),
         [itemId]: {
           price: String(item?.price ?? ''),
-          isActive: !!item?.isActive
+          isActive: !!item?.isActive,
+          printLabelEnabled: item?.printLabelEnabled === true
         }
       }))
     } finally {
@@ -391,6 +395,10 @@ export default function MenuItemsPage() {
             <input type="checkbox" checked={!!createForm.isWeightBased} onChange={(e) => setCreateForm({ ...createForm, isWeightBased: e.target.checked })} />
             Kg ile satış
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={!!createForm.printLabelEnabled} onChange={(e) => setCreateForm({ ...createForm, printLabelEnabled: e.target.checked })} />
+            Etiket yazicisinda ciksin
+          </label>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn" onClick={onCreateKeepOpen} disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Ekle'}</button>
@@ -434,6 +442,10 @@ export default function MenuItemsPage() {
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
             Aktif
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={!!editForm.printLabelEnabled} onChange={(e) => setEditForm({ ...editForm, printLabelEnabled: e.target.checked })} />
+            Etiket yazicisinda ciksin
           </label>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
           <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>

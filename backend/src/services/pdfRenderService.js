@@ -94,6 +94,20 @@ const fitFontSize = (doc, text, width, height, { min = 6, max = 18 } = {}) => {
   return min
 }
 
+const fitFontSizeWithLineLimit = (doc, text, width, height, { min = 6, max = 18, maxLines = Infinity } = {}) => {
+  const content = String(text || '').trim()
+  if (!content) return min
+  for (let size = max; size >= min; size -= 0.5) {
+    useFont(doc, 'tr')
+    doc.fontSize(size)
+    const measuredHeight = doc.heightOfString(content, { width, align: 'center' })
+    const lineHeight = Math.max(1, doc.currentLineHeight(true))
+    const lineCount = Math.max(1, Math.ceil(measuredHeight / lineHeight))
+    if (measuredHeight <= height && lineCount <= maxLines) return size
+  }
+  return fitFontSize(doc, content, width, height, { min, max })
+}
+
 const measureReceiptHeightPt = ({
   widthPt,
   margins,
@@ -458,33 +472,33 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
   const contentHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom
   const qtyText = `x${q}`
-  const topBlockHeight = top ? Math.max(mmToPt(4), contentHeight * 0.16) : 0
+  const topBlockHeight = top ? Math.max(mmToPt(4), contentHeight * 0.17) : 0
   const verticalGap = top ? Math.max(2, contentHeight * 0.03) : 0
-  const qtyBandHeight = Math.max(mmToPt(6), contentHeight * 0.18)
+  const qtyBandHeight = Math.max(mmToPt(6), contentHeight * 0.16)
   const productHeight = Math.max(mmToPt(10), contentHeight - topBlockHeight - verticalGap - qtyBandHeight)
   const leftX = doc.page.margins.left
 
   let y = doc.page.margins.top
 
   if (top) {
-    const topSize = fitFontSize(doc, top, contentWidth, topBlockHeight, { min: 7, max: Math.min(14, h * 0.38) })
+    const topSize = fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: 7, max: Math.min(13, h * 0.32), maxLines: 2 })
     useFont(doc, 'tr')
     doc.fontSize(topSize)
-    textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'left' })
+    textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'center' })
     y += topBlockHeight + verticalGap
   }
 
-  const productSize = fitFontSize(doc, product || '-', contentWidth, productHeight, { min: 10, max: Math.min(26, h * 0.8) })
+  const productSize = fitFontSizeWithLineLimit(doc, product || '-', contentWidth, productHeight, { min: 11, max: Math.min(22, h * 0.58), maxLines: 3 })
   useFont(doc, 'trBold')
   doc.fontSize(productSize)
-  textMediumAt(doc, product || '-', leftX, y, { width: contentWidth, height: productHeight, align: 'left' })
+  textMediumAt(doc, product || '-', leftX, y, { width: contentWidth, height: productHeight, align: 'center' })
 
-  const qtySize = fitFontSize(doc, qtyText, contentWidth, qtyBandHeight, { min: 13, max: Math.min(24, h * 0.55) })
-  useFont(doc, 'tr')
+  const qtySize = fitFontSizeWithLineLimit(doc, qtyText, contentWidth, qtyBandHeight, { min: 12, max: Math.min(18, h * 0.42), maxLines: 1 })
+  useFont(doc, 'trBold')
   doc.fontSize(qtySize)
-  const qtyHeight = doc.heightOfString(qtyText, { width: contentWidth, align: 'left' })
+  const qtyHeight = doc.heightOfString(qtyText, { width: contentWidth, align: 'center' })
   const qtyY = doc.page.height - doc.page.margins.bottom - qtyHeight
-  textMediumAt(doc, qtyText, leftX, qtyY, { width: contentWidth, align: 'left' })
+  textMediumAt(doc, qtyText, leftX, qtyY, { width: contentWidth, align: 'center' })
 
   doc.end()
   await done

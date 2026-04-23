@@ -2,6 +2,7 @@ import { error } from '../utils/errors.js'
 import { createOrder, findByIdAndTenant, updateById } from '../repositories/orderRepository.js'
 import { findByIdAndTenant as findMenuItem } from '../repositories/menuItemRepository.js'
 import Order from '../models/Order.js'
+import MenuItem from '../models/MenuItem.js'
 import mongoose from 'mongoose'
 import CustomerAccount from '../models/CustomerAccount.js'
 import AccountTransaction from '../models/AccountTransaction.js'
@@ -1187,9 +1188,17 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
       const { createJob } = await import('./printingService.js')
       const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
       if (labelProfile && labelProfile.isActive !== false) {
+        const menuItemIds = itemsToLabel
+          .map(it => String(it?.menuItemId || '').trim())
+          .filter(id => mongoose.Types.ObjectId.isValid(id))
+        const labelEnabledDocs = menuItemIds.length > 0
+          ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds }, printLabelEnabled: true }).select('_id').lean()
+          : []
+        const labelEnabledSet = new Set((labelEnabledDocs || []).map(doc => String(doc?._id || '')))
+        const labelItems = itemsToLabel.filter(it => labelEnabledSet.has(String(it?.menuItemId || '')))
         const tableName = order.tableId ? String((await Table.findById(order.tableId).select('name').lean())?.name || '') : ''
         const top = tableName ? tableName : (order.saleType === 'delivery' ? 'PAKET' : (order.saleType === 'walkin' ? 'HIZLI' : 'SİPARİŞ'))
-        for (const it of itemsToLabel) {
+        for (const it of labelItems) {
           const line2 = `${String(it.nameSnapshot || '').trim() || '-'} x${Number(it.qty || 1)}`
           const payload = `${top}\n${line2}\n`
           await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
