@@ -1197,7 +1197,14 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
         const labelEnabledSet = new Set((labelEnabledDocs || []).map(doc => String(doc?._id || '')))
         const labelItems = itemsToLabel.filter(it => labelEnabledSet.has(String(it?.menuItemId || '')))
         const tableName = order.tableId ? String((await Table.findById(order.tableId).select('name').lean())?.name || '') : ''
-        const top = tableName ? tableName : (order.saleType === 'delivery' ? 'PAKET' : (order.saleType === 'walkin' ? 'HIZLI' : 'SİPARİŞ'))
+        const walkinCustomerName = String(order?.customerName || '').trim()
+        const top = tableName
+          ? tableName
+          : (order.saleType === 'delivery'
+            ? 'PAKET'
+            : (order.saleType === 'walkin'
+              ? (walkinCustomerName || 'HIZLI')
+              : 'SİPARİŞ'))
         for (const it of labelItems) {
           const line2 = `${String(it.nameSnapshot || '').trim() || '-'} x${Number(it.qty || 1)}`
           const payload = `${top}\n${line2}\n`

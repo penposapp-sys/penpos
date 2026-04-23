@@ -482,8 +482,8 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
   const qtyX = doc.page.width - doc.page.margins.right - qtyColWidth
 
   let y = doc.page.margins.top
-  const uniformMaxSize = Math.min(18, h * 0.42)
-  const uniformMinSize = Math.min(11, uniformMaxSize)
+  const uniformMaxSize = Math.min(21, h * 0.5)
+  const uniformMinSize = Math.min(13, uniformMaxSize)
   const topSize = top
     ? fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: Math.max(7, uniformMinSize - 2), max: uniformMaxSize, maxLines: 2 })
     : uniformMaxSize
