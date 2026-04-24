@@ -6,6 +6,7 @@ import { signToken } from '../utils/jwt.js'
 import * as printingService from '../services/printingService.js'
 import * as stationRepo from '../repositories/printStationRepository.js'
 import * as jobRepo from '../repositories/printJobRepository.js'
+import * as printerRepo from '../repositories/printPrinterRepository.js'
 import * as logger from '../utils/logger.js'
 import Order from '../models/Order.js'
 import Table from '../models/Table.js'
@@ -173,8 +174,29 @@ export const claimNext = async (req, res) => {
 
     const filePath = `/api/printing/jobs/${encodeURIComponent(jobId)}/file?stationId=${encodeURIComponent(stationId)}`
     const fileUrl = buildAbsoluteUrl(req, filePath)
+    const profile = await PrintProfile.findOne({ _id: job.profileId, tenantId: scope.tenantId, system: scope.system }).select('printerId options').lean()
+    const printer = profile?.printerId
+      ? await printerRepo.findByIdAndScope(profile.printerId, scope.tenantId, scope.system)
+      : null
+    const copies = Math.max(1, Math.min(10, Number(job?.meta?.copies || 1)))
+    const printerName = String(printer?.windowsPrinterName || '').trim()
     logger.info(`[PRINTING_CLAIM] station=${stationId} job=${jobId}`)
-    res.json({ job: { id: jobId, type: String(job.type || ''), fileUrl } })
+    res.json({
+      job: {
+        id: jobId,
+        type: String(job.type || ''),
+        fileUrl,
+        profileId: String(job.profileId || ''),
+        printerName,
+        copies,
+        meta: job?.meta && typeof job.meta === 'object' ? job.meta : {},
+        printSettings: {
+          printerName,
+          copies,
+          options: profile?.options && typeof profile.options === 'object' ? profile.options : {}
+        }
+      }
+    })
   } catch (err) {
     sendError(res, err)
   }
