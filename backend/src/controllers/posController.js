@@ -3,11 +3,44 @@ import { createOrderService, getOrderService, addItemService, removeItemService,
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
+import Table from '../models/Table.js'
 import mongoose from 'mongoose'
 import { log as auditLog } from '../services/auditService.js'
 import * as logger from '../utils/logger.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
+
+const getStaffAllowedBranchIds = (req) => {
+  if (String(req.user?.role || '') !== 'staff') return null
+  const ids = Array.isArray(req.user?.branchIds) && req.user.branchIds.length > 0
+    ? req.user.branchIds.map(String)
+    : (req.user?.branchId ? [String(req.user.branchId)] : [])
+  return ids.filter(Boolean)
+}
+
+const assertTablesWithinStaffBranches = async (req, tableIds = []) => {
+  const allowedBranchIds = getStaffAllowedBranchIds(req)
+  if (!allowedBranchIds || allowedBranchIds.length === 0) return
+
+  const normalizedTableIds = Array.isArray(tableIds)
+    ? tableIds.map(String).filter(id => mongoose.Types.ObjectId.isValid(id))
+    : []
+  if (normalizedTableIds.length === 0) return
+
+  const tables = await Table.find({
+    _id: { $in: normalizedTableIds },
+    tenantId: req.user.tenantId,
+    isActive: true
+  }).select('_id branchId').lean()
+
+  const tableById = new Map((tables || []).map(t => [String(t._id), String(t.branchId || '')]))
+  for (const tableId of normalizedTableIds) {
+    const branchId = tableById.get(String(tableId))
+    if (!branchId || !allowedBranchIds.includes(branchId)) {
+      throw error('branch_not_allowed', 'Bu şubeye taşıma yetkin yok', 403)
+    }
+  }
+}
 
 export const getTableMeta = async (req, res) => {
   try {
@@ -513,6 +546,9 @@ export const abandonTable = async (req, res) => {
 
 export const mergeTables = async (req, res) => {
   try {
+    const targetTableId = String(req.params.targetTableId || '').trim()
+    const sourceTableIds = Array.isArray(req.body?.sourceTableIds) ? req.body.sourceTableIds : []
+    await assertTablesWithinStaffBranches(req, [targetTableId, ...sourceTableIds])
     const result = await mergeOrdersService(req.user.tenantId, req.params.targetTableId, req.body?.sourceTableIds || [])
     res.json(result)
   } catch (err) {
@@ -522,6 +558,8 @@ export const mergeTables = async (req, res) => {
 
 export const transfer = async (req, res) => {
   try {
+    const targetTableId = String(req.body?.targetTableId || '').trim()
+    await assertTablesWithinStaffBranches(req, [targetTableId])
     try {
       logger.info('[TRANSFER_ENTRY]', {
         controller: 'posController.transfer',
@@ -538,6 +576,8 @@ export const transfer = async (req, res) => {
 
 export const split = async (req, res) => {
   try {
+    const targetTableId = String(req.body?.targetTableId || '').trim()
+    await assertTablesWithinStaffBranches(req, targetTableId ? [targetTableId] : [])
     const result = await splitOrderService(req.user.tenantId, req.params.id, req.body?.items || [], req.body?.targetTableId)
     res.json(result)
   } catch (err) {

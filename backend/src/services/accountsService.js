@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import CustomerAccount from '../models/CustomerAccount.js'
 import AccountTransaction from '../models/AccountTransaction.js'
 import Order from '../models/Order.js'
+import MenuItem from '../models/MenuItem.js'
 import { error } from '../utils/errors.js'
 import { log as auditLog } from './auditService.js'
 import { isTxnSupported } from '../utils/mongoTxn.js'
@@ -187,6 +188,31 @@ export const getAccountService = async (tenantId, branchId, id) => {
   }
 }
 
+export const getAccountCatalogService = async (tenantId) => {
+  const [categories, items] = await Promise.all([
+    mongoose.model('Category').find({ tenantId }).sort({ sortOrder: 1, name: 1 }).lean(),
+    MenuItem.find({ tenantId }).sort({ sortOrder: 1, name: 1 }).lean()
+  ])
+
+  return {
+    categories: (categories || []).map((c) => ({
+      id: String(c._id),
+      name: String(c.name || '').trim(),
+      isActive: c.isActive !== false,
+      sortOrder: Number(c.sortOrder || 0)
+    })),
+    items: (items || []).map((i) => ({
+      id: String(i._id),
+      categoryId: i.categoryId ? String(i.categoryId) : null,
+      name: String(i.name || '').trim(),
+      price: toMoney(i.price),
+      imageUrl: String(i.imageUrl || '').trim(),
+      isActive: i.isActive !== false,
+      isWeightBased: !!i.isWeightBased
+    }))
+  }
+}
+
 export const listTransactionsService = async (tenantId, branchId, id, query = {}) => {
   if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid account id', 400)
   const page = Math.max(1, Number(query.page) || 1)
@@ -319,6 +345,173 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
   }
 }
 
+export const addManualBalanceTransactionService = async (tenantId, branchId, actorUserId, id, body = {}) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid account id', 400)
+
+  const amount = toMoney(body.amount)
+  if (amount <= 0) throw error('invalid_amount', 'Geçerli bir tutar girin', 400)
+
+  const type = body?.type === 'credit' ? 'credit' : 'debit'
+  const note = String(body.note || '').trim()
+  const balanceDelta = type === 'debit' ? amount : -amount
+
+  const acc = await CustomerAccount.findOneAndUpdate(
+    { _id: id, tenantId },
+    { $inc: { balance: balanceDelta } },
+    { new: true }
+  )
+  if (!acc) throw error('not_found', 'Account not found', 404)
+
+  const tx = await AccountTransaction.create({
+    tenantId,
+    branchId,
+    accountId: acc.id,
+    type,
+    amount,
+    method: 'other',
+    note,
+    source: 'manual',
+    orderId: null
+  })
+
+  await auditLog(tenantId, actorUserId, type === 'debit' ? 'cari_manual_borc' : 'cari_manual_alacak', 'CustomerAccount', acc.id, { amount })
+
+  return {
+    account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
+    transaction: { id: tx.id, type: tx.type, amount: toMoney(tx.amount), method: tx.method, note: tx.note, source: tx.source, createdAt: tx.createdAt }
+  }
+}
+
+export const addManualProductChargeService = async (tenantId, branchId, actorUserId, id, body = {}) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid account id', 400)
+  const menuItemId = String(body.menuItemId || '').trim()
+  if (!mongoose.Types.ObjectId.isValid(menuItemId)) throw error('invalid_request', 'Geçerli bir ürün seçin', 400)
+
+  const qty = Number(body.qty)
+  if (!Number.isFinite(qty) || qty <= 0) throw error('invalid_amount', 'Geçerli bir miktar girin', 400)
+
+  const item = await MenuItem.findOne({ _id: menuItemId, tenantId })
+    .select('name price isActive isWeightBased')
+    .lean()
+  if (!item) throw error('not_found', 'Ürün bulunamadı', 404)
+
+  const amount = toMoney((Number(item.price || 0) || 0) * qty)
+  if (amount <= 0) throw error('invalid_amount', 'Ürün tutarı geçersiz', 400)
+
+  const extraNote = String(body.note || '').trim()
+  const qtyLabel = Number.isInteger(qty) ? String(qty) : String(qty).replace('.', ',')
+  const baseNote = `${String(item.name || 'Ürün').trim() || 'Ürün'} x${qtyLabel}`
+  const note = extraNote ? `${baseNote} - ${extraNote}` : baseNote
+
+  const acc = await CustomerAccount.findOneAndUpdate(
+    { _id: id, tenantId },
+    { $inc: { balance: amount } },
+    { new: true }
+  )
+  if (!acc) throw error('not_found', 'Account not found', 404)
+
+  const tx = await AccountTransaction.create({
+    tenantId,
+    branchId,
+    accountId: acc.id,
+    type: 'debit',
+    amount,
+    method: 'other',
+    note,
+    source: 'manual',
+    orderId: null
+  })
+
+  await auditLog(tenantId, actorUserId, 'cari_manual_urun', 'CustomerAccount', acc.id, {
+    menuItemId,
+    qty,
+    amount
+  })
+
+  return {
+    account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
+    transaction: { id: tx.id, type: tx.type, amount: toMoney(tx.amount), method: tx.method, note: tx.note, source: tx.source, createdAt: tx.createdAt }
+  }
+}
+
+export const addManualCartChargeService = async (tenantId, branchId, actorUserId, id, body = {}) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid account id', 400)
+
+  const rawItems = Array.isArray(body.items) ? body.items : []
+  const normalizedItems = rawItems
+    .map((entry) => ({
+      menuItemId: String(entry?.menuItemId || '').trim(),
+      qty: Number(entry?.qty),
+      note: String(entry?.note || '').trim()
+    }))
+    .filter((entry) => mongoose.Types.ObjectId.isValid(entry.menuItemId) && Number.isFinite(entry.qty) && entry.qty > 0)
+
+  if (normalizedItems.length === 0) throw error('invalid_request', 'Sepette ürün yok', 400)
+
+  const uniqueIds = [...new Set(normalizedItems.map((entry) => entry.menuItemId))]
+  const menuItems = await MenuItem.find({ tenantId, _id: { $in: uniqueIds } })
+    .select('name price isActive')
+    .lean()
+  const menuItemMap = new Map(menuItems.map((item) => [String(item._id), item]))
+
+  const txPayload = normalizedItems.map((entry) => {
+    const item = menuItemMap.get(entry.menuItemId)
+    if (!item) throw error('not_found', 'Ürün bulunamadı', 404)
+    const amount = toMoney((Number(item.price || 0) || 0) * entry.qty)
+    if (amount <= 0) throw error('invalid_amount', 'Ürün tutarı geçersiz', 400)
+    const qtyLabel = Number.isInteger(entry.qty) ? String(entry.qty) : String(entry.qty).replace('.', ',')
+    const baseNote = `${String(item.name || 'Ürün').trim() || 'Ürün'} x${qtyLabel}`
+    const note = entry.note ? `${baseNote} - ${entry.note}` : baseNote
+    return {
+      menuItemId: entry.menuItemId,
+      qty: entry.qty,
+      amount,
+      note
+    }
+  })
+
+  const totalAmount = toMoney(txPayload.reduce((sum, entry) => sum + entry.amount, 0))
+  const acc = await CustomerAccount.findOneAndUpdate(
+    { _id: id, tenantId },
+    { $inc: { balance: totalAmount } },
+    { new: true }
+  )
+  if (!acc) throw error('not_found', 'Account not found', 404)
+
+  const created = await AccountTransaction.insertMany(
+    txPayload.map((entry) => ({
+      tenantId,
+      branchId,
+      accountId: acc.id,
+      type: 'debit',
+      amount: entry.amount,
+      method: 'other',
+      note: entry.note,
+      source: 'manual',
+      orderId: null
+    }))
+  )
+
+  await auditLog(tenantId, actorUserId, 'cari_manual_sepet', 'CustomerAccount', acc.id, {
+    totalAmount,
+    lineCount: txPayload.length
+  })
+
+  return {
+    account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
+    transactions: created.map((tx) => ({
+      id: tx.id,
+      type: tx.type,
+      amount: toMoney(tx.amount),
+      method: tx.method,
+      note: tx.note,
+      source: tx.source,
+      createdAt: tx.createdAt
+    })),
+    totalAmount
+  }
+}
+
 export const deleteCollectionTransactionService = async (tenantId, branchId, actorUserId, txId) => {
   if (!mongoose.Types.ObjectId.isValid(txId)) throw error('invalid_request', 'Invalid transaction id', 400)
 
@@ -349,12 +542,12 @@ export const deleteCollectionTransactionService = async (tenantId, branchId, act
     const txExisting = await AccountTransaction.findOne({ _id: txId, tenantId })
     if (!txExisting) throw error('not_found', 'Transaction not found', 404)
     if (txExisting.isDeleted) throw error('already_deleted', 'Transaction already deleted', 409)
-    if (!(txExisting.source === 'collection' && txExisting.type === 'credit')) {
-      throw error('invalid_request', 'Only collection transactions can be deleted', 409)
-    }
+    const isCollection = txExisting.source === 'collection' && txExisting.type === 'credit'
+    const isManual = txExisting.source === 'manual' && !txExisting.orderId
+    if (!isCollection && !isManual) throw error('invalid_request', 'Bu hareket silinemez', 409)
 
     if (txExisting.orderId) {
-      throw error('payment_locked', 'Bu tahsilat silinemez', 409)
+      throw error('payment_locked', 'Bu hareket silinemez', 409)
     }
 
     const deletedTx = await AccountTransaction.findOneAndUpdate(
@@ -372,7 +565,14 @@ export const deleteCollectionTransactionService = async (tenantId, branchId, act
     )
     if (!acc) throw error('account_not_found_after_delete', 'Account not found', 409)
 
-    await auditLog(tenantId, actorUserId, 'cari_tahsilat_silindi', 'CustomerAccount', acc.id, { amount: toMoney(txExisting.amount), txId, mode: 'no_txn' })
+    await auditLog(
+      tenantId,
+      actorUserId,
+      isManual ? 'cari_manual_hareket_silindi' : 'cari_tahsilat_silindi',
+      'CustomerAccount',
+      acc.id,
+      { amount: toMoney(txExisting.amount), txId, mode: 'no_txn' }
+    )
     return { success: true, accountId: acc.id, balance: toMoney(acc.balance), txId: deletedTx.id }
   }
 
@@ -387,12 +587,12 @@ export const deleteCollectionTransactionService = async (tenantId, branchId, act
         const tx = await AccountTransaction.findOne({ _id: txId, tenantId }).session(session)
         if (!tx) throw error('not_found', 'Transaction not found', 404)
         if (tx.isDeleted) throw error('already_deleted', 'Transaction already deleted', 409)
-        if (!(tx.source === 'collection' && tx.type === 'credit')) {
-          throw error('invalid_request', 'Only collection transactions can be deleted', 409)
-        }
+        const isCollection = tx.source === 'collection' && tx.type === 'credit'
+        const isManual = tx.source === 'manual' && !tx.orderId
+        if (!isCollection && !isManual) throw error('invalid_request', 'Bu hareket silinemez', 409)
 
         if (tx.orderId) {
-          throw error('payment_locked', 'Bu tahsilat silinemez', 409)
+          throw error('payment_locked', 'Bu hareket silinemez', 409)
         }
 
         const acc = await CustomerAccount.findOne({ _id: tx.accountId, tenantId }).session(session)
@@ -415,7 +615,7 @@ export const deleteCollectionTransactionService = async (tenantId, branchId, act
       throw err
     }
 
-    await auditLog(tenantId, actorUserId, 'cari_tahsilat_silindi', 'CustomerAccount', out?.accountId || null, { txId, mode: 'txn' })
+    await auditLog(tenantId, actorUserId, 'cari_hareket_silindi', 'CustomerAccount', out?.accountId || null, { txId, mode: 'txn' })
     return { success: true, ...out }
   } finally {
     await session.endSession()

@@ -14,6 +14,7 @@ import { trPaymentMethodLabel, trStatusLabel } from '../i18n/tr.js'
 import ProductCard from '../components/ProductCard.jsx'
 import { ServingType, normalizeServingType, servingTypeLabelTR } from '../utils/servingType.js'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
+import { buildBranchQueryParams } from '../lib/branchQuery.js'
 
 export default function PosPage() {
   const nav = useNavigate()
@@ -1015,7 +1016,9 @@ export default function PosPage() {
 
   const openTransfer = async () => {
     setError('')
-    const res = await safeAction((signal) => api('/api/tenant/tables', { signal, silent: true }), { reload: false })
+    const { params } = buildBranchQueryParams(allowedBranchIds)
+    const url = params ? `/api/tenant/tables?${params.toString()}` : '/api/tenant/tables'
+    const res = await safeAction((signal) => api(url, { signal, silent: true, skipBranchHeader: true }), { reload: false })
     const tables = res?.tables || []
     setEmptyTables(tables.filter(x => x.status === 'empty'))
     setTargetTableId('')
@@ -1025,7 +1028,9 @@ export default function PosPage() {
   const submitTransfer = async () => {
     setError('')
     await safeAction((signal) => api(`/api/pos/orders/${order.id}/transfer`, { method: 'PUT', body: JSON.stringify({ targetTableId }), signal, silent: true }))
-    const res = await safeAction((signal) => api('/api/tenant/tables', { signal, silent: true }), { reload: false })
+    const { params } = buildBranchQueryParams(allowedBranchIds)
+    const url = params ? `/api/tenant/tables?${params.toString()}` : '/api/tenant/tables'
+    const res = await safeAction((signal) => api(url, { signal, silent: true, skipBranchHeader: true }), { reload: false })
     const tables = res?.tables || []
     const t = tables.find(x => x.id === targetTableId)
     setTableName(t?.name || '')
@@ -1034,7 +1039,9 @@ export default function PosPage() {
 
   const openSplit = async () => {
     setError('')
-    const res = await safeAction((signal) => api('/api/tenant/tables', { signal, silent: true }), { reload: false })
+    const { params } = buildBranchQueryParams(allowedBranchIds)
+    const url = params ? `/api/tenant/tables?${params.toString()}` : '/api/tenant/tables'
+    const res = await safeAction((signal) => api(url, { signal, silent: true, skipBranchHeader: true }), { reload: false })
     const tables = res?.tables || []
     setEmptyTables(tables.filter(x => x.status === 'empty'))
     const initial = {}

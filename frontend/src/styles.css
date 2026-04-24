@@ -1101,8 +1101,8 @@ body.scroll-lock { overflow: hidden !important }
   color: #666666;
 }
 
-.account-detail-scope { display: grid; gap: 8px; min-width: 0; width: 100%; }
-.account-detail-scope .card { padding: 10px; border-radius: 12px; }
+.account-detail-scope { display: grid; gap: 14px; min-width: 0; width: 100%; align-content: start; }
+.account-detail-scope .card { padding: 14px; border-radius: 16px; }
 .account-detail-scope .account-balance-card { height: 64px; display: flex; align-items: center; }
 .account-detail-scope .account-balance-toprow { width: 100%; }
 .account-detail-scope .account-header-right { display: grid; gap: 2px; justify-items: end; min-width: 0; }
@@ -1124,17 +1124,17 @@ body.scroll-lock { overflow: hidden !important }
 .account-detail-scope .account-order-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; }
 
 @media (min-width: 769px) {
-  .account-detail-scope { max-width: 980px; margin: 0 auto; }
-  .account-detail-scope .card { padding: 10px; }
-  .account-detail-scope .account-balance-value { font-size: 18px; }
+  .account-detail-scope { max-width: 100%; margin: 0; }
+  .account-detail-scope .card { padding: 16px; }
+  .account-detail-scope .account-balance-value { font-size: 22px; }
   .account-detail-scope .account-meta-phone { font-size: 13px; }
   .account-detail-scope .account-meta-note { font-size: 12px; }
   .account-detail-scope .account-collect-btn { padding: 6px 10px; min-width: 120px; }
-  .account-detail-scope .txCard { padding: 6px 8px; border-radius: 10px; }
-  .account-detail-scope .txRow { gap: 6px; }
-  .account-detail-scope .txRight { font-size: 11px; }
-  .account-detail-scope .txLeft { font-size: 13px; }
-  .account-detail-scope .account-order-item { border-radius: 8px; padding: 8px; }
+  .account-detail-scope .txCard { padding: 10px 12px; border-radius: 12px; }
+  .account-detail-scope .txRow { gap: 10px; }
+  .account-detail-scope .txRight { font-size: 12px; }
+  .account-detail-scope .txLeft { font-size: 14px; }
+  .account-detail-scope .account-order-item { border-radius: 10px; padding: 10px; }
 }
 
 @media (max-width: 768px) {

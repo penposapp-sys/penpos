@@ -2064,7 +2064,6 @@ const buildTransferContext = async (tenantId, id, targetTableId) => {
   if (!sourceTable) throw error('invalid_table', 'Invalid source table', 400)
   const targetTable = await Table.findOne({ _id: targetTableId, tenantId, isActive: true })
   if (!targetTable) throw error('invalid_table', 'Invalid target table', 400)
-  if (String(sourceTable.branchId) !== String(targetTable.branchId)) throw error('forbidden', 'Cross-branch transfer not allowed', 403)
   return { order, sourceTable, targetTable }
 }
 
@@ -2216,34 +2215,22 @@ export const transferOrderService = async (tenantId, id, targetTableId) => {
   }
 }
 
+const normalizeMergedItem = (item) => {
+  const qty = toMoney(item?.qty ?? item?.quantity)
+  const price = toMoney(item?.priceSnapshot ?? item?.price)
+  const subtotal = toMoney(qty * price)
+  return {
+    ...item,
+    qty,
+    priceSnapshot: price,
+    subtotal
+  }
+}
+
 const mergeItems = (targetItems, sourceItems) => {
-  const map = new Map()
-  for (const it of targetItems) {
-    map.set(String(it.menuItemId), { ...it })
-  }
-  for (const it of sourceItems) {
-    const key = String(it.menuItemId)
-    if (map.has(key)) {
-      const existing = map.get(key)
-      const qty =
-        toMoney(existing.qty ?? existing.quantity) +
-        toMoney(it.qty ?? it.quantity)
-      const price = toMoney(
-        existing.priceSnapshot ??
-        existing.price ??
-        it.priceSnapshot ??
-        it.price
-      )
-      const subtotal = toMoney(qty * price)
-      map.set(key, { ...existing, qty, priceSnapshot: price, subtotal })
-    } else {
-      const qty = toMoney(it.qty ?? it.quantity)
-      const price = toMoney(it.priceSnapshot ?? it.price)
-      const subtotal = toMoney(qty * price)
-      map.set(key, { ...it, qty, priceSnapshot: price, subtotal })
-    }
-  }
-  return Array.from(map.values())
+  const targetList = Array.isArray(targetItems) ? targetItems : []
+  const sourceList = Array.isArray(sourceItems) ? sourceItems : []
+  return [...targetList, ...sourceList].map(normalizeMergedItem)
 }
 
 const buildMergedOrderData = (targetOrder, sourceOrders) => {
@@ -2362,9 +2349,6 @@ export const mergeOrdersService = async (tenantId, targetTableId, sourceTableIds
   if (sourceTables.length !== sourceTableIds.length) throw error('invalid_table', 'Invalid source table', 400)
   const invalidSource = sourceTables.find(t => t.status !== 'occupied' || !t.activeOrderId)
   if (invalidSource) throw error('invalid_table', 'Invalid source table', 400)
-  const crossBranch = sourceTables.find(t => String(t.branchId) !== String(targetTable.branchId))
-  if (crossBranch) throw error('forbidden', 'Cross-branch merge not allowed', 403)
-
   const sourceOrders = await Order.find({ _id: { $in: sourceTables.map(t => t.activeOrderId) }, tenantId })
   const badOrder = sourceOrders.find(o => !['open', 'sent'].includes(o.status))
   if (badOrder) throw error('order_not_mergeable', 'Order not mergeable', 400)

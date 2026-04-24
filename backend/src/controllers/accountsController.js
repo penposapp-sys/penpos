@@ -1,5 +1,5 @@
 import { sendError } from '../utils/errors.js'
-import { listAccountsService, createAccountService, updateAccountService, deleteAccountService, getAccountService, listTransactionsService, getTransactionOrderService, collectDebtService, deleteCollectionTransactionService } from '../services/accountsService.js'
+import { listAccountsService, createAccountService, updateAccountService, deleteAccountService, getAccountService, getAccountCatalogService, listTransactionsService, getTransactionOrderService, collectDebtService, addManualBalanceTransactionService, addManualProductChargeService, addManualCartChargeService, deleteCollectionTransactionService } from '../services/accountsService.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 
@@ -112,6 +112,18 @@ export const getAccount = async (req, res) => {
   }
 }
 
+export const getAccountCatalog = async (req, res) => {
+  try {
+    const ctx = ensureTenantAndBranch(req, res)
+    if (!ctx) return
+    const { tenantId } = ctx
+    const result = await getAccountCatalogService(tenantId)
+    res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const listTransactions = async (req, res) => {
   try {
     const ctx = ensureTenantAndBranch(req, res)
@@ -142,6 +154,42 @@ export const collect = async (req, res) => {
     if (!ctx) return
     const { tenantId, branchId } = ctx
     const result = await collectDebtService(tenantId, branchId, req.user.id, req.params.id, req.body)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const addManualBalanceTransaction = async (req, res) => {
+  try {
+    const ctx = ensureTenantAndBranch(req, res)
+    if (!ctx) return
+    const { tenantId, branchId } = ctx
+    const result = await addManualBalanceTransactionService(tenantId, branchId, req.user.id, req.params.id, req.body)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const addManualProductCharge = async (req, res) => {
+  try {
+    const ctx = ensureTenantAndBranch(req, res)
+    if (!ctx) return
+    const { tenantId, branchId } = ctx
+    const result = await addManualProductChargeService(tenantId, branchId, req.user.id, req.params.id, req.body)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const addManualCartCharge = async (req, res) => {
+  try {
+    const ctx = ensureTenantAndBranch(req, res)
+    if (!ctx) return
+    const { tenantId, branchId } = ctx
+    const result = await addManualCartChargeService(tenantId, branchId, req.user.id, req.params.id, req.body)
     res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)

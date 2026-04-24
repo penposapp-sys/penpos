@@ -44,7 +44,7 @@ export const branchListGuard = async (req, res, next) => {
     const validIds = finalIds.filter(id => activeIds.includes(String(id)))
 
     if (requested.length > 0 && validIds.length === 0) {
-      return res.status(403).json({ status: 403, code: 'branch_not_allowed', message: 'Branch not allowed' })
+      return res.status(403).json({ status: 403, code: 'branch_not_allowed', message: 'Bu şubeye erişim yetkin yok' })
     }
     if (validIds.length === 0) {
       return res.status(403).json({

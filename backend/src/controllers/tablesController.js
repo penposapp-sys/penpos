@@ -5,7 +5,9 @@ import { error } from '../utils/errors.js'
 
 export const list = async (req, res) => {
   try {
-    const items = await listTablesService(req.user.tenantId, req.branch?.id || null)
+    const branchIds = Array.isArray(req.branchIds) ? req.branchIds.map(String).filter(Boolean) : []
+    const branchId = req.branch?.id || null
+    const items = await listTablesService(req.user.tenantId, branchIds.length > 0 ? { branchIds } : branchId)
     res.json({ tables: items })
   } catch (err) {
     sendError(res, err)

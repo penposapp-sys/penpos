@@ -8,8 +8,8 @@ import { getTenantPlan, ensureNotExpired } from './planService.js'
 import mongoose from 'mongoose'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 
-export const listTablesService = async (tenantId, branchId) => {
-  const list = await listTables(tenantId, branchId)
+export const listTablesService = async (tenantId, branchFilter) => {
+  const list = await listTables(tenantId, branchFilter)
   return list.map(t => ({
     id: t.id,
     name: t.name,

@@ -4,6 +4,15 @@ import { normalizePermissions } from '../constants/permissions.js'
 
 const AuthContext = createContext()
 
+const resolveAllowedBranchIds = (normalizedUser, tenantProfile) => {
+  const tenantAllowed = Array.isArray(tenantProfile?.allowedBranchIds) ? tenantProfile.allowedBranchIds.map(String).filter(Boolean) : []
+  if (String(normalizedUser?.role || '') !== 'staff') return tenantAllowed
+  const staffAllowed = Array.isArray(normalizedUser?.branchIds) && normalizedUser.branchIds.length > 0
+    ? normalizedUser.branchIds.map(String).filter(Boolean)
+    : (normalizedUser?.branchId ? [String(normalizedUser.branchId)] : [])
+  return tenantAllowed.filter(id => staffAllowed.includes(String(id)))
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -63,7 +72,7 @@ export const AuthProvider = ({ children }) => {
         if (!res?.ok || res?.success === false) {
           setAllowedBranchIds([])
         } else {
-          const ids = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+          const ids = resolveAllowedBranchIds(normalized, res?.tenant)
           setAllowedBranchIds(ids)
           if (ids.length === 1) {
             localStorage.setItem('selectedBranchId', String(ids[0]))
@@ -132,7 +141,7 @@ export const AuthProvider = ({ children }) => {
         if (!res?.ok || res?.success === false) {
           setAllowedBranchIds([])
         } else {
-          const ids = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+          const ids = resolveAllowedBranchIds(normalized, res?.tenant)
           setAllowedBranchIds(ids)
           if (ids.length === 1) {
             localStorage.setItem('selectedBranchId', String(ids[0]))
@@ -190,7 +199,7 @@ export const AuthProvider = ({ children }) => {
           if (!res?.ok || res?.success === false) {
             setAllowedBranchIds([])
           } else {
-            const ids = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+            const ids = resolveAllowedBranchIds(normalized, res?.tenant)
             setAllowedBranchIds(ids)
             if (ids.length === 1) {
               localStorage.setItem('selectedBranchId', String(ids[0]))

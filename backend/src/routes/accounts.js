@@ -11,12 +11,16 @@ const router = Router()
 
 router.get('/', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['view_accounts']), ctrl.listAccounts)
 router.post('/', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.createAccount)
+router.get('/catalog', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.getAccountCatalog)
 router.get('/:id', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['view_accounts']), ctrl.getAccount)
 router.put('/:id', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.updateAccount)
 router.delete('/:id', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.deleteAccount)
 router.get('/:id/transactions', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['view_accounts']), ctrl.listTransactions)
 router.get('/transactions/:id/order', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['view_accounts']), ctrl.getTransactionOrder)
 router.post('/:id/collect', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['view_accounts', 'collect_debt']), ctrl.collect)
+router.post('/:id/manual-adjust', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.addManualBalanceTransaction)
+router.post('/:id/manual-product', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.addManualProductCharge)
+router.post('/:id/manual-cart', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_accounts']), ctrl.addManualCartCharge)
 router.delete('/transactions/:id', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['cari_tahsilat_sil']), ctrl.deleteTransaction)
 
 export default router

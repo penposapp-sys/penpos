@@ -1,8 +1,14 @@
 import Table from '../models/Table.js'
+import { applyBranchFilter } from '../utils/branchFilter.js'
 
-export const listTables = async (tenantId, branchId) => {
-  const filter = { tenantId, isActive: true }
-  if (branchId) filter.branchId = branchId
+export const listTables = async (tenantId, branchFilter) => {
+  let filter = { tenantId, isActive: true }
+  if (branchFilter && typeof branchFilter === 'object' && !Array.isArray(branchFilter)) {
+    const branchIds = Array.isArray(branchFilter.branchIds) ? branchFilter.branchIds.map(String).filter(Boolean) : []
+    filter = applyBranchFilter(filter, branchIds.length > 0 ? branchIds : (branchFilter.branchId ? [branchFilter.branchId] : []))
+  } else if (branchFilter) {
+    filter.branchId = branchFilter
+  }
   return Table.find(filter).sort({ name: 1 })
 }
 

@@ -196,7 +196,7 @@ export default function TablesPage() {
     return acc
   }, {})
 
-  const categories = ['Tümü', ...Object.keys(groupedTables)]
+  const categories = Object.keys(groupedTables)
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -272,7 +272,7 @@ export default function TablesPage() {
             >
               {category}
               <span style={{ marginLeft: 6, color: 'var(--muted)' }}>
-                ({category === 'Tümü' ? tables.length : (groupedTables[category]?.length || 0)})
+                ({groupedTables[category]?.length || 0})
               </span>
             </button>
           ))}
@@ -280,7 +280,7 @@ export default function TablesPage() {
       )}
 
       <div className="tablesGrid">
-        {(activeCategory === 'Tümü' ? tables : (groupedTables[activeCategory] || [])).map(t => {
+        {(groupedTables[activeCategory] || []).map(t => {
           const isAnyBusy = busyGlobal || !!busyTableId
           const isBusy = busyGlobal || busyTableId === t.id
           return (
