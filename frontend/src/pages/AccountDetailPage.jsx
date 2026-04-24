@@ -9,6 +9,13 @@ import Modal from '../components/Modal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
+const toNumberInput = (value) => {
+  if (value === null || value === undefined) return 0
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  const normalized = String(value).trim().replace(/\s/g, '').replace(',', '.')
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : 0
+}
 
 export default function AccountDetailPage() {
   const nav = useNavigate()
@@ -40,6 +47,8 @@ export default function AccountDetailPage() {
 
   const [collectOpen, setCollectOpen] = useState(false)
   const [collectForm, setCollectForm] = useState({ amount: '', method: 'cash', note: '' })
+  const [collectMethods, setCollectMethods] = useState([])
+  const [collectDiscountDraft, setCollectDiscountDraft] = useState('0')
   const [manualOpen, setManualOpen] = useState(false)
   const [manualForm, setManualForm] = useState({ amount: '', type: 'debit', note: '' })
 
@@ -119,6 +128,29 @@ export default function AccountDetailPage() {
   }, [canManageAccount])
 
   useEffect(() => {
+    if (!canCollect) return
+    let cancelled = false
+    const run = async () => {
+      try {
+        const res = await api('/api/tenant/payment-settings', { silent: true })
+        if (cancelled) return
+        if (res?.success === false) {
+          setCollectMethods([])
+          return
+        }
+        const methods = Array.isArray(res?.methods) ? res.methods.filter((m) => m.isEnabled) : []
+        setCollectMethods(methods)
+        const def = methods.find((m) => m.isDefault && m.isEnabled)
+        if (def?.key) {
+          setCollectForm((prev) => ({ ...prev, method: def.key }))
+        }
+      } catch {}
+    }
+    run()
+    return () => { cancelled = true }
+  }, [canCollect])
+
+  useEffect(() => {
     const run = async () => {
       const txId = String(expandedId || '').trim()
       if (!txId) {
@@ -168,6 +200,12 @@ export default function AccountDetailPage() {
     () => (cartItems || []).reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.price || 0)), 0),
     [cartItems]
   )
+  const collectGross = Math.max(0, Number(account?.balance || 0))
+  const collectDiscountPercent = Math.max(0, Math.min(100, toNumberInput(collectDiscountDraft) || 0))
+  const collectDiscountAmount = Number(((collectGross * collectDiscountPercent) / 100).toFixed(2))
+  const collectNet = Math.max(0, Number((collectGross - collectDiscountAmount).toFixed(2)))
+  const collectAmountValue = Math.max(0, toNumberInput(collectForm.amount || 0))
+  const collectRemaining = Math.max(0, Number((collectGross - collectDiscountAmount - collectAmountValue).toFixed(2)))
 
   const txRows = useMemo(() => (Array.isArray(tx) ? tx : []), [tx])
 
@@ -185,22 +223,56 @@ export default function AccountDetailPage() {
   const collect = async () => {
     const accountId = String(account?.id || '').trim()
     if (!accountId) return
-    const amt = Number(collectForm.amount)
-    if (!Number.isFinite(amt) || amt <= 0) {
+    const amt = toNumberInput(collectForm.amount)
+    if (!Number.isFinite(amt) || amt < 0 || (amt + collectDiscountAmount) <= 0) {
       toast.error('Tutar geçersiz')
       return
     }
     try {
       await api(`/api/accounts/${accountId}/collect`, {
         method: 'POST',
-        body: JSON.stringify({ amount: amt, method: collectForm.method, note: collectForm.note, orderId: orderIdFromUrl || undefined })
+        body: JSON.stringify({
+          amount: amt,
+          discountAmount: collectDiscountAmount,
+          method: collectForm.method,
+          note: collectForm.note,
+          orderId: orderIdFromUrl || undefined
+        })
       })
       toast.success('Tahsilat kaydedildi')
       setCollectOpen(false)
       setCollectForm({ amount: '', method: 'cash', note: '' })
+      setCollectDiscountDraft('0')
       await reloadAccount(accountId)
     } catch (err) {
       toast.error(err?.message || 'Tahsilat alınamadı')
+    }
+  }
+
+  const applyCollectDiscount = async () => {
+    const accountId = String(account?.id || '').trim()
+    if (!accountId) return
+    if (collectDiscountAmount <= 0) {
+      toast.error('İndirim tutarı geçersiz')
+      return
+    }
+    try {
+      await api(`/api/accounts/${accountId}/collect`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: 0,
+          discountAmount: collectDiscountAmount,
+          method: collectForm.method || 'other',
+          note: collectForm.note || 'Cari indirimi',
+          orderId: orderIdFromUrl || undefined
+        })
+      })
+      toast.success('İndirim uygulandı')
+      setCollectDiscountDraft('0')
+      setCollectForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(account?.balance || 0) - collectDiscountAmount).toFixed(2)), note: '' }))
+      await reloadAccount(accountId)
+    } catch (err) {
+      toast.error(err?.message || 'İndirim uygulanamadı')
     }
   }
 
@@ -212,7 +284,7 @@ export default function AccountDetailPage() {
   const submitManualBalance = async () => {
     const accountId = String(account?.id || '').trim()
     if (!accountId) return
-    const amt = Number(manualForm.amount)
+    const amt = toNumberInput(manualForm.amount)
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error('Tutar geçersiz')
       return
@@ -355,7 +427,22 @@ export default function AccountDetailPage() {
               <button className="btn" onClick={() => openManualModal('credit')}>- Bakiye</button>
             </>
           )}
-          {canCollect && <button className="btn account-collect-btn" onClick={() => setCollectOpen(true)}>Tahsilat Al</button>}
+          {canCollect && (
+            <button
+              className="btn account-collect-btn"
+              onClick={() => {
+                setCollectDiscountDraft('0')
+                setCollectForm((prev) => ({
+                  ...prev,
+                  amount: String(Math.max(0, Number(account?.balance || 0)).toFixed(2)),
+                  note: ''
+                }))
+                setCollectOpen(true)
+              }}
+            >
+              Tahsilat Al
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -375,9 +462,14 @@ export default function AccountDetailPage() {
             type="button"
             style={{
               textAlign: 'left',
-              justifyContent: 'flex-start',
+              justifyContent: isMobilePortrait ? 'center' : 'flex-start',
               fontWeight: String(activeCategoryId) === String(category.id) ? 800 : 600,
-              opacity: category.isActive === false ? 0.75 : 1
+              opacity: category.isActive === false ? 0.75 : 1,
+              minHeight: isMobilePortrait ? 64 : undefined,
+              whiteSpace: 'normal',
+              lineHeight: 1.05,
+              padding: isMobilePortrait ? '8px 6px' : undefined,
+              fontSize: isMobilePortrait ? 13 : undefined
             }}
             onClick={() => setActiveCategoryId(category.id)}
           >
@@ -474,6 +566,26 @@ export default function AccountDetailPage() {
                       </div>
                     </div>
 
+                    {Array.isArray(t?.lines) && t.lines.length > 0 && (
+                      <div className="account-subcard">
+                        <div style={{ fontWeight: 800, marginBottom: 6 }}>Ürün Detayları</div>
+                        <div className="account-order-items">
+                          {t.lines.map((line, idx) => (
+                            <div key={`${line?.menuItemId || line?.name || 'line'}-${idx}`} className="account-order-item">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                                <div className="breakAny" style={{ fontWeight: 700 }}>{line?.name || '-'}</div>
+                                <div style={{ fontWeight: 800 }}>{money(line?.lineTotal || 0)}</div>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
+                                <div>{Number(line?.qty || 0)} × {money(line?.price || 0)}</div>
+                                {!!String(line?.note || '').trim() && <div className="breakAny">{String(line.note).trim()}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {!!t?.orderId && (
                       <div className="account-subcard">
                         <div style={{ fontWeight: 800, marginBottom: 6 }}>Sipariş Özeti</div>
@@ -532,7 +644,7 @@ export default function AccountDetailPage() {
   )
 
   const productsPanel = canManageAccount ? (
-    <div className="card" style={{ display: 'grid', gap: 14, alignSelf: 'start', alignContent: 'start', justifyContent: 'start', minHeight: isMobilePortrait ? undefined : 520 }}>
+    <div className="card" style={{ display: 'grid', gap: 14, alignSelf: 'start', alignContent: 'start', justifyContent: 'stretch', width: '100%', minHeight: isMobilePortrait ? undefined : 520 }}>
       <div>
         <div style={{ fontWeight: 800 }}>Ürünler</div>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Mutfağı etkilemez. Ürüne tıklayınca sepete eklenir.</div>
@@ -545,7 +657,7 @@ export default function AccountDetailPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(auto-fill, 155px)',
+            gridTemplateColumns: isMobilePortrait ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fill, minmax(145px, 165px))',
             gap: 10,
             justifyContent: 'start',
             alignContent: 'start',
@@ -564,8 +676,8 @@ export default function AccountDetailPage() {
                 display: 'grid',
                 alignContent: 'end',
                 justifyItems: 'start',
-                minHeight: 98,
-                borderRadius: 14,
+                minHeight: isMobilePortrait ? 96 : 98,
+                borderRadius: isMobilePortrait ? 16 : 14,
                 overflow: 'hidden',
                 position: 'relative',
                 border: '1px solid rgba(255,255,255,0.12)',
@@ -574,12 +686,12 @@ export default function AccountDetailPage() {
                   : 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
                 color: '#fff',
                 boxShadow: '0 16px 28px rgba(15, 23, 42, 0.18)',
-                padding: 10
+                padding: isMobilePortrait ? 9 : 10
               }}
               onClick={() => addToCart(item)}
             >
-              <span style={{ fontWeight: 900, fontSize: 12, lineHeight: 1.05, textShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>{item.name}</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', fontWeight: 700, textShadow: '0 2px 10px rgba(0,0,0,0.35)' }}>
+              <span style={{ fontWeight: 900, fontSize: isMobilePortrait ? 11 : 12, lineHeight: 1.05, textShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>{item.name}</span>
+              <span style={{ fontSize: isMobilePortrait ? 10 : 11, color: 'rgba(255,255,255,0.92)', fontWeight: 700, textShadow: '0 2px 10px rgba(0,0,0,0.35)' }}>
                 {money(item.price)}{item.isActive === false ? ' • Pasif ürün' : ''}
               </span>
             </button>
@@ -642,7 +754,15 @@ export default function AccountDetailPage() {
 
   const catalogGridStyle = isMobilePortrait || !canManageAccount
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start', width: '100%' }
-    : { display: 'grid', gridTemplateColumns: 'minmax(220px, 0.8fr) minmax(280px, 0.95fr) minmax(0, 1.4fr) minmax(320px, 0.95fr)', gap: 18, alignItems: 'start', width: '100%' }
+    : { display: 'grid', gridTemplateColumns: 'minmax(200px, 0.72fr) minmax(220px, 0.82fr) minmax(0, 1.8fr) minmax(300px, 0.9fr)', gap: 18, alignItems: 'start', width: '100%' }
+
+  const mobileCatalogTopStyle = {
+    display: 'grid',
+    gridTemplateColumns: '104px minmax(0, 1fr)',
+    gap: 12,
+    alignItems: 'start',
+    width: '100%'
+  }
 
   return (
     <div
@@ -671,32 +791,131 @@ export default function AccountDetailPage() {
         <>
           {balanceCard}
 
-          <div style={catalogGridStyle}>
-            {debtPanel}
-            {categoriesPanel}
-            {canManageAccount ? (
-              <>
+          {canManageAccount && isMobilePortrait ? (
+            <>
+              <div style={mobileCatalogTopStyle}>
+                {categoriesPanel}
                 {productsPanel}
-                {cartPanel}
-              </>
-            ) : null}
-          </div>
+              </div>
+              {debtPanel}
+              {cartPanel}
+            </>
+          ) : (
+            <div style={catalogGridStyle}>
+              {debtPanel}
+              {categoriesPanel}
+              {canManageAccount ? (
+                <>
+                  {productsPanel}
+                  {cartPanel}
+                </>
+              ) : null}
+            </div>
+          )}
         </>
       )}
 
       <Modal open={collectOpen} onClose={() => setCollectOpen(false)} title="Tahsilat Al">
         <div style={{ display: 'grid', gap: 10 }}>
-          <label>Tutar <input type="number" className="input" value={collectForm.amount} onChange={(e) => setCollectForm({ ...collectForm, amount: e.target.value })} /></label>
-          <label>Yöntem
-            <select className="input" value={collectForm.method} onChange={(e) => setCollectForm({ ...collectForm, method: e.target.value })}>
-              <option value="cash">Nakit</option>
-              <option value="card">Kart</option>
-              <option value="transfer">Havale</option>
-              <option value="other">Diğer</option>
-            </select>
-          </label>
-          <label>Not <input className="input" value={collectForm.note} onChange={(e) => setCollectForm({ ...collectForm, note: e.target.value })} /></label>
-          <button className="btn" onClick={collect}>Onayla</button>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+            Cari: {account?.name || '-'} • Güncel Bakiye: {money(account?.balance || 0)}
+          </div>
+
+          <div className="card" style={{ borderColor: 'var(--border)' }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>Brüt</div>
+                <div style={{ fontWeight: 600 }}>{money(collectGross)}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="input"
+                    style={{ width: 120 }}
+                    value={collectDiscountDraft}
+                    onChange={(e) => setCollectDiscountDraft(e.target.value)}
+                  />
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={applyCollectDiscount}
+                  >
+                    Uygula
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
+                <div style={{ fontWeight: 600 }}>{money(collectDiscountAmount)}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>Net</div>
+                <div style={{ fontWeight: 700 }}>{money(collectNet)}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>Bakiye</div>
+                <div style={{ fontWeight: 700 }}>{money(collectGross)}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>Kalan</div>
+                <div style={{ fontWeight: 700 }}>{money(collectRemaining)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ borderColor: 'var(--border)' }}>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yöntem</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {(collectMethods.length > 0 ? collectMethods : [
+                    { key: 'cash', label: 'Nakit' },
+                    { key: 'card', label: 'Kart' },
+                    { key: 'transfer', label: 'Havale' },
+                    { key: 'other', label: 'Diğer' }
+                  ]).map((m) => {
+                    const active = collectForm.method === m.key
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        className="btn"
+                        onClick={() => setCollectForm({ ...collectForm, method: m.key })}
+                        style={{
+                          minWidth: 96,
+                          fontWeight: active ? 800 : 600,
+                          background: active ? '#111827' : undefined,
+                          color: active ? '#fff' : undefined,
+                          borderColor: active ? '#111827' : undefined
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <label>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
+                <input type="number" className="input" value={collectForm.amount} onChange={(e) => setCollectForm({ ...collectForm, amount: e.target.value })} placeholder="Tutar giriniz" />
+              </label>
+
+              <label>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not (opsiyonel)</div>
+                <input className="input" value={collectForm.note} onChange={(e) => setCollectForm({ ...collectForm, note: e.target.value })} />
+              </label>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn" onClick={collect}>Tahsilat Ekle</button>
+                <button className="btn" onClick={() => setCollectOpen(false)}>Kapat</button>
+              </div>
+            </div>
+          </div>
         </div>
       </Modal>
 

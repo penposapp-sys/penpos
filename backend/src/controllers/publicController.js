@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import mongoose from 'mongoose'
 import Tenant from '../models/Tenant.js'
 import Category from '../models/Category.js'
@@ -39,4 +41,33 @@ export const getPublicMenu = async (req, res) => {
       sortOrder: Number(i.sortOrder || 0)
     }))
   })
+}
+
+export const downloadPrintAgentSetup = async (req, res) => {
+  const envPath = String(process.env.PRINT_AGENT_WINDOWS_FILE || '').trim()
+  const fileName = 'PenPOS_PrintAgent_Setup_0.1.0.exe'
+  const candidates = [
+    envPath,
+    path.join(process.cwd(), 'backend', 'public', 'downloads', fileName),
+    path.join(process.cwd(), 'public', 'downloads', fileName)
+  ].filter(Boolean)
+
+  const existing = candidates.find((candidate) => {
+    try {
+      return fs.existsSync(candidate)
+    } catch {
+      return false
+    }
+  })
+
+  if (!existing) {
+    return res.status(404).json({
+      success: false,
+      code: 'print_agent_not_found',
+      error: 'print_agent_not_found',
+      message: 'Print Agent kurulum dosyası bulunamadı'
+    })
+  }
+
+  return res.download(existing, fileName)
 }

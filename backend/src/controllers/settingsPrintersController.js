@@ -14,7 +14,7 @@ export const getPrintersSettings = async (req, res) => {
     }
   }
 
-  const fallbackPath = '/public/downloads/PenPOS_PrintAgent_Setup_0.1.0.exe'
+  const fallbackPath = '/api/public/downloads/print-agent/windows'
   const base = buildBaseUrl()
   const downloadUrl = String(process.env.PRINT_AGENT_WINDOWS_URL || (base ? new URL(fallbackPath, base).toString() : fallbackPath)).trim()
   res.json({

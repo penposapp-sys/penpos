@@ -9,6 +9,14 @@ const accountTransactionSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     method: { type: String, enum: ['cash', 'card', 'transfer', 'other'], default: 'other' },
     note: { type: String, default: '' },
+    lines: [{
+      menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', default: null },
+      name: { type: String, default: '' },
+      qty: { type: Number, default: 0 },
+      price: { type: Number, default: 0 },
+      lineTotal: { type: Number, default: 0 },
+      note: { type: String, default: '' }
+    }],
     source: { type: String, enum: ['order_veresiye', 'order_veresiye_delete', 'collection', 'manual'], required: true },
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     isDeleted: { type: Boolean, default: false, index: true },

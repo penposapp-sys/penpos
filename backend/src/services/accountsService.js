@@ -8,7 +8,8 @@ import { log as auditLog } from './auditService.js'
 import { isTxnSupported } from '../utils/mongoTxn.js'
 
 const toMoney = (v) => {
-  const n = Number(v)
+  const raw = v === null || v === undefined ? '' : String(v).trim().replace(/\s/g, '').replace(',', '.')
+  const n = Number(raw)
   return Number.isFinite(n) ? n : 0
 }
 
@@ -17,6 +18,28 @@ const normalizePhone = (v) => {
   const out = raw.replace(/\s/g, '').trim()
   return out ? out : null
 }
+
+const mapTransactionDto = (t, orderMap = null) => ({
+  id: t._id.toString(),
+  type: t.type,
+  amount: toMoney(t.amount),
+  method: t.method,
+  note: t.note,
+  source: t.source,
+  orderId: t.orderId ? t.orderId.toString() : null,
+  orderSummary: t.orderId && orderMap ? (orderMap.get(String(t.orderId)) || null) : null,
+  lines: Array.isArray(t?.lines)
+    ? t.lines.map((line) => ({
+      menuItemId: line?.menuItemId ? String(line.menuItemId) : null,
+      name: String(line?.name || '').trim(),
+      qty: Number(line?.qty || 0),
+      price: toMoney(line?.price),
+      lineTotal: toMoney(line?.lineTotal),
+      note: String(line?.note || '').trim()
+    }))
+    : [],
+  createdAt: t.createdAt
+})
 
  
 
@@ -174,17 +197,7 @@ export const getAccountService = async (tenantId, branchId, id) => {
       isActive: !!acc.isActive,
       createdAt: acc.createdAt
     },
-    recentTransactions: tx.map(t => ({
-      id: t._id.toString(),
-      type: t.type,
-      amount: toMoney(t.amount),
-      method: t.method,
-      note: t.note,
-      source: t.source,
-      orderId: t.orderId ? t.orderId.toString() : null,
-      orderSummary: t.orderId ? (orderMap.get(String(t.orderId)) || null) : null,
-      createdAt: t.createdAt
-    }))
+    recentTransactions: tx.map(t => mapTransactionDto(t, orderMap))
   }
 }
 
@@ -254,17 +267,7 @@ export const listTransactionsService = async (tenantId, branchId, id, query = {}
   )
 
   return {
-    transactions: items.map(t => ({
-      id: t._id.toString(),
-      type: t.type,
-      amount: toMoney(t.amount),
-      method: t.method,
-      note: t.note,
-      source: t.source,
-      orderId: t.orderId ? t.orderId.toString() : null,
-      orderSummary: t.orderId ? (orderMap.get(String(t.orderId)) || null) : null,
-      createdAt: t.createdAt
-    })),
+    transactions: items.map(t => mapTransactionDto(t, orderMap)),
     page,
     limit,
     total
@@ -313,14 +316,20 @@ export const getTransactionOrderService = async (tenantId, branchId, txId) => {
 export const collectDebtService = async (tenantId, branchId, actorUserId, id, body = {}) => {
   if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid account id', 400)
   const amount = toMoney(body.amount)
-  if (amount <= 0) throw error('invalid_amount', 'Invalid amount', 400)
+  const discountAmount = toMoney(body.discountAmount)
+  const totalEffect = toMoney(amount + discountAmount)
+  if (totalEffect <= 0) throw error('invalid_amount', 'Invalid amount', 400)
+  if (amount < 0) throw error('invalid_amount', 'Invalid amount', 400)
   const method = ['cash', 'card', 'transfer', 'other'].includes(body.method) ? body.method : 'cash'
-  const note = String(body.note || '').trim()
+  const rawNote = String(body.note || '').trim()
+  const note = discountAmount > 0
+    ? [rawNote, `Tahsilat: ${toMoney(amount).toFixed(2)} TL`, `İndirim: ${toMoney(discountAmount).toFixed(2)} TL`].filter(Boolean).join(' • ')
+    : rawNote
   const orderId = body?.orderId && mongoose.Types.ObjectId.isValid(String(body.orderId)) ? new mongoose.Types.ObjectId(String(body.orderId)) : null
 
   const acc = await CustomerAccount.findOneAndUpdate(
     { _id: id, tenantId },
-    { $inc: { balance: -amount } },
+    { $inc: { balance: -totalEffect } },
     { new: true }
   )
   if (!acc) throw error('not_found', 'Account not found', 404)
@@ -330,14 +339,14 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
     branchId,
     accountId: acc.id,
     type: 'credit',
-    amount,
+    amount: totalEffect,
     method,
     note,
     source: 'collection',
     orderId
   })
 
-  await auditLog(tenantId, actorUserId, 'cari_tahsilat', 'CustomerAccount', acc.id, { amount, method })
+  await auditLog(tenantId, actorUserId, 'cari_tahsilat', 'CustomerAccount', acc.id, { amount, discountAmount, method })
 
   return {
     account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
@@ -464,9 +473,12 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
     const note = entry.note ? `${baseNote} - ${entry.note}` : baseNote
     return {
       menuItemId: entry.menuItemId,
+      name: String(item.name || '').trim(),
       qty: entry.qty,
+      price: toMoney(item.price),
       amount,
-      note
+      note,
+      lineTotal: amount
     }
   })
 
@@ -478,19 +490,29 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
   )
   if (!acc) throw error('not_found', 'Account not found', 404)
 
-  const created = await AccountTransaction.insertMany(
-    txPayload.map((entry) => ({
-      tenantId,
-      branchId,
-      accountId: acc.id,
-      type: 'debit',
-      amount: entry.amount,
-      method: 'other',
-      note: entry.note,
-      source: 'manual',
-      orderId: null
-    }))
-  )
+  const summaryNote = txPayload.length === 1
+    ? txPayload[0].note
+    : `${txPayload.length} ürünlük sepet`
+
+  const created = await AccountTransaction.create({
+    tenantId,
+    branchId,
+    accountId: acc.id,
+    type: 'debit',
+    amount: totalAmount,
+    method: 'other',
+    note: summaryNote,
+    lines: txPayload.map((entry) => ({
+      menuItemId: entry.menuItemId,
+      name: entry.name,
+      qty: entry.qty,
+      price: entry.price,
+      lineTotal: entry.lineTotal,
+      note: entry.note
+    })),
+    source: 'manual',
+    orderId: null
+  })
 
   await auditLog(tenantId, actorUserId, 'cari_manual_sepet', 'CustomerAccount', acc.id, {
     totalAmount,
@@ -499,15 +521,25 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
 
   return {
     account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
-    transactions: created.map((tx) => ({
-      id: tx.id,
-      type: tx.type,
-      amount: toMoney(tx.amount),
-      method: tx.method,
-      note: tx.note,
-      source: tx.source,
-      createdAt: tx.createdAt
-    })),
+    transaction: {
+      id: created.id,
+      type: created.type,
+      amount: toMoney(created.amount),
+      method: created.method,
+      note: created.note,
+      source: created.source,
+      lines: Array.isArray(created.lines)
+        ? created.lines.map((line) => ({
+          menuItemId: line?.menuItemId ? String(line.menuItemId) : null,
+          name: String(line?.name || '').trim(),
+          qty: Number(line?.qty || 0),
+          price: toMoney(line?.price),
+          lineTotal: toMoney(line?.lineTotal),
+          note: String(line?.note || '').trim()
+        }))
+        : [],
+      createdAt: created.createdAt
+    },
     totalAmount
   }
 }

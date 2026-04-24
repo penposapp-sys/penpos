@@ -1752,14 +1752,32 @@ export default function PosPage() {
 
         <div className="card" style={{ borderColor: 'var(--border)' }}>
           <div style={{ display: 'grid', gap: 10 }}>
-            <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yöntem</div>
-              <select className="input" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} disabled={!canTakePayment || busy}>
-                {payMethods.map(m => (
-                  <option key={m.key} value={m.key}>{m.label}</option>
-                ))}
-              </select>
-            </label>
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yöntem</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {payMethods.map((m) => {
+                  const active = paymentMethod === m.key
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      className="btn"
+                      disabled={!canTakePayment || busy}
+                      onClick={() => setPaymentMethod(m.key)}
+                      style={{
+                        minWidth: 96,
+                        fontWeight: active ? 800 : 600,
+                        background: active ? '#111827' : undefined,
+                        color: active ? '#fff' : undefined,
+                        borderColor: active ? '#111827' : undefined
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             <label>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
               <input

@@ -1115,9 +1115,9 @@ body.scroll-lock { overflow: hidden !important }
 .account-detail-scope .account-balance-label { color: var(--muted); }
 .account-detail-scope .account-balance-value { font-weight: 900; font-size: 19px; white-space: nowrap; }
 .account-detail-scope .account-collect-btn { padding: 6px 10px; font-size: 13px; }
-.account-detail-scope .account-tx-card { display: grid; gap: 8px; }
+.account-detail-scope .account-tx-card { display: grid; gap: 8px; align-content: start; justify-items: stretch; }
 .account-detail-scope .account-tx-empty { color: var(--muted); }
-.account-detail-scope .account-tx-list { display: grid; gap: 6px; }
+.account-detail-scope .account-tx-list { display: grid; gap: 6px; align-content: start; justify-items: stretch; }
 .account-detail-scope .account-tx-expanded { margin-top: 8px; display: grid; gap: 8px; }
 .account-detail-scope .account-subcard { border: 0; border-radius: 0; padding: 0; background: transparent; }
 .account-detail-scope .account-order-items { display: grid; gap: 8px; }
