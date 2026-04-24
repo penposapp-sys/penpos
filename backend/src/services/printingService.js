@@ -298,6 +298,18 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
   if (!prf) throw error('not_found', 'Profil bulunamadı', 404)
   if (prf.isActive === false) throw error('profile_inactive', 'Profil pasif', 400)
 
+  const profilePrinterId = String(prf?.printerId || '').trim()
+  if (!profilePrinterId || !mongoose.isValidObjectId(profilePrinterId)) {
+    throw error('printer_missing', `Printer seçilmemiş: ${type}`, 400)
+  }
+  const profilePrinter = await printerRepo.findByIdAndScope(profilePrinterId, tenantId, system)
+  if (!profilePrinter) {
+    throw error('printer_missing', `Printer seçilmemiş: ${type}`, 400)
+  }
+  if (profilePrinter.isActive === false) {
+    throw error('printer_inactive', `Yazıcı pasif: ${type}`, 400)
+  }
+
   const created = await jobRepo.create({
     tenantId,
     system,
