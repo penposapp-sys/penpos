@@ -12,6 +12,35 @@ export const normalizeSystem = (value) => {
   return v === 'canteen' ? 'canteen' : 'kermes'
 }
 
+const logicalPrinterNameByType = (typeOrCode) => {
+  const v = String(typeOrCode || '').trim().toLowerCase()
+  if (v === 'label') return 'Etiket Yazıcısı'
+  if (v === 'receipt') return 'Fiş Yazıcısı'
+  return ''
+}
+
+const resolveProfilePrinter = async (tenantId, system, profile, typeOrCode) => {
+  const printerId = String(profile?.printerId || '').trim()
+  let printer = null
+  if (printerId && mongoose.isValidObjectId(printerId)) {
+    printer = await printerRepo.findByIdAndScope(printerId, tenantId, system)
+  }
+  if (printer) return { profile, printer }
+
+  const logicalName = logicalPrinterNameByType(typeOrCode || profile?.code)
+  if (!logicalName) return { profile, printer: null }
+  const fallbackPrinter = await printerRepo.findByNameAndScope(logicalName, tenantId, system)
+  if (!fallbackPrinter) return { profile, printer: null }
+
+  const repairedProfile = await profileRepo.updateByIdAndScope(
+    String(profile.id || profile._id || ''),
+    tenantId,
+    system,
+    { printerId: fallbackPrinter.id }
+  )
+  return { profile: repairedProfile || profile, printer: fallbackPrinter }
+}
+
 export const listPrinters = async (tenantId, system) => {
   const items = await printerRepo.listByTenantAndSystem(tenantId, system)
   return (items || []).map(p => ({
@@ -298,11 +327,7 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
   if (!prf) throw error('not_found', 'Profil bulunamadı', 404)
   if (prf.isActive === false) throw error('profile_inactive', 'Profil pasif', 400)
 
-  const profilePrinterId = String(prf?.printerId || '').trim()
-  if (!profilePrinterId || !mongoose.isValidObjectId(profilePrinterId)) {
-    throw error('printer_missing', `Printer seçilmemiş: ${type}`, 400)
-  }
-  const profilePrinter = await printerRepo.findByIdAndScope(profilePrinterId, tenantId, system)
+  const { profile: resolvedProfile, printer: profilePrinter } = await resolveProfilePrinter(tenantId, system, prf, type)
   if (!profilePrinter) {
     throw error('printer_missing', `Printer seçilmemiş: ${type}`, 400)
   }
@@ -315,7 +340,7 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
     system,
     type,
     stationId: st ? new mongoose.Types.ObjectId(String(st.id)) : null,
-    profileId: new mongoose.Types.ObjectId(String(prf.id)),
+    profileId: new mongoose.Types.ObjectId(String((resolvedProfile?.id || prf.id))),
     status: 'queued',
     payload: {
       type: ['raw', 'html', 'pdf_base64'].includes(payloadType) ? payloadType : 'raw',

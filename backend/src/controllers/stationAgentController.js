@@ -44,6 +44,40 @@ const getStationScope = async (stationId) => {
   return st ? { stationId: String(st._id), tenantId: String(st.tenantId), system: String(st.system), stationName: String(st.name || '') } : null
 }
 
+const logicalPrinterNameByType = (typeOrCode) => {
+  const v = String(typeOrCode || '').trim().toLowerCase()
+  if (v === 'label') return 'Etiket Yazıcısı'
+  if (v === 'receipt') return 'Fiş Yazıcısı'
+  return ''
+}
+
+const resolveJobPrinter = async ({ tenantId, system, profileId, type }) => {
+  const profile = mongoose.isValidObjectId(String(profileId || ''))
+    ? await PrintProfile.findOne({ _id: profileId, tenantId, system }).select('printerId options code').lean()
+    : null
+  if (!profile) return { profile: null, printer: null }
+
+  let printer = null
+  const printerId = String(profile?.printerId || '').trim()
+  if (printerId && mongoose.isValidObjectId(printerId)) {
+    printer = await printerRepo.findByIdAndScope(printerId, tenantId, system)
+  }
+  if (printer) return { profile, printer }
+
+  const logicalName = logicalPrinterNameByType(type || profile?.code)
+  if (!logicalName) return { profile, printer: null }
+  const fallbackPrinter = await printerRepo.findByNameAndScope(logicalName, tenantId, system)
+  if (!fallbackPrinter) return { profile, printer: null }
+
+  const repairedProfile = await PrintProfile.findOneAndUpdate(
+    { _id: profileId, tenantId, system },
+    { $set: { printerId: fallbackPrinter._id } },
+    { new: true }
+  ).select('printerId options code').lean()
+
+  return { profile: repairedProfile || profile, printer: fallbackPrinter }
+}
+
 const getJobPdfBase64 = async ({ job, tenantId, system }) => {
   const type = String(job?.type || '')
   const profileId = String(job?.profileId || '').trim()
@@ -174,10 +208,12 @@ export const claimNext = async (req, res) => {
 
     const filePath = `/api/printing/jobs/${encodeURIComponent(jobId)}/file?stationId=${encodeURIComponent(stationId)}`
     const fileUrl = buildAbsoluteUrl(req, filePath)
-    const profile = await PrintProfile.findOne({ _id: job.profileId, tenantId: scope.tenantId, system: scope.system }).select('printerId options').lean()
-    const printer = profile?.printerId
-      ? await printerRepo.findByIdAndScope(profile.printerId, scope.tenantId, scope.system)
-      : null
+    const { profile, printer } = await resolveJobPrinter({
+      tenantId: scope.tenantId,
+      system: scope.system,
+      profileId: job.profileId,
+      type: job.type
+    })
     const copies = Math.max(1, Math.min(10, Number(job?.meta?.copies || 1)))
     const printerName = String(printer?.windowsPrinterName || '').trim()
     logger.info(`[PRINTING_CLAIM] station=${stationId} job=${jobId}`)

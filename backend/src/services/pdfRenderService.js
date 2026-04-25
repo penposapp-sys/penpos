@@ -471,42 +471,42 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
 
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
   const contentHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom
-  const qtyText = `x${q}`
-  const topBlockHeight = top ? Math.max(mmToPt(4), contentHeight * 0.17) : 0
-  const verticalGap = top ? Math.max(2, contentHeight * 0.03) : 0
-  const qtyBandHeight = Math.max(mmToPt(6), contentHeight * 0.18)
-  const productHeight = Math.max(mmToPt(10), contentHeight - topBlockHeight - verticalGap - qtyBandHeight)
+  const qtyText = `${q} ADET`
+  const blockGap = Math.max(mmToPt(1.5), contentHeight * 0.06)
+  const topBlockHeight = top ? Math.max(mmToPt(6), contentHeight * 0.2) : 0
+  const qtyBlockHeight = Math.max(mmToPt(6), contentHeight * 0.18)
+  const productBlockHeight = Math.max(mmToPt(12), contentHeight - topBlockHeight - qtyBlockHeight - (top ? blockGap * 2 : blockGap))
   const leftX = doc.page.margins.left
-  const qtyColWidth = Math.min(mmToPt(16), Math.max(mmToPt(11), contentWidth * 0.22))
-  const productWidth = Math.max(mmToPt(18), contentWidth - qtyColWidth - mmToPt(2))
-  const qtyX = doc.page.width - doc.page.margins.right - qtyColWidth
 
-  let y = doc.page.margins.top
-  const uniformMaxSize = Math.min(21, h * 0.5)
-  const uniformMinSize = Math.min(13, uniformMaxSize)
-  const topSize = top
-    ? fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: Math.max(7, uniformMinSize - 2), max: uniformMaxSize, maxLines: 2 })
-    : uniformMaxSize
-  const productSize = fitFontSizeWithLineLimit(doc, product || '-', productWidth, productHeight, { min: uniformMinSize, max: uniformMaxSize, maxLines: 3 })
-  const qtySize = fitFontSizeWithLineLimit(doc, qtyText, qtyColWidth, qtyBandHeight, { min: uniformMinSize, max: uniformMaxSize, maxLines: 1 })
-  const sharedSize = Math.max(uniformMinSize, Math.min(top ? topSize : productSize, productSize, qtySize))
+  const topFitSize = top
+    ? fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: 8, max: Math.min(18, h * 0.34), maxLines: 2 })
+    : Math.min(18, h * 0.34)
+  const productFitSize = fitFontSizeWithLineLimit(doc, product || '-', contentWidth, productBlockHeight, { min: 9, max: Math.min(21, h * 0.4), maxLines: 2 })
+  const qtyFitSize = fitFontSizeWithLineLimit(doc, qtyText, contentWidth, qtyBlockHeight, { min: 8, max: Math.min(17, h * 0.32), maxLines: 1 })
+  const sharedSize = Math.max(8, Math.min(topFitSize, productFitSize, qtyFitSize))
 
+  const topHeight = top ? doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(top, { width: contentWidth, align: 'center' }) : 0
+  const productHeightUsed = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(product || '-', { width: contentWidth, align: 'center' })
+  const qtyHeight = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(qtyText, { width: contentWidth, align: 'center', lineBreak: false })
+  const totalUsedHeight = topHeight + productHeightUsed + qtyHeight + (top ? blockGap * 2 : blockGap)
+
+  let y = doc.page.margins.top + Math.max(0, (contentHeight - totalUsedHeight) / 2)
+
+  useFont(doc, 'trBold')
   if (top) {
-    useFont(doc, 'trBold')
     doc.fontSize(sharedSize)
-    textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'left' })
-    y += topBlockHeight + verticalGap
+    textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'center' })
+    y += topHeight + blockGap
   }
 
   useFont(doc, 'trBold')
   doc.fontSize(sharedSize)
-  textMediumAt(doc, product || '-', leftX, y, { width: productWidth, height: productHeight, align: 'left' })
+  textMediumAt(doc, product || '-', leftX, y, { width: contentWidth, align: 'center' })
+  y += productHeightUsed + blockGap
 
   useFont(doc, 'trBold')
   doc.fontSize(sharedSize)
-  const qtyHeight = doc.heightOfString(qtyText, { width: qtyColWidth, align: 'right' })
-  const qtyY = doc.page.height - doc.page.margins.bottom - qtyHeight
-  textMediumAt(doc, qtyText, qtyX, qtyY, { width: qtyColWidth, align: 'right' })
+  textMediumAt(doc, qtyText, leftX, y, { width: contentWidth, align: 'center', lineBreak: false })
 
   doc.end()
   await done
