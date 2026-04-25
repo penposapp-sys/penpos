@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -58,22 +58,49 @@ import CanteenPrintStationPage from './canteen/pages/CanteenPrintStationPage.jsx
 
 const ProductReportPage = _ProductReportPage
 
+const getDefaultRoute = (user, tenantCtx) => {
+  if (!user) return null
+  if (user.role === 'superadmin') return '/superadmin/tenants'
+  if (user.role === 'platform_admin') return '/platform/kermes-tenants'
+  if (user.systemType === 'canteen') return '/canteen/kasa'
+
+  const perms = Array.isArray(user.permissions) ? user.permissions : []
+  const isExpired = tenantCtx?.tenant?.plan?.status === 'expired'
+  const canSettings = user.role === 'tenant_admin' || perms.includes('manage_settings') || perms.includes('manage_menu')
+
+  if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/kermes/app/dashboard'
+  if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/kermes/app/tables'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) return '/kermes/app/kitchen'
+  if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) return '/kermes/app/walkin'
+  if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) return '/kermes/app/delivery'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) return '/kermes/app/reports/sales'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) return '/kermes/app/accounts'
+  if (canSettings) return '/kermes/settings'
+  if (user.role === 'tenant_admin' || perms.includes('audit_view')) return '/kermes/app/audit'
+  return null
+}
+
+const RootIndexRedirect = () => {
+  const { user, loading, tenantCtx } = useAuth()
+  if (loading) return <div className="card">Yükleniyor...</div>
+  if (!user) return <EntryPage />
+
+  const nextPath = getDefaultRoute(user, tenantCtx)
+  if (nextPath) return <Navigate to={nextPath} replace />
+  return <div className="card">Yetkili sayfa yok, yöneticinle görüş</div>
+}
+
+const KermesIndexRedirect = () => {
+  const { user, loading, tenantCtx } = useAuth()
+  if (loading) return <div className="card">Yükleniyor...</div>
+  if (!user) return <Navigate to="/" replace />
+
+  const nextPath = getDefaultRoute(user, tenantCtx)
+  if (nextPath) return <Navigate to={nextPath} replace />
+  return <div className="card">Yetkili sayfa yok, yöneticinle görüş</div>
+}
+
 export default function App() {
-  const KermesIndexRedirect = () => {
-    const { user, loading } = useAuth()
-    if (loading) return <div className="card">Yükleniyor...</div>
-    if (!user) return <Navigate to="/" replace />
-
-    if (user.role === 'tenant_admin' || user.role === 'superadmin') {
-      return <Navigate to="/kermes/app/dashboard" replace />
-    }
-
-    const perms = Array.isArray(user.permissions) ? user.permissions : []
-    if (perms.includes('reports_dashboard_view')) return <Navigate to="/kermes/app/dashboard" replace />
-    if (perms.includes('closed_tables_page_view')) return <Navigate to="/kermes/app/reports/sales" replace />
-    return <div className="card">Yetkili sayfa yok, yöneticinle görüş</div>
-  }
-
   return (
     <AuthProvider>
       <Toast />
@@ -99,8 +126,9 @@ export default function App() {
             <Route path="paket" element={<CanteenSettingsBillingPage />} />
           </Route>
         </Route>
+
         <Route path="/" element={<Layout />}>
-          <Route index element={<EntryPage />} />
+          <Route index element={<RootIndexRedirect />} />
           <Route path="login" element={<Navigate to="/" replace />} />
           <Route path="login/platform" element={<PlatformLogin />} />
           <Route path="login/restoran" element={<SignIn portal="kermes" />} />
@@ -157,15 +185,13 @@ export default function App() {
             }
           />
         </Route>
-        {/* Legacy admin path redirect if exists */}
+
         <Route path="/platform/tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
         <Route path="/platform-admin/kermes-tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
         <Route path="/platform-admin/plans" element={<Navigate to="/platform/plans" replace />} />
         <Route path="/platform-admin/payments" element={<Navigate to="/platform/payments" replace />} />
-        <Route
-          path="/kermes"
-          element={<Layout />}
-        >
+
+        <Route path="/kermes" element={<Layout />}>
           <Route index element={<KermesIndexRedirect />} />
           <Route path="app/dashboard" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><Dashboard /></ProtectedRoute>} />
           <Route path="app/tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><TablesPage /></ProtectedRoute>} />

@@ -49,7 +49,7 @@ router.put('/me/username', requireAuth, requireRole(['platform_admin', 'superadm
   }
 })
 
-router.post('/tenants/kermes', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.post('/tenants/kermes', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await createTenantWithOwnerService({ ...(req.body || {}), systemType: 'kermes' })
     res.json({ success: true, id: result.tenant?._id || null })
@@ -58,7 +58,7 @@ router.post('/tenants/kermes', requireAuth, requireRole(['platform_admin']), asy
   }
 })
 
-router.post('/tenants/canteen', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.post('/tenants/canteen', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const incoming = req.body || {}
     if (incoming.systemType !== undefined && String(incoming.systemType) !== 'kantin') {
@@ -71,7 +71,7 @@ router.post('/tenants/canteen', requireAuth, requireRole(['platform_admin']), as
   }
 })
 
-router.post('/tenants', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.post('/tenants', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await createTenantWithOwnerService(req.body || {})
     res.json({ success: true, id: result.tenant?._id || null })
@@ -89,7 +89,7 @@ router.get('/tenants', requireAuth, requireRole(['platform_admin', 'superadmin']
   }
 })
 
-router.put('/tenants/:id/status', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/tenants/:id/status', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const { isActive } = req.body || {}
     const result = await updateTenantStatusService(req.params.id, !!isActive, req.user.id)
@@ -99,7 +99,7 @@ router.put('/tenants/:id/status', requireAuth, requireRole(['platform_admin']), 
   }
 })
 
-router.put('/tenants/:tenantId', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/tenants/:tenantId', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const { name, email } = req.body || {}
     const tenant = await editTenantService(req.params.tenantId, { name, email }, req.user.id)
@@ -109,7 +109,7 @@ router.put('/tenants/:tenantId', requireAuth, requireRole(['platform_admin']), a
   }
 })
 
-router.delete('/tenants/:tenantId', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.delete('/tenants/:tenantId', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await hardDeleteTenantService(req.params.tenantId, req.user.id)
     res.json(result)
@@ -154,7 +154,7 @@ router.delete('/plans/:id', requireAuth, requireRole(['platform_admin', 'superad
   }
 })
 
-router.put('/tenants/:tenantId/plan', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/tenants/:tenantId/plan', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await assignTenantPlanService(req.params.tenantId, req.body || {}, req.user.id)
     res.json(result)
@@ -163,7 +163,7 @@ router.put('/tenants/:tenantId/plan', requireAuth, requireRole(['platform_admin'
   }
 })
 
-router.put('/tenants/:tenantId/trial-extend', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/tenants/:tenantId/trial-extend', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const days = Number(req.body?.days || 0)
     const result = await trialExtendService(req.params.tenantId, days, req.user.id)
@@ -173,7 +173,7 @@ router.put('/tenants/:tenantId/trial-extend', requireAuth, requireRole(['platfor
   }
 })
 
-router.put('/tenants/:tenantId/trial-end', requireAuth, requireRole(['platform_admin']), async (req, res) => {
+router.put('/tenants/:tenantId/trial-end', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const result = await trialEndService(req.params.tenantId, req.user.id)
     res.json(result)

@@ -225,14 +225,12 @@ export default function Layout() {
           >
             ☰
           </button>
-          <button
-            type="button"
-            onClick={() => nav('/')}
-            style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            aria-label="Anasayfa"
+          <div
+            style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', alignItems: 'center' }}
+            aria-label="PenPOS"
           >
             <img src="/penpos%20logo.png" alt="PenPOS" style={{ height: 28, pointerEvents: 'none' }} onError={(e) => { e.currentTarget.src = '/penpos-logo.png' }} />
-          </button>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontWeight: 600 }}>
           {current && <span className="page-pill">{current.label}</span>}

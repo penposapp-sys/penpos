@@ -147,11 +147,17 @@ export default function TablesPage() {
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('allowed_branches_changed', onBranchChanged)
+    const pollId = window.setInterval(() => {
+      if (!busyGlobal && !busyTableId && document.visibilityState === 'visible') {
+        load({ reason: 'poll' })
+      }
+    }, 5000)
 
     return () => {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('allowed_branches_changed', onBranchChanged)
+      window.clearInterval(pollId)
     }
   }, [allowedBranchIds, busyGlobal, busyTableId])
 
@@ -366,6 +372,12 @@ export default function TablesPage() {
               {active?.hasActive && createdByName && (
                 <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 700 }}>
                   Siparişi Alan: {createdByName}
+                </div>
+              )}
+
+              {active?.hasActive && paid?.hasCancelAlert === true && (
+                <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 800 }}>
+                  İptal var
                 </div>
               )}
 

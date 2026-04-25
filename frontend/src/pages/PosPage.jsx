@@ -203,6 +203,20 @@ export default function PosPage() {
     qtyTimerRef.current.set(iId, t)
   }
 
+  const flushPendingOrderEdits = async () => {
+    try {
+      for (const timer of qtyTimerRef.current.values()) clearTimeout(timer)
+      qtyTimerRef.current.clear()
+    } catch {}
+
+    const pendingIds = Array.from(qtyPendingRef.current.keys())
+    for (const itemId of pendingIds) {
+      await flushQtyUpdate(itemId)
+    }
+
+    await saveNote()
+  }
+
   useEffect(() => {
     return () => {
       try {
@@ -773,6 +787,8 @@ export default function PosPage() {
       setError('Sipariş bulunamadı')
       return
     }
+
+    await flushPendingOrderEdits()
 
     const payload = { servingType: normalizeServingType(servingType) }
     await safeAction(

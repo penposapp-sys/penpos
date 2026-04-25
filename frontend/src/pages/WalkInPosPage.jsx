@@ -212,6 +212,20 @@ export default function WalkInPosPage() {
     qtyTimerRef.current.set(iId, t)
   }
 
+  const flushPendingOrderEdits = async () => {
+    try {
+      for (const timer of qtyTimerRef.current.values()) clearTimeout(timer)
+      qtyTimerRef.current.clear()
+    } catch {}
+
+    const pendingEntries = Array.from(qtyPendingRef.current.entries())
+    for (const [itemId, pending] of pendingEntries) {
+      await flushQtyUpdate(String(pending?.orderId || ''), itemId)
+    }
+
+    await saveNote()
+  }
+
   useEffect(() => {
     return () => {
       try {
@@ -689,6 +703,8 @@ export default function WalkInPosPage() {
       setError('Sipariş bulunamadı')
       return
     }
+
+    await flushPendingOrderEdits()
 
     const payload = {
       servingType: normalizeServingType(servingType),

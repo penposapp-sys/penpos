@@ -10,6 +10,8 @@ const resolveAllowedBranchIds = (normalizedUser, tenantProfile) => {
   const staffAllowed = Array.isArray(normalizedUser?.branchIds) && normalizedUser.branchIds.length > 0
     ? normalizedUser.branchIds.map(String).filter(Boolean)
     : (normalizedUser?.branchId ? [String(normalizedUser.branchId)] : [])
+  if (staffAllowed.length === 0) return tenantAllowed
+  if (tenantAllowed.length === 0) return staffAllowed
   return tenantAllowed.filter(id => staffAllowed.includes(String(id)))
 }
 

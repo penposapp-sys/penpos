@@ -89,6 +89,7 @@ const orderSchema = new mongoose.Schema(
     sendToKitchen: { type: Boolean, default: true },
     currentKitchenBatchId: { type: String, default: null },
     kitchenBatches: { type: [kitchenBatchSchema], default: [] },
+    cancelAlertActive: { type: Boolean, default: false },
     servingType: {
       type: String,
       enum: ['tray', 'plate', 'package'],

@@ -503,6 +503,10 @@ export const getDeliveryOrdersService = async (tenantId, branchFilter, { status,
 export const getOrderService = async (tenantId, id) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.cancelAlertActive === true) {
+    order.cancelAlertActive = false
+    await order.save()
+  }
   const rawCollections = await AccountTransaction.find({
     tenantId,
     orderId: order._id,
@@ -839,6 +843,9 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user 
       throw e
     }
     item.status = 'cancelled'
+    if (order.tableId) {
+      order.cancelAlertActive = true
+    }
     if (reason) item.note = reason
 
     order.totals = computeTotals(order.items)

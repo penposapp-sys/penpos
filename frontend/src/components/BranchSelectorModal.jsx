@@ -4,7 +4,7 @@ import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function BranchSelectorModal() {
-  const { user, logout } = useAuth()
+  const { user, logout, allowedBranchIds } = useAuth()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [branches, setBranches] = useState([])
@@ -16,6 +16,11 @@ export default function BranchSelectorModal() {
     const v = localStorage.getItem('selectedBranchId')
     return v ? String(v) : ''
   }, [open])
+
+  const normalizedAllowedIds = useMemo(() => {
+    const raw = Array.isArray(allowedBranchIds) ? allowedBranchIds : []
+    return Array.from(new Set(raw.map(String).filter(Boolean)))
+  }, [allowedBranchIds])
 
   useEffect(() => {
     const onMissingBranch = () => {
@@ -36,7 +41,9 @@ export default function BranchSelectorModal() {
         const res = await api('/api/branches', { silent: true })
         if (!mounted) return
         const list = Array.isArray(res?.branches) ? res.branches : []
-        const filtered = user?.role === 'tenant_admin' ? list.filter(b => b.isActive !== false) : list
+        const filtered = user?.role === 'tenant_admin'
+          ? list.filter(b => b.isActive !== false)
+          : list.filter(b => normalizedAllowedIds.includes(String(b?._id || b?.id || '')))
         setBranches(filtered)
       } catch (e) {
         if (!mounted) return
@@ -48,7 +55,20 @@ export default function BranchSelectorModal() {
     }
     load()
     return () => { mounted = false }
-  }, [open, canSelectBranch, user?.role])
+  }, [open, canSelectBranch, user?.role, normalizedAllowedIds])
+
+  useEffect(() => {
+    if (!open || !canSelectBranch) return
+    if (user?.role === 'tenant_admin') return
+    if (normalizedAllowedIds.length !== 1) return
+    const branchId = normalizedAllowedIds[0]
+    if (!branchId) return
+    localStorage.setItem('selectedBranchId', branchId)
+    setOpen(false)
+    try {
+      window.dispatchEvent(new CustomEvent('selected_branch_changed', { detail: { branchId } }))
+    } catch {}
+  }, [open, canSelectBranch, user?.role, normalizedAllowedIds])
 
   const select = (id) => {
     const bid = String(id || '')

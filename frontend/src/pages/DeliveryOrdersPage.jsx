@@ -212,6 +212,20 @@ export default function DeliveryOrdersPage() {
     qtyTimerRef.current.set(iId, t)
   }
 
+  const flushPendingOrderEdits = async () => {
+    try {
+      for (const timer of qtyTimerRef.current.values()) clearTimeout(timer)
+      qtyTimerRef.current.clear()
+    } catch {}
+
+    const pendingIds = Array.from(qtyPendingRef.current.keys())
+    for (const itemId of pendingIds) {
+      await flushQtyUpdate(itemId)
+    }
+
+    await saveNote()
+  }
+
   useEffect(() => {
     return () => {
       try {
@@ -641,6 +655,7 @@ export default function DeliveryOrdersPage() {
     if (tab === 'delivered') return
     const orderId = selectedId || getOrderId(order)
     if (!orderId) return
+    await flushPendingOrderEdits()
     await safeAction((signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: { servingType: ServingType.PACKAGE }, signal, silent: true }))
     await reloadOrder()
   }

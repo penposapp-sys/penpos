@@ -446,10 +446,11 @@ export const renderReceiptPdfBase64 = async ({
   return Buffer.concat(chunks).toString('base64')
 }
 
-export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm, heightMm } = {}) => {
+export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountText, widthMm, heightMm } = {}) => {
   const top = safeText(topText)
   const product = safeText(productText)
   const q = Math.max(1, Number(qty || 1))
+  const amount = safeText(amountText) || `${q} ADET`
   const rawW = Math.max(20, Number(widthMm || 50))
   const rawH = Math.max(20, Number(heightMm || 30))
   const w = Math.max(rawW, rawH)
@@ -471,7 +472,7 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, widthMm,
 
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
   const contentHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom
-  const qtyText = `${q} ADET`
+  const qtyText = amount
   const blockGap = Math.max(mmToPt(1.5), contentHeight * 0.06)
   const topBlockHeight = top ? Math.max(mmToPt(6), contentHeight * 0.2) : 0
   const qtyBlockHeight = Math.max(mmToPt(6), contentHeight * 0.18)

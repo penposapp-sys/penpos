@@ -192,6 +192,7 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
       isPaid,
       note: ord.note || '',
       createdAt: ord.createdAt,
+      hasCancelAlert: ord.cancelAlertActive === true,
       createdByName: String(
         creatorNameById.get(String(ord?.createdByUserId || ord?.createdBy || '')) ||
         ord.createdByName ||
