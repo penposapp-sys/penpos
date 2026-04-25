@@ -72,6 +72,74 @@ const getEffectiveServingTypeForOrder = (order) => {
   return normalizeServingType(order?.servingType) || 'plate'
 }
 
+const buildLabelTopLine = async (order) => {
+  const tableName = order?.tableId
+    ? String((await Table.findById(order.tableId).select('name').lean())?.name || '')
+    : ''
+  const customerName = String(order?.customerName || '').trim()
+
+  if (tableName) return tableName
+  if (order?.saleType === 'delivery') return customerName ? `PAKET - ${customerName}` : 'PAKET'
+  if (order?.saleType === 'walkin') return customerName || 'HIZLI'
+  return 'SIPARIS'
+}
+
+const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = null }) => {
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
+  if (!order || safeItems.length === 0) return
+
+  const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
+  const { createJob } = await import('./printingService.js')
+
+  const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
+  if (!labelProfile || labelProfile.isActive === false) return
+
+  const options = labelProfile?.options && typeof labelProfile.options === 'object' ? labelProfile.options : {}
+  const autoPrintOnOrder = options.autoPrintOnOrder === true
+  const printOnReady = options.printOnReady === true
+
+  if (mode === 'order_send' && !autoPrintOnOrder) return
+  if (mode === 'item_ready' && !printOnReady) return
+
+  const menuItemIds = safeItems
+    .map((it) => String(it?.menuItemId || '').trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+
+  const labelEnabledDocs = menuItemIds.length > 0
+    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds }, printLabelEnabled: true }).select('_id').lean()
+    : []
+
+  const labelEnabledSet = new Set((labelEnabledDocs || []).map((doc) => String(doc?._id || '')))
+  const labelItems = safeItems.filter((it) => labelEnabledSet.has(String(it?.menuItemId || '')))
+  if (labelItems.length === 0) return
+
+  const top = await buildLabelTopLine(order)
+
+  for (const it of labelItems) {
+    const name = String(it?.nameSnapshot || '').trim() || '-'
+    const qty = Math.max(1, Number(it?.qty || 1))
+    const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
+    const isWeightBased = it?.isWeightBased === true || weightGrams > 0
+    const amountLine = isWeightBased && weightGrams > 0 ? `${weightGrams} GR` : `${qty} ADET`
+    const payload = `${top}\n${name}\n${amountLine}\n`
+
+    await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
+      type: 'label',
+      profileId: String(labelProfile.id),
+      payload: { type: 'raw', content: payload },
+      meta: {
+        orderId: String(order.id),
+        tableId: order.tableId ? String(order.tableId) : null,
+        kitchenBatchId: batchId ? String(batchId) : (it?.kitchenBatchId ? String(it.kitchenBatchId) : null),
+        menuItemId: it?.menuItemId ? String(it.menuItemId) : null,
+        itemId: it?._id ? String(it._id) : null,
+        qty,
+        triggerMode: mode
+      }
+    })
+  }
+}
+
 const normalizeOpenDuplicatesForResponse = (items) => {
   const src = Array.isArray(items) ? items : []
   const map = new Map()
@@ -687,6 +755,25 @@ export const completeItemByItemIdService = async (tenantId, id, itemId) => {
   normalizeLegacyItemStatuses(order)
   await order.save()
 
+  try {
+    await enqueueOrderItemLabels({
+      tenantId,
+      order,
+      items: [{
+        _id: it._id,
+        menuItemId: it.menuItemId,
+        nameSnapshot: it.nameSnapshot,
+        qty: it.qty,
+        kitchenBatchId: it.kitchenBatchId,
+        isWeightBased: it.isWeightBased,
+        weightGrams: it.weightGrams
+      }],
+      mode: 'item_ready',
+      batchId: it.kitchenBatchId || null
+    })
+  } catch {
+  }
+
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }
 }
@@ -1174,7 +1261,9 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
       itemsToLabel.push({
         menuItemId: it.menuItemId,
         nameSnapshot: it.nameSnapshot,
-        qty: it.qty
+        qty: it.qty,
+        isWeightBased: it.isWeightBased,
+        weightGrams: it.weightGrams
       })
     }
   }
@@ -1184,45 +1273,7 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
 
   try {
     if (order.kitchenEnabled !== false && order.sendToKitchen !== false && itemsToLabel.length > 0) {
-      const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
-      const { createJob } = await import('./printingService.js')
-      const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
-      if (labelProfile && labelProfile.isActive !== false) {
-        const menuItemIds = itemsToLabel
-          .map(it => String(it?.menuItemId || '').trim())
-          .filter(id => mongoose.Types.ObjectId.isValid(id))
-        const labelEnabledDocs = menuItemIds.length > 0
-          ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds }, printLabelEnabled: true }).select('_id').lean()
-          : []
-        const labelEnabledSet = new Set((labelEnabledDocs || []).map(doc => String(doc?._id || '')))
-        const labelItems = itemsToLabel.filter(it => labelEnabledSet.has(String(it?.menuItemId || '')))
-        const tableName = order.tableId ? String((await Table.findById(order.tableId).select('name').lean())?.name || '') : ''
-        const walkinCustomerName = String(order?.customerName || '').trim()
-        const deliveryCustomerName = String(order?.customerName || '').trim()
-        const top = tableName
-          ? tableName
-          : (order.saleType === 'delivery'
-            ? (deliveryCustomerName ? `PAKET - ${deliveryCustomerName}` : 'PAKET')
-            : (order.saleType === 'walkin'
-              ? (walkinCustomerName || 'HIZLI')
-              : 'SİPARİŞ'))
-        for (const it of labelItems) {
-          const line2 = `${String(it.nameSnapshot || '').trim() || '-'} x${Number(it.qty || 1)}`
-          const payload = `${top}\n${line2}\n`
-          await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
-            type: 'label',
-            profileId: String(labelProfile.id),
-            payload: { type: 'raw', content: payload },
-            meta: {
-              orderId: String(order.id),
-              tableId: order.tableId ? String(order.tableId) : null,
-              kitchenBatchId: String(batchId),
-              menuItemId: it.menuItemId ? String(it.menuItemId) : null,
-              qty: Number(it.qty || 1)
-            }
-          })
-        }
-      }
+      await enqueueOrderItemLabels({ tenantId, order, items: itemsToLabel, mode: 'order_send', batchId })
     }
   } catch {
   }

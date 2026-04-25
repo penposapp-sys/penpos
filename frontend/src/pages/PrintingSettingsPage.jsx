@@ -31,6 +31,8 @@ export default function PrintingSettingsPage({ system }) {
   const [labelActive, setLabelActive] = useState(false)
   const [labelW, setLabelW] = useState('50')
   const [labelH, setLabelH] = useState('30')
+  const [labelAutoPrintOnOrder, setLabelAutoPrintOnOrder] = useState(false)
+  const [labelPrintOnReady, setLabelPrintOnReady] = useState(false)
 
   const [receiptPrinterName, setReceiptPrinterName] = useState('')
   const [receiptActive, setReceiptActive] = useState(false)
@@ -136,9 +138,14 @@ export default function PrintingSettingsPage({ system }) {
     if (labelProfile?.options && typeof labelProfile.options === 'object') {
       if (labelProfile.options.widthMm) setLabelW(String(labelProfile.options.widthMm))
       if (labelProfile.options.heightMm) setLabelH(String(labelProfile.options.heightMm))
+      setLabelAutoPrintOnOrder(labelProfile.options.autoPrintOnOrder === true)
+      setLabelPrintOnReady(labelProfile.options.printOnReady === true)
+    } else {
+      setLabelAutoPrintOnOrder(false)
+      setLabelPrintOnReady(false)
     }
     setLabelActive(labelProfile?.isActive === true)
-  }, [labelProfile?.id])
+  }, [labelProfile?.id, labelProfile?.options, labelProfile?.isActive])
 
   useEffect(() => {
     setLabelPrinterName(String(labelPrinter?.windowsPrinterName || ''))
@@ -206,7 +213,12 @@ export default function PrintingSettingsPage({ system }) {
         name: 'Etiket',
         printerId: printer.id,
         payloadType: 'raw',
-        options: { widthMm: mmNum(labelW, 50), heightMm: mmNum(labelH, 30) },
+        options: {
+          widthMm: mmNum(labelW, 50),
+          heightMm: mmNum(labelH, 30),
+          autoPrintOnOrder: labelAutoPrintOnOrder === true,
+          printOnReady: labelPrintOnReady === true
+        },
         isActive: labelActive === true
       })
       if (!profile?.id) throw new Error('Profil kaydedilemedi')
@@ -395,6 +407,10 @@ export default function PrintingSettingsPage({ system }) {
         setWidthMm={setLabelW}
         heightMm={labelH}
         setHeightMm={setLabelH}
+        autoPrintOnOrder={labelAutoPrintOnOrder}
+        setAutoPrintOnOrder={setLabelAutoPrintOnOrder}
+        printOnReady={labelPrintOnReady}
+        setPrintOnReady={setLabelPrintOnReady}
         active={labelActive}
         setActive={setLabelActive}
         onSave={saveLabel}
