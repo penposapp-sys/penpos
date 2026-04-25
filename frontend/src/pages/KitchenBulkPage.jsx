@@ -231,6 +231,7 @@ export default function KitchenBulkPage() {
         hiddenSet={menuFilters.hiddenSet}
         onToggleMenuItem={menuFilters.toggleMenuItem}
         onReset={menuFilters.resetAllVisible}
+        onSetHiddenMenuItemIds={menuFilters.setHiddenMenuItemIds}
       />
     </div>
   )

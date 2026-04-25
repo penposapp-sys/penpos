@@ -9,7 +9,8 @@ export default function MenuItemFilterDrawer({
   menuItems,
   hiddenSet,
   onToggleMenuItem,
-  onReset
+  onReset,
+  onSetHiddenMenuItemIds
 }) {
   const [query, setQuery] = useState('')
   const cats = Array.isArray(categories) ? categories : []
@@ -31,6 +32,30 @@ export default function MenuItemFilterDrawer({
     }
     return map
   }, [filteredItems])
+
+  const allVisibleItemIds = useMemo(() => {
+    return filteredItems
+      .map(it => normalizeId(it?._id))
+      .filter(Boolean)
+  }, [filteredItems])
+
+  const hideAll = () => {
+    if (typeof onSetHiddenMenuItemIds !== 'function') return
+    onSetHiddenMenuItemIds(Array.from(new Set(allVisibleItemIds)))
+  }
+
+  const setCategoryVisibility = (categoryItems, visible) => {
+    if (typeof onSetHiddenMenuItemIds !== 'function') return
+    const ids = (Array.isArray(categoryItems) ? categoryItems : [])
+      .map(it => normalizeId(it?._id))
+      .filter(Boolean)
+    const next = new Set(hiddenSet instanceof Set ? Array.from(hiddenSet) : [])
+    for (const id of ids) {
+      if (visible) next.delete(id)
+      else next.add(id)
+    }
+    onSetHiddenMenuItemIds(Array.from(next))
+  }
 
   if (!open) return null
 
@@ -68,6 +93,7 @@ export default function MenuItemFilterDrawer({
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
           <button className="btn btn--toggle" type="button" aria-pressed={false} onClick={onReset}>Hepsini Aç</button>
+          <button className="btn btn--toggle" type="button" aria-pressed={false} onClick={hideAll}>Hepsini Kapat</button>
         </div>
 
         <div style={{ display: 'grid', gap: 12 }}>
@@ -75,9 +101,20 @@ export default function MenuItemFilterDrawer({
             const catId = normalizeId(c?._id)
             const catItems = (itemsByCategory.get(catId) || []).slice()
             if (catItems.length === 0) return null
+            const visibleCount = catItems.filter(it => !hiddenSet?.has(normalizeId(it?._id))).length
+            const allVisible = visibleCount === catItems.length
             return (
               <div key={catId}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>{String(c?.name || '-')}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700 }}>{String(c?.name || '-')}</div>
+                  <button
+                    className="btn btn--xs"
+                    type="button"
+                    onClick={() => setCategoryVisibility(catItems, !allVisible)}
+                  >
+                    {allVisible ? 'Hepsini Kapat' : 'Hepsini Aç'}
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gap: 8 }}>
                   {catItems.map(it => {
                     const id = normalizeId(it?._id)
@@ -102,4 +139,3 @@ export default function MenuItemFilterDrawer({
     </div>
   )
 }
-

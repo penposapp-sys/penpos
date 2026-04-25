@@ -229,11 +229,7 @@ export default function KitchenPage() {
       .filter(c => (Array.isArray(c?.items) ? c.items.length : 0) > 0)
   }, [cards, menuFilters.hiddenSet])
 
-  const filteredOut = useMemo(() => {
-    const hasAny = (Array.isArray(cards) ? cards : []).some(c => (Array.isArray(c?.items) ? c.items.length : 0) > 0)
-    const hasVisible = (Array.isArray(visibleCards) ? visibleCards : []).length > 0
-    return hasAny && !hasVisible
-  }, [cards, visibleCards])
+  const filteredOut = false
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -405,6 +401,7 @@ export default function KitchenPage() {
         hiddenSet={menuFilters.hiddenSet}
         onToggleMenuItem={menuFilters.toggleMenuItem}
         onReset={menuFilters.resetAllVisible}
+        onSetHiddenMenuItemIds={menuFilters.setHiddenMenuItemIds}
       />
     </div>
   )
