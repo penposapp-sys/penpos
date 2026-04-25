@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { toast } from '../lib/toast.js'
-import { api } from '../lib/apiClient.js'
-import { useAuth } from '../context/AuthContext.jsx'
 import Modal from '../components/Modal.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { api } from '../lib/apiClient.js'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
+import { toast } from '../lib/toast.js'
 
 const inferTableCategory = (table) => {
   const raw = String(table?.name || '').trim()
@@ -16,22 +16,48 @@ const inferTableCategory = (table) => {
   return normalized || raw
 }
 
+const formatTime = (value) => {
+  if (!value) return '--:--'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+}
+
+const getElapsedMinutes = (value, nowTs) => {
+  if (!value) return null
+  const date = new Date(value)
+  const createdAtTs = date.getTime()
+  if (!Number.isFinite(createdAtTs)) return null
+  return Math.max(0, Math.floor((nowTs - createdAtTs) / 60000))
+}
+
+const getBorderColor = (active, paid, elapsedMinutes) => {
+  if (!active?.hasActive) return '#22c55e'
+  if (paid?.isPaid) return '#94a3b8'
+  if (!Number.isFinite(elapsedMinutes)) return '#ef4444'
+  if (elapsedMinutes >= 45) return '#ef4444'
+  if (elapsedMinutes >= 30) return '#f59e0b'
+  return '#22c55e'
+}
+
 export default function TablesPage() {
-  const { allowedBranchIds } = useAuth()
-  const [tables, setTables] = useState([])
-  const [error, setError] = useState('')
   const nav = useNavigate()
+  const { allowedBranchIds } = useAuth()
+  const { ids: allowed } = buildBranchQueryParams(allowedBranchIds)
+
+  const [tables, setTables] = useState([])
+  const [activeByTable, setActiveByTable] = useState({})
+  const [paidByTable, setPaidByTable] = useState({})
+  const [error, setError] = useState('')
+  const [activeCategory, setActiveCategory] = useState('')
   const [busyTableId, setBusyTableId] = useState(null)
   const [busyGlobal, setBusyGlobal] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [targetTable, setTargetTable] = useState(null)
   const [mergeSources, setMergeSources] = useState([])
-  const [paidByTable, setPaidByTable] = useState({})
-  const [activeByTable, setActiveByTable] = useState({})
-  const [activeCategory, setActiveCategory] = useState('')
-  const loadingRef = useRef(false)
+  const [nowTs, setNowTs] = useState(Date.now())
 
-  const { ids: allowed } = buildBranchQueryParams(allowedBranchIds)
+  const loadingRef = useRef(false)
 
   const parseApiError = (err) => {
     if (!err) return 'Bir hata oluştu. Tekrar deneyin.'
@@ -41,48 +67,21 @@ export default function TablesPage() {
     const code = err?.data?.code || err?.data?.error || err?.code
 
     if (status === 409) {
-      const map = {
+      const messages = {
         table_in_use: 'Bu masada zaten aktif sipariş var. Liste yenilendi.',
         order_not_editable: 'Bu sipariş artık düzenlenemez. Liste yenilendi.',
-        invalid_state: 'İşlem yapılamadı (durum uyuşmuyor). Liste yenilendi.'
+        invalid_state: 'İşlem yapılamadı. Liste yenilendi.'
       }
-      return map[code] || 'İşlem yapılamadı. Liste yenilendi.'
+      return messages[code] || 'İşlem yapılamadı. Liste yenilendi.'
     }
+
     if (status >= 500) return 'Bir hata oluştu. Tekrar deneyin.'
     return err?.data?.message || err?.message || 'Bir hata oluştu. Tekrar deneyin.'
   }
 
-  const runTableAction = async (tableId, actionFn, opts = {}) => {
-    const isGlobal = !!opts.global
-    if (busyGlobal || busyTableId) return null
+  const load = async (options = {}) => {
+    if (!Array.isArray(allowedBranchIds)) return null
 
-    setError('')
-    setBusyTableId(tableId)
-    if (isGlobal) setBusyGlobal(true)
-
-    try {
-      await actionFn()
-      const latest = await load({ reason: 'after_action', force: true })
-      return latest || null
-    } catch (err) {
-      const msg = parseApiError(err)
-      if (msg) toast.error(msg)
-
-      if (err?.name !== 'AbortError') {
-        const latest = await load({ reason: 'after_error_sync' })
-        return latest || null
-      }
-      return null
-    } finally {
-      setBusyTableId(null)
-      setBusyGlobal(false)
-    }
-  }
-
-  const load = async (_opts = {}) => {
-    if (!Array.isArray(allowedBranchIds)) {
-      return null
-    }
     if (allowed.length === 0) {
       setTables([])
       setActiveByTable({})
@@ -90,20 +89,17 @@ export default function TablesPage() {
       setError('Sistem Ayarları > Yetkili Şubeler bölümünden şube seçin')
       return null
     }
-    if (loadingRef.current && !_opts.force) return null
+
+    if (loadingRef.current && !options.force) return null
+
     loadingRef.current = true
     setError('')
+
     try {
       const { params } = buildBranchQueryParams(allowedBranchIds)
       const url = params ? `/api/pos/tables/overview?${params.toString()}` : '/api/pos/tables/overview'
-      if (import.meta.env.DEV) {
-        console.log('[TABLES_OVERVIEW_REQUEST]', {
-          allowedBranchIds,
-          normalizedIds: allowed,
-          url
-        })
-      }
       const res = await api(url, { silent: true, skipBranchHeader: true, suppressBranchModal: true })
+
       if (res?.success === false) {
         setTables([])
         setActiveByTable({})
@@ -111,92 +107,69 @@ export default function TablesPage() {
         setError(res.message || 'Bir hata oluştu')
         return null
       }
-      const { tables, activeByTable: activeMap = {}, paidByTable: paidMap = {} } = res || {}
-      setTables(tables || [])
-      setActiveByTable(activeMap)
-      setPaidByTable(paidMap)
-      return { tables: tables || [], activeByTable: activeMap, paidByTable: paidMap }
+
+      const nextTables = Array.isArray(res?.tables) ? res.tables : []
+      const nextActiveByTable = res?.activeByTable || {}
+      const nextPaidByTable = res?.paidByTable || {}
+
+      setTables(nextTables)
+      setActiveByTable(nextActiveByTable)
+      setPaidByTable(nextPaidByTable)
+
+      return {
+        tables: nextTables,
+        activeByTable: nextActiveByTable,
+        paidByTable: nextPaidByTable
+      }
     } catch (err) {
       setError(err?.message || 'Bir hata oluştu')
+      return null
     } finally {
       loadingRef.current = false
     }
   }
+
   useEffect(() => {
     load()
+
     const onFocus = () => {
-      if (busyGlobal || busyTableId) return
-      load({ reason: 'focus' })
+      if (!busyGlobal && !busyTableId) load({ reason: 'focus' })
     }
     const onVisibility = () => {
-      if (document.visibilityState !== 'visible') return
-      if (busyGlobal || busyTableId) return
-      load({ reason: 'visible' })
+      if (document.visibilityState === 'visible' && !busyGlobal && !busyTableId) {
+        load({ reason: 'visible' })
+      }
     }
+    const onBranchChanged = () => {
+      if (!busyGlobal && !busyTableId) load({ reason: 'branch_changed', force: true })
+    }
+
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
-    const onBranchChanged = () => {
-      if (busyGlobal || busyTableId) return
-      if (import.meta.env.DEV) console.log('[ALLOWED_BRANCHES_CHANGED]', allowedBranchIds)
-      load({ reason: 'branch_changed', force: true })
-    }
     window.addEventListener('allowed_branches_changed', onBranchChanged)
+
     return () => {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('allowed_branches_changed', onBranchChanged)
     }
-  }, [allowedBranchIds])
+  }, [allowedBranchIds, busyGlobal, busyTableId])
 
-  const onTableClick = async (t) => {
-    if (busyGlobal || busyTableId) return
-    try {
-      const tableId = t?.id
-      if (!tableId) {
-        toast.error('Masa id bulunamadı')
-        console.log('[TABLE_CLICK_NO_ID]', t)
-        return
-      }
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTs(Date.now()), 60000)
+    return () => window.clearInterval(timer)
+  }, [])
 
-      if (t?.branchId) {
-        const branchIdStr = String(t.branchId)
-        const allowedStr = Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String) : []
-        if (allowedStr.length > 0 && !allowedStr.includes(branchIdStr)) {
-          toast.error('Bu masaya erişim yetkin yok (Şube uyuşmuyor)')
-          return
-        }
-        localStorage.setItem('selectedBranchId', branchIdStr)
-      }
+  const groupedTables = useMemo(() => {
+    return tables.reduce((acc, table) => {
+      const category = inferTableCategory(table)
+      if (!acc[category]) acc[category] = []
+      acc[category].push(table)
+      return acc
+    }, {})
+  }, [tables])
 
-      const active = activeByTable[tableId]
-      if (active?.hasActive && active?.orderId) {
-        nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
-      } else {
-        nav(`/kermes/app/pos?tableId=${tableId}`, { state: { fromTables: true } })
-      }
-    } catch (err) {
-      setError(err.message)
-    }
-  }
-
-  const openMerge = (t) => {
-    setTargetTable(t)
-    setMergeSources([])
-    setMergeOpen(true)
-  }
-
-  const toggleSource = (id) => {
-    setMergeSources(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }
-
-  const groupedTables = tables.reduce((acc, table) => {
-    const category = inferTableCategory(table)
-    if (!acc[category]) acc[category] = []
-    acc[category].push(table)
-    return acc
-  }, {})
-
-  const categories = Object.keys(groupedTables)
+  const categories = useMemo(() => Object.keys(groupedTables), [groupedTables])
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -208,6 +181,69 @@ export default function TablesPage() {
     }
   }, [activeCategory, categories])
 
+  const runTableAction = async (tableId, actionFn, options = {}) => {
+    if (busyGlobal || busyTableId) return null
+
+    setError('')
+    setBusyTableId(tableId)
+    if (options.global) setBusyGlobal(true)
+
+    try {
+      await actionFn()
+      return await load({ reason: 'after_action', force: true })
+    } catch (err) {
+      const message = parseApiError(err)
+      if (message) toast.error(message)
+      if (err?.name !== 'AbortError') {
+        return await load({ reason: 'after_error_sync', force: true })
+      }
+      return null
+    } finally {
+      setBusyTableId(null)
+      setBusyGlobal(false)
+    }
+  }
+
+  const onTableClick = async (table) => {
+    if (busyGlobal || busyTableId) return
+
+    const tableId = table?.id
+    if (!tableId) {
+      toast.error('Masa id bulunamadı')
+      return
+    }
+
+    if (table?.branchId) {
+      const branchId = String(table.branchId)
+      const allowedStr = Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String) : []
+      if (allowedStr.length > 0 && !allowedStr.includes(branchId)) {
+        toast.error('Bu masaya erişim yetkin yok')
+        return
+      }
+      localStorage.setItem('selectedBranchId', branchId)
+    }
+
+    const active = activeByTable[tableId]
+    if (active?.hasActive && active?.orderId) {
+      nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
+      return
+    }
+
+    nav(`/kermes/app/pos?tableId=${tableId}`, { state: { fromTables: true } })
+  }
+
+  const openMerge = (table) => {
+    setTargetTable(table)
+    setMergeSources([])
+    setMergeOpen(true)
+  }
+
+  const toggleSource = (id) => {
+    setMergeSources((prev) => (
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    ))
+  }
+
   const submitMerge = async () => {
     try {
       const latest = await runTableAction(
@@ -216,19 +252,22 @@ export default function TablesPage() {
           if (targetTable?.branchId) {
             localStorage.setItem('selectedBranchId', String(targetTable.branchId))
           }
-          await api(`/api/pos/tables/${targetTable.id}/merge`, { method: 'PUT', body: JSON.stringify({ sourceTableIds: mergeSources }) })
+          await api(`/api/pos/tables/${targetTable.id}/merge`, {
+            method: 'PUT',
+            body: JSON.stringify({ sourceTableIds: mergeSources })
+          })
           setMergeOpen(false)
         },
         { global: true }
       )
 
-      const active = latest?.activeByTable?.[targetTable?.id] || null
+      const active = latest?.activeByTable?.[targetTable?.id]
       if (active?.orderId) {
         nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
       }
     } catch (err) {
-      const msg = parseApiError(err)
-      if (msg) toast.error(msg)
+      const message = parseApiError(err)
+      if (message) toast.error(message)
     }
   }
 
@@ -243,16 +282,17 @@ export default function TablesPage() {
       {Array.isArray(allowedBranchIds) && allowed.length === 0 && (
         <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', marginBottom: 12 }}>
           <div style={{ fontWeight: 800, color: '#b91c1c' }}>
-            Şube yetkisi yok. Ayarlar &gt; Sistem Ayarları &gt; Yetkili Şubeler’den şube seç.
+            Şube yetkisi yok. Ayarlar &gt; Sistem Ayarları &gt; Yetkili Şubeler bölümünden şube seçin.
           </div>
         </div>
       )}
 
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>İşlem sürüyor…</div>}
+      {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>İşlem sürüyor...</div>}
+
       {categories.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-          {categories.map(category => (
+          {categories.map((category) => (
             <button
               key={category}
               type="button"
@@ -280,75 +320,160 @@ export default function TablesPage() {
       )}
 
       <div className="tablesGrid">
-        {(groupedTables[activeCategory] || []).map(t => {
+        {(groupedTables[activeCategory] || []).map((table) => {
+          const active = activeByTable[table.id]
+          const paid = paidByTable[table.id] || {}
+          const elapsedMinutes = getElapsedMinutes(paid?.createdAt, nowTs)
+          const createdByName = String(paid?.createdByName || '').trim()
           const isAnyBusy = busyGlobal || !!busyTableId
-          const isBusy = busyGlobal || busyTableId === t.id
+          const isBusy = busyGlobal || busyTableId === table.id
+
           return (
             <div
-              key={t.id}
+              key={table.id}
               className="card"
               style={{
                 cursor: isAnyBusy ? 'not-allowed' : 'pointer',
                 position: 'relative',
-                borderColor: (() => {
-                  const active = activeByTable[t.id]
-                  if (!active?.hasActive) return '#22c55e'
-                  const createdAt = paidByTable[t.id]?.createdAt
-                  if (!createdAt) return '#ef4444'
-                  const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
-                  if (mins >= 45) return '#ef4444'
-                  if (mins >= 30) return '#f59e0b'
-                  return '#22c55e'
-                })(),
+                borderColor: getBorderColor(active, paid, elapsedMinutes),
                 borderWidth: 1.5,
                 boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
                 borderRadius: 18,
                 background: '#ffffff',
-                padding: 20
+                padding: 16,
+                minHeight: 118,
+                display: 'grid',
+                alignContent: 'start',
+                gap: 5
               }}
-              onClick={() => (isAnyBusy ? null : onTableClick(t))}
+              onClick={() => (isAnyBusy ? null : onTableClick(table))}
             >
               {isBusy && (
-                <span className="page-pill" style={{ position: 'absolute', top: 12, left: 12 }}>İşleniyor</span>
+                <span className="page-pill" style={{ position: 'absolute', top: 12, left: 12 }}>
+                  İşleniyor
+                </span>
               )}
-              {paidByTable[t.id]?.isPaid && (
-                <span className="page-pill" style={{ position: 'absolute', top: 12, right: 12 }}>Ödendi</span>
+              {paid?.isPaid && (
+                <span className="page-pill" style={{ position: 'absolute', top: 12, right: 12 }}>
+                  Ödendi
+                </span>
               )}
-              <div style={{ fontWeight: 700 }}>{t.name}</div>
-              {!!paidByTable[t.id]?.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{paidByTable[t.id].note}</div>}
-              <div style={{ color: (!activeByTable[t.id]?.hasActive) ? '#22c55e' : (paidByTable[t.id]?.isPaid ? 'var(--muted)' : '#ef4444') }}>
-                {!activeByTable[t.id]?.hasActive ? 'Boş' : (paidByTable[t.id]?.isPaid ? 'Dolu (Ödendi)' : 'Dolu')}
+
+              <div style={{ fontWeight: 800, fontSize: 16, lineHeight: 1.15, minHeight: 32 }}>
+                {table.name}
               </div>
-              {activeByTable[t.id]?.hasActive && (
-                <div style={{ marginTop: 8 }}>
-                  <button className="btn" onClick={(e) => { e.stopPropagation(); openMerge(t) }} disabled={isAnyBusy}>Masa Birleştir</button>
+
+              {active?.hasActive && createdByName && (
+                <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 700 }}>
+                  Siparişi Alan: {createdByName}
+                </div>
+              )}
+
+              {!!paid?.note && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    lineHeight: 1.25,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {paid.note}
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  fontSize: 12
+                }}
+              >
+                <div style={{ color: !active?.hasActive ? '#22c55e' : (paid?.isPaid ? 'var(--muted)' : '#ef4444') }}>
+                  {!active?.hasActive ? 'Boş' : (paid?.isPaid ? 'Dolu (Ödendi)' : 'Dolu')}
+                </div>
+                {active?.hasActive && (
+                  <div style={{ color: 'var(--muted)' }}>
+                    {formatTime(paid?.createdAt)}
+                    {elapsedMinutes !== null ? ` • ${elapsedMinutes} dk geçti` : ''}
+                  </div>
+                )}
+              </div>
+
+              {active?.hasActive && (
+                <div style={{ marginTop: 2 }}>
+                  <button
+                    className="btn"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openMerge(table)
+                    }}
+                    disabled={isAnyBusy}
+                    style={{
+                      padding: '6px 10px',
+                      fontSize: 13,
+                      borderRadius: 9
+                    }}
+                  >
+                    Masa Birleştir
+                  </button>
                 </div>
               )}
             </div>
           )
         })}
+
         {tables.length === 0 && (
-          <div className="card">Masa tanımlı değil. İşletme yöneticisi “Ayarlar &gt; Masalar” üzerinden ekleyebilir.</div>
+          <div className="card">
+            Masa tanımlı değil. İşletme yöneticisi Ayarlar &gt; Masalar üzerinden ekleyebilir.
+          </div>
         )}
       </div>
 
-      <Modal open={mergeOpen} onClose={() => ((busyGlobal || !!busyTableId) ? null : setMergeOpen(false))} title="Masa Birleştir">
+      <Modal
+        open={mergeOpen}
+        onClose={() => ((busyGlobal || !!busyTableId) ? null : setMergeOpen(false))}
+        title="Masa Birleştir"
+      >
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hedef: {targetTable?.name}</div>
+
           <div style={{ display: 'grid', gap: 8 }}>
-            {tables.filter(x => x.status !== 'empty' && x.id !== targetTable?.id).map(t => (
-              <label key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="checkbox" checked={mergeSources.includes(t.id)} onChange={() => toggleSource(t.id)} disabled={busyGlobal || !!busyTableId} />
-                <div>{t.name}</div>
-              </label>
-            ))}
-            {tables.filter(x => x.status !== 'empty' && x.id !== targetTable?.id).length === 0 && (
+            {tables
+              .filter((table) => table.status !== 'empty' && table.id !== targetTable?.id)
+              .map((table) => (
+                <label key={table.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={mergeSources.includes(table.id)}
+                    onChange={() => toggleSource(table.id)}
+                    disabled={busyGlobal || !!busyTableId}
+                  />
+                  <div>{table.name}</div>
+                </label>
+              ))}
+
+            {tables.filter((table) => table.status !== 'empty' && table.id !== targetTable?.id).length === 0 && (
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Birleştirilecek uygun masa yok.</div>
             )}
           </div>
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={submitMerge} disabled={mergeSources.length === 0 || busyGlobal || !!busyTableId}>Birleştir</button>
-            <button className="btn" onClick={() => setMergeOpen(false)} disabled={busyGlobal || !!busyTableId}>İptal</button>
+            <button
+              className="btn"
+              onClick={submitMerge}
+              disabled={mergeSources.length === 0 || busyGlobal || !!busyTableId}
+            >
+              Birleştir
+            </button>
+            <button className="btn" onClick={() => setMergeOpen(false)} disabled={busyGlobal || !!busyTableId}>
+              İptal
+            </button>
           </div>
         </div>
       </Modal>

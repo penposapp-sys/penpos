@@ -3,6 +3,7 @@ import { listTables, createTable, confirmNameAvailable, updateById, findByIdAndT
 import { createOrder } from '../repositories/orderRepository.js'
 import Table from '../models/Table.js'
 import Order from '../models/Order.js'
+import User from '../models/User.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { getTenantPlan, ensureNotExpired } from './planService.js'
 import mongoose from 'mongoose'
@@ -157,6 +158,15 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
     ? await Order.find({ tenantId, _id: { $in: activeOrderIds }, status: { $in: ['open', 'sent', 'completed'] } }).lean()
     : []
   const orderById = new Map(orders.map(o => [String(o._id), o]))
+  const creatorIds = Array.from(new Set(
+    (orders || [])
+      .map(o => String(o?.createdByUserId || o?.createdBy || ''))
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+  ))
+  const creators = creatorIds.length
+    ? await User.find({ tenantId, _id: { $in: creatorIds } }).select('name').lean()
+    : []
+  const creatorNameById = new Map((creators || []).map(u => [String(u._id), String(u?.name || '').trim()]))
 
   const activeByTable = {}
   const paidByTable = {}
@@ -181,7 +191,12 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
     paidByTable[key] = {
       isPaid,
       note: ord.note || '',
-      createdAt: ord.createdAt
+      createdAt: ord.createdAt,
+      createdByName: String(
+        creatorNameById.get(String(ord?.createdByUserId || ord?.createdBy || '')) ||
+        ord.createdByName ||
+        ''
+      ).trim()
     }
   }
   return {

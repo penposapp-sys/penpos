@@ -1198,10 +1198,11 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
         const labelItems = itemsToLabel.filter(it => labelEnabledSet.has(String(it?.menuItemId || '')))
         const tableName = order.tableId ? String((await Table.findById(order.tableId).select('name').lean())?.name || '') : ''
         const walkinCustomerName = String(order?.customerName || '').trim()
+        const deliveryCustomerName = String(order?.customerName || '').trim()
         const top = tableName
           ? tableName
           : (order.saleType === 'delivery'
-            ? 'PAKET'
+            ? (deliveryCustomerName ? `PAKET - ${deliveryCustomerName}` : 'PAKET')
             : (order.saleType === 'walkin'
               ? (walkinCustomerName || 'HIZLI')
               : 'SİPARİŞ'))

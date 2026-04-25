@@ -284,8 +284,8 @@ export default function KitchenPage() {
               const sendTime = o.batchSentAt
                 ? new Date(o.batchSentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
                 : '-'
-              const orderStatusLabel = trKitchenStatusLabel(o.status)
               const servingType = trOrderServingType(o)
+              const createdByName = String(o?.createdByName || '').trim()
 
               return (
                 <div className="kitchen-card-header">
@@ -293,8 +293,12 @@ export default function KitchenPage() {
                     <span style={{ fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleLeft}</span>
                     <span className="kitchen-card-sep">•</span>
                     <span>{sendTime}</span>
-                    <span className="kitchen-card-sep">•</span>
-                    <span>{orderStatusLabel}</span>
+                    {createdByName && (
+                      <>
+                        <span className="kitchen-card-sep">{' • '}</span>
+                        <span style={{ color: '#dc2626', fontWeight: 700 }}>SİP. VER. {createdByName}</span>
+                      </>
+                    )}
                   </div>
                   <div className="kitchen-card-badges">
                     {servingType && (
