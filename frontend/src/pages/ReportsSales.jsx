@@ -202,12 +202,12 @@ export default function ReportsSales() {
                               const d = detailsCache[o.id]
                               const items = Array.isArray(d?.items) ? d.items : []
                               const statusLabel = (s) => trStatusLabel(s) || '-'
-                              const methodLabel = (m) => trPaymentMethodLabel(m) || '-'
+                              const methodLabel = (payment) => String(payment?.methodLabel || '').trim() || trPaymentMethodLabel(payment?.method) || '-'
                               const payments = Array.isArray(d?.payments) ? d.payments : []
                               const netTotal = Number(d?.netTotal ?? d?.totals?.grandTotal ?? 0)
                               const paidTotal = Number(d?.paidTotal ?? 0)
                               const over = Math.max(0, paidTotal - netTotal)
-                              const paymentParts = payments.map(p => `${Number(p?.amount || 0).toFixed(2)} TL ${methodLabel(p?.method)}`)
+                              const paymentParts = payments.map(p => `${Number(p?.amount || 0).toFixed(2)} TL ${methodLabel(p)}`)
                               if (String(d?.settlementType || '') === 'veresiye' && Number(d?.veresiyeAmount || 0) > 0) {
                                 paymentParts.push(`${Number(d.veresiyeAmount || 0).toFixed(2)} TL Veresiye`)
                               }
@@ -325,8 +325,10 @@ export default function ReportsSales() {
                         if (v === 'open') return 'Açık'
                         return v || '-'
                       }
-                      const methodLabel = (m) => {
-                        const v = String(m || '')
+                      const methodLabel = (payment) => {
+                        const custom = String(payment?.methodLabel || '').trim()
+                        if (custom) return custom
+                        const v = String(payment?.method || '')
                         if (v === 'cash') return 'cash'
                         if (v === 'card' || v === 'pos' || v === 'other') return 'pos'
                         if (v === 'transfer' || v === 'bank') return 'bank'
@@ -337,7 +339,7 @@ export default function ReportsSales() {
                       const netTotal = Number(d?.netTotal ?? d?.totals?.grandTotal ?? 0)
                       const paidTotal = Number(d?.paidTotal ?? 0)
                       const over = Math.max(0, paidTotal - netTotal)
-                      const paymentParts = payments.map(p => `${Number(p?.amount || 0).toFixed(2)} TL ${methodLabel(p?.method)}`)
+                      const paymentParts = payments.map(p => `${Number(p?.amount || 0).toFixed(2)} TL ${methodLabel(p)}`)
                       if (String(d?.settlementType || '') === 'veresiye' && Number(d?.veresiyeAmount || 0) > 0) {
                         paymentParts.push(`${Number(d.veresiyeAmount || 0).toFixed(2)} TL account`)
                       }

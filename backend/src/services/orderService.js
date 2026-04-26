@@ -13,6 +13,7 @@ import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
+import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 
 const toMoney = (v) => {
   const n = Number(v)
@@ -36,6 +37,14 @@ const computeTotals = (items) => {
   const safeSubtotal = toMoney(subtotal)
   const grandTotal = toMoney(safeSubtotal)
   return { subtotal: safeSubtotal, grandTotal }
+}
+
+const splitQtyItemSnapshot = (item, overrides = {}) => {
+  const base = typeof item?.toObject === 'function' ? item.toObject() : { ...item }
+  return {
+    ...base,
+    ...overrides
+  }
 }
 
 const normalizeLegacyItemStatuses = (order) => {
@@ -121,7 +130,8 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
     const isWeightBased = it?.isWeightBased === true || weightGrams > 0
     const amountLine = isWeightBased && weightGrams > 0 ? `${weightGrams} GR` : `${qty} ADET`
-    const payload = `${top}\n${name}\n${amountLine}\n`
+    const noteLine = String(it?.note || '').trim()
+    const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}\n` : ''}`
 
     await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
       type: 'label',
@@ -139,6 +149,10 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     })
   }
 }
+
+const normalizeKitchenItemIds = (itemIds = []) => Array.isArray(itemIds)
+  ? itemIds.map((id) => String(id || '').trim()).filter((id) => mongoose.Types.ObjectId.isValid(id))
+  : []
 
 const normalizeOpenDuplicatesForResponse = (items) => {
   const src = Array.isArray(items) ? items : []
@@ -525,6 +539,8 @@ export const getOrderService = async (tenantId, id) => {
     id: String(t?._id),
     amount: Number(t?.amount) || 0,
     method: String(t?.method || 'other'),
+    methodLabel: String(t?.methodLabel || t?.method || ''),
+    methodBucket: String(t?.methodBucket || ''),
     note: String(t?.note || ''),
     accountId: String(t?.accountId || ''),
     accountName: accountNameById.get(String(t?.accountId || '')) || '',
@@ -755,7 +771,24 @@ export const completeItemByItemIdService = async (tenantId, id, itemId) => {
     throw e
   }
 
-  it.status = 'completed'
+  let readyItem = it
+  if ((Number(it.qty) || 0) > 1 && !it.isWeightBased) {
+    const unitPrice = toMoney(it.priceSnapshot || 0)
+    it.qty = Math.max(1, (Number(it.qty) || 0) - 1)
+    it.subtotal = toMoney(it.qty * unitPrice)
+
+    const completedClone = splitQtyItemSnapshot(it, {
+      _id: new mongoose.Types.ObjectId(),
+      qty: 1,
+      subtotal: unitPrice,
+      status: 'completed'
+    })
+    order.items.push(completedClone)
+    readyItem = order.items[order.items.length - 1]
+  } else {
+    it.status = 'completed'
+  }
+  readyItem.status = 'completed'
   normalizeLegacyItemStatuses(order)
   await order.save()
 
@@ -764,16 +797,69 @@ export const completeItemByItemIdService = async (tenantId, id, itemId) => {
       tenantId,
       order,
       items: [{
-        _id: it._id,
-        menuItemId: it.menuItemId,
-        nameSnapshot: it.nameSnapshot,
-        qty: it.qty,
-        kitchenBatchId: it.kitchenBatchId,
-        isWeightBased: it.isWeightBased,
-        weightGrams: it.weightGrams
+        _id: readyItem._id,
+        menuItemId: readyItem.menuItemId,
+        nameSnapshot: readyItem.nameSnapshot,
+        qty: readyItem.qty,
+        kitchenBatchId: readyItem.kitchenBatchId,
+        isWeightBased: readyItem.isWeightBased,
+        weightGrams: readyItem.weightGrams
       }],
       mode: 'item_ready',
-      batchId: it.kitchenBatchId || null
+      batchId: readyItem.kitchenBatchId || null
+    })
+  } catch {
+  }
+
+  const fresh = await Order.findById(order.id).lean()
+  return { order: decorateOrder(fresh) }
+}
+
+export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds = []) => {
+  const order = await findByIdAndTenant(orderId, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+
+  const ids = normalizeKitchenItemIds(itemIds)
+  if (ids.length === 0) throw error('invalid_request', 'Invalid item ids', 400)
+
+  const readyItems = []
+  const now = new Date()
+  for (const itemId of ids) {
+    const it = order.items.id(itemId)
+    if (!it) continue
+    if (it.status !== 'sent') continue
+    it.status = 'completed'
+    if (!it.sentAt) it.sentAt = order.createdAt || now
+    if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
+    readyItems.push(it)
+  }
+
+  if (readyItems.length === 0) {
+    throw error('invalid_state', 'No sent items found for completion', 400)
+  }
+
+  normalizeLegacyItemStatuses(order)
+  await order.save()
+
+  try {
+    const first = readyItems[0]
+    const groupedLabelItem = {
+      _id: first?._id,
+      menuItemId: first?.menuItemId,
+      nameSnapshot: first?.nameSnapshot,
+      qty: readyItems.reduce((sum, item) => sum + Math.max(1, Number(item?.qty || 1)), 0),
+      kitchenBatchId: first?.kitchenBatchId || null,
+      isWeightBased: first?.isWeightBased === true,
+      weightGrams: Math.max(0, readyItems.reduce((sum, item) => sum + (Number(item?.weightGrams || 0) || 0), 0)),
+      note: String(first?.note || '')
+    }
+
+    await enqueueOrderItemLabels({
+      tenantId,
+      order,
+      items: [groupedLabelItem],
+      mode: 'item_ready',
+      batchId: first?.kitchenBatchId || null
     })
   } catch {
   }
@@ -806,6 +892,7 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
     throw e
   }
   it.status = 'cancelled'
+  it.cancelledAt = new Date()
   it.note = reason ? String(reason) : it.note
   const totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
@@ -842,11 +929,29 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user 
       e.payload = { error: 'invalid_state', message: 'Item not sent or completed', details: { currentStatus: item.status, allowed: ['sent', 'completed'] } }
       throw e
     }
-    item.status = 'cancelled'
+    const cancelAt = new Date()
+    if ((Number(item.qty) || 0) > 1 && !item.isWeightBased) {
+      const unitPrice = toMoney(item.priceSnapshot || 0)
+      item.qty = Math.max(1, (Number(item.qty) || 0) - 1)
+      item.subtotal = toMoney(item.qty * unitPrice)
+
+      const cancelledClone = splitQtyItemSnapshot(item, {
+        _id: new mongoose.Types.ObjectId(),
+        qty: 1,
+        subtotal: unitPrice,
+        status: 'cancelled',
+        cancelledAt: cancelAt,
+        note: reason || item.note || ''
+      })
+      order.items.push(cancelledClone)
+    } else {
+      item.status = 'cancelled'
+      item.cancelledAt = cancelAt
+      if (reason) item.note = reason
+    }
     if (order.tableId) {
       order.cancelAlertActive = true
     }
-    if (reason) item.note = reason
 
     order.totals = computeTotals(order.items)
     normalizeLegacyItemStatuses(order)
@@ -865,6 +970,55 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user 
     const dto = decorateOrder(freshOrder)
     return { order: dto }
   }
+
+export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], reason, user }) => {
+  const order = await findByIdAndTenant(orderId, user.tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+  if (isNotEditableStatus(order.status)) {
+    const e = new Error('Order is not editable')
+    e.status = 409
+    e.payload = { error: 'order_not_editable', message: 'Order is not editable' }
+    throw e
+  }
+
+  const ids = normalizeKitchenItemIds(itemIds)
+  if (ids.length === 0) throw error('invalid_request', 'Invalid item ids', 400)
+
+  let changed = 0
+  const cancelAt = new Date()
+  for (const itemId of ids) {
+    const item = order.items.id(itemId)
+    if (!item) continue
+    if (!['sent', 'completed'].includes(item.status)) continue
+    item.status = 'cancelled'
+    item.cancelledAt = cancelAt
+    if (reason) item.note = reason
+    changed += 1
+  }
+
+  if (changed === 0) {
+    throw error('invalid_state', 'No cancellable items found', 400)
+  }
+
+  if (order.tableId) {
+    order.cancelAlertActive = true
+  }
+  order.totals = computeTotals(order.items)
+  normalizeLegacyItemStatuses(order)
+  {
+    const fin = computePaymentSummary(order)
+    if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
+      order.paymentStatus = 'paid'
+      order.paidAt = order.paidAt || new Date()
+    } else {
+      order.paymentStatus = 'unpaid'
+      order.paidAt = null
+    }
+  }
+  await order.save()
+  const freshOrder = await Order.findById(order.id).lean()
+  return { order: decorateOrder(freshOrder) }
+}
 
 export const removeItemService = async (tenantId, id, menuItemId) => {
   const order = await findByIdAndTenant(id, tenantId)
@@ -1081,7 +1235,23 @@ export const setItemNoteByItemIdService = async (tenantId, id, itemId, note) => 
   }
   const it = order.items.id(itemId)
   if (!it) throw error('not_found', 'Item not in order', 404)
-  it.note = String(note || '')
+  const nextNote = String(note || '')
+  if ((Number(it.qty) || 0) > 1 && !it.isWeightBased && String(it.note || '') !== nextNote) {
+    const unitPrice = toMoney(it.priceSnapshot || 0)
+    it.qty = Math.max(1, (Number(it.qty) || 0) - 1)
+    it.subtotal = toMoney(it.qty * unitPrice)
+
+    const notedClone = splitQtyItemSnapshot(it, {
+      _id: new mongoose.Types.ObjectId(),
+      qty: 1,
+      subtotal: unitPrice,
+      note: nextNote
+    })
+    order.items.push(notedClone)
+  } else {
+    it.note = nextNote
+  }
+  order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
   await order.save()
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_item_note', 'Order', order.id, { itemId, menuItemId: String(it.menuItemId) })
@@ -1327,8 +1497,14 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
   if (!Number.isFinite(payAmount) || payAmount <= 0) {
     throw error('invalid_amount', 'Invalid payment amount', 400)
   }
-  const m = ['cash', 'card', 'transfer', 'other'].includes(method) ? method : 'cash'
-  order.payments.push({ method: m, amount: payAmount, note: String(note || '') })
+  const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, method)
+  order.payments.push({
+    method: resolvedMethod.method,
+    methodLabel: resolvedMethod.methodLabel,
+    methodBucket: resolvedMethod.methodBucket,
+    amount: payAmount,
+    note: String(note || '')
+  })
   const fin = computePaymentSummary(order)
   if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
     order.paymentStatus = 'paid'
@@ -1813,9 +1989,12 @@ export const payOrderService = async (tenantId, id, paymentMethod, amount) => {
     throw e
   }
 
+  const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, paymentMethod)
   order.payments.push({
     amount: payAmount,
-    method: paymentMethod || 'cash',
+    method: resolvedMethod.method,
+    methodLabel: resolvedMethod.methodLabel,
+    methodBucket: resolvedMethod.methodBucket,
     note: ''
   })
 

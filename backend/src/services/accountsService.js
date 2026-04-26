@@ -6,6 +6,7 @@ import MenuItem from '../models/MenuItem.js'
 import { error } from '../utils/errors.js'
 import { log as auditLog } from './auditService.js'
 import { isTxnSupported } from '../utils/mongoTxn.js'
+import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 
 const toMoney = (v) => {
   const raw = v === null || v === undefined ? '' : String(v).trim().replace(/\s/g, '').replace(',', '.')
@@ -24,6 +25,8 @@ const mapTransactionDto = (t, orderMap = null) => ({
   type: t.type,
   amount: toMoney(t.amount),
   method: t.method,
+  methodLabel: String(t?.methodLabel || t?.method || ''),
+  methodBucket: String(t?.methodBucket || ''),
   note: t.note,
   source: t.source,
   orderId: t.orderId ? t.orderId.toString() : null,
@@ -320,7 +323,7 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
   const totalEffect = toMoney(amount + discountAmount)
   if (totalEffect <= 0) throw error('invalid_amount', 'Invalid amount', 400)
   if (amount < 0) throw error('invalid_amount', 'Invalid amount', 400)
-  const method = ['cash', 'card', 'transfer', 'other'].includes(body.method) ? body.method : 'cash'
+  const paymentMethod = await resolvePaymentMethodSelection(tenantId, branchId, body.method)
   const rawNote = String(body.note || '').trim()
   const note = discountAmount > 0
     ? [rawNote, `Tahsilat: ${toMoney(amount).toFixed(2)} TL`, `İndirim: ${toMoney(discountAmount).toFixed(2)} TL`].filter(Boolean).join(' • ')
@@ -340,17 +343,19 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
     accountId: acc.id,
     type: 'credit',
     amount: totalEffect,
-    method,
+    method: paymentMethod.method,
+    methodLabel: paymentMethod.methodLabel,
+    methodBucket: paymentMethod.methodBucket,
     note,
     source: 'collection',
     orderId
   })
 
-  await auditLog(tenantId, actorUserId, 'cari_tahsilat', 'CustomerAccount', acc.id, { amount, discountAmount, method })
+  await auditLog(tenantId, actorUserId, 'cari_tahsilat', 'CustomerAccount', acc.id, { amount, discountAmount, method: paymentMethod.method })
 
   return {
     account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
-    transaction: { id: tx.id, type: tx.type, amount: toMoney(tx.amount), method: tx.method, note: tx.note, source: tx.source, createdAt: tx.createdAt }
+    transaction: { id: tx.id, type: tx.type, amount: toMoney(tx.amount), method: tx.method, methodLabel: tx.methodLabel, methodBucket: tx.methodBucket, note: tx.note, source: tx.source, createdAt: tx.createdAt }
   }
 }
 
@@ -427,6 +432,14 @@ export const addManualProductChargeService = async (tenantId, branchId, actorUse
     amount,
     method: 'other',
     note,
+    lines: [{
+      menuItemId: item._id,
+      name: String(item.name || '').trim(),
+      qty,
+      price: toMoney(item.price),
+      lineTotal: amount,
+      note: extraNote
+    }],
     source: 'manual',
     orderId: null
   })

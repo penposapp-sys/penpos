@@ -15,6 +15,7 @@ import { trPaymentMethodLabel } from '../i18n/tr.js'
 import ProductCard from '../components/ProductCard.jsx'
 import { ServingType, normalizeServingType } from '../utils/servingType.js'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
+import { buildCartRows } from '../lib/cartItemRows.js'
 
 export default function WalkInPosPage() {
   const nav = useNavigate()
@@ -1310,137 +1311,10 @@ export default function WalkInPosPage() {
                   const approvedItems = canShowPrep ? [] : prepItems
                   const otherItems = raw.filter(it => it?.status === 'completed' || it?.status === 'cancelled')
 
-                  const otherRender = cartViewMode === 'grouped'
-                    ? Object.values(otherItems.reduce((acc, it) => {
-                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
-                      const prev = acc[k]
-                      if (!prev) {
-                        acc[k] = { key: `o:${k}`, menuItemId: it.menuItemId, itemId: it._id, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
-                      } else {
-                        prev.qty += Number(it.qty) || 0
-                        prev.subtotal += Number(it.subtotal) || 0
-                      }
-                      return acc
-                    }, {}))
-                    : otherItems.map((it, idx) => {
-                      const stableId = it?._id || it?.id || it?.itemId || null
-                      const key = stableId ? String(stableId) : `${it.menuItemId}-other-${idx}`
-                      return { key, menuItemId: it.menuItemId, itemId: stableId ? String(stableId) : null, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
-                    })
-
-                  const openRender = cartViewMode === 'grouped'
-                    ? Object.values(openItems.reduce((acc, it) => {
-                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
-                      const prev = acc[k]
-                      if (!prev) {
-                        acc[k] = {
-                          key: `g:${k}`,
-                          menuItemId: it.menuItemId,
-                          itemId: it._id,
-                          itemIds: [it._id].filter(Boolean),
-                          note: it.note || '',
-                          qty: Number(it.qty) || 0,
-                          subtotal: Number(it.subtotal) || 0,
-                          repr: it
-                        }
-                      } else {
-                        prev.qty += Number(it.qty) || 0
-                        prev.subtotal += Number(it.subtotal) || 0
-                        if (it._id) prev.itemIds.push(it._id)
-                      }
-                      return acc
-                    }, {}))
-                    : openItems.map((it, idx) => {
-                      const stableId = it?._id || it?.id || it?.itemId || null
-                      const key = stableId ? String(stableId) : `${it.menuItemId}-${idx}`
-                      const itemId = stableId ? String(stableId) : null
-                      return {
-                      key,
-                      menuItemId: it.menuItemId,
-                      itemId,
-                      itemIds: [itemId].filter(Boolean),
-                      note: it.note || '',
-                      qty: Number(it.qty) || 0,
-                      subtotal: Number(it.subtotal) || 0,
-                      repr: it
-                      }
-                    })
-
-                  const sentRender = cartViewMode === 'grouped'
-                    ? Object.values(sentItems.reduce((acc, it) => {
-                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
-                      const prev = acc[k]
-                      if (!prev) {
-                        acc[k] = {
-                          key: `s:${k}`,
-                          menuItemId: it.menuItemId,
-                          itemId: it._id,
-                          itemIds: [it._id].filter(Boolean),
-                          note: it.note || '',
-                          qty: Number(it.qty) || 0,
-                          subtotal: Number(it.subtotal) || 0,
-                          repr: it
-                        }
-                      } else {
-                        prev.qty += Number(it.qty) || 0
-                        prev.subtotal += Number(it.subtotal) || 0
-                        if (it._id) prev.itemIds.push(it._id)
-                      }
-                      return acc
-                    }, {}))
-                    : sentItems.map((it, idx) => {
-                      const stableId = it?._id || it?.id || it?.itemId || null
-                      const key = stableId ? String(stableId) : `${it.menuItemId}-sent-${idx}`
-                      const itemId = stableId ? String(stableId) : null
-                      return {
-                        key,
-                        menuItemId: it.menuItemId,
-                        itemId,
-                        itemIds: [itemId].filter(Boolean),
-                        note: it.note || '',
-                        qty: Number(it.qty) || 0,
-                        subtotal: Number(it.subtotal) || 0,
-                        repr: it
-                      }
-                    })
-
-                  const approvedRender = cartViewMode === 'grouped'
-                    ? Object.values(approvedItems.reduce((acc, it) => {
-                  const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}|${String(it.weightGrams || '')}`
-                      const prev = acc[k]
-                      if (!prev) {
-                        acc[k] = {
-                          key: `a:${k}`,
-                          menuItemId: it.menuItemId,
-                          itemId: it._id,
-                          itemIds: [it._id].filter(Boolean),
-                          note: it.note || '',
-                          qty: Number(it.qty) || 0,
-                          subtotal: Number(it.subtotal) || 0,
-                          repr: it
-                        }
-                      } else {
-                        prev.qty += Number(it.qty) || 0
-                        prev.subtotal += Number(it.subtotal) || 0
-                        if (it._id) prev.itemIds.push(it._id)
-                      }
-                      return acc
-                    }, {}))
-                    : approvedItems.map((it, idx) => {
-                      const stableId = it?._id || it?.id || it?.itemId || null
-                      const key = stableId ? String(stableId) : `${it.menuItemId}-approved-${idx}`
-                      const itemId = stableId ? String(stableId) : null
-                      return {
-                        key,
-                        menuItemId: it.menuItemId,
-                        itemId,
-                        itemIds: [itemId].filter(Boolean),
-                        note: it.note || '',
-                        qty: Number(it.qty) || 0,
-                        subtotal: Number(it.subtotal) || 0,
-                        repr: it
-                      }
-                    })
+                  const otherRender = buildCartRows(otherItems, cartViewMode, 'o')
+                  const openRender = buildCartRows(openItems, cartViewMode, 'g')
+                  const sentRender = buildCartRows(sentItems, cartViewMode, 's')
+                  const approvedRender = buildCartRows(approvedItems, cartViewMode, 'a')
 
                   const setItemQtyByRow = async (row, nextQty) => {
                     const orderId = selectedOrderId || getOrderId(order)

@@ -110,6 +110,7 @@ export default function ProductReportPage() {
   }, [query.toString()])
 
   const items = Array.isArray(data?.items) ? data.items : []
+  const cancelledItems = Array.isArray(data?.cancelledItems) ? data.cancelledItems : []
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -224,6 +225,59 @@ export default function ProductReportPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ color: 'var(--muted)', fontSize: 12 }}>Ciro</div>
                       <div style={{ fontWeight: 900 }}>{fmtTl(r.revenue || 0)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )
+        )}
+      </div>
+
+      <div className="card">
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 10 }}>Iptal Olan Urunler Raporu</div>
+        <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 10 }}>
+          Hazir/onay sonrasi iptal edilen urunler. Tarih filtresi iptal zamanina gore uygulanir.
+        </div>
+        {error && <div style={{ color: '#b91c1c', marginBottom: 10 }}>{error}</div>}
+        {loading && <div style={{ color: 'var(--muted)' }}>Yukleniyor...</div>}
+        {!loading && !error && (
+          cancelledItems.length === 0 ? (
+            <div style={{ color: 'var(--muted)' }}>Bu aralikta hazir olduktan sonra iptal edilen urun yok.</div>
+          ) : (
+            <>
+              <div className="onlyDesktop desktop-only reportsTableWrap">
+                <table className="table" style={{ minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <th>Urun</th>
+                      <th style={{ textAlign: 'right' }}>Iptal Adedi</th>
+                      <th style={{ textAlign: 'right' }}>Iptal Tutari</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cancelledItems.map((r) => (
+                      <tr key={`cancelled-${r.productId || r.menuItemId}-${r.name}`}>
+                        <td style={{ fontWeight: 700 }}>{r.name}</td>
+                        <td style={{ textAlign: 'right' }}>{Number(r.qty || 0)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#b91c1c' }}>{fmtTl(r.revenue || 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10, maxHeight: '65vh', overflowY: 'auto', paddingRight: 6 }}>
+                {cancelledItems.map((r) => (
+                  <div key={`cancelled-${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff', display: 'grid', gap: 6 }}>
+                    <div style={{ fontWeight: 800 }}>{r.name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ color: 'var(--muted)', fontSize: 12 }}>Iptal Adedi</div>
+                      <div style={{ fontWeight: 800 }}>{Number(r.qty || 0)}</div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ color: 'var(--muted)', fontSize: 12 }}>Iptal Tutari</div>
+                      <div style={{ fontWeight: 900, color: '#b91c1c' }}>{fmtTl(r.revenue || 0)}</div>
                     </div>
                   </div>
                 ))}

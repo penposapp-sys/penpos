@@ -7,7 +7,9 @@ const accountTransactionSchema = new mongoose.Schema(
     accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomerAccount', required: true, index: true },
     type: { type: String, enum: ['debit', 'credit'], required: true },
     amount: { type: Number, required: true, min: 0 },
-    method: { type: String, enum: ['cash', 'card', 'transfer', 'other'], default: 'other' },
+    method: { type: String, default: 'other' },
+    methodLabel: { type: String, default: '' },
+    methodBucket: { type: String, enum: ['cash', 'card', 'bank', 'account', 'other'], default: 'other' },
     note: { type: String, default: '' },
     lines: [{
       menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', default: null },

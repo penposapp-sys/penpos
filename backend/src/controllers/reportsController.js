@@ -1,6 +1,7 @@
 import { sendError } from '../utils/errors.js'
 import Order from '../models/Order.js'
 import Table from '../models/Table.js'
+import AccountTransaction from '../models/AccountTransaction.js'
 import mongoose from 'mongoose'
 import { ensureFeature, ensureNotExpired } from '../services/planService.js'
 import { applyBranchFilter, buildBranchMatch } from '../utils/branchFilter.js'
@@ -35,6 +36,489 @@ const buildNetTotalExpr = () => {
   const pct = { $divide: [{ $ifNull: ['$discountPercent', 0] }, 100] }
   const discounted = { $subtract: [itemsTotal, { $multiply: [itemsTotal, pct] }] }
   return { $max: [0, discounted] }
+}
+
+const toMoneySafe = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+const buildScopedMatches = (tenantId, branchIds = []) => {
+  const tenantIdStr = String(tenantId || '')
+  const tenantIdObj = mongoose.Types.ObjectId.isValid(tenantIdStr) ? new mongoose.Types.ObjectId(tenantIdStr) : null
+  const tenantMatch = tenantIdObj
+    ? { $or: [{ tenantId: tenantIdObj }, { tenantId: tenantIdStr }] }
+    : { tenantId: tenantIdStr }
+  const branchMatch = buildBranchMatch(branchIds)
+  return { tenantMatch, branchMatch }
+}
+
+const mergeProductRows = (...groups) => {
+  const map = new Map()
+  for (const group of groups) {
+    for (const row of group || []) {
+      const id = row?.menuItemId ? String(row.menuItemId) : null
+      const name = String(row?.name || 'Bilinmeyen Ürün').trim() || 'Bilinmeyen Ürün'
+      const key = `${id || 'null'}|${name}`
+      const prev = map.get(key) || { productId: id, menuItemId: id, name, qty: 0, revenue: 0 }
+      prev.qty += toMoneySafe(row?.qty)
+      prev.revenue += toMoneySafe(row?.revenue)
+      map.set(key, prev)
+    }
+  }
+  return Array.from(map.values())
+    .map((row) => ({
+      productId: row.productId,
+      menuItemId: row.menuItemId,
+      name: row.name,
+      qty: toMoneySafe(row.qty),
+      revenue: toMoneySafe(row.revenue)
+    }))
+    .filter((row) => row.qty > 0 || row.revenue > 0)
+    .sort((a, b) => (b.revenue - a.revenue) || (b.qty - a.qty) || String(a.name).localeCompare(String(b.name), 'tr'))
+}
+
+const parseLegacyManualProductNote = (note, amount) => {
+  const raw = String(note || '').trim()
+  if (!raw) return null
+
+  const [head] = raw.split(' - ')
+  const match = /^(.*)\sx([0-9]+(?:[.,][0-9]+)?)$/i.exec(String(head || '').trim())
+  if (!match) return null
+
+  const name = String(match[1] || '').trim()
+  const qty = Number(String(match[2] || '').replace(',', '.'))
+  const revenue = toMoneySafe(amount)
+  if (!name || !Number.isFinite(qty) || qty <= 0 || revenue <= 0) return null
+
+  return {
+    productId: null,
+    menuItemId: null,
+    name,
+    qty,
+    revenue
+  }
+}
+
+const aggregateOrderProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
+  const { tenantMatch, branchMatch } = buildScopedMatches(tenantId, branchIds)
+  const menuItemIdExpr = {
+    $cond: [
+      { $eq: [{ $type: '$items.menuItemId' }, 'objectId'] },
+      '$items.menuItemId',
+      { $convert: { input: '$items.menuItemId', to: 'objectId', onError: null, onNull: null } }
+    ]
+  }
+  const qtyRawExpr = {
+    $convert: {
+      input: { $ifNull: ['$items.qty', '$items.quantity'] },
+      to: 'double',
+      onError: null,
+      onNull: null
+    }
+  }
+  const qtyExpr = {
+    $cond: [
+      {
+        $or: [
+          { $eq: [qtyRawExpr, null] },
+          { $lte: [qtyRawExpr, 0] }
+        ]
+      },
+      1,
+      qtyRawExpr
+    ]
+  }
+  const priceExpr = {
+    $convert: {
+      input: { $ifNull: ['$items.priceSnapshot', { $ifNull: ['$items.price', '$mi.price'] }] },
+      to: 'double',
+      onError: 0,
+      onNull: 0
+    }
+  }
+  const revenueExpr = {
+    $let: {
+      vars: {
+        subtotalValue: {
+          $convert: {
+            input: '$items.subtotal',
+            to: 'double',
+            onError: null,
+            onNull: null
+          }
+        }
+      },
+      in: {
+        $cond: [
+          { $and: [{ $ne: ['$$subtotalValue', null] }, { $gt: ['$$subtotalValue', 0] }] },
+          '$$subtotalValue',
+          { $multiply: [priceExpr, qtyExpr] }
+        ]
+      }
+    }
+  }
+  const itemReportAtExpr = {
+    $convert: {
+      input: {
+        $ifNull: [
+          '$items.kitchenSentAt',
+          {
+            $ifNull: [
+              '$items.sentAt',
+              {
+                $ifNull: [
+                  '$paidAt',
+                  { $ifNull: ['$closedAt', { $ifNull: ['$updatedAt', '$createdAt'] }] }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      to: 'date',
+      onError: null,
+      onNull: null
+    }
+  }
+
+  const agg = await Order.aggregate([
+    { $match: tenantMatch },
+    ...(branchMatch ? [{ $match: branchMatch }] : []),
+    { $unwind: { path: '$items', preserveNullAndEmptyArrays: false } },
+    {
+      $match: {
+        $and: [
+          {
+            $or: [
+              { 'items.status': { $ne: 'cancelled' } },
+              { 'items.status': { $exists: false } }
+            ]
+          },
+          {
+            $or: [
+              { 'items.cancelledAt': null },
+              { 'items.cancelledAt': { $exists: false } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      $addFields: {
+        menuItemIdObj: menuItemIdExpr,
+        itemReportAt: itemReportAtExpr
+      }
+    },
+    {
+      $match: {
+        itemReportAt: { $ne: null, $gte: fromDate, $lt: toDate },
+        $or: [
+          { 'items.status': { $in: ['sent', 'completed'] } },
+          {
+            $and: [
+              {
+                $or: [
+                  { 'items.status': { $exists: false } },
+                  { 'items.status': null },
+                  { 'items.status': 'open' }
+                ]
+              },
+              {
+                $or: [
+                  { status: { $in: ['closed', 'completed'] } },
+                  { paymentStatus: 'paid' },
+                  { settlementType: 'veresiye' },
+                  { 'payments.0': { $exists: true } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    { $match: { menuItemIdObj: { $ne: null } } },
+    {
+      $lookup: {
+        from: 'menuitems',
+        localField: 'menuItemIdObj',
+        foreignField: '_id',
+        as: 'mi'
+      }
+    },
+    { $unwind: { path: '$mi', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: '$menuItemIdObj',
+        productId: { $first: '$menuItemIdObj' },
+        menuItemId: { $first: '$menuItemIdObj' },
+        name: { $first: { $ifNull: ['$items.nameSnapshot', { $ifNull: ['$mi.name', 'Bilinmeyen Ürün'] }] } },
+        qty: { $sum: qtyExpr },
+        revenue: { $sum: revenueExpr }
+      }
+    },
+    { $match: { revenue: { $gt: 0 } } },
+    { $sort: { revenue: -1, qty: -1 } }
+  ])
+
+  return (agg || []).map((r) => {
+    const rawId = r?.menuItemId ?? r?.productId ?? r?._id
+    const id = rawId != null ? String(rawId) : null
+    return {
+      productId: id,
+      menuItemId: id,
+      name: String(r?.name || 'Bilinmeyen Ürün'),
+      qty: toMoneySafe(r?.qty),
+      revenue: toMoneySafe(r?.revenue)
+    }
+  })
+}
+
+const aggregateManualAccountProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
+  const { tenantMatch, branchMatch } = buildScopedMatches(tenantId, branchIds)
+  const menuItemIdExpr = {
+    $cond: [
+      { $eq: [{ $type: '$lines.menuItemId' }, 'objectId'] },
+      '$lines.menuItemId',
+      { $convert: { input: '$lines.menuItemId', to: 'objectId', onError: null, onNull: null } }
+    ]
+  }
+  const qtyExpr = {
+    $convert: {
+      input: '$lines.qty',
+      to: 'double',
+      onError: 0,
+      onNull: 0
+    }
+  }
+  const revenueExpr = {
+    $let: {
+      vars: {
+        lineTotalValue: {
+          $convert: {
+            input: '$lines.lineTotal',
+            to: 'double',
+            onError: null,
+            onNull: null
+          }
+        },
+        priceValue: {
+          $convert: {
+            input: '$lines.price',
+            to: 'double',
+            onError: 0,
+            onNull: 0
+          }
+        }
+      },
+      in: {
+        $cond: [
+          { $and: [{ $ne: ['$$lineTotalValue', null] }, { $gt: ['$$lineTotalValue', 0] }] },
+          '$$lineTotalValue',
+          { $multiply: ['$$priceValue', qtyExpr] }
+        ]
+      }
+    }
+  }
+
+  const agg = await AccountTransaction.aggregate([
+    { $match: tenantMatch },
+    ...(branchMatch ? [{ $match: branchMatch }] : []),
+    {
+      $match: {
+        source: 'manual',
+        type: 'debit',
+        isDeleted: { $ne: true },
+        createdAt: { $gte: fromDate, $lt: toDate },
+        'lines.0': { $exists: true }
+      }
+    },
+    { $unwind: { path: '$lines', preserveNullAndEmptyArrays: false } },
+    { $addFields: { menuItemIdObj: menuItemIdExpr } },
+    { $match: { menuItemIdObj: { $ne: null } } },
+    {
+      $group: {
+        _id: '$menuItemIdObj',
+        productId: { $first: '$menuItemIdObj' },
+        menuItemId: { $first: '$menuItemIdObj' },
+        name: { $first: { $ifNull: ['$lines.name', 'Bilinmeyen Ürün'] } },
+        qty: { $sum: qtyExpr },
+        revenue: { $sum: revenueExpr }
+      }
+    },
+    { $match: { revenue: { $gt: 0 } } },
+    { $sort: { revenue: -1, qty: -1 } }
+  ])
+
+  return (agg || []).map((r) => {
+    const rawId = r?.menuItemId ?? r?.productId ?? r?._id
+    const id = rawId != null ? String(rawId) : null
+    return {
+      productId: id,
+      menuItemId: id,
+      name: String(r?.name || 'Bilinmeyen Ürün'),
+      qty: toMoneySafe(r?.qty),
+      revenue: toMoneySafe(r?.revenue)
+    }
+  })
+}
+
+const aggregateLegacyManualAccountProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
+  let filter = {
+    tenantId,
+    source: 'manual',
+    type: 'debit',
+    isDeleted: { $ne: true },
+    createdAt: { $gte: fromDate, $lt: toDate },
+    $or: [
+      { lines: { $exists: false } },
+      { lines: { $size: 0 } }
+    ]
+  }
+  filter = applyBranchFilter(filter, branchIds)
+
+  const rows = await AccountTransaction.find(filter)
+    .select({ note: 1, amount: 1 })
+    .lean()
+
+  return (rows || [])
+    .map((row) => parseLegacyManualProductNote(row?.note, row?.amount))
+    .filter(Boolean)
+}
+
+const aggregateCancelledOrderProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
+  const { tenantMatch, branchMatch } = buildScopedMatches(tenantId, branchIds)
+  const menuItemIdExpr = {
+    $cond: [
+      { $eq: [{ $type: '$items.menuItemId' }, 'objectId'] },
+      '$items.menuItemId',
+      { $convert: { input: '$items.menuItemId', to: 'objectId', onError: null, onNull: null } }
+    ]
+  }
+  const qtyRawExpr = {
+    $convert: {
+      input: { $ifNull: ['$items.qty', '$items.quantity'] },
+      to: 'double',
+      onError: null,
+      onNull: null
+    }
+  }
+  const qtyExpr = {
+    $cond: [
+      {
+        $or: [
+          { $eq: [qtyRawExpr, null] },
+          { $lte: [qtyRawExpr, 0] }
+        ]
+      },
+      1,
+      qtyRawExpr
+    ]
+  }
+  const priceExpr = {
+    $convert: {
+      input: { $ifNull: ['$items.priceSnapshot', { $ifNull: ['$items.price', '$mi.price'] }] },
+      to: 'double',
+      onError: 0,
+      onNull: 0
+    }
+  }
+  const revenueExpr = {
+    $let: {
+      vars: {
+        subtotalValue: {
+          $convert: {
+            input: '$items.subtotal',
+            to: 'double',
+            onError: null,
+            onNull: null
+          }
+        }
+      },
+      in: {
+        $cond: [
+          { $and: [{ $ne: ['$$subtotalValue', null] }, { $gt: ['$$subtotalValue', 0] }] },
+          '$$subtotalValue',
+          { $multiply: [priceExpr, qtyExpr] }
+        ]
+      }
+    }
+  }
+  const cancelledAtExpr = {
+    $convert: {
+      input: '$items.cancelledAt',
+      to: 'date',
+      onError: null,
+      onNull: null
+    }
+  }
+  const approvedAtExpr = {
+    $convert: {
+      input: {
+        $ifNull: [
+          '$items.kitchenSentAt',
+          '$items.sentAt'
+        ]
+      },
+      to: 'date',
+      onError: null,
+      onNull: null
+    }
+  }
+
+  const agg = await Order.aggregate([
+    { $match: tenantMatch },
+    ...(branchMatch ? [{ $match: branchMatch }] : []),
+    { $unwind: { path: '$items', preserveNullAndEmptyArrays: false } },
+    {
+      $addFields: {
+        menuItemIdObj: menuItemIdExpr,
+        cancelledAtValue: cancelledAtExpr,
+        approvedAtValue: approvedAtExpr
+      }
+    },
+    {
+      $match: {
+        'items.status': 'cancelled',
+        cancelledAtValue: { $ne: null, $gte: fromDate, $lt: toDate },
+        approvedAtValue: { $ne: null }
+      }
+    },
+    { $match: { menuItemIdObj: { $ne: null } } },
+    {
+      $lookup: {
+        from: 'menuitems',
+        localField: 'menuItemIdObj',
+        foreignField: '_id',
+        as: 'mi'
+      }
+    },
+    { $unwind: { path: '$mi', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: '$menuItemIdObj',
+        productId: { $first: '$menuItemIdObj' },
+        menuItemId: { $first: '$menuItemIdObj' },
+        name: { $first: { $ifNull: ['$items.nameSnapshot', { $ifNull: ['$mi.name', 'Bilinmeyen Ürün'] }] } },
+        qty: { $sum: qtyExpr },
+        revenue: { $sum: revenueExpr }
+      }
+    },
+    { $match: { revenue: { $gt: 0 } } },
+    { $sort: { revenue: -1, qty: -1 } }
+  ])
+
+  return (agg || []).map((r) => {
+    const rawId = r?.menuItemId ?? r?.productId ?? r?._id
+    const id = rawId != null ? String(rawId) : null
+    return {
+      productId: id,
+      menuItemId: id,
+      name: String(r?.name || 'Bilinmeyen Ürün'),
+      qty: toMoneySafe(r?.qty),
+      revenue: toMoneySafe(r?.revenue)
+    }
+  })
 }
 
 export const orders = async (req, res) => {
@@ -99,7 +583,7 @@ export const orders = async (req, res) => {
       const byMethod = { cash: 0, pos: 0, bank: 0, account: 0 }
       for (const p of payments) {
         const amt = Number(p?.amount) || 0
-        const bucket = normalizeMethod(p?.method)
+        const bucket = normalizeMethod(p?.methodBucket || p?.method)
         byMethod[bucket] = (byMethod[bucket] || 0) + amt
         if (bucket === 'account') accountPaidExplicit += amt
         else nonAccountPaid += amt
@@ -191,7 +675,7 @@ export const summary = async (req, res) => {
       let accountPaidExplicit = 0
       for (const p of payments) {
         const amt = Number(p?.amount) || 0
-        const bucket = normalizeMethod(p?.method)
+        const bucket = normalizeMethod(p?.methodBucket || p?.method)
         if (bucket === 'account') accountPaidExplicit += amt
         else nonAccountPaid += amt
       }
@@ -251,17 +735,12 @@ export const dashboard = async (req, res) => {
       .select({ items: 1, discountPercent: 1, payments: 1, settlementType: 1, createdAt: 1, closedAt: 1, updatedAt: 1, saleType: 1 })
       .lean()
 
-    const toMoney = (v) => {
-      const n = Number(v)
-      return Number.isFinite(n) ? n : 0
-    }
-
     const computeNetTotal = (order) => {
       const items = Array.isArray(order?.items) ? order.items : []
       const itemsTotal = items
         .filter(it => it && it.status !== 'cancelled')
-        .reduce((sum, it) => sum + toMoney(it.subtotal), 0)
-      const pct = Math.max(0, Math.min(100, toMoney(order?.discountPercent)))
+        .reduce((sum, it) => sum + toMoneySafe(it.subtotal), 0)
+      const pct = Math.max(0, Math.min(100, toMoneySafe(order?.discountPercent)))
       const net = itemsTotal - (itemsTotal * pct) / 100
       return Math.max(0, net)
     }
@@ -298,17 +777,17 @@ export const dashboard = async (req, res) => {
       let nonAccountPaid = 0
       let accountPaidExplicit = 0
       for (const p of payments) {
-        const amt = toMoney(p?.amount)
-        const bucket = normalizeMethod(p?.method)
+        const amt = toMoneySafe(p?.amount)
+        const bucket = normalizeMethod(p?.methodBucket || p?.method)
         if (bucket === 'account') accountPaidExplicit += amt
         else nonAccountPaid += amt
-        sales.byMethod[bucket] = toMoney(sales.byMethod[bucket]) + amt
+        sales.byMethod[bucket] = toMoneySafe(sales.byMethod[bucket]) + amt
       }
 
       const isAccountSettlement = String(o?.settlementType || '') === 'veresiye'
       const implicitAccount = isAccountSettlement ? Math.max(0, netTotalEffective - (nonAccountPaid + accountPaidExplicit)) : 0
       if (implicitAccount > 0) {
-        sales.byMethod.account = toMoney(sales.byMethod.account) + implicitAccount
+        sales.byMethod.account = toMoneySafe(sales.byMethod.account) + implicitAccount
       }
       const totalPaidOrder = nonAccountPaid + accountPaidExplicit + implicitAccount
       sales.totalPaid += totalPaidOrder
@@ -322,8 +801,8 @@ export const dashboard = async (req, res) => {
         if (!it || it.status === 'cancelled') continue
         const menuItemId = it.menuItemId ? String(it.menuItemId) : null
         const name = String(it.nameSnapshot || '-')
-        const qty = toMoney(it.qty)
-        const revenue = toMoney(it.priceSnapshot) * qty
+        const qty = toMoneySafe(it.qty)
+        const revenue = toMoneySafe(it.subtotal) > 0 ? toMoneySafe(it.subtotal) : (toMoneySafe(it.priceSnapshot) * qty)
         const key = `${menuItemId || 'null'}|${name}`
         const prev = productMap.get(key) || { menuItemId, name, qty: 0, revenue: 0 }
         prev.qty += qty
@@ -336,9 +815,19 @@ export const dashboard = async (req, res) => {
       hourlyCounts.set(hh, (hourlyCounts.get(hh) || 0) + 1)
     }
 
-    const products = Array.from(productMap.values())
-      .sort((a, b) => (b.revenue - a.revenue) || (b.qty - a.qty) || String(a.name).localeCompare(String(b.name), 'tr'))
-      .slice(0, 10)
+    const [orderProducts, manualProducts, legacyManualProducts, cancelledProducts] = await Promise.all([
+      aggregateOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
+      aggregateManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
+      aggregateLegacyManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
+      aggregateCancelledOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to })
+    ])
+    const products = mergeProductRows(orderProducts, manualProducts, legacyManualProducts).slice(0, 10)
+    const cancelledSummaryRows = mergeProductRows(cancelledProducts)
+    const cancelled = {
+      itemCount: cancelledSummaryRows.length,
+      totalQty: cancelledSummaryRows.reduce((sum, row) => sum + toMoneySafe(row.qty), 0),
+      totalRevenue: cancelledSummaryRows.reduce((sum, row) => sum + toMoneySafe(row.revenue), 0)
+    }
 
     const hourly = Array.from({ length: 24 }).map((_, h) => {
       const hh = String(h).padStart(2, '0')
@@ -349,27 +838,32 @@ export const dashboard = async (req, res) => {
       success: true,
       range: { start: startYmd, end: endYmd },
       sales: {
-        totalRevenue: toMoney(sales.totalRevenue),
-        totalPaid: toMoney(sales.totalPaid),
-        overpayTotal: toMoney(sales.overpayTotal),
-        balanceDueSigned: toMoney(sales.balanceDueSigned),
+        totalRevenue: toMoneySafe(sales.totalRevenue),
+        totalPaid: toMoneySafe(sales.totalPaid),
+        overpayTotal: toMoneySafe(sales.overpayTotal),
+        balanceDueSigned: toMoneySafe(sales.balanceDueSigned),
         byMethod: {
-          cash: toMoney(sales.byMethod.cash),
-          pos: toMoney(sales.byMethod.pos),
-          bank: toMoney(sales.byMethod.bank),
-          account: toMoney(sales.byMethod.account)
+          cash: toMoneySafe(sales.byMethod.cash),
+          pos: toMoneySafe(sales.byMethod.pos),
+          bank: toMoneySafe(sales.byMethod.bank),
+          account: toMoneySafe(sales.byMethod.account)
         },
         orderCount: Number(sales.orderCount || 0)
       },
       products: products.map(p => ({
         menuItemId: p.menuItemId,
         name: p.name,
-        qty: toMoney(p.qty),
-        revenue: toMoney(p.revenue)
+        qty: toMoneySafe(p.qty),
+        revenue: toMoneySafe(p.revenue)
       })),
       customers: {
         totalCustomers: Number(sales.orderCount || 0),
         hourly
+      },
+      cancelled: {
+        itemCount: Number(cancelled.itemCount || 0),
+        totalQty: toMoneySafe(cancelled.totalQty),
+        totalRevenue: toMoneySafe(cancelled.totalRevenue)
       }
     })
   } catch (err) {
@@ -413,6 +907,20 @@ export const products = async (req, res) => {
         message: 'Kullanıcıya atanmış aktif şube yok'
       })
     }
+
+    const [orderItems, manualItems, legacyManualItems, cancelledItems] = await Promise.all([
+      aggregateOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate, toDate }),
+      aggregateManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate, toDate }),
+      aggregateLegacyManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate, toDate }),
+      aggregateCancelledOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate, toDate })
+    ])
+
+    return res.json({
+      success: true,
+      range: { start: startYmd, end: endYmd },
+      items: mergeProductRows(orderItems, manualItems, legacyManualItems),
+      cancelledItems: mergeProductRows(cancelledItems)
+    })
 
     const tenantIdStr = String(req.user.tenantId || '')
     const tenantIdObj = mongoose.Types.ObjectId.isValid(tenantIdStr) ? new mongoose.Types.ObjectId(tenantIdStr) : null
@@ -618,7 +1126,7 @@ export const exportXlsx = async (req, res) => {
       let accountPaidExplicit = 0
       for (const p of payments) {
         const amt = toMoneySafe(p?.amount)
-        const bucket = normalizeMethod(p?.method)
+        const bucket = normalizeMethod(p?.methodBucket || p?.method)
         if (bucket === 'account') accountPaidExplicit += amt
         else nonAccountPaid += amt
         sales.byMethod[bucket] = toMoneySafe(sales.byMethod[bucket]) + amt
@@ -649,8 +1157,12 @@ export const exportXlsx = async (req, res) => {
       }
     }
 
-    const products = Array.from(productMap.values())
-      .sort((a, b) => (b.revenue - a.revenue) || (b.qty - a.qty) || String(a.name).localeCompare(String(b.name), 'tr'))
+    const [orderProducts, manualProducts, legacyManualProducts] = await Promise.all([
+      aggregateOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
+      aggregateManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
+      aggregateLegacyManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to })
+    ])
+    const products = mergeProductRows(orderProducts, manualProducts, legacyManualProducts)
 
     const cash = toMoneySafe(sales.byMethod.cash)
     const pos = toMoneySafe(sales.byMethod.pos)

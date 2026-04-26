@@ -7,7 +7,7 @@ import MenuItem from '../models/MenuItem.js'
 import KitchenBulkPrepState from '../models/KitchenBulkPrepState.js'
 import mongoose from 'mongoose'
 import { ensureFeature, ensureNotExpired } from '../services/planService.js'
-import { completeItemByItemIdService, cancelItemByItemIdService, completeKitchenBatchByIdService, completeKitchenBatchService, listKitchenOrdersService } from '../services/orderService.js'
+import { completeItemByItemIdService, cancelItemByItemIdService, completeKitchenBatchByIdService, completeKitchenBatchService, completeKitchenItemGroupService, cancelKitchenItemGroupService, listKitchenOrdersService } from '../services/orderService.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 
 const SIGN = 'kitchen_v4_12h_2026-01-16'
@@ -322,6 +322,43 @@ export const itemCancel = async (req, res) => {
     const { order } = await cancelItemByItemIdService({
       orderId: id,
       itemId,
+      reason: req.body?.reason || '',
+      user: req.user
+    })
+    res.json({ order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const itemGroupComplete = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'kitchen')
+    const { id } = req.params
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : []
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw error('invalid_request', 'Invalid order id', 400)
+    }
+    const { order } = await completeKitchenItemGroupService(req.user.tenantId, id, itemIds)
+    res.json({ order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const itemGroupCancel = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'kitchen')
+    const { id } = req.params
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : []
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw error('invalid_request', 'Invalid order id', 400)
+    }
+    const { order } = await cancelKitchenItemGroupService({
+      orderId: id,
+      itemIds,
       reason: req.body?.reason || '',
       user: req.user
     })

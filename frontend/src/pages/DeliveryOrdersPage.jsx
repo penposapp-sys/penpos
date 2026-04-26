@@ -14,6 +14,7 @@ import { trPaymentMethodLabel } from '../i18n/tr.js'
 import ProductCard from '../components/ProductCard.jsx'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { ServingType } from '../utils/servingType.js'
+import { buildCartRows } from '../lib/cartItemRows.js'
 
 export default function DeliveryOrdersPage() {
   const { user, allowedBranchIds } = useAuth()
@@ -1231,44 +1232,8 @@ export default function DeliveryOrdersPage() {
                       scheduleQtyUpdate(orderId, itemId, rowKey, nextQty)
                     }
 
-                    const openRender = cartViewMode === 'grouped'
-                      ? Object.values(openItems.reduce((acc, it) => {
-                        const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
-                        const prev = acc[k]
-                        if (!prev) {
-                          acc[k] = { key: `g:${k}`, menuItemId: it.menuItemId, itemId: it._id, itemIds: [it._id].filter(Boolean), note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
-                        } else {
-                          prev.qty += Number(it.qty) || 0
-                          prev.subtotal += Number(it.subtotal) || 0
-                          if (it._id) prev.itemIds.push(it._id)
-                        }
-                        return acc
-                      }, {}))
-                      : openItems.map((it, idx) => {
-                        const stableId = it?._id || it?.id || it?.itemId || null
-                        const key = stableId ? String(stableId) : `${it.menuItemId}-${idx}`
-                        const itemId = stableId ? String(stableId) : null
-                        return { key, menuItemId: it.menuItemId, itemId, itemIds: [itemId].filter(Boolean), note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
-                      })
-
-                    const otherRender = cartViewMode === 'grouped'
-                      ? Object.values(otherItems.reduce((acc, it) => {
-                        const k = `${String(it.menuItemId)}|${String(it.note || '')}|${String(it.status)}`
-                        const prev = acc[k]
-                        if (!prev) {
-                          acc[k] = { key: `o:${k}`, menuItemId: it.menuItemId, itemId: it._id, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
-                        } else {
-                          prev.qty += Number(it.qty) || 0
-                          prev.subtotal += Number(it.subtotal) || 0
-                        }
-                        return acc
-                      }, {}))
-                      : otherItems.map((it, idx) => {
-                        const stableId = it?._id || it?.id || it?.itemId || null
-                        const key = stableId ? String(stableId) : `${it.menuItemId}-other-${idx}`
-                        const itemId = stableId ? String(stableId) : null
-                        return { key, menuItemId: it.menuItemId, itemId, note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }
-                      })
+                    const openRender = buildCartRows(openItems, cartViewMode, 'g')
+                    const otherRender = buildCartRows(otherItems, cartViewMode, 'o')
 
                     const renderLine = (row, opts = {}) => {
                       const it = row.repr
@@ -1398,7 +1363,7 @@ export default function DeliveryOrdersPage() {
                       <>
                         {openRender.map(r => renderLine(r, { type: 'open', grouped: cartViewMode === 'grouped' }))}
                         {sentItems.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mutfağa Gönderilenler</div>}
-                        {sentItems.map((it, idx) => renderLine({ key: it._id || `${it.menuItemId}-sent-${idx}`, menuItemId: it.menuItemId, itemId: it._id, itemIds: [it._id].filter(Boolean), note: it.note || '', qty: Number(it.qty) || 0, subtotal: Number(it.subtotal) || 0, repr: it }, { type: 'sent' }))}
+                        {buildCartRows(sentItems, cartViewMode, 's').map(r => renderLine(r, { type: 'sent', grouped: cartViewMode === 'grouped' }))}
                         {otherItems.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>}
                         {otherRender.map(r => renderLine(r, { type: 'other', grouped: cartViewMode === 'grouped' }))}
                       </>

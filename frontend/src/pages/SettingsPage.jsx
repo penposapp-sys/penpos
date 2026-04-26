@@ -737,10 +737,16 @@ export const SettingsPaymentsContent = () => {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [newMethod, setNewMethod] = useState({ label: '', bucket: 'other' })
+  const makeKey = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
   const load = async () => {
     setError('')
     try {
-      const result = await api('/api/tenant/payment-settings', { silent: true, skipBranchHeader: true })
+      const result = await api('/api/tenant/payment-settings', { silent: true })
       setData(result && Array.isArray(result.methods) ? result : { methods: [] })
     } catch (err) {
       setError(err.message)
@@ -760,11 +766,53 @@ export const SettingsPaymentsContent = () => {
       return { ...(prev || {}), methods }
     })
   }
+  const updateLabel = (key, label) => {
+    setData(prev => {
+      const methods = (prev?.methods || []).map(m => m.key === key ? { ...m, label } : m)
+      return { ...(prev || {}), methods }
+    })
+  }
+  const updateBucket = (key, bucket) => {
+    setData(prev => {
+      const methods = (prev?.methods || []).map(m => m.key === key ? { ...m, bucket } : m)
+      return { ...(prev || {}), methods }
+    })
+  }
+  const removeMethod = (key) => {
+    setData(prev => {
+      const current = Array.isArray(prev?.methods) ? prev.methods : []
+      const filtered = current.filter(m => m.key !== key)
+      const hasDefault = filtered.some(m => m.isDefault)
+      const methods = hasDefault ? filtered : filtered.map((m, index) => ({ ...m, isDefault: index === 0 }))
+      return { ...(prev || {}), methods }
+    })
+  }
+  const addMethod = () => {
+    const label = String(newMethod.label || '').trim()
+    const key = makeKey(label)
+    if (!label || !key) {
+      setError('Yeni odeme secenegi icin isim girin')
+      return
+    }
+    if ((data?.methods || []).some(m => m.key === key)) {
+      setError('Ayni isimde bir odeme secenegi zaten var')
+      return
+    }
+    setError('')
+    setData(prev => ({
+      ...(prev || {}),
+      methods: [
+        ...(prev?.methods || []),
+        { key, label, bucket: newMethod.bucket || 'other', isEnabled: true, isDefault: !(prev?.methods || []).some(m => m.isDefault) }
+      ]
+    }))
+    setNewMethod({ label: '', bucket: 'other' })
+  }
   const save = async () => {
     setSaving(true)
     setError('')
     try {
-      await api('/api/tenant/payment-settings', { method: 'PUT', body: JSON.stringify({ methods: data?.methods || [] }), silent: true, skipBranchHeader: true })
+      await api('/api/tenant/payment-settings', { method: 'PUT', body: JSON.stringify({ methods: data?.methods || [] }), silent: true })
       await load()
     } catch (err) {
       setError(err.message)

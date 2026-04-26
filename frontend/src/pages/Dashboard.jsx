@@ -127,6 +127,7 @@ export default function Dashboard() {
   const products = Array.isArray(data?.products) ? data.products : []
   const customers = data?.customers || null
   const hourly = Array.isArray(customers?.hourly) ? customers.hourly : []
+  const cancelled = data?.cancelled || null
 
   const onExport = async () => {
     if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) {
@@ -253,7 +254,7 @@ export default function Dashboard() {
 
       {!loading && !error && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(12, minmax(0, 1fr))', gap: 12 }}>
-          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 5', display: 'grid', gap: 10 }}>
+          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 4', display: 'grid', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <div style={{ fontWeight: 800 }}>Satış Özeti</div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sipariş: {sales ? Number(sales.orderCount || 0) : 0}</div>
@@ -292,7 +293,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 4', display: 'grid', gap: 10, overflow: 'hidden' }}>
+          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 3', display: 'grid', gap: 10, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <div style={{ fontWeight: 800 }}>Ürün Raporu (Top 10)</div>
               <Link to="/kermes/app/product-report" style={{ fontSize: 12, color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}>Tümünü Gör</Link>
@@ -331,6 +332,25 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 2', display: 'grid', gap: 10, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <div style={{ fontWeight: 800 }}>Iptal Urunler</div>
+              <Link to="/kermes/app/product-report" style={{ fontSize: 12, color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}>Detay</Link>
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazir sonrasi iptal tutari</div>
+              <div style={{ fontWeight: 900, fontSize: 24, color: '#b91c1c' }}>{fmtTl(cancelled?.totalRevenue || 0)}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>Iptal Adedi</div>
+                <div style={{ fontWeight: 800 }}>{Number(cancelled?.totalQty || 0)}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ color: 'var(--muted)' }}>Urun Cesidi</div>
+                <div style={{ fontWeight: 800 }}>{Number(cancelled?.itemCount || 0)}</div>
+              </div>
+            </div>
           </div>
 
           <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 3', display: 'grid', gap: 10, overflow: 'hidden' }}>

@@ -5,7 +5,6 @@ export const normalizeMethod = (method) => {
   if (m === 'cash' || m === 'nakit') return 'cash'
   if (m === 'pos' || m === 'card' || m === 'kart' || m === 'kredi_karti' || m === 'credit' || m === 'credit_card' || m === 'other') return 'pos'
   if (m === 'bank' || m === 'transfer' || m === 'eft' || m === 'havale') return 'bank'
-  if (m === 'account' || m === 'veresiye') return 'account'
+  if (m === 'account' || m === 'veresiye' || m === 'credit_account') return 'account'
   return 'pos'
 }
-

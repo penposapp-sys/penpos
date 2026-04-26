@@ -55,6 +55,13 @@ export default function KitchenPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_normal' })
   const { soundEnabled, setSoundEnabled, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('kitchenViewMode') === 'separate' ? 'separate' : 'grouped'
+    } catch {
+      return 'grouped'
+    }
+  })
 
   const load = async () => {
     setError('')
@@ -121,6 +128,12 @@ export default function KitchenPage() {
     } catch {}
   }, [soundEnabled])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('kitchenViewMode', viewMode)
+    } catch {}
+  }, [viewMode])
+
   const soundIcon = useMemo(() => (soundEnabled ? '🔊' : '🔇'), [soundEnabled])
 
   const complete = async (id) => {
@@ -152,8 +165,23 @@ export default function KitchenPage() {
     }
   }
 
-  const openCancelModal = (orderId, itemId) => {
-    setCancelSelection({ orderId, itemId })
+  const itemGroupComplete = async (orderId, itemIds) => {
+    try {
+      await api(`/api/kitchen/orders/${orderId}/items/group-complete`, {
+        method: 'PUT',
+        body: JSON.stringify({ itemIds: Array.isArray(itemIds) ? itemIds : [] })
+      })
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const openCancelModal = (orderId, itemIdOrIds, grouped = false) => {
+    const itemIds = Array.isArray(itemIdOrIds)
+      ? itemIdOrIds.map((id) => String(id || '').trim()).filter(Boolean)
+      : [String(itemIdOrIds || '').trim()].filter(Boolean)
+    setCancelSelection({ orderId, itemIds, grouped: grouped === true })
     setCancelReason('')
     setCancelModalOpen(true)
   }
@@ -161,8 +189,16 @@ export default function KitchenPage() {
   const submitCancel = async (reason) => {
     if (!cancelSelection) return
     try {
-      const { orderId, itemId } = cancelSelection
-      await api(`/api/kitchen/orders/${orderId}/items/${itemId}/cancel`, { method: 'PUT', body: JSON.stringify({ reason }) })
+      const { orderId, itemIds, grouped } = cancelSelection
+      const ids = Array.isArray(itemIds) ? itemIds : []
+      if (grouped) {
+        await api(`/api/kitchen/orders/${orderId}/items/group-cancel`, {
+          method: 'PUT',
+          body: JSON.stringify({ itemIds: ids, reason })
+        })
+      } else if (ids.length === 1) {
+        await api(`/api/kitchen/orders/${orderId}/items/${ids[0]}/cancel`, { method: 'PUT', body: JSON.stringify({ reason }) })
+      }
       await load()
       setCancelModalOpen(false)
     } catch (err) {
@@ -229,6 +265,8 @@ export default function KitchenPage() {
       .filter(c => (Array.isArray(c?.items) ? c.items.length : 0) > 0)
   }, [cards, menuFilters.hiddenSet])
 
+  const effectiveViewMode = viewMode
+
   const filteredOut = false
 
   return (
@@ -236,6 +274,12 @@ export default function KitchenPage() {
       <div className="stickyTop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingBottom: 12 }}>
         <h3 style={{ margin: 0 }}>Mutfağa Gelen Siparişler</h3>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn" onClick={() => setViewMode('grouped')} aria-pressed={effectiveViewMode === 'grouped'}>
+            Toplu
+          </button>
+          <button type="button" className="btn" onClick={() => setViewMode('separate')} aria-pressed={effectiveViewMode === 'separate'}>
+            Ayri
+          </button>
           <button type="button" className="btn" onClick={() => setFilterOpen(true)}>Filtre</button>
           <button
             type="button"
@@ -305,15 +349,54 @@ export default function KitchenPage() {
               )
             })()}
             <div className="kitchenItemsList kitchenOrderItems" style={{ marginTop: 4 }}>
-              {(Array.isArray(o.items) ? o.items : []).map((it, index) => {
+              {(effectiveViewMode === 'grouped'
+                ? Object.values((Array.isArray(o.items) ? o.items : []).reduce((acc, it) => {
+                  const key = [
+                    String(it?.menuItemId || ''),
+                    String(it?.note || ''),
+                    String(it?.status || ''),
+                    String(it?.weightGrams || ''),
+                    String(it?.servingType || '')
+                  ].join('|')
+                  const prev = acc[key]
+                  if (!prev) {
+                    acc[key] = {
+                      ...it,
+                      qty: Math.max(1, Number(it?.qty || 1)),
+                      __rowKey: `group:${key}`,
+                      itemIds: [String(it?._id || '')].filter(Boolean)
+                    }
+                  } else {
+                    prev.qty += Math.max(1, Number(it?.qty || 1))
+                    if (it?._id) prev.itemIds.push(String(it._id))
+                  }
+                  return acc
+                }, {}))
+                : (Array.isArray(o.items) ? o.items : []).flatMap((it, index) => {
+                  const qty = Math.max(1, Number(it?.qty || 1))
+                  if (!!it?.isWeightBased || qty <= 1) {
+                    return [{ ...it, __rowKey: it._id || `${o._id || o.id}-${it.menuItemId}-${index}` }]
+                  }
+                  return Array.from({ length: qty }, (_, unitIndex) => ({
+                    ...it,
+                    qty: 1,
+                    subtotal: Number(it?.priceSnapshot || 0),
+                    __rowKey: `${it._id || `${o._id || o.id}-${it.menuItemId}-${index}`}:u:${unitIndex}`
+                  }))
+                })
+              ).map((it, index) => {
                 const orderServingType = trOrderServingType(o)
                 const itemServingType = ['tray', 'plate', 'package'].includes(String(it?.servingType || '').trim()) ? String(it.servingType).trim() : null
                 const showItemServingType = !!orderServingType && orderServingType !== 'package' && !!itemServingType && itemServingType !== orderServingType
                 const showItemStatus = it?.status && String(it.status).trim() !== 'sent'
                 const itemStatusLabel = showItemStatus ? trKitchenStatusLabel(it.status) : ''
+                const actionItemId = Array.isArray(it?.itemIds) && it.itemIds.length > 0 ? String(it.itemIds[0]) : String(it?._id || '')
+                const actionItemIds = Array.isArray(it?.itemIds) && it.itemIds.length > 0
+                  ? it.itemIds.map((id) => String(id || '').trim()).filter(Boolean)
+                  : [String(it?._id || '').trim()].filter(Boolean)
                 return (
                   <div
-                    key={it._id || `${o._id || o.id}-${it.menuItemId}-${index}`}
+                    key={it.__rowKey || it._id || `${o._id || o.id}-${it.menuItemId}-${index}`}
                     className="kitchenItem"
                   >
                     <div
@@ -339,9 +422,13 @@ export default function KitchenPage() {
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              itemComplete(o.orderId || o.id, it._id)
+                              if (effectiveViewMode === 'grouped') {
+                                itemGroupComplete(o.orderId || o.id, actionItemIds)
+                                return
+                              }
+                              itemComplete(o.orderId || o.id, actionItemId)
                             }}
-                            disabled={it.status !== 'sent'}
+                            disabled={it.status !== 'sent' || (effectiveViewMode === 'grouped' ? actionItemIds.length === 0 : !actionItemId)}
                           >
                             Hazır
                           </button>
@@ -351,9 +438,13 @@ export default function KitchenPage() {
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              openCancelModal(o.orderId || o.id, it._id)
+                              if (effectiveViewMode === 'grouped') {
+                                openCancelModal(o.orderId || o.id, actionItemIds, true)
+                                return
+                              }
+                              openCancelModal(o.orderId || o.id, actionItemId, false)
                             }}
-                            disabled={it.status !== 'sent'}
+                            disabled={it.status !== 'sent' || actionItemIds.length === 0}
                           >
                             İptal
                           </button>

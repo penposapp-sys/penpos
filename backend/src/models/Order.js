@@ -2,7 +2,9 @@ import mongoose from 'mongoose'
 
 const paymentSchema = new mongoose.Schema(
   {
-    method: { type: String, enum: ['cash', 'card', 'transfer', 'other'], default: 'cash' },
+    method: { type: String, default: 'cash' },
+    methodLabel: { type: String, default: '' },
+    methodBucket: { type: String, enum: ['cash', 'card', 'bank', 'account', 'other'], default: 'other' },
     amount: { type: Number, required: true, min: 0 },
     note: { type: String, default: '' }
   },
@@ -21,6 +23,7 @@ const itemSchema = new mongoose.Schema({
   servingType: { type: String, enum: ['tray', 'plate', 'package'], default: 'plate' },
   status: { type: String, enum: ['open', 'sent', 'completed', 'cancelled'], default: 'open' },
   sentAt: { type: Date, default: null },
+  cancelledAt: { type: Date, default: null },
   kitchenBatchId: { type: String, default: null },
   kitchenSentAt: { type: Date, default: null }
 })
