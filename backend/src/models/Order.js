@@ -21,7 +21,7 @@ const itemSchema = new mongoose.Schema({
   weightGrams: { type: Number, default: null, min: 1 },
   note: { type: String, default: '' },
   servingType: { type: String, enum: ['tray', 'plate', 'package'], default: 'plate' },
-  status: { type: String, enum: ['open', 'sent', 'completed', 'cancelled'], default: 'open' },
+  status: { type: String, enum: ['open', 'sent', 'cooking', 'completed', 'cancelled'], default: 'open' },
   sentAt: { type: Date, default: null },
   cancelledAt: { type: Date, default: null },
   kitchenBatchId: { type: String, default: null },

@@ -7,7 +7,7 @@ import MenuItem from '../models/MenuItem.js'
 import KitchenBulkPrepState from '../models/KitchenBulkPrepState.js'
 import mongoose from 'mongoose'
 import { ensureFeature, ensureNotExpired } from '../services/planService.js'
-import { completeItemByItemIdService, cancelItemByItemIdService, completeKitchenBatchByIdService, completeKitchenBatchService, completeKitchenItemGroupService, cancelKitchenItemGroupService, listKitchenOrdersService } from '../services/orderService.js'
+import { completeItemByItemIdService, cancelItemByItemIdService, completeKitchenBatchByIdService, completeKitchenBatchService, completeKitchenItemGroupService, cancelKitchenItemGroupService, listKitchenOrdersService, setItemCookingByItemIdService, setKitchenItemGroupCookingService } from '../services/orderService.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 
 const SIGN = 'kitchen_v4_12h_2026-01-16'
@@ -124,7 +124,7 @@ export const bulkList = async (req, res) => {
       for (const b of batches) {
         const items = Array.isArray(b?.items) ? b.items : []
         for (const it of items) {
-          if (!it || it.status !== 'sent') continue
+          if (!it || !['sent', 'cooking'].includes(String(it.status || ''))) continue
           const orderId = String(o?.id || '')
           const itemId = String(it?._id || '')
           if (!orderId || !itemId) continue
@@ -138,6 +138,7 @@ export const bulkList = async (req, res) => {
             menuItemId: String(it?.menuItemId || ''),
             name: String(it?.nameSnapshot || ''),
             note: String(it?.note || ''),
+            status: String(it?.status || 'sent'),
             tableName: displayName,
             isWeightBased: !!it?.isWeightBased,
             weightGrams: Number(it?.weightGrams || 0) || 0,
@@ -160,12 +161,13 @@ export const bulkList = async (req, res) => {
 
     const byMenuItemId = new Map()
     for (const r of rows) {
-      const key = `${String(r.menuItemId || '')}|${String(r.weightGrams || '')}`
+      const key = `${String(r.menuItemId || '')}|${String(r.weightGrams || '')}|${String(r.status || 'sent')}`
       if (!key) continue
       const entry = byMenuItemId.get(key) || {
         menuItemId: String(r.menuItemId || ''),
         name: String(r.name || ''),
         categoryId: categoryIdByMenuItemId.get(String(r.menuItemId || '')) || '',
+        status: String(r.status || 'sent'),
         isWeightBased: !!r.isWeightBased,
         weightGrams: Number(r.weightGrams || 0) || 0,
         totalQty: 0,
@@ -311,6 +313,21 @@ export const itemComplete = async (req, res) => {
   }
 }
 
+export const itemCooking = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'kitchen')
+    const { id, itemId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      throw error('invalid_request', 'Invalid order or item id', 400)
+    }
+    const { order } = await setItemCookingByItemIdService(req.user.tenantId, id, itemId)
+    res.json({ order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const itemCancel = async (req, res) => {
   try {
     await ensureNotExpired(req.user.tenantId, req.user.id)
@@ -341,6 +358,22 @@ export const itemGroupComplete = async (req, res) => {
       throw error('invalid_request', 'Invalid order id', 400)
     }
     const { order } = await completeKitchenItemGroupService(req.user.tenantId, id, itemIds)
+    res.json({ order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const itemGroupCooking = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'kitchen')
+    const { id } = req.params
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : []
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw error('invalid_request', 'Invalid order id', 400)
+    }
+    const { order } = await setKitchenItemGroupCookingService(req.user.tenantId, id, itemIds)
     res.json({ order })
   } catch (err) {
     sendError(res, err)

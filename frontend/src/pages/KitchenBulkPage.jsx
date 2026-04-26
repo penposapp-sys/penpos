@@ -101,6 +101,21 @@ export default function KitchenBulkPage() {
     }
   }
 
+  const setRowCooking = async (rowKey) => {
+    const key = String(rowKey || '')
+    if (!key) return
+    const [orderId, itemId] = key.split(':')
+    if (!orderId || !itemId) return
+    try {
+      await api(`/api/kitchen/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/cooking`, {
+        method: 'PUT'
+      })
+      await load()
+    } catch (err) {
+      setError(err?.message || 'Islem basarisiz')
+    }
+  }
+
   const visibleItems = useMemo(() => {
     const list = Array.isArray(items) ? items : []
     const hidden = menuFilters.hiddenSet
@@ -112,6 +127,97 @@ export default function KitchenBulkPage() {
   }, [items, menuFilters.hiddenSet])
 
   const totalCards = useMemo(() => (Array.isArray(visibleItems) ? visibleItems.length : 0), [visibleItems])
+  const waitingItems = useMemo(() => visibleItems.filter((card) => String(card?.status || '') === 'sent'), [visibleItems])
+  const stoveItems = useMemo(() => visibleItems.filter((card) => String(card?.status || '') === 'cooking'), [visibleItems])
+
+  const renderBulkCards = (list, actionMode) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+      {(Array.isArray(list) ? list : []).map(card => {
+        const rows = Array.isArray(card?.rows) ? card.rows : []
+        const isWeightBased = !!card?.isWeightBased
+        const cardWeightGrams = Number(card?.weightGrams || 0) || 0
+        return (
+          <div key={`${String(card?.menuItemId || '')}|${String(cardWeightGrams || '')}|${String(card?.status || '')}`} className="card" style={{ padding: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.25 }}>
+              <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(card?.name || '-')}</div>
+              <div style={{ whiteSpace: 'nowrap' }}>
+                {isWeightBased ? `${cardWeightGrams} gr` : `x${Math.max(0, Number(card?.totalQty || 0))}`}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              {rows.map(r => {
+                const rowKey = String(r?.rowKey || '')
+                const tableName = String(r?.tableName || '')
+                const qty = Math.max(1, Number(r?.qty || 1))
+                const rowIsWeightBased = !!r?.isWeightBased
+                const weightGrams = Number(r?.weightGrams || 0) || 0
+                const createdAt = r?.createdAt || null
+                return (
+                  <div
+                    key={rowKey}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      alignItems: 'center',
+                      gap: 10,
+                      border: '1px solid var(--border)',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      background: actionMode === 'cooking' ? '#dbeafe' : '#fff'
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ marginBottom: 4 }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>
+                          {tableName || 'Siparis'}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {rowIsWeightBased ? <span>{weightGrams} gr</span> : null}
+                        {createdAt ? <span>Saat: {new Date(createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span> : null}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: 52,
+                          padding: '3px 10px',
+                          borderRadius: 999,
+                          background: '#eef2ff',
+                          color: '#1d4ed8',
+                          fontWeight: 800,
+                          fontSize: 14
+                        }}
+                      >
+                        x{qty}
+                      </span>
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => {
+                          if (actionMode === 'waiting') {
+                            setRowCooking(rowKey)
+                            return
+                          }
+                          doneRow(rowKey, { tableName, qty, weightGrams, createdAt })
+                        }}
+                      >
+                        {actionMode === 'waiting' ? 'OCAKTA' : 'HAZIRLA'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className="main">
@@ -142,85 +248,15 @@ export default function KitchenBulkPage() {
 
       {error && <div className="card" style={{ borderColor: '#ef4444', color: '#ef4444', marginBottom: 12 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-        {visibleItems.map(card => {
-          const rows = Array.isArray(card?.rows) ? card.rows : []
-          const isWeightBased = !!card?.isWeightBased
-          const cardWeightGrams = Number(card?.weightGrams || 0) || 0
-          return (
-            <div key={`${String(card?.menuItemId || '')}|${String(cardWeightGrams || '')}`} className="card" style={{ padding: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.25 }}>
-                <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(card?.name || '-')}</div>
-                <div style={{ whiteSpace: 'nowrap' }}>
-                  {isWeightBased ? `${cardWeightGrams} gr` : `x${Math.max(0, Number(card?.totalQty || 0))}`}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gap: 8 }}>
-                {rows.map(r => {
-                  const rowKey = String(r?.rowKey || '')
-                  const tableName = String(r?.tableName || '')
-                  const qty = Math.max(1, Number(r?.qty || 1))
-                  const isWeightBased = !!r?.isWeightBased
-                  const weightGrams = Number(r?.weightGrams || 0) || 0
-                  const createdAt = r?.createdAt || null
-                  return (
-                    <div
-                      key={rowKey}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto',
-                        alignItems: 'center',
-                        gap: 10,
-                        border: '1px solid var(--border)',
-                        borderRadius: 10,
-                        padding: '10px 12px',
-                        background: '#fff'
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ marginBottom: 4 }}>
-                          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>
-                            {tableName || 'Sipari\u015f'}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {isWeightBased ? <span>{weightGrams} gr</span> : null}
-                          {createdAt ? <span>Saat: {new Date(createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span> : null}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            minWidth: 52,
-                            padding: '3px 10px',
-                            borderRadius: 999,
-                            background: '#eef2ff',
-                            color: '#1d4ed8',
-                            fontWeight: 800,
-                            fontSize: 14
-                          }}
-                        >
-                          x{qty}
-                        </span>
-                        <button
-                          className="btn"
-                          type="button"
-                          onClick={() => doneRow(rowKey, { tableName, qty, weightGrams, createdAt })}
-                        >
-                          HAZIRLA
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div className="card" style={{ fontWeight: 800 }}>Ocaga Atilmamis Urunler</div>
+          {renderBulkCards(waitingItems, 'waiting')}
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div className="card" style={{ fontWeight: 800 }}>Ocaktaki Urunler</div>
+          {renderBulkCards(stoveItems, 'cooking')}
+        </div>
       </div>
 
       <MenuItemFilterDrawer

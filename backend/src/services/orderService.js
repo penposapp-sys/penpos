@@ -98,33 +98,55 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
   if (!order || safeItems.length === 0) return
 
   const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
-  const { createJob } = await import('./printingService.js')
+  const { createJob, resolveActiveStationForJob, resolveStationPrinterConfig } = await import('./printingService.js')
 
   const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
   if (!labelProfile || labelProfile.isActive === false) return
-
   const options = labelProfile?.options && typeof labelProfile.options === 'object' ? labelProfile.options : {}
   const autoPrintOnOrder = options.autoPrintOnOrder === true
   const printOnReady = options.printOnReady === true
 
-  if (mode === 'order_send' && !autoPrintOnOrder) return
-  if (mode === 'item_ready' && !printOnReady) return
+  if (mode === 'order_send' && !autoPrintOnOrder) {
+    const activeStation = await resolveActiveStationForJob({ tenantId, system: 'kermes', jobType: 'label', jobMeta: { triggerMode: 'order_send' } })
+    const hasStationLabelRule = Array.isArray(activeStation?.printers) && activeStation.printers.some((entry) => entry?.printerType === 'label' && entry?.isActive !== false && entry?.autoPrintOnOrder === true)
+    if (!hasStationLabelRule) return
+  }
+  if (mode === 'item_ready' && !printOnReady) {
+    const activeStation = await resolveActiveStationForJob({ tenantId, system: 'kermes', jobType: 'label', jobMeta: { triggerMode: 'item_ready' } })
+    const hasStationLabelRule = Array.isArray(activeStation?.printers) && activeStation.printers.some((entry) => entry?.printerType === 'label' && entry?.isActive !== false && entry?.printOnReady === true)
+    if (!hasStationLabelRule) return
+  }
 
   const menuItemIds = safeItems
     .map((it) => String(it?.menuItemId || '').trim())
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
 
   const labelEnabledDocs = menuItemIds.length > 0
-    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds }, printLabelEnabled: true }).select('_id').lean()
+    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds }, printLabelEnabled: true }).select('_id categoryId').lean()
     : []
 
-  const labelEnabledSet = new Set((labelEnabledDocs || []).map((doc) => String(doc?._id || '')))
-  const labelItems = safeItems.filter((it) => labelEnabledSet.has(String(it?.menuItemId || '')))
+  const labelEnabledMap = new Map((labelEnabledDocs || []).map((doc) => [String(doc?._id || ''), String(doc?.categoryId || '')]))
+  const labelItems = safeItems.filter((it) => labelEnabledMap.has(String(it?.menuItemId || '')))
   if (labelItems.length === 0) return
 
   const top = await buildLabelTopLine(order)
-
   for (const it of labelItems) {
+    const categoryId = labelEnabledMap.get(String(it?.menuItemId || '')) || ''
+    const activeStation = await resolveActiveStationForJob({
+      tenantId,
+      system: 'kermes',
+      jobType: 'label',
+      jobMeta: { categoryId, triggerMode: mode }
+    })
+    const stationPrinter = activeStation
+      ? resolveStationPrinterConfig({
+          station: activeStation,
+          jobType: 'label',
+          jobMeta: { categoryId },
+          triggerMode: mode
+        })
+      : null
+    if (activeStation && !stationPrinter) continue
     const name = String(it?.nameSnapshot || '').trim() || '-'
     const qty = Math.max(1, Number(it?.qty || 1))
     const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
@@ -142,6 +164,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
         tableId: order.tableId ? String(order.tableId) : null,
         kitchenBatchId: batchId ? String(batchId) : (it?.kitchenBatchId ? String(it.kitchenBatchId) : null),
         menuItemId: it?.menuItemId ? String(it.menuItemId) : null,
+        categoryId: categoryId || null,
         itemId: it?._id ? String(it._id) : null,
         qty,
         triggerMode: mode
@@ -764,10 +787,10 @@ export const completeItemByItemIdService = async (tenantId, id, itemId) => {
     e.payload = { code: 'item_already_completed', message: 'Item already completed' }
     throw e
   }
-  if (it.status !== 'sent') {
-    const e = new Error('Item not sent')
+  if (!['sent', 'cooking'].includes(it.status)) {
+    const e = new Error('Item not in sent/cooking state')
     e.status = 400
-    e.payload = { code: 'invalid_state', message: 'Item not sent', details: { currentStatus: it.status, allowed: ['sent'] } }
+    e.payload = { code: 'invalid_state', message: 'Item not in sent/cooking state', details: { currentStatus: it.status, allowed: ['sent', 'cooking'] } }
     throw e
   }
 
@@ -827,7 +850,7 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
   for (const itemId of ids) {
     const it = order.items.id(itemId)
     if (!it) continue
-    if (it.status !== 'sent') continue
+    if (!['sent', 'cooking'].includes(it.status)) continue
     it.status = 'completed'
     if (!it.sentAt) it.sentAt = order.createdAt || now
     if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
@@ -835,7 +858,7 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
   }
 
   if (readyItems.length === 0) {
-    throw error('invalid_state', 'No sent items found for completion', 400)
+    throw error('invalid_state', 'No sent/cooking items found for completion', 400)
   }
 
   normalizeLegacyItemStatuses(order)
@@ -923,10 +946,10 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user 
       e.payload = { error: 'item_already_cancelled', message: 'Item already cancelled' }
       throw e
     }
-    if (!['sent', 'completed'].includes(item.status)) {
+    if (!['sent', 'cooking', 'completed'].includes(item.status)) {
       const e = new Error('Item not in cancellable status')
       e.status = 400
-      e.payload = { error: 'invalid_state', message: 'Item not sent or completed', details: { currentStatus: item.status, allowed: ['sent', 'completed'] } }
+      e.payload = { error: 'invalid_state', message: 'Item not sent/cooking/completed', details: { currentStatus: item.status, allowed: ['sent', 'cooking', 'completed'] } }
       throw e
     }
     const cancelAt = new Date()
@@ -989,7 +1012,7 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
   for (const itemId of ids) {
     const item = order.items.id(itemId)
     if (!item) continue
-    if (!['sent', 'completed'].includes(item.status)) continue
+    if (!['sent', 'cooking', 'completed'].includes(item.status)) continue
     item.status = 'cancelled'
     item.cancelledAt = cancelAt
     if (reason) item.note = reason
@@ -1018,6 +1041,51 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
   await order.save()
   const freshOrder = await Order.findById(order.id).lean()
   return { order: decorateOrder(freshOrder) }
+}
+
+export const setItemCookingByItemIdService = async (tenantId, id, itemId) => {
+  const order = await findByIdAndTenant(id, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+
+  const it = order.items.id(itemId)
+  if (!it) throw error('not_found', 'Item not found', 404)
+  if (it.status === 'cancelled') throw error('invalid_state', 'Item cancelled', 409)
+  if (it.status === 'completed') throw error('invalid_state', 'Item completed', 409)
+  if (it.status !== 'sent') {
+    throw error('invalid_state', 'Item not sent', 400)
+  }
+
+  it.status = 'cooking'
+  normalizeLegacyItemStatuses(order)
+  await order.save()
+
+  const fresh = await Order.findById(order.id).lean()
+  return { order: decorateOrder(fresh) }
+}
+
+export const setKitchenItemGroupCookingService = async (tenantId, orderId, itemIds = []) => {
+  const order = await findByIdAndTenant(orderId, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+
+  const ids = normalizeKitchenItemIds(itemIds)
+  if (ids.length === 0) throw error('invalid_request', 'Invalid item ids', 400)
+
+  let changed = 0
+  for (const itemId of ids) {
+    const it = order.items.id(itemId)
+    if (!it) continue
+    if (!['sent', 'cooking'].includes(it.status)) continue
+    it.status = 'cooking'
+    changed += 1
+  }
+
+  if (changed === 0) throw error('invalid_state', 'No sent items found for cooking', 400)
+
+  normalizeLegacyItemStatuses(order)
+  await order.save()
+
+  const fresh = await Order.findById(order.id).lean()
+  return { order: decorateOrder(fresh) }
 }
 
 export const removeItemService = async (tenantId, id, menuItemId) => {
@@ -2120,7 +2188,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
 
   let filter = {
     ...base,
-    items: { $elemMatch: { status: 'sent' } }
+    items: { $elemMatch: { status: { $in: ['sent', 'cooking'] } } }
   }
   filter = applyBranchFilter(filter, branchIds.length > 0 ? branchIds : (branchId ? [branchId] : []))
 
@@ -2151,10 +2219,10 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
       const batchMetaMap = new Map(batchMeta.map(b => [String(b?.batchId || ''), { servingType: b?.servingType ?? null, sentAt: b?.sentAt ?? null }]))
       for (const it of rawItems) {
         if (!it) continue
-        if (it.status === 'sent' && !it.sentAt) {
+        if ((it.status === 'sent' || it.status === 'cooking') && !it.sentAt) {
           it.sentAt = baseCreatedAt
         }
-        if (it.status === 'sent' && !it.kitchenSentAt) {
+        if ((it.status === 'sent' || it.status === 'cooking') && !it.kitchenSentAt) {
           it.kitchenSentAt = it.sentAt || baseCreatedAt
         }
       }
@@ -2162,7 +2230,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
       const byBatch = new Map()
       for (const it of rawItems) {
         if (!it) continue
-        if (it.status !== 'sent' && it.status !== 'completed' && it.status !== 'cancelled') continue
+        if (it.status !== 'sent' && it.status !== 'cooking' && it.status !== 'completed' && it.status !== 'cancelled') continue
         const rawBatchId = it.kitchenBatchId ? String(it.kitchenBatchId) : ''
         const key = rawBatchId || '__legacy__'
         const meta = rawBatchId ? batchMetaMap.get(rawBatchId) : null
@@ -2178,7 +2246,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
           hasActiveItems: false
         }
         entry.items.push(it)
-        if (it.status === 'sent') entry.hasActiveItems = true
+        if (it.status === 'sent' || it.status === 'cooking') entry.hasActiveItems = true
         const itSentAt = it.kitchenSentAt || it.sentAt || baseCreatedAt
         if (!entry.batchSentAt || new Date(itSentAt).getTime() < new Date(entry.batchSentAt).getTime()) {
           entry.batchSentAt = itSentAt
@@ -2228,7 +2296,7 @@ export const completeKitchenBatchByIdService = async (tenantId, orderId, batchId
   const now = new Date()
   for (const it of items) {
     if (!it) continue
-    if (it.status !== 'sent') continue
+    if (!['sent', 'cooking'].includes(it.status)) continue
     if (String(it.kitchenBatchId || '') !== target) continue
     it.status = 'completed'
     if (!it.sentAt) it.sentAt = order.createdAt || now

@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import AutoPrintInfoCard from '../components/printing/AutoPrintInfoCard.jsx'
-import LabelPrinterSettingsCard from '../components/printing/LabelPrinterSettingsCard.jsx'
-import ReceiptPrinterSettingsCard from '../components/printing/ReceiptPrinterSettingsCard.jsx'
 import PrintStationsCard from '../components/printing/PrintStationsCard.jsx'
 import PrintJobsCard from '../components/printing/PrintJobsCard.jsx'
 
@@ -24,6 +22,7 @@ export default function PrintingSettingsPage({ system }) {
   const [profiles, setProfiles] = useState([])
   const [stations, setStations] = useState([])
   const [jobs, setJobs] = useState([])
+  const [menuCategories, setMenuCategories] = useState([])
 
   const [pcPrinterDownloadUrl, setPcPrinterDownloadUrl] = useState('')
 
@@ -77,18 +76,20 @@ export default function PrintingSettingsPage({ system }) {
     setBusy(true)
     try {
       const qs = `?system=${encodeURIComponent(sys)}`
-      const [p1, p2, p3, p4, p5] = await Promise.all([
+      const [p1, p2, p3, p4, p5, p6] = await Promise.all([
         api(`/api/printing/printers${qs}`, { silent: true }),
         api(`/api/printing/profiles${qs}`, { silent: true }),
         api(`/api/printing/stations${qs}`, { silent: true }),
         api(`/api/printing/jobs${qs}&limit=50`, { silent: true }),
-        api('/api/settings/printers', { silent: true, skipBranchHeader: true })
+        api('/api/settings/printers', { silent: true, skipBranchHeader: true }),
+        api('/api/settings/menu/active-items', { silent: true })
       ])
       setPrinters(Array.isArray(p1?.printers) ? p1.printers : [])
       setProfiles(Array.isArray(p2?.profiles) ? p2.profiles : [])
       setStations(Array.isArray(p3?.stations) ? p3.stations : [])
       setJobs(Array.isArray(p4?.jobs) ? p4.jobs : [])
       setPcPrinterDownloadUrl(String(p5?.printAgent?.pcPrinter?.downloadUrl || '').trim())
+      setMenuCategories(Array.isArray(p6?.categories) ? p6.categories.map((c) => ({ id: String(c?._id || c?.id || ''), name: String(c?.name || '') })).filter((c) => c.id && c.name) : [])
     } finally {
       setBusy(false)
     }
@@ -106,7 +107,7 @@ export default function PrintingSettingsPage({ system }) {
       return
     }
     if (!activeStation?.id) {
-      setAgentHint('Aktif Print Station seçin (aynı anda sadece 1 istasyon aktif olabilir).')
+      setAgentHint('En az 1 aktif Print Station seçin.')
       setAgentPrinters([])
       return
     }
@@ -310,7 +311,14 @@ export default function PrintingSettingsPage({ system }) {
   }
 
   const createStation = async () => {
-    const name = String(window.prompt('İstasyon adı', 'Print Station') || '').trim()
+    const existingNames = new Set((stations || []).map((s) => String(s?.name || '').trim().toLowerCase()).filter(Boolean))
+    let suggestedName = 'Print Station'
+    let nextIndex = 2
+    while (existingNames.has(suggestedName.trim().toLowerCase())) {
+      suggestedName = `Print Station ${nextIndex}`
+      nextIndex += 1
+    }
+    const name = String(window.prompt('İstasyon adı', suggestedName) || '').trim()
     if (!name) return
     setBusy(true)
     try {
@@ -321,6 +329,10 @@ export default function PrintingSettingsPage({ system }) {
       await loadAll()
       return { stationId: String(res.station.id), secret }
     } catch (e) {
+      if (String(e?.code || e?.error || '') === 'duplicate_station_name') {
+        toast.error('Bu istasyon adı zaten kayıtlı')
+        return
+      }
       toast.error(e?.message || 'İstasyon eklenemedi')
     } finally {
       setBusy(false)
@@ -354,6 +366,26 @@ export default function PrintingSettingsPage({ system }) {
       await loadAll()
     } catch (e) {
       toast.error(e?.message || 'İptal başarısız')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveStationPrinters = async (stationId, printers) => {
+    const id = String(stationId || '').trim()
+    if (!id) return
+    setBusy(true)
+    try {
+      const res = await api(`/api/printing/stations/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        data: { system: sys, printers: Array.isArray(printers) ? printers : [] },
+        silent: true
+      })
+      if (!res?.station?.id) throw new Error(res?.message || 'İstasyon yazıcıları kaydedilemedi')
+      toast.success('İstasyon yazıcıları kaydedildi')
+      await loadAll()
+    } catch (e) {
+      toast.error(e?.message || 'İstasyon yazıcıları kaydedilemedi')
     } finally {
       setBusy(false)
     }
@@ -397,46 +429,16 @@ export default function PrintingSettingsPage({ system }) {
         hint={agentHint}
       />
 
-      <LabelPrinterSettingsCard
-        busy={busy}
-        agentOnline={agentOnline}
-        agentPrinters={agentPrinters}
-        printerName={labelPrinterName}
-        setPrinterName={setLabelPrinterName}
-        widthMm={labelW}
-        setWidthMm={setLabelW}
-        heightMm={labelH}
-        setHeightMm={setLabelH}
-        autoPrintOnOrder={labelAutoPrintOnOrder}
-        setAutoPrintOnOrder={setLabelAutoPrintOnOrder}
-        printOnReady={labelPrintOnReady}
-        setPrintOnReady={setLabelPrintOnReady}
-        active={labelActive}
-        setActive={setLabelActive}
-        onSave={saveLabel}
-        onTest={testLabel}
-      />
-
-      <ReceiptPrinterSettingsCard
-        busy={busy}
-        agentOnline={agentOnline}
-        agentPrinters={agentPrinters}
-        printerName={receiptPrinterName}
-        setPrinterName={setReceiptPrinterName}
-        widthMm={receiptWidth}
-        setWidthMm={setReceiptWidth}
-        active={receiptActive}
-        setActive={setReceiptActive}
-        onSave={saveReceipt}
-        onTest={testReceipt}
-      />
-
       <PrintStationsCard
         busy={busy}
         system={sys}
         stations={stations}
+        activeStationId={activeStation?.id || ''}
+        agentPrinters={agentPrinters}
+        categories={menuCategories}
         onCreate={createStation}
         onActivate={setActiveStation}
+        onSavePrinters={saveStationPrinters}
         onReload={loadAll}
       />
 

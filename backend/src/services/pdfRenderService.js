@@ -446,9 +446,10 @@ export const renderReceiptPdfBase64 = async ({
   return Buffer.concat(chunks).toString('base64')
 }
 
-export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountText, widthMm, heightMm } = {}) => {
+export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountText, noteText, widthMm, heightMm } = {}) => {
   const top = safeText(topText)
   const product = safeText(productText)
+  const note = safeText(noteText)
   const q = Math.max(1, Number(qty || 1))
   const amount = safeText(amountText) || `${q} ADET`
   const rawW = Math.max(20, Number(widthMm || 50))
@@ -475,21 +476,28 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   const qtyText = amount
   const blockGap = Math.max(mmToPt(1.5), contentHeight * 0.06)
   const topBlockHeight = top ? Math.max(mmToPt(6), contentHeight * 0.2) : 0
+  const noteBlockHeight = note ? Math.max(mmToPt(5), contentHeight * 0.18) : 0
   const qtyBlockHeight = Math.max(mmToPt(6), contentHeight * 0.18)
-  const productBlockHeight = Math.max(mmToPt(12), contentHeight - topBlockHeight - qtyBlockHeight - (top ? blockGap * 2 : blockGap))
+  const totalGapCount = (top ? 1 : 0) + 1 + (note ? 1 : 0)
+  const productBlockHeight = Math.max(mmToPt(12), contentHeight - topBlockHeight - noteBlockHeight - qtyBlockHeight - (blockGap * totalGapCount))
   const leftX = doc.page.margins.left
 
   const topFitSize = top
     ? fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: 8, max: Math.min(18, h * 0.34), maxLines: 2 })
     : Math.min(18, h * 0.34)
   const productFitSize = fitFontSizeWithLineLimit(doc, product || '-', contentWidth, productBlockHeight, { min: 9, max: Math.min(21, h * 0.4), maxLines: 2 })
+  const noteFitSize = note
+    ? fitFontSizeWithLineLimit(doc, note, contentWidth, noteBlockHeight, { min: 7, max: Math.min(14, h * 0.26), maxLines: 2 })
+    : Math.min(14, h * 0.26)
   const qtyFitSize = fitFontSizeWithLineLimit(doc, qtyText, contentWidth, qtyBlockHeight, { min: 8, max: Math.min(17, h * 0.32), maxLines: 1 })
   const sharedSize = Math.max(8, Math.min(topFitSize, productFitSize, qtyFitSize))
+  const noteSize = note ? Math.max(7, Math.min(noteFitSize, sharedSize - 1)) : 0
 
   const topHeight = top ? doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(top, { width: contentWidth, align: 'center' }) : 0
   const productHeightUsed = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(product || '-', { width: contentWidth, align: 'center' })
+  const noteHeight = note ? doc.font('Helvetica').fontSize(noteSize).heightOfString(note, { width: contentWidth, align: 'center' }) : 0
   const qtyHeight = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(qtyText, { width: contentWidth, align: 'center', lineBreak: false })
-  const totalUsedHeight = topHeight + productHeightUsed + qtyHeight + (top ? blockGap * 2 : blockGap)
+  const totalUsedHeight = topHeight + productHeightUsed + noteHeight + qtyHeight + (blockGap * totalGapCount)
 
   let y = doc.page.margins.top + Math.max(0, (contentHeight - totalUsedHeight) / 2)
 
@@ -504,6 +512,13 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   doc.fontSize(sharedSize)
   textMediumAt(doc, product || '-', leftX, y, { width: contentWidth, align: 'center' })
   y += productHeightUsed + blockGap
+
+  if (note) {
+    useFont(doc, 'tr')
+    doc.fontSize(noteSize)
+    textMediumAt(doc, note, leftX, y, { width: contentWidth, align: 'center' })
+    y += noteHeight + blockGap
+  }
 
   useFont(doc, 'trBold')
   doc.fontSize(sharedSize)

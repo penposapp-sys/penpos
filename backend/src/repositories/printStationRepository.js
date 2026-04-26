@@ -6,16 +6,19 @@ export const listByTenantAndSystem = (tenantId, system) =>
 export const findByIdAndScope = (id, tenantId, system) =>
   PrintStation.findOne({ _id: id, tenantId, system })
 
+export const findByNameAndScope = (name, tenantId, system) =>
+  PrintStation.findOne({ name, tenantId, system })
+
 export const findActiveByTenantAndSystem = (tenantId, system) =>
   PrintStation.findOne({ tenantId, system, isActive: true })
+
+export const listActiveByTenantAndSystem = (tenantId, system) =>
+  PrintStation.find({ tenantId, system, isActive: true }).sort({ updatedAt: -1, createdAt: -1 })
 
 export const create = (data) => PrintStation.create(data)
 
 export const updateByIdAndScope = (id, tenantId, system, update) =>
   PrintStation.findOneAndUpdate({ _id: id, tenantId, system }, update, { new: true })
-
-export const deactivateOthers = (tenantId, system, activeId) =>
-  PrintStation.updateMany({ tenantId, system, _id: { $ne: activeId } }, { $set: { isActive: false } })
 
 export const deleteByIdAndScope = (id, tenantId, system) =>
   PrintStation.deleteOne({ _id: id, tenantId, system })

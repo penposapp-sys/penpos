@@ -6,7 +6,6 @@ import { signToken } from '../utils/jwt.js'
 import * as printingService from '../services/printingService.js'
 import * as stationRepo from '../repositories/printStationRepository.js'
 import * as jobRepo from '../repositories/printJobRepository.js'
-import * as printerRepo from '../repositories/printPrinterRepository.js'
 import * as logger from '../utils/logger.js'
 import Order from '../models/Order.js'
 import Table from '../models/Table.js'
@@ -51,43 +50,49 @@ const logicalPrinterNameByType = (typeOrCode) => {
   return ''
 }
 
-const resolveJobPrinter = async ({ tenantId, system, profileId, type }) => {
+const resolveJobPrinter = async ({ tenantId, system, station, profileId, type, jobMeta }) => {
   const profile = mongoose.isValidObjectId(String(profileId || ''))
     ? await PrintProfile.findOne({ _id: profileId, tenantId, system }).select('printerId options code').lean()
     : null
   if (!profile) return { profile: null, printer: null }
 
+  const stationPrinter = printingService.resolveStationPrinterConfig({
+    station,
+    jobType: type,
+    jobMeta,
+    triggerMode: String(jobMeta?.triggerMode || '')
+  })
+  if (stationPrinter) {
+    return { profile, printer: { windowsPrinterName: stationPrinter.windowsPrinterName, isActive: stationPrinter.isActive !== false }, stationPrinter }
+  }
+
   let printer = null
   const printerId = String(profile?.printerId || '').trim()
   if (printerId && mongoose.isValidObjectId(printerId)) {
-    printer = await printerRepo.findByIdAndScope(printerId, tenantId, system)
+    const pr = await (await import('../repositories/printPrinterRepository.js')).findByIdAndScope(printerId, tenantId, system)
+    if (pr) printer = pr
   }
-  if (printer) return { profile, printer }
+  if (printer) return { profile, printer, stationPrinter: null }
 
-  const logicalName = logicalPrinterNameByType(type || profile?.code)
-  if (!logicalName) return { profile, printer: null }
-  const fallbackPrinter = await printerRepo.findByNameAndScope(logicalName, tenantId, system)
-  if (!fallbackPrinter) return { profile, printer: null }
-
-  const repairedProfile = await PrintProfile.findOneAndUpdate(
-    { _id: profileId, tenantId, system },
-    { $set: { printerId: fallbackPrinter._id } },
-    { new: true }
-  ).select('printerId options code').lean()
-
-  return { profile: repairedProfile || profile, printer: fallbackPrinter }
+  return { profile, printer: null, stationPrinter: null }
 }
 
-const getJobPdfBase64 = async ({ job, tenantId, system }) => {
+const getJobPdfBase64 = async ({ job, tenantId, system, station }) => {
   const type = String(job?.type || '')
   const profileId = String(job?.profileId || '').trim()
   const profile = mongoose.isValidObjectId(profileId)
     ? await PrintProfile.findOne({ _id: profileId, tenantId, system }).select('options').lean()
     : null
   const profileOptions = profile?.options && typeof profile.options === 'object' ? profile.options : {}
-  const labelWidthMm = Math.max(20, Number(profileOptions.widthMm || 50))
-  const labelHeightMm = Math.max(20, Number(profileOptions.heightMm || 30))
-  const receiptWidthMm = Math.max(58, Number(profileOptions.widthMm || 80))
+  const stationPrinter = printingService.resolveStationPrinterConfig({
+    station,
+    jobType: type,
+    jobMeta: job?.meta || {},
+    triggerMode: String(job?.meta?.triggerMode || '')
+  })
+  const labelWidthMm = Math.max(20, Number(stationPrinter?.widthMm || profileOptions.widthMm || 50))
+  const labelHeightMm = Math.max(20, Number(stationPrinter?.heightMm || profileOptions.heightMm || 30))
+  const receiptWidthMm = Math.max(58, Number(stationPrinter?.receiptWidthMm || profileOptions.widthMm || 80))
 
   if (String(job?.payload?.type || '') === 'pdf_base64') {
     return String(job?.payload?.content || '')
@@ -131,8 +136,9 @@ const getJobPdfBase64 = async ({ job, tenantId, system }) => {
     const productLine = String(lines[1] || '')
     const productText = productLine.replace(/\s+x\d+\s*$/i, '').trim() || productLine
     const amountText = String(lines[2] || '')
+    const noteText = String(lines[3] || '')
     const qty = Number(job?.meta?.qty || 1)
-    return await renderLabelPdfBase64({ topText, productText, qty, amountText, widthMm: labelWidthMm, heightMm: labelHeightMm })
+    return await renderLabelPdfBase64({ topText, productText, qty, amountText, noteText, widthMm: labelWidthMm, heightMm: labelHeightMm })
   }
 
   const payloadText = String(job?.payload?.content || '')
@@ -209,13 +215,16 @@ export const claimNext = async (req, res) => {
 
     const filePath = `/api/printing/jobs/${encodeURIComponent(jobId)}/file?stationId=${encodeURIComponent(stationId)}`
     const fileUrl = buildAbsoluteUrl(req, filePath)
-    const { profile, printer } = await resolveJobPrinter({
+    const station = await PrintStation.findById(stationId).select('printers').lean()
+    const { profile, printer, stationPrinter } = await resolveJobPrinter({
       tenantId: scope.tenantId,
       system: scope.system,
+      station,
       profileId: job.profileId,
-      type: job.type
+      type: job.type,
+      jobMeta: job?.meta || {}
     })
-    const copies = Math.max(1, Math.min(10, Number(job?.meta?.copies || 1)))
+    const copies = Math.max(1, Math.min(10, Number(stationPrinter?.copies || job?.meta?.copies || 1)))
     const printerName = String(printer?.windowsPrinterName || '').trim()
     logger.info(`[PRINTING_CLAIM] station=${stationId} job=${jobId}`)
     res.json({
@@ -230,7 +239,14 @@ export const claimNext = async (req, res) => {
         printSettings: {
           printerName,
           copies,
-          options: profile?.options && typeof profile.options === 'object' ? profile.options : {}
+          options: {
+            ...(profile?.options && typeof profile.options === 'object' ? profile.options : {}),
+            ...(stationPrinter ? {
+              widthMm: stationPrinter.widthMm || undefined,
+              heightMm: stationPrinter.heightMm || undefined,
+              receiptWidthMm: stationPrinter.receiptWidthMm || undefined
+            } : {})
+          }
         }
       }
     })
@@ -253,7 +269,8 @@ export const downloadJobFile = async (req, res) => {
     const scope = await getStationScope(stationId)
     if (!scope?.tenantId) throw error('not_found', 'İstasyon bulunamadı', 404)
 
-    const b64 = await getJobPdfBase64({ job, tenantId: scope.tenantId, system: scope.system })
+    const station = await PrintStation.findById(stationId).select('printers').lean()
+    const b64 = await getJobPdfBase64({ job, tenantId: scope.tenantId, system: scope.system, station })
     const buf = Buffer.from(String(b64 || ''), 'base64')
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Cache-Control', 'no-store')

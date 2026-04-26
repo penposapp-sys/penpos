@@ -19,6 +19,108 @@ const logicalPrinterNameByType = (typeOrCode) => {
   return ''
 }
 
+const toPositiveNumberOrNull = (value, fallback = null) => {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+const normalizeStationPrinters = (value) => {
+  const src = Array.isArray(value) ? value : []
+  const out = []
+  for (const entry of src) {
+    if (!entry || typeof entry !== 'object') continue
+    const name = String(entry.name || '').trim()
+    const printerType = String(entry.printerType || '').trim().toLowerCase()
+    const windowsPrinterName = String(entry.windowsPrinterName || '').trim()
+    if (!name || !windowsPrinterName) continue
+    if (!['receipt', 'label'].includes(printerType)) continue
+    const rawCategoryIds = Array.isArray(entry.labelCategoryIds) ? entry.labelCategoryIds : []
+    const labelCategoryIds = rawCategoryIds
+      .map(String)
+      .filter(mongoose.isValidObjectId)
+      .map((id) => new mongoose.Types.ObjectId(id))
+    out.push({
+      _id: entry._id && mongoose.isValidObjectId(String(entry._id)) ? new mongoose.Types.ObjectId(String(entry._id)) : new mongoose.Types.ObjectId(),
+      name,
+      printerType,
+      windowsPrinterName,
+      isActive: entry.isActive !== false,
+      labelCategoryIds,
+      autoPrintOnOrder: entry.autoPrintOnOrder === true,
+      printOnReady: entry.printOnReady === true,
+      widthMm: printerType === 'label' ? toPositiveNumberOrNull(entry.widthMm) : null,
+      heightMm: printerType === 'label' ? toPositiveNumberOrNull(entry.heightMm) : null,
+      receiptWidthMm: printerType === 'receipt' ? toPositiveNumberOrNull(entry.receiptWidthMm, 80) : null,
+      copies: Math.max(1, Math.min(10, Number(entry.copies || 1) || 1))
+    })
+  }
+  return out
+}
+
+const mapStationPrinter = (entry) => ({
+  id: String(entry?._id || ''),
+  name: String(entry?.name || ''),
+  printerType: String(entry?.printerType || ''),
+  windowsPrinterName: String(entry?.windowsPrinterName || ''),
+  isActive: entry?.isActive !== false,
+  labelCategoryIds: Array.isArray(entry?.labelCategoryIds) ? entry.labelCategoryIds.map(String) : [],
+  autoPrintOnOrder: entry?.autoPrintOnOrder === true,
+  printOnReady: entry?.printOnReady === true,
+  widthMm: toPositiveNumberOrNull(entry?.widthMm),
+  heightMm: toPositiveNumberOrNull(entry?.heightMm),
+  receiptWidthMm: toPositiveNumberOrNull(entry?.receiptWidthMm, 80),
+  copies: Math.max(1, Math.min(10, Number(entry?.copies || 1) || 1))
+})
+
+export const resolveStationPrinterConfig = ({ station, jobType, jobMeta, triggerMode = '' }) => {
+  const printers = Array.isArray(station?.printers) ? station.printers : []
+  const activePrinters = printers.filter((entry) => entry && entry.isActive !== false)
+  if (activePrinters.length === 0) return null
+
+  if (jobType === 'receipt') {
+    return activePrinters.find((entry) => entry.printerType === 'receipt') || null
+  }
+
+  if (jobType !== 'label') return null
+
+  const categoryId = String(jobMeta?.categoryId || '').trim()
+  const labelPrinters = activePrinters.filter((entry) => entry.printerType === 'label')
+  if (labelPrinters.length === 0) return null
+
+  const candidates = labelPrinters.filter((entry) => {
+    if (triggerMode === 'order_send' && entry.autoPrintOnOrder !== true) return false
+    if (triggerMode === 'item_ready' && entry.printOnReady !== true) return false
+    const categories = Array.isArray(entry.labelCategoryIds) ? entry.labelCategoryIds.map(String) : []
+    if (!categoryId) return true
+    return categories.length === 0 || categories.includes(categoryId)
+  })
+  return candidates[0] || null
+}
+
+export const resolveActiveStationForJob = async ({ tenantId, system, jobType, jobMeta, preferredStationId = '' }) => {
+  const preferredId = String(preferredStationId || '').trim()
+  if (preferredId && mongoose.isValidObjectId(preferredId)) {
+    const preferred = await stationRepo.findByIdAndScope(preferredId, tenantId, system)
+    if (preferred && preferred.isActive === true) return preferred
+  }
+
+  const activeStations = await stationRepo.listActiveByTenantAndSystem(tenantId, system)
+  const list = Array.isArray(activeStations) ? activeStations : []
+  if (list.length === 0) return null
+
+  for (const station of list) {
+    const printer = resolveStationPrinterConfig({
+      station,
+      jobType,
+      jobMeta,
+      triggerMode: String(jobMeta?.triggerMode || '')
+    })
+    if (printer) return station
+  }
+
+  return list[0] || null
+}
+
 const resolveProfilePrinter = async (tenantId, system, profile, typeOrCode) => {
   const printerId = String(profile?.printerId || '').trim()
   let printer = null
@@ -169,8 +271,10 @@ export const listStations = async (tenantId, system) => {
     lastHeartbeatMeta: {
       hostname: String(s.lastHeartbeatMeta?.hostname || ''),
       version: String(s.lastHeartbeatMeta?.version || ''),
-      printersCount: Array.isArray(s.lastHeartbeatMeta?.printers) ? s.lastHeartbeatMeta.printers.length : 0
-    }
+      printersCount: Array.isArray(s.lastHeartbeatMeta?.printers) ? s.lastHeartbeatMeta.printers.length : 0,
+      printers: Array.isArray(s.lastHeartbeatMeta?.printers) ? s.lastHeartbeatMeta.printers.map(String) : []
+    },
+    printers: Array.isArray(s.printers) ? s.printers.map(mapStationPrinter) : []
   }))
 }
 
@@ -185,12 +289,15 @@ export const listStationPrinters = async (tenantId, system, stationId) => {
 
 export const createStation = async (tenantId, system, input) => {
   const name = String(input?.name || '').trim()
+  const existing = await stationRepo.findByNameAndScope(name, tenantId, system)
+  if (existing) throw error('duplicate_station_name', 'Bu istasyon adı zaten kayıtlı', 409)
   if (!name) throw error('name_required', 'İstasyon adı zorunlu', 400)
   const branchIdRaw = input?.branchId === undefined || input?.branchId === null ? null : String(input.branchId).trim()
   const branchId = branchIdRaw && mongoose.isValidObjectId(branchIdRaw) ? new mongoose.Types.ObjectId(branchIdRaw) : null
   const assignedProfileIds = Array.isArray(input?.assignedProfileIds)
     ? input.assignedProfileIds.map(String).filter(mongoose.isValidObjectId).map(id => new mongoose.Types.ObjectId(id))
     : []
+  const printers = normalizeStationPrinters(input?.printers)
   const secret = crypto.randomBytes(24).toString('base64url')
   const secretHash = await bcrypt.hash(secret, 10)
   const created = await stationRepo.create({
@@ -204,11 +311,9 @@ export const createStation = async (tenantId, system, input) => {
     lastHeartbeatAt: null,
     lastHeartbeatMeta: { hostname: '', version: '', printers: [] },
     lastSeenAt: null,
-    lastSeenMeta: {}
+    lastSeenMeta: {},
+    printers
   })
-  if (created.isActive === true) {
-    await stationRepo.deactivateOthers(tenantId, system, created.id)
-  }
   return {
     id: String(created.id),
     name: created.name,
@@ -216,6 +321,7 @@ export const createStation = async (tenantId, system, input) => {
     assignedProfileIds: Array.isArray(created.assignedProfileIds) ? created.assignedProfileIds.map(String) : [],
     isActive: created.isActive === true,
     lastHeartbeatAt: created.lastHeartbeatAt ? new Date(created.lastHeartbeatAt).toISOString() : null,
+    printers: Array.isArray(created.printers) ? created.printers.map(mapStationPrinter) : [],
     stationSecret: secret
   }
 }
@@ -238,21 +344,22 @@ export const updateStation = async (tenantId, system, id, input) => {
       : []
     update.assignedProfileIds = assignedProfileIds
   }
+  if (input?.printers !== undefined) {
+    update.printers = normalizeStationPrinters(input?.printers)
+  }
   if (input?.isActive !== undefined) update.isActive = input?.isActive === true
   if (input?.lastSeenMeta !== undefined) update.lastSeenMeta = input?.lastSeenMeta && typeof input.lastSeenMeta === 'object' ? input.lastSeenMeta : {}
   if (input?.touch === true) update.lastSeenAt = new Date()
   const updated = await stationRepo.updateByIdAndScope(id, tenantId, system, update)
   if (!updated) throw error('not_found', 'İstasyon bulunamadı', 404)
-  if (updated.isActive === true) {
-    await stationRepo.deactivateOthers(tenantId, system, updated.id)
-  }
   return {
     id: String(updated.id),
     name: updated.name,
     branchId: updated.branchId ? String(updated.branchId) : null,
     assignedProfileIds: Array.isArray(updated.assignedProfileIds) ? updated.assignedProfileIds.map(String) : [],
     isActive: updated.isActive === true,
-    lastSeenAt: updated.lastSeenAt ? new Date(updated.lastSeenAt).toISOString() : null
+    lastSeenAt: updated.lastSeenAt ? new Date(updated.lastSeenAt).toISOString() : null,
+    printers: Array.isArray(updated.printers) ? updated.printers.map(mapStationPrinter) : []
   }
 }
 
@@ -307,7 +414,12 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
   let queuedWithoutStation = false
   if (stationId && !mongoose.isValidObjectId(stationId)) throw error('invalid_request', 'Invalid stationId', 400)
   if (!stationId) {
-    const active = await stationRepo.findActiveByTenantAndSystem(tenantId, system)
+    const active = await resolveActiveStationForJob({
+      tenantId,
+      system,
+      jobType: type,
+      jobMeta: input?.meta || {}
+    })
     if (!active) {
       stationId = null
       queuedWithoutStation = true
@@ -327,11 +439,14 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
   if (!prf) throw error('not_found', 'Profil bulunamadı', 404)
   if (prf.isActive === false) throw error('profile_inactive', 'Profil pasif', 400)
 
+  const stationPrinter = st
+    ? resolveStationPrinterConfig({ station: st, jobType: type, jobMeta: input?.meta || {}, triggerMode: String(input?.meta?.triggerMode || '') })
+    : null
   const { profile: resolvedProfile, printer: profilePrinter } = await resolveProfilePrinter(tenantId, system, prf, type)
-  if (!profilePrinter) {
+  if (!stationPrinter && !profilePrinter) {
     throw error('printer_missing', `Printer seçilmemiş: ${type}`, 400)
   }
-  if (profilePrinter.isActive === false) {
+  if (!stationPrinter && profilePrinter.isActive === false) {
     throw error('printer_inactive', `Yazıcı pasif: ${type}`, 400)
   }
 
