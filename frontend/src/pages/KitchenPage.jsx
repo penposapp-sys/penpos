@@ -406,7 +406,7 @@ export default function KitchenPage() {
                         <div className="kitchenItemName">
                           {it?.isWeightBased
                             ? `${it.nameSnapshot} • ${Number(it?.weightGrams || 0)} gr`
-                            : `${it.qty}x ${it.nameSnapshot}`}
+                            : <><span style={{ color: '#dc2626', fontWeight: 800 }}>{it.qty} ADET</span>{' '}<span>{it.nameSnapshot}</span></>}
                         </div>
                         <div className="kitchenItemAge">{getItemAgeMinutes(o, it)} dk</div>
                         <div className="kitchenItemActions">
