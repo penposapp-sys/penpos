@@ -5,8 +5,9 @@
   "httpPort": 17171,
   "sumatraPath": "C:/Program Files/SumatraPDF/SumatraPDF.exe",
   "spoolDir": "C:/ProgramData/PenPOS/PrintAgent/spool",
+  "autoUpdate": true,
+  "updateCheckIntervalMs": 300000,
   "heartbeatIntervalMs": 10000,
   "jobPollIntervalMs": 1500,
   "requestTimeoutMs": 20000
 }
-

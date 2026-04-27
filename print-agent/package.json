@@ -3,8 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "build:exe": "npx pkg . --targets node24-win-x64 --output dist/PenPOS_PrintAgent.exe",
+    "build:backend": "npm run build:exe && node build-release.mjs"
+  },
+  "pkg": {
+    "scripts": [
+      "index.js"
+    ],
+    "assets": [
+      "config.sample.json"
+    ],
+    "outputPath": "dist"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
   }
 }
-

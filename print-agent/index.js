@@ -4,6 +4,7 @@ import os from 'os'
 import http from 'http'
 import { spawn } from 'child_process'
 
+const AGENT_VERSION = '0.1.0'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {
@@ -142,6 +143,26 @@ const defaultConfigPath = () => {
   return path.join(programData, 'PenPOS', 'PrintAgent', 'config.json')
 }
 
+const compareVersions = (left, right) => {
+  const a = String(left || '').trim().replace(/^v/i, '').split('.').map((part) => Number(part || 0))
+  const b = String(right || '').trim().replace(/^v/i, '').split('.').map((part) => Number(part || 0))
+  const maxLen = Math.max(a.length, b.length, 3)
+  for (let i = 0; i < maxLen; i++) {
+    const av = Number.isFinite(a[i]) ? a[i] : 0
+    const bv = Number.isFinite(b[i]) ? b[i] : 0
+    if (av > bv) return 1
+    if (av < bv) return -1
+  }
+  return 0
+}
+
+const isPackagedExecutable = () => {
+  const execPath = String(process.execPath || '').trim().toLowerCase()
+  const baseName = path.basename(execPath)
+  if (!execPath.endsWith('.exe')) return false
+  return baseName !== 'node.exe'
+}
+
 const ensureDir = async (p) => {
   await fs.mkdir(p, { recursive: true })
 }
@@ -238,6 +259,62 @@ const printRawText = async ({ printerName, content, txtPath }) => {
   await run('powershell.exe', ['-NoProfile', '-Command', script], { timeoutMs: 30000 })
 }
 
+const downloadBinary = async ({ url, headers, destinationPath, timeoutMs }) => {
+  const buf = await httpBuffer(url, { headers, timeoutMs })
+  await ensureDir(path.dirname(destinationPath))
+  await fs.writeFile(destinationPath, buf)
+}
+
+const triggerSelfUpdate = async ({ manifest, configPath, baseDir, headers, timeoutMs, log }) => {
+  if (!isPackagedExecutable()) {
+    log('warn', '[UPDATE] Paketlenmis exe modunda degil, otomatik guncelleme atlandi', { currentVersion: AGENT_VERSION, latestVersion: manifest?.version })
+    return false
+  }
+
+  const downloadUrl = String(manifest?.downloadUrl || '').trim()
+  const nextVersion = String(manifest?.version || '').trim()
+  if (!downloadUrl || !nextVersion) return false
+
+  const updateDir = path.join(baseDir, 'updates')
+  const pendingExePath = path.join(updateDir, `PenPOS_PrintAgent_${nextVersion}.exe`)
+  const updaterScriptPath = path.join(updateDir, 'apply-update.ps1')
+  const currentExePath = process.execPath
+
+  await downloadBinary({ url: downloadUrl, headers, destinationPath: pendingExePath, timeoutMs })
+
+  const script = [
+    'param([string]$TargetExe,[string]$SourceExe,[string]$ConfigPath,[int]$PidToWait)',
+    'Start-Sleep -Seconds 2',
+    'try { Wait-Process -Id $PidToWait -Timeout 30 } catch {}',
+    'Start-Sleep -Milliseconds 800',
+    'Copy-Item -LiteralPath $SourceExe -Destination $TargetExe -Force',
+    'Start-Process -FilePath $TargetExe -ArgumentList @("--config", $ConfigPath)',
+    'Start-Sleep -Seconds 2',
+    'Remove-Item -LiteralPath $SourceExe -Force -ErrorAction SilentlyContinue'
+  ].join('\r\n')
+  await ensureDir(updateDir)
+  await fs.writeFile(updaterScriptPath, script, 'utf8')
+
+  const child = spawn('powershell.exe', [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    updaterScriptPath,
+    currentExePath,
+    pendingExePath,
+    path.resolve(configPath),
+    String(process.pid)
+  ], {
+    detached: true,
+    windowsHide: true,
+    stdio: 'ignore'
+  })
+  child.unref()
+  log('info', '[UPDATE] Guncelleme indirildi, agent yeniden baslatilacak', { nextVersion, currentVersion: AGENT_VERSION })
+  return true
+}
+
 const main = async () => {
   const args = parseArgs(process.argv)
   const configPath = path.resolve(String(args.config || defaultConfigPath()))
@@ -250,6 +327,8 @@ const main = async () => {
   const jobPollIntervalMs = Math.max(500, Number(cfg.jobPollIntervalMs || 1500))
   const heartbeatIntervalMs = Math.max(2000, Number(cfg.heartbeatIntervalMs || 10000))
   const requestTimeoutMs = Math.max(2000, Number(cfg.requestTimeoutMs || 20000))
+  const updateCheckIntervalMs = Math.max(30000, Number(cfg.updateCheckIntervalMs || 300000))
+  const autoUpdate = cfg.autoUpdate !== false
   const httpPort = Math.max(1, Number(cfg.httpPort || 17171))
   const spoolDir = String(cfg.spoolDir || '').trim() || path.join(baseDir, 'spool')
   await ensureDir(spoolDir)
@@ -268,7 +347,13 @@ const main = async () => {
     backendOnline: false,
     lastHeartbeatAt: null,
     printers: [],
-    stationId
+    stationId,
+    version: AGENT_VERSION,
+    update: {
+      available: false,
+      latestVersion: '',
+      lastCheckedAt: null
+    }
   }
 
   startStatusServer({ port: httpPort, getStatus: () => ({ ...status }), log })
@@ -300,7 +385,7 @@ const main = async () => {
 
   const auth = async () => {
     log('info', '[AUTH] Auth oluyor...', { stationId })
-    const body = { stationSecret, hostname: os.hostname(), at: new Date().toISOString(), version: 'v0.1.0' }
+    const body = { stationSecret, hostname: os.hostname(), at: new Date().toISOString(), version: AGENT_VERSION }
     const authRes = await httpJson(authUrl, { method: 'POST', body, timeoutMs: requestTimeoutMs })
     const t = String(authRes?.token || authRes?.data?.token || '').trim()
     if (!t) throw new Error('Station token alınamadı')
@@ -318,8 +403,10 @@ const main = async () => {
 
   const hbUrl = `${backendBaseUrl}/api/printing/stations/${encodeURIComponent(stationId)}/heartbeat`
   const claimUrl = `${backendBaseUrl}/api/printing/stations/${encodeURIComponent(stationId)}/claim-next`
+  const updateManifestUrl = `${backendBaseUrl}/api/public/downloads/print-agent/windows/manifest`
 
   let lastHb = 0
+  let lastUpdateCheckAt = 0
   let backoffMs = 1000
   let pollingStarted = false
 
@@ -336,7 +423,7 @@ const main = async () => {
             printers,
             hostname: os.hostname(),
             at: new Date().toISOString(),
-            version: 'v0.1.0'
+            version: AGENT_VERSION
           },
           timeoutMs: requestTimeoutMs
         })
@@ -355,6 +442,41 @@ const main = async () => {
       }
     }
 
+    if (now - lastUpdateCheckAt > updateCheckIntervalMs) {
+      lastUpdateCheckAt = now
+      try {
+        const manifest = await httpJson(updateManifestUrl, { timeoutMs: requestTimeoutMs })
+        const latestVersion = String(manifest?.version || '').trim()
+        status.update = {
+          available: !!latestVersion && compareVersions(latestVersion, AGENT_VERSION) > 0,
+          latestVersion,
+          lastCheckedAt: new Date().toISOString()
+        }
+        if (status.update.available) {
+          log('info', '[UPDATE] Yeni surum bulundu', { currentVersion: AGENT_VERSION, latestVersion })
+          if (autoUpdate) {
+            const started = await triggerSelfUpdate({
+              manifest,
+              configPath,
+              baseDir,
+              headers: buildHeaders(),
+              timeoutMs: Math.max(15000, requestTimeoutMs),
+              log
+            })
+            if (started) {
+              process.exit(0)
+            }
+          }
+        }
+      } catch (e) {
+        status.update = {
+          ...status.update,
+          lastCheckedAt: new Date().toISOString()
+        }
+        log('warn', '[UPDATE] Surum kontrolu basarisiz', { message: String(e?.message || e) })
+      }
+    }
+
     let claim = null
     try {
       if (!pollingStarted) {
@@ -364,7 +486,7 @@ const main = async () => {
       claim = await httpJson(claimUrl, {
         method: 'POST',
         headers: buildHeaders(),
-        body: { meta: { at: new Date().toISOString(), hostname: os.hostname() } },
+        body: { meta: { at: new Date().toISOString(), hostname: os.hostname(), version: AGENT_VERSION } },
         timeoutMs: requestTimeoutMs,
         allowNoContent: true
       })

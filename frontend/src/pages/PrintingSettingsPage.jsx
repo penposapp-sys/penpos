@@ -25,6 +25,8 @@ export default function PrintingSettingsPage({ system }) {
   const [menuCategories, setMenuCategories] = useState([])
 
   const [pcPrinterDownloadUrl, setPcPrinterDownloadUrl] = useState('')
+  const [pcPrinterManifestUrl, setPcPrinterManifestUrl] = useState('')
+  const [latestAgentVersion, setLatestAgentVersion] = useState('')
 
   const [labelPrinterName, setLabelPrinterName] = useState('')
   const [labelActive, setLabelActive] = useState(false)
@@ -89,6 +91,7 @@ export default function PrintingSettingsPage({ system }) {
       setStations(Array.isArray(p3?.stations) ? p3.stations : [])
       setJobs(Array.isArray(p4?.jobs) ? p4.jobs : [])
       setPcPrinterDownloadUrl(String(p5?.printAgent?.pcPrinter?.downloadUrl || '').trim())
+      setPcPrinterManifestUrl(String(p5?.printAgent?.pcPrinter?.manifestUrl || '').trim())
       setMenuCategories(Array.isArray(p6?.categories) ? p6.categories.map((c) => ({ id: String(c?._id || c?.id || ''), name: String(c?.name || '') })).filter((c) => c.id && c.name) : [])
     } finally {
       setBusy(false)
@@ -98,6 +101,21 @@ export default function PrintingSettingsPage({ system }) {
   useEffect(() => {
     loadAll()
   }, [sys])
+
+  useEffect(() => {
+    if (!pcPrinterManifestUrl) {
+      setLatestAgentVersion('')
+      return
+    }
+    ;(async () => {
+      try {
+        const res = await api(pcPrinterManifestUrl, { silent: true, skipBranchHeader: true })
+        setLatestAgentVersion(String(res?.version || '').trim())
+      } catch {
+        setLatestAgentVersion('')
+      }
+    })()
+  }, [pcPrinterManifestUrl])
 
   useEffect(() => {
     setAgentError('')
@@ -423,6 +441,8 @@ export default function PrintingSettingsPage({ system }) {
         printerCount={agentPrinters.length}
         hostname={agentHostname}
         version={agentVersion}
+        latestVersion={latestAgentVersion}
+        updateAvailable={!!latestAgentVersion && !!agentVersion && latestAgentVersion !== agentVersion}
         lastSeenSec={heartbeatAgeMs !== null ? heartbeatAgeMs / 1000 : null}
         onReload={loadAll}
         error={agentError}
