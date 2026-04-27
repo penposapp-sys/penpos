@@ -192,6 +192,20 @@ const printPdf = async ({ sumatraPath, printerName, pdfPath, orientation = 'port
   await run(exe, ['-print-to', prn, '-print-settings', `noscale,${dir}`, '-silent', pdfPath], { timeoutMs: 30000 })
 }
 
+const psQuote = (value) => `'${String(value || '').replace(/'/g, "''")}'`
+
+const printRawText = async ({ printerName, content, txtPath }) => {
+  const prn = String(printerName || '').trim()
+  if (!prn) throw new Error('printerName missing')
+  const script = [
+    '$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()',
+    `[System.IO.File]::WriteAllText(${psQuote(txtPath)}, ${psQuote(String(content || ''))}, [System.Text.UTF8Encoding]::new($false))`,
+    `$text = [System.IO.File]::ReadAllText(${psQuote(txtPath)}, [System.Text.UTF8Encoding]::new($false))`,
+    '$text | Out-Printer -Name ' + psQuote(prn)
+  ].join('; ')
+  await run('powershell.exe', ['-NoProfile', '-Command', script], { timeoutMs: 30000 })
+}
+
 const main = async () => {
   const args = parseArgs(process.argv)
   const configPath = path.resolve(String(args.config || defaultConfigPath()))
@@ -348,27 +362,41 @@ const main = async () => {
       const printerName = String(job.printerName || job.printer || job?.printSettings?.printerName || '').trim()
       const copies = Math.max(1, Math.min(10, Number(job.copies || job?.printSettings?.copies || 1)))
       const orientation = String(job?.type || '').trim().toLowerCase() === 'label' ? 'landscape' : 'portrait'
+      const payloadType = String(job?.payloadType || '').trim().toLowerCase()
+      const rawContent = String(job?.rawContent || '').trim()
       const pdfBase64 = String(job?.content?.data || job?.pdfBase64 || '')
       if (!printerName) throw new Error('printerName missing')
 
-      let pdfBuf = null
-      if (pdfBase64) {
-        pdfBuf = Buffer.from(pdfBase64, 'base64')
-      } else {
-        const url = String(job.documentUrl || job.url || job.fileUrl || '').trim()
-        if (!url) throw new Error('pdf missing')
-        pdfBuf = await httpBuffer(url, { headers: buildHeaders(), timeoutMs: requestTimeoutMs })
-      }
-
-      const tmp = path.join(spoolDir, `job-${jobId}.pdf`)
-      await fs.writeFile(tmp, pdfBuf)
-      try {
-        for (let i = 0; i < copies; i++) {
-          await printPdf({ sumatraPath, printerName, pdfPath: tmp, orientation })
+      if (String(job?.type || '').trim().toLowerCase() === 'receipt' && payloadType === 'raw' && rawContent) {
+        const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
+        try {
+          for (let i = 0; i < copies; i++) {
+            await printRawText({ printerName, content: rawContent, txtPath: txtTmp })
+          }
+          await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
+        } finally {
+          await fs.unlink(txtTmp).catch(() => {})
         }
-        await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
-      } finally {
-        await fs.unlink(tmp).catch(() => {})
+      } else {
+        let pdfBuf = null
+        if (pdfBase64) {
+          pdfBuf = Buffer.from(pdfBase64, 'base64')
+        } else {
+          const url = String(job.documentUrl || job.url || job.fileUrl || '').trim()
+          if (!url) throw new Error('pdf missing')
+          pdfBuf = await httpBuffer(url, { headers: buildHeaders(), timeoutMs: requestTimeoutMs })
+        }
+
+        const tmp = path.join(spoolDir, `job-${jobId}.pdf`)
+        await fs.writeFile(tmp, pdfBuf)
+        try {
+          for (let i = 0; i < copies; i++) {
+            await printPdf({ sumatraPath, printerName, pdfPath: tmp, orientation })
+          }
+          await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
+        } finally {
+          await fs.unlink(tmp).catch(() => {})
+        }
       }
     } catch (e) {
       try {

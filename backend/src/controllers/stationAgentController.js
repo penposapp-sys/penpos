@@ -232,6 +232,8 @@ export const claimNext = async (req, res) => {
         id: jobId,
         type: String(job.type || ''),
         fileUrl,
+        payloadType: String(job?.payload?.type || ''),
+        rawContent: String(job?.payload?.content || ''),
         profileId: String(job.profileId || ''),
         printerName,
         copies,

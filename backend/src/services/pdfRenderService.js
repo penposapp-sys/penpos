@@ -274,7 +274,7 @@ export const renderReceiptPdfBase64 = async ({
   const pkgPhone = safeText(customerPhone)
   const pkgAddress = safeText(customerAddress)
 
-  const marginPt = mmToPt(8)
+  const marginPt = mmToPt(2)
   const margins = { top: marginPt, left: marginPt, right: marginPt, bottom: marginPt }
   const measuredHeightPt = measureReceiptHeightPt({
     widthPt,
@@ -299,10 +299,10 @@ export const renderReceiptPdfBase64 = async ({
   const formulaHeightPt = headerH + (its.length * lineH) + footerH + safetyH
 
   const heightPt = Math.max(
-    260,
+    180,
     formulaHeightPt,
-    measuredHeightPt + 80,
-    widthPt + 120
+    measuredHeightPt + 20,
+    widthPt + 60
   )
 
   const doc = new PDFDocument({ autoFirstPage: false, margins })
