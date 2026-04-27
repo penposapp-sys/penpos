@@ -401,14 +401,75 @@ export const listJobs = async (tenantId, system, limit) => {
   }))
 }
 
+const ensureSystemProfileForType = async ({ tenantId, system, type, station }) => {
+  const code = String(type || '').trim().toLowerCase()
+  if (!['receipt', 'label'].includes(code)) throw error('invalid_request', 'Invalid type', 400)
+
+  const profileName = code === 'receipt' ? 'Fiş' : 'Etiket'
+  const logicalName = logicalPrinterNameByType(code)
+  const stationPrinter = station
+    ? resolveStationPrinterConfig({ station, jobType: code, jobMeta: {}, triggerMode: '' })
+    : null
+  const stationWindowsPrinterName = String(stationPrinter?.windowsPrinterName || '').trim()
+
+  let printer = await printerRepo.findByNameAndScope(logicalName, tenantId, system)
+  if (!printer && stationWindowsPrinterName) {
+    printer = await printerRepo.create({
+      tenantId,
+      system,
+      name: logicalName,
+      windowsPrinterName: stationWindowsPrinterName,
+      isActive: true
+    })
+  } else if (printer && stationWindowsPrinterName && String(printer.windowsPrinterName || '').trim() !== stationWindowsPrinterName) {
+    printer = await printerRepo.updateByIdAndScope(printer.id, tenantId, system, {
+      windowsPrinterName: stationWindowsPrinterName,
+      isActive: true
+    })
+  } else if (printer && printer.isActive === false) {
+    printer = await printerRepo.updateByIdAndScope(printer.id, tenantId, system, { isActive: true })
+  }
+
+  if (!printer) throw error('printer_missing', `${profileName} yazıcısı bulunamadı`, 400)
+
+  const nextOptions = code === 'receipt'
+    ? { widthMm: toPositiveNumberOrNull(stationPrinter?.receiptWidthMm, 80) || 80 }
+    : {
+        widthMm: toPositiveNumberOrNull(stationPrinter?.widthMm, 50) || 50,
+        heightMm: toPositiveNumberOrNull(stationPrinter?.heightMm, 30) || 30
+      }
+
+  const existingProfile = await profileRepo.findByCodeAndScope(code, tenantId, system)
+  if (existingProfile) {
+    const updatedProfile = await profileRepo.updateByIdAndScope(existingProfile.id, tenantId, system, {
+      name: String(existingProfile.name || '').trim() || profileName,
+      printerId: printer.id,
+      payloadType: existingProfile.payloadType || 'raw',
+      options: { ...(existingProfile.options || {}), ...nextOptions },
+      isActive: true
+    })
+    return updatedProfile || existingProfile
+  }
+
+  return await profileRepo.create({
+    tenantId,
+    system,
+    code,
+    name: profileName,
+    printerId: printer.id,
+    payloadType: 'raw',
+    options: nextOptions,
+    isActive: true
+  })
+}
+
 export const createJob = async (tenantId, system, actorUserId, input) => {
   const type = String(input?.type || '').trim()
-  const profileId = String(input?.profileId || '').trim()
+  const requestedProfileId = String(input?.profileId || '').trim()
   const stationIdRaw = String(input?.stationId || '').trim()
   const payloadType = String(input?.payload?.type || input?.payloadType || 'raw').trim()
   const payloadContent = String(input?.payload?.content || input?.payloadContent || '')
   if (!['receipt', 'label'].includes(type)) throw error('invalid_request', 'Invalid type', 400)
-  if (!mongoose.isValidObjectId(profileId)) throw error('invalid_request', 'Invalid profileId', 400)
 
   let stationId = stationIdRaw
   let queuedWithoutStation = false
@@ -435,9 +496,17 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
     if (st.isActive !== true) throw error('station_inactive', 'Print Station aktif değil', 400)
   }
 
-  const prf = await profileRepo.findByIdAndScope(profileId, tenantId, system)
+  let prf = null
+  if (requestedProfileId) {
+    if (!mongoose.isValidObjectId(requestedProfileId)) throw error('invalid_request', 'Invalid profileId', 400)
+    prf = await profileRepo.findByIdAndScope(requestedProfileId, tenantId, system)
+  } else {
+    prf = await ensureSystemProfileForType({ tenantId, system, type, station: st })
+  }
   if (!prf) throw error('not_found', 'Profil bulunamadı', 404)
-  if (prf.isActive === false) throw error('profile_inactive', 'Profil pasif', 400)
+  if (prf.isActive === false) {
+    prf = await ensureSystemProfileForType({ tenantId, system, type, station: st })
+  }
 
   const stationPrinter = st
     ? resolveStationPrinterConfig({ station: st, jobType: type, jobMeta: input?.meta || {}, triggerMode: String(input?.meta?.triggerMode || '') })

@@ -306,7 +306,7 @@ export const itemComplete = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(itemId)) {
       throw error('invalid_request', 'Invalid order or item id', 400)
     }
-    const { order } = await completeItemByItemIdService(req.user.tenantId, id, itemId)
+    const { order } = await completeItemByItemIdService(req.user.tenantId, id, itemId, { unitIndex: req.body?.unitIndex })
     res.json({ order })
   } catch (err) {
     sendError(res, err)
@@ -321,7 +321,7 @@ export const itemCooking = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(itemId)) {
       throw error('invalid_request', 'Invalid order or item id', 400)
     }
-    const { order } = await setItemCookingByItemIdService(req.user.tenantId, id, itemId)
+    const { order } = await setItemCookingByItemIdService(req.user.tenantId, id, itemId, { unitIndex: req.body?.unitIndex })
     res.json({ order })
   } catch (err) {
     sendError(res, err)
@@ -340,7 +340,8 @@ export const itemCancel = async (req, res) => {
       orderId: id,
       itemId,
       reason: req.body?.reason || '',
-      user: req.user
+      user: req.user,
+      unitIndex: req.body?.unitIndex
     })
     res.json({ order })
   } catch (err) {

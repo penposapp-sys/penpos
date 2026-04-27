@@ -74,6 +74,7 @@ const buildSeparateItems = (items) => (Array.isArray(items) ? items : []).flatMa
     ...it,
     qty: 1,
     subtotal: Number(it?.priceSnapshot || 0),
+    __unitIndex: unitIndex,
     __rowKey: `${it._id || `${it?.menuItemId || 'item'}-${index}`}:u:${unitIndex}`
   }))
 })
@@ -88,6 +89,7 @@ export default function KitchenPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const lastIdsRef = useRef([])
   const initialLoadedRef = useRef(false)
+  const restoreMainScrollTopRef = useRef(null)
   const { allowedBranchIds } = useAuth()
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_normal' })
   const { soundEnabled, setSoundEnabled, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
@@ -99,8 +101,34 @@ export default function KitchenPage() {
     }
   })
 
-  const load = async () => {
+  const captureMainScrollTop = () => {
+    try {
+      const el = document.querySelector('.main')
+      return el ? el.scrollTop : 0
+    } catch {
+      return 0
+    }
+  }
+
+  const restoreMainScrollTop = () => {
+    const top = restoreMainScrollTopRef.current
+    if (top === null || top === undefined) return
+    restoreMainScrollTopRef.current = null
+    try {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          const el = document.querySelector('.main')
+          if (el) el.scrollTop = top
+        })
+      })
+    } catch {}
+  }
+
+  const load = async ({ preserveScroll = false } = {}) => {
     setError('')
+    if (preserveScroll) {
+      restoreMainScrollTopRef.current = captureMainScrollTop()
+    }
     try {
       if (!Array.isArray(allowedBranchIds)) {
         setOrders([])
@@ -126,11 +154,14 @@ export default function KitchenPage() {
       const ids = safe.flatMap((o) => {
         const batches = Array.isArray(o?.batches) ? o.batches : []
         if (batches.length === 0) return [String(o.id)]
-        return batches.filter((b) => b?.hasActiveItems).map((b) => `${String(o.id)}:${String(b?.batchId || 'legacy')}`)
+        return batches
+          .filter((b) => !b?.completedAt && b?.hasActiveItems)
+          .map((b) => `${String(o.id)}:${String(b?.batchId || 'legacy')}`)
       })
       const prevIds = lastIdsRef.current || []
 
       setOrders(safe)
+      restoreMainScrollTop()
       lastIdsRef.current = ids
 
       if (!initialLoadedRef.current) {
@@ -174,7 +205,7 @@ export default function KitchenPage() {
   const complete = async (id) => {
     try {
       await api(`/api/kitchen/orders/${id}/complete`, { method: 'PUT' })
-      await load()
+      await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
     }
@@ -183,16 +214,19 @@ export default function KitchenPage() {
   const completeBatch = async (orderId, batchId) => {
     try {
       await api(`/api/kitchen/orders/${orderId}/batches/${batchId}/complete`, { method: 'PUT' })
-      await load()
+      await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
     }
   }
 
-  const itemCooking = async (orderId, itemId) => {
+  const itemCooking = async (orderId, itemId, unitIndex = 0) => {
     try {
-      await api(`/api/kitchen/orders/${orderId}/items/${itemId}/cooking`, { method: 'PUT' })
-      await load()
+      await api(`/api/kitchen/orders/${orderId}/items/${itemId}/cooking`, {
+        method: 'PUT',
+        body: JSON.stringify({ unitIndex })
+      })
+      await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
     }
@@ -204,16 +238,19 @@ export default function KitchenPage() {
         method: 'PUT',
         body: JSON.stringify({ itemIds: Array.isArray(itemIds) ? itemIds : [] })
       })
-      await load()
+      await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
     }
   }
 
-  const itemComplete = async (orderId, itemId) => {
+  const itemComplete = async (orderId, itemId, unitIndex = 0) => {
     try {
-      await api(`/api/kitchen/orders/${orderId}/items/${itemId}/complete`, { method: 'PUT' })
-      await load()
+      await api(`/api/kitchen/orders/${orderId}/items/${itemId}/complete`, {
+        method: 'PUT',
+        body: JSON.stringify({ unitIndex })
+      })
+      await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
     }
@@ -225,17 +262,17 @@ export default function KitchenPage() {
         method: 'PUT',
         body: JSON.stringify({ itemIds: Array.isArray(itemIds) ? itemIds : [] })
       })
-      await load()
+      await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
     }
   }
 
-  const openCancelModal = (orderId, itemIdOrIds, grouped = false) => {
+  const openCancelModal = (orderId, itemIdOrIds, grouped = false, unitIndex = 0) => {
     const itemIds = Array.isArray(itemIdOrIds)
       ? itemIdOrIds.map((id) => String(id || '').trim()).filter(Boolean)
       : [String(itemIdOrIds || '').trim()].filter(Boolean)
-    setCancelSelection({ orderId, itemIds, grouped: grouped === true })
+    setCancelSelection({ orderId, itemIds, grouped: grouped === true, unitIndex })
     setCancelReason('')
     setCancelModalOpen(true)
   }
@@ -243,7 +280,7 @@ export default function KitchenPage() {
   const submitCancel = async (reason) => {
     if (!cancelSelection) return
     try {
-      const { orderId, itemIds, grouped } = cancelSelection
+      const { orderId, itemIds, grouped, unitIndex } = cancelSelection
       const ids = Array.isArray(itemIds) ? itemIds : []
       if (grouped) {
         await api(`/api/kitchen/orders/${orderId}/items/group-cancel`, {
@@ -253,10 +290,10 @@ export default function KitchenPage() {
       } else if (ids.length === 1) {
         await api(`/api/kitchen/orders/${orderId}/items/${ids[0]}/cancel`, {
           method: 'PUT',
-          body: JSON.stringify({ reason })
+          body: JSON.stringify({ reason, unitIndex })
         })
       }
-      await load()
+      await load({ preserveScroll: true })
       setCancelModalOpen(false)
     } catch (err) {
       setError(err.message)
@@ -288,7 +325,7 @@ export default function KitchenPage() {
         continue
       }
       for (const b of batches) {
-        if (!b?.hasActiveItems) continue
+        if (b?.completedAt) continue
         out.push({
           ...o,
           orderId: o.id,
@@ -346,7 +383,7 @@ export default function KitchenPage() {
         const createdByName = String(o?.createdByName || '').trim()
 
         return (
-          <div key={`${o._id || o.id}-${String(o.batchId || 'legacy')}-${(o.displayItems || []).map((it) => it.__rowKey || it._id).join(',')}`} className="card kitchenOrderCard" style={{ borderColor: ageColor(o.batchSentAt || o.createdAt) }}>
+          <div key={`${o._id || o.id}-${String(o.batchId || 'legacy')}`} className="card kitchenOrderCard" style={{ borderColor: ageColor(o.batchSentAt || o.createdAt) }}>
             <div className="kitchen-card-header">
               <div className="kitchen-card-info">
                 <span style={{ fontWeight: 700, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{titleLeft}</span>
@@ -377,6 +414,7 @@ export default function KitchenPage() {
                 const actionItemIds = Array.isArray(it?.itemIds) && it.itemIds.length > 0
                   ? it.itemIds.map((id) => String(id || '').trim()).filter(Boolean)
                   : [String(it?._id || '').trim()].filter(Boolean)
+                const actionUnitIndex = Number.isFinite(Number(it?.__unitIndex)) ? Number(it.__unitIndex) : 0
 
                 return (
                   <div key={it.__rowKey || it._id || `${o._id || o.id}-${it.menuItemId}-${index}`} className="kitchenItem">
@@ -405,7 +443,7 @@ export default function KitchenPage() {
                                 itemGroupCooking(o.orderId || o.id, actionItemIds)
                                 return
                               }
-                              itemCooking(o.orderId || o.id, actionItemId)
+                              itemCooking(o.orderId || o.id, actionItemId, actionUnitIndex)
                             }}
                             disabled={it.status !== 'sent' || actionItemIds.length === 0}
                           >
@@ -421,7 +459,7 @@ export default function KitchenPage() {
                                 itemGroupComplete(o.orderId || o.id, actionItemIds)
                                 return
                               }
-                              itemComplete(o.orderId || o.id, actionItemId)
+                              itemComplete(o.orderId || o.id, actionItemId, actionUnitIndex)
                             }}
                             disabled={!['sent', 'cooking'].includes(String(it.status || '')) || (viewMode === 'grouped' ? actionItemIds.length === 0 : !actionItemId)}
                           >
@@ -437,7 +475,7 @@ export default function KitchenPage() {
                                 openCancelModal(o.orderId || o.id, actionItemIds, true)
                                 return
                               }
-                              openCancelModal(o.orderId || o.id, actionItemId, false)
+                              openCancelModal(o.orderId || o.id, actionItemId, false, actionUnitIndex)
                             }}
                             disabled={!['sent', 'cooking'].includes(String(it.status || '')) || actionItemIds.length === 0}
                           >

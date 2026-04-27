@@ -32,7 +32,8 @@ const kitchenBatchSchema = new mongoose.Schema(
   {
     batchId: { type: String, required: true },
     servingType: { type: String, enum: ['tray', 'plate', 'package'], default: 'plate' },
-    sentAt: { type: Date, default: null }
+    sentAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null }
   },
   { _id: false }
 )

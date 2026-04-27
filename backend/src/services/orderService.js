@@ -47,6 +47,74 @@ const splitQtyItemSnapshot = (item, overrides = {}) => {
   }
 }
 
+const insertSplitItemAtSourcePosition = (order, sourceItemId, nextItem) => {
+  if (!order || !Array.isArray(order.items)) return
+  const sourceId = String(sourceItemId || '').trim()
+  const sourceIndex = order.items.findIndex((entry) => String(entry?._id || '') === sourceId)
+  if (sourceIndex === -1) {
+    order.items.push(nextItem)
+    return
+  }
+  order.items.splice(sourceIndex, 0, nextItem)
+}
+
+const splitItemAroundUnitSelection = ({ order, item, selectedUnitIndex, selectedOverrides = {} }) => {
+  const totalQty = Math.max(1, Number(item?.qty || 1))
+  const unitIndex = Math.max(0, Math.min(totalQty - 1, Number(selectedUnitIndex || 0)))
+  const unitPrice = toMoney(item?.priceSnapshot || 0)
+  const sourceIndex = Array.isArray(order?.items)
+    ? order.items.findIndex((entry) => String(entry?._id || '') === String(item?._id || ''))
+    : -1
+
+  if (sourceIndex === -1 || totalQty <= 1 || item?.isWeightBased) {
+    Object.assign(item, selectedOverrides)
+    if (selectedOverrides.qty !== undefined) item.qty = selectedOverrides.qty
+    if (selectedOverrides.subtotal !== undefined) item.subtotal = selectedOverrides.subtotal
+    return item
+  }
+
+  const beforeQty = unitIndex
+  const afterQty = Math.max(0, totalQty - unitIndex - 1)
+  const originalStatus = item.status
+  const originalNote = item.note
+  const originalCancelledAt = item.cancelledAt || null
+
+  const selectedItem = splitQtyItemSnapshot(item, {
+    _id: item._id,
+    qty: 1,
+    subtotal: unitPrice,
+    status: selectedOverrides.status ?? item.status,
+    note: selectedOverrides.note !== undefined ? selectedOverrides.note : originalNote,
+    cancelledAt: selectedOverrides.cancelledAt !== undefined ? selectedOverrides.cancelledAt : originalCancelledAt
+  })
+
+  const replacements = []
+  if (beforeQty > 0) {
+    replacements.push(splitQtyItemSnapshot(item, {
+      _id: new mongoose.Types.ObjectId(),
+      qty: beforeQty,
+      subtotal: toMoney(beforeQty * unitPrice),
+      status: originalStatus,
+      note: originalNote,
+      cancelledAt: originalCancelledAt
+    }))
+  }
+  replacements.push(selectedItem)
+  if (afterQty > 0) {
+    replacements.push(splitQtyItemSnapshot(item, {
+      _id: new mongoose.Types.ObjectId(),
+      qty: afterQty,
+      subtotal: toMoney(afterQty * unitPrice),
+      status: originalStatus,
+      note: originalNote,
+      cancelledAt: originalCancelledAt
+    }))
+  }
+
+  order.items.splice(sourceIndex, 1, ...replacements)
+  return order.items[sourceIndex + (beforeQty > 0 ? 1 : 0)] || selectedItem
+}
+
 const normalizeLegacyItemStatuses = (order) => {
   if (!order || !Array.isArray(order.items)) return
   order.items = order.items.map(it => {
@@ -769,7 +837,7 @@ export const completeItemService = async (tenantId, id, menuItemId) => {
   return { order: dto }
 }
 
-export const completeItemByItemIdService = async (tenantId, id, itemId) => {
+export const completeItemByItemIdService = async (tenantId, id, itemId, options = {}) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
 
@@ -796,18 +864,14 @@ export const completeItemByItemIdService = async (tenantId, id, itemId) => {
 
   let readyItem = it
   if ((Number(it.qty) || 0) > 1 && !it.isWeightBased) {
-    const unitPrice = toMoney(it.priceSnapshot || 0)
-    it.qty = Math.max(1, (Number(it.qty) || 0) - 1)
-    it.subtotal = toMoney(it.qty * unitPrice)
-
-    const completedClone = splitQtyItemSnapshot(it, {
-      _id: new mongoose.Types.ObjectId(),
-      qty: 1,
-      subtotal: unitPrice,
-      status: 'completed'
+    readyItem = splitItemAroundUnitSelection({
+      order,
+      item: it,
+      selectedUnitIndex: options?.unitIndex,
+      selectedOverrides: {
+        status: 'completed'
+      }
     })
-    order.items.push(completedClone)
-    readyItem = order.items[order.items.length - 1]
   } else {
     it.status = 'completed'
   }
@@ -929,7 +993,7 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
   return { order: dto }
 }
 
-export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user }) => {
+export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user, unitIndex }) => {
     const order = await findByIdAndTenant(orderId, user.tenantId)
     if (!order) throw error('not_found', 'Order not found', 404)
     if (isNotEditableStatus(order.status)) {
@@ -954,19 +1018,16 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user 
     }
     const cancelAt = new Date()
     if ((Number(item.qty) || 0) > 1 && !item.isWeightBased) {
-      const unitPrice = toMoney(item.priceSnapshot || 0)
-      item.qty = Math.max(1, (Number(item.qty) || 0) - 1)
-      item.subtotal = toMoney(item.qty * unitPrice)
-
-      const cancelledClone = splitQtyItemSnapshot(item, {
-        _id: new mongoose.Types.ObjectId(),
-        qty: 1,
-        subtotal: unitPrice,
-        status: 'cancelled',
-        cancelledAt: cancelAt,
-        note: reason || item.note || ''
+      splitItemAroundUnitSelection({
+        order,
+        item,
+        selectedUnitIndex: unitIndex,
+        selectedOverrides: {
+          status: 'cancelled',
+          cancelledAt: cancelAt,
+          note: reason || item.note || ''
+        }
       })
-      order.items.push(cancelledClone)
     } else {
       item.status = 'cancelled'
       item.cancelledAt = cancelAt
@@ -1043,7 +1104,7 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
   return { order: decorateOrder(freshOrder) }
 }
 
-export const setItemCookingByItemIdService = async (tenantId, id, itemId) => {
+export const setItemCookingByItemIdService = async (tenantId, id, itemId, options = {}) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
 
@@ -1055,7 +1116,18 @@ export const setItemCookingByItemIdService = async (tenantId, id, itemId) => {
     throw error('invalid_state', 'Item not sent', 400)
   }
 
-  it.status = 'cooking'
+  if ((Number(it.qty) || 0) > 1 && !it.isWeightBased) {
+    splitItemAroundUnitSelection({
+      order,
+      item: it,
+      selectedUnitIndex: options?.unitIndex,
+      selectedOverrides: {
+        status: 'cooking'
+      }
+    })
+  } else {
+    it.status = 'cooking'
+  }
   normalizeLegacyItemStatuses(order)
   await order.save()
 
@@ -1315,7 +1387,7 @@ export const setItemNoteByItemIdService = async (tenantId, id, itemId, note) => 
       subtotal: unitPrice,
       note: nextNote
     })
-    order.items.push(notedClone)
+    insertSplitItemAtSourcePosition(order, it._id, notedClone)
   } else {
     it.note = nextNote
   }
@@ -1478,7 +1550,7 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
     : baseServingType
   if (!Array.isArray(order.kitchenBatches)) order.kitchenBatches = []
   if (!order.kitchenBatches.some(b => String(b?.batchId || '') === batchId)) {
-    order.kitchenBatches.push({ batchId, servingType: baseServingType, sentAt: now })
+    order.kitchenBatches.push({ batchId, servingType: baseServingType, sentAt: now, completedAt: null })
   }
 
   const hasOpenItems = (order.items || []).some(it => it && it.status === 'open')
@@ -2188,7 +2260,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
 
   let filter = {
     ...base,
-    items: { $elemMatch: { status: { $in: ['sent', 'cooking'] } } }
+    items: { $elemMatch: { status: { $in: ['sent', 'cooking', 'completed', 'cancelled'] } } }
   }
   filter = applyBranchFilter(filter, branchIds.length > 0 ? branchIds : (branchId ? [branchId] : []))
 
@@ -2216,7 +2288,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
       const baseCreatedAt = o.createdAt || new Date()
       const rawItems = Array.isArray(o.items) ? o.items : []
       const batchMeta = Array.isArray(o.kitchenBatches) ? o.kitchenBatches : []
-      const batchMetaMap = new Map(batchMeta.map(b => [String(b?.batchId || ''), { servingType: b?.servingType ?? null, sentAt: b?.sentAt ?? null }]))
+      const batchMetaMap = new Map(batchMeta.map(b => [String(b?.batchId || ''), { servingType: b?.servingType ?? null, sentAt: b?.sentAt ?? null, completedAt: b?.completedAt ?? null }]))
       for (const it of rawItems) {
         if (!it) continue
         if ((it.status === 'sent' || it.status === 'cooking') && !it.sentAt) {
@@ -2242,6 +2314,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
           servingType: normalizeServingType(meta?.servingType) || fallbackServing,
           batchSentAt: meta?.sentAt ?? null,
           sentAt: meta?.sentAt ?? null,
+          completedAt: meta?.completedAt ?? null,
           items: [],
           hasActiveItems: false
         }
@@ -2258,7 +2331,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
       }
 
       const batches = Array.from(byBatch.values())
-        .filter(b => b.hasActiveItems)
+        .filter(b => !b?.completedAt && Array.isArray(b?.items) && b.items.length > 0)
         .sort((a, b) => new Date(b.batchSentAt || 0).getTime() - new Date(a.batchSentAt || 0).getTime())
 
       return {
@@ -2303,6 +2376,13 @@ export const completeKitchenBatchByIdService = async (tenantId, orderId, batchId
     if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
   }
   order.items = items
+  if (Array.isArray(order.kitchenBatches)) {
+    order.kitchenBatches = order.kitchenBatches.map((batch) => {
+      if (String(batch?.batchId || '') !== target) return batch
+      const plainBatch = typeof batch?.toObject === 'function' ? batch.toObject() : batch
+      return { ...plainBatch, completedAt: now }
+    })
+  }
   if (order.currentKitchenBatchId && String(order.currentKitchenBatchId) === target) {
     order.currentKitchenBatchId = null
   }
@@ -2331,6 +2411,15 @@ export const completeKitchenBatchService = async (tenantId, id) => {
     if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
   }
   order.items = items
+  if (Array.isArray(order.kitchenBatches) && order.kitchenBatches.length > 0) {
+    order.kitchenBatches = order.kitchenBatches.map((batch) => {
+      const plainBatch = typeof batch?.toObject === 'function' ? batch.toObject() : batch
+      return {
+        ...plainBatch,
+        completedAt: plainBatch?.completedAt || now
+      }
+    })
+  }
   order.currentKitchenBatchId = null
   await order.save()
   const fresh = await Order.findById(order.id).lean()
