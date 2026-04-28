@@ -20,6 +20,7 @@ frontend/.env.*
 
 # build output
 frontend/dist/
+backend/public/downloads/print-agent/windows/PenPOS_PrintAgent_Setup_*.exe
 
 # logs
 *.log

@@ -2,6 +2,8 @@ import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
 import http from 'http'
+import https from 'https'
+import dns from 'dns'
 import { spawn } from 'child_process'
 
 const AGENT_VERSION = '0.1.0'
@@ -56,29 +58,63 @@ const listPrintersWindows = async () => {
   }
 }
 
-const fetchWithTimeout = async (url, { method = 'GET', headers = {}, body = null, timeoutMs = 20000 } = {}) => {
-  const controller = new AbortController()
-  const t = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || 20000)))
-  try {
-    const res = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: body ? JSON.stringify(body) : null,
-    signal: controller.signal
+const requestBuffer = async (url, { method = 'GET', headers = {}, body = null, timeoutMs = 20000 } = {}) => {
+  return new Promise((resolve, reject) => {
+    let parsedUrl
+    try {
+      parsedUrl = new URL(url)
+    } catch (error) {
+      reject(error)
+      return
+    }
+
+    const transport = parsedUrl.protocol === 'https:' ? https : http
+    const payload = body == null
+      ? null
+      : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body), 'utf8')
+
+    const requestHeaders = { ...headers }
+    if (payload && !Object.keys(requestHeaders).some((key) => String(key).toLowerCase() === 'content-type')) {
+      requestHeaders['Content-Type'] = 'application/json'
+    }
+    if (payload && !Object.keys(requestHeaders).some((key) => String(key).toLowerCase() === 'content-length')) {
+      requestHeaders['Content-Length'] = String(payload.length)
+    }
+
+    const req = transport.request(parsedUrl, {
+      method,
+      headers: requestHeaders,
+      family: 4,
+      lookup: (hostname, options, callback) => dns.lookup(hostname, { ...options, family: 4 }, callback)
+    }, (res) => {
+      const chunks = []
+      res.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+      res.on('end', () => {
+        resolve({
+          status: Number(res.statusCode || 0),
+          headers: res.headers || {},
+          buffer: Buffer.concat(chunks)
+        })
+      })
     })
-    return res
-  } finally {
-    clearTimeout(t)
-  }
+
+    req.on('error', (error) => reject(error))
+    req.setTimeout(Math.max(1000, Number(timeoutMs || 20000)), () => {
+      req.destroy(new Error('timeout'))
+    })
+
+    if (payload) req.write(payload)
+    req.end()
+  })
 }
 
 const httpJson = async (url, { method = 'GET', headers = {}, body = null, timeoutMs = 20000, allowNoContent = false } = {}) => {
-  const res = await fetchWithTimeout(url, { method, headers, body, timeoutMs })
+  const res = await requestBuffer(url, { method, headers, body, timeoutMs })
   if (allowNoContent && res.status === 204) return null
-  const txt = await res.text().catch(() => '')
+  const txt = String(res.buffer || Buffer.alloc(0)).trim()
   let data = null
   try { data = txt ? JSON.parse(txt) : null } catch { data = null }
-  if (!res.ok) {
+  if (res.status < 200 || res.status >= 300) {
     const msg = data?.message || data?.error || txt || `HTTP ${res.status}`
     const err = new Error(msg)
     err.status = res.status
@@ -88,15 +124,14 @@ const httpJson = async (url, { method = 'GET', headers = {}, body = null, timeou
 }
 
 const httpBuffer = async (url, { method = 'GET', headers = {}, timeoutMs = 20000 } = {}) => {
-  const res = await fetchWithTimeout(url, { method, headers, timeoutMs })
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
+  const res = await requestBuffer(url, { method, headers, timeoutMs })
+  if (res.status < 200 || res.status >= 300) {
+    const txt = String(res.buffer || Buffer.alloc(0), 'utf8')
     const err = new Error(txt || `HTTP ${res.status}`)
     err.status = res.status
     throw err
   }
-  const ab = await res.arrayBuffer()
-  return Buffer.from(ab)
+  return res.buffer
 }
 
 const fileExists = async (p) => {
@@ -143,6 +178,57 @@ const defaultConfigPath = () => {
   return path.join(programData, 'PenPOS', 'PrintAgent', 'config.json')
 }
 
+const resolveConfigPath = async (argConfigPath) => {
+  const explicit = String(argConfigPath || '').trim()
+  if (explicit) return path.resolve(explicit)
+
+  const candidates = []
+  const execDir = path.dirname(String(process.execPath || ''))
+  const cwd = process.cwd()
+  if (execDir) candidates.push(path.join(execDir, 'config.json'))
+  if (cwd) candidates.push(path.join(cwd, 'config.json'))
+  candidates.push(defaultConfigPath())
+
+  for (const candidate of candidates) {
+    const resolved = path.resolve(candidate)
+    if (await fileExists(resolved)) return resolved
+  }
+  return path.resolve(defaultConfigPath())
+}
+
+const defaultBaseDir = () => {
+  const cfgPath = defaultConfigPath()
+  return path.dirname(cfgPath)
+}
+
+const writeFatalLog = async (message, extra = null) => {
+  try {
+    const baseDir = defaultBaseDir()
+    await ensureDir(baseDir)
+    const file = path.join(baseDir, 'agent-fatal.log')
+    const line = JSON.stringify({
+      at: new Date().toISOString(),
+      version: AGENT_VERSION,
+      message: String(message || ''),
+      extra
+    })
+    await fs.appendFile(file, line + os.EOL, 'utf8')
+  } catch {
+  }
+}
+
+const showFatalDialog = async (message) => {
+  try {
+    const text = String(message || 'Bilinmeyen hata').replace(/'/g, "''")
+    const script = [
+      'Add-Type -AssemblyName PresentationFramework',
+      `[System.Windows.MessageBox]::Show('${text}', 'PenPOS Print Agent', 'OK', 'Error') | Out-Null`
+    ].join('; ')
+    await run('powershell.exe', ['-NoProfile', '-Command', script], { timeoutMs: 15000 })
+  } catch {
+  }
+}
+
 const compareVersions = (left, right) => {
   const a = String(left || '').trim().replace(/^v/i, '').split('.').map((part) => Number(part || 0))
   const b = String(right || '').trim().replace(/^v/i, '').split('.').map((part) => Number(part || 0))
@@ -154,6 +240,18 @@ const compareVersions = (left, right) => {
     if (av < bv) return -1
   }
   return 0
+}
+
+const describeError = (error) => {
+  const message = String(error?.message || error || '').trim()
+  const cause = error?.cause
+  const code = String(cause?.code || error?.code || '').trim()
+  const causeMessage = String(cause?.message || '').trim()
+  return {
+    message: message || 'unknown_error',
+    code: code || '',
+    cause: causeMessage || ''
+  }
 }
 
 const isPackagedExecutable = () => {
@@ -198,6 +296,19 @@ const startStatusServer = ({ port, getStatus, log }) => {
       res.end('error')
     }
   })
+  server.on('error', (error) => {
+    const code = String(error?.code || '').trim()
+    if (code === 'EADDRINUSE') {
+      log('warn', '[HTTP] status server port already in use, continuing without local status server', {
+        port: Number(port || 17171)
+      })
+      return
+    }
+    log('error', '[HTTP] status server failed', {
+      message: String(error?.message || error || ''),
+      code
+    })
+  })
   server.listen(Number(port || 17171), '127.0.0.1', () => {
     log('info', '[HTTP] status server listening', { port: Number(port || 17171) })
   })
@@ -220,41 +331,56 @@ const printRawText = async ({ printerName, content, txtPath }) => {
   if (!prn) throw new Error('printerName missing')
   const script = [
     '$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()',
-    `[System.IO.File]::WriteAllText(${psQuote(txtPath)}, ${psQuote(String(content || ''))}, [System.Text.UTF8Encoding]::new($false))`,
-    '$text = [System.IO.File]::ReadAllText(' + psQuote(txtPath) + ', [System.Text.UTF8Encoding]::new($false))',
-    '$lines = $text -split "\\r?\\n"',
-    '$doc = New-Object System.Drawing.Printing.PrintDocument',
-    '$doc.PrinterSettings.PrinterName = ' + psQuote(prn),
-    '$doc.OriginAtMargins = $false',
-    '$doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)',
-    '$doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController',
-    '$font = New-Object System.Drawing.Font("Consolas", 9)',
-    '$brush = [System.Drawing.Brushes]::Black',
-    '$lineHeight = [int][Math]::Ceiling($font.GetHeight() + 2)',
-    '$index = 0',
-    '$handler = [System.Drawing.Printing.PrintPageEventHandler]{',
-    '  param($sender, $ev)',
-    '  $y = 0',
-    '  $pageHeight = $ev.MarginBounds.Height',
-    '  if ($pageHeight -le 0) { $pageHeight = $ev.PageBounds.Height }',
-    '  $pageWidth = $ev.PageBounds.Width',
-    '  while ($index -lt $lines.Length) {',
-    '    if (($y + $lineHeight) -gt $pageHeight) {',
-    '      $ev.HasMorePages = $true',
-    '      return',
-    '    }',
-    '    $line = [string]$lines[$index]',
-    '    $ev.Graphics.DrawString($line, $font, $brush, 0, $y)',
-    '    $y += $lineHeight',
-    '    $index++',
-    '  }',
-    '  $ev.HasMorePages = $false',
+    '$printerName = ' + psQuote(prn),
+    '$content = ' + psQuote(String(content || '')),
+    '$txtPath = ' + psQuote(txtPath),
+    'Get-Printer -Name $printerName -ErrorAction Stop | Out-Null',
+    '$printed = $false',
+    'try {',
+    '  $rawPrinterType = \'using System; using System.Runtime.InteropServices; public static class RawPrinterHelper { [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public class DOCINFO { [MarshalAs(UnmanagedType.LPWStr)] public string pDocName; [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile; [MarshalAs(UnmanagedType.LPWStr)] public string pDataType; } [DllImport("winspool.drv", EntryPoint = "OpenPrinterW", SetLastError = true, CharSet = CharSet.Unicode)] public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault); [DllImport("winspool.drv", SetLastError = true)] public static extern bool ClosePrinter(IntPtr hPrinter); [DllImport("winspool.drv", EntryPoint = "StartDocPrinterW", SetLastError = true, CharSet = CharSet.Unicode)] public static extern int StartDocPrinter(IntPtr hPrinter, int level, DOCINFO di); [DllImport("winspool.drv", SetLastError = true)] public static extern bool EndDocPrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool StartPagePrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool EndPagePrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten); public static bool SendBytes(string printerName, byte[] bytes) { IntPtr hPrinter; if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false; try { var doc = new DOCINFO(); doc.pDocName = "PenPOS Raw Receipt"; doc.pDataType = "RAW"; if (StartDocPrinter(hPrinter, 1, doc) == 0) return false; try { if (!StartPagePrinter(hPrinter)) return false; IntPtr pUnmanaged = Marshal.AllocCoTaskMem(bytes.Length); try { Marshal.Copy(bytes, 0, pUnmanaged, bytes.Length); int written = 0; return WritePrinter(hPrinter, pUnmanaged, bytes.Length, out written) && written == bytes.Length; } finally { Marshal.FreeCoTaskMem(pUnmanaged); EndPagePrinter(hPrinter); } } finally { EndDocPrinter(hPrinter); } } finally { ClosePrinter(hPrinter); } } }\'',
+    '  Add-Type -TypeDefinition $rawPrinterType -Language CSharp -ErrorAction Stop',
+    '  $bytes = [System.Text.Encoding]::ASCII.GetBytes($content)',
+    '  [System.IO.File]::WriteAllBytes($txtPath, $bytes)',
+    '  if ([RawPrinterHelper]::SendBytes($printerName, $bytes)) { $printed = $true }',
+    '} catch {',
     '}',
-    '$doc.add_PrintPage($handler)',
-    '$doc.Print()',
-    '$doc.remove_PrintPage($handler)',
-    '$font.Dispose()',
-    '$doc.Dispose()'
+    'if (-not $printed) {',
+    '  [System.IO.File]::WriteAllText($txtPath, $content, [System.Text.UTF8Encoding]::new($false))',
+    '  $text = [System.IO.File]::ReadAllText($txtPath, [System.Text.UTF8Encoding]::new($false))',
+    '  $lines = $text -split "\\r?\\n"',
+    '  Add-Type -AssemblyName System.Drawing -ErrorAction SilentlyContinue',
+    '  if ([type]::GetType("System.Drawing.Printing.PrintDocument, System.Drawing")) {',
+    '    $doc = New-Object System.Drawing.Printing.PrintDocument',
+    '    $doc.PrinterSettings.PrinterName = $printerName',
+    '    $doc.OriginAtMargins = $false',
+    '    $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)',
+    '    $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController',
+    '    $font = New-Object System.Drawing.Font("Consolas", 8, [System.Drawing.FontStyle]::Regular)',
+    '    $brush = [System.Drawing.Brushes]::Black',
+    '    $lineHeight = [int][Math]::Ceiling($font.GetHeight() + 1)',
+    '    $index = 0',
+    '    $handler = [System.Drawing.Printing.PrintPageEventHandler]{',
+    '      param($sender, $ev)',
+    '      $y = 0',
+    '      $pageHeight = $ev.MarginBounds.Height',
+    '      if ($pageHeight -le 0) { $pageHeight = $ev.PageBounds.Height }',
+    '      while ($index -lt $lines.Length) {',
+    '        if (($y + $lineHeight) -gt $pageHeight) { $ev.HasMorePages = $true; return }',
+    '        $ev.Graphics.DrawString([string]$lines[$index], $font, $brush, 0, $y)',
+    '        $y += $lineHeight',
+    '        $index++',
+    '      }',
+    '      $ev.HasMorePages = $false',
+    '    }',
+    '    $doc.add_PrintPage($handler)',
+    '    $doc.Print()',
+    '    $doc.remove_PrintPage($handler)',
+    '    $font.Dispose()',
+    '    $doc.Dispose()',
+    '  } else {',
+    '    Get-Content -LiteralPath $txtPath -Encoding UTF8 | Out-Printer -Name $printerName',
+    '  }',
+    '}'
   ].join('; ')
   await run('powershell.exe', ['-NoProfile', '-Command', script], { timeoutMs: 30000 })
 }
@@ -266,17 +392,34 @@ const downloadBinary = async ({ url, headers, destinationPath, timeoutMs }) => {
 }
 
 const triggerSelfUpdate = async ({ manifest, configPath, baseDir, headers, timeoutMs, log }) => {
+  const downloadUrl = String(manifest?.downloadUrl || '').trim()
+  const nextVersion = String(manifest?.version || '').trim()
+  const fileName = String(manifest?.fileName || '').trim() || `PenPOS_PrintAgent_${nextVersion}.exe`
+  const packageType = String(manifest?.packageType || '').trim().toLowerCase() || 'binary'
+  if (!downloadUrl || !nextVersion) return false
+
+  if (packageType === 'setup') {
+    const setupPath = path.join(baseDir, 'updates', fileName)
+    await downloadBinary({ url: downloadUrl, headers, destinationPath: setupPath, timeoutMs })
+    const installArgsRaw = String(manifest?.installArgs || '').trim() || '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-'
+    const installArgs = installArgsRaw.split(/\s+/g).filter(Boolean)
+    const child = spawn(setupPath, installArgs, {
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore'
+    })
+    child.unref()
+    log('info', '[UPDATE] Setup guncellemesi baslatildi', { nextVersion, currentVersion: AGENT_VERSION, setupPath, installArgs })
+    return true
+  }
+
   if (!isPackagedExecutable()) {
-    log('warn', '[UPDATE] Paketlenmis exe modunda degil, otomatik guncelleme atlandi', { currentVersion: AGENT_VERSION, latestVersion: manifest?.version })
+    log('warn', '[UPDATE] Paketlenmis exe modunda degil, binary otomatik guncelleme atlandi', { currentVersion: AGENT_VERSION, latestVersion: manifest?.version })
     return false
   }
 
-  const downloadUrl = String(manifest?.downloadUrl || '').trim()
-  const nextVersion = String(manifest?.version || '').trim()
-  if (!downloadUrl || !nextVersion) return false
-
   const updateDir = path.join(baseDir, 'updates')
-  const pendingExePath = path.join(updateDir, `PenPOS_PrintAgent_${nextVersion}.exe`)
+  const pendingExePath = path.join(updateDir, fileName)
   const updaterScriptPath = path.join(updateDir, 'apply-update.ps1')
   const currentExePath = process.execPath
 
@@ -317,7 +460,7 @@ const triggerSelfUpdate = async ({ manifest, configPath, baseDir, headers, timeo
 
 const main = async () => {
   const args = parseArgs(process.argv)
-  const configPath = path.resolve(String(args.config || defaultConfigPath()))
+  const configPath = await resolveConfigPath(args.config)
   const cfg = await readJson(configPath)
   const baseDir = path.dirname(configPath)
   const { log } = await openLogger(baseDir)
@@ -571,6 +714,12 @@ const main = async () => {
 }
 
 main().catch((e) => {
-  console.error('[AGENT_FATAL]', e?.message || e)
-  process.exit(1)
+  const message = String(e?.message || e || 'Bilinmeyen hata')
+  console.error('[AGENT_FATAL]', message)
+  Promise.resolve()
+    .then(() => writeFatalLog(message, { stack: String(e?.stack || '') }))
+    .then(() => showFatalDialog(`${message}\n\nDetay log: C:/ProgramData/PenPOS/PrintAgent/agent-fatal.log`))
+    .finally(() => {
+      process.exit(1)
+    })
 })
