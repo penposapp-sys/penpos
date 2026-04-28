@@ -589,12 +589,43 @@ export const receipt = async (req, res) => {
   try {
     const o = await Order.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
     if (!o) throw (await import('../utils/errors.js')).error('not_found', 'Order not found', 404)
+    const [table, tenant] = await Promise.all([
+      o.tableId ? Table.findOne({ _id: o.tableId, tenantId: req.user.tenantId }).select('name').lean() : Promise.resolve(null),
+      req.tenant?.name ? Promise.resolve({ name: req.tenant.name }) : findTenantById(req.user.tenantId)
+    ])
+    const subtotal = Number(o.total ?? o.totals?.subtotal ?? 0)
+    const discountTotal = Number(o.discountTotal ?? 0)
+    const grandTotal = Number(o.netTotal ?? o.totals?.grandTotal ?? 0)
+    const paidTotal = Number(o.paidTotal ?? 0)
+    const balanceDue = Number(o.balanceDue ?? 0)
     const dto = {
       id: o.id,
+      receiptNo: String(o.id || '').slice(-8).toUpperCase(),
       status: o.status,
+      orderNo: o.orderNo ?? null,
+      tableName: String(table?.name || ''),
+      saleType: String(o.saleType || ''),
+      customerName: String(o.customerName || ''),
+      customerPhone: String(o.customerPhone || ''),
+      customerAddress: String(o.customerAddress || ''),
+      createdByName: String(o.createdByName || ''),
+      businessName: String(tenant?.name || 'PENPOS'),
       items: o.items,
-      totals: o.totals,
+      totals: {
+        subtotal,
+        discountTotal,
+        grandTotal,
+        paidTotal,
+        balanceDue
+      },
+      discountPercent: Number(o.discountPercent || 0),
+      discountTotal,
+      paidTotal,
+      balanceDue,
+      netTotal: grandTotal,
+      payments: Array.isArray(o.payments) ? o.payments : [],
       paymentMethod: o.paymentMethod,
+      paymentStatus: o.paymentStatus,
       note: o.note,
       createdAt: o.createdAt
     }

@@ -33,6 +33,13 @@ const toPrintAscii = (value) => String(value || '')
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
 
+const splitDateTime = (value) => {
+  const date = value ? new Date(value) : new Date()
+  const full = date.toLocaleString('tr-TR')
+  const [datePart = full, timePart = ''] = full.split(' ')
+  return { datePart, timePart }
+}
+
 const line = (char = '-') => `${String(char || '-').repeat(RECEIPT_WIDTH)}\n`
 
 const center = (text) => {
@@ -108,11 +115,18 @@ const derivePaymentType = (receipt) => {
   return toPrintAscii(receipt?.paymentMethod || '').trim() || (String(receipt?.paymentStatus || '') === 'paid' ? 'Odendi' : 'Bekliyor')
 }
 
+const deriveReceiptStatus = (receipt) => {
+  if (String(receipt?.status || '') === 'cancelled') return 'IPTAL'
+  return String(receipt?.paymentStatus || '') === 'paid' ? 'ODENDI' : 'ODENMEDI'
+}
+
 const buildReceiptContent = (receipt) => {
   const businessName = String(receipt?.businessName || 'PENPOS').trim()
-  const orderNo = receipt?.orderNo || receipt?.id || '-'
-  const dateText = new Date(receipt?.createdAt || Date.now()).toLocaleString('tr-TR')
+  const receiptNo = receipt?.receiptNo || String(receipt?.id || '').slice(-8).toUpperCase() || '-'
+  const orderNo = receipt?.orderNo || '-'
+  const { datePart, timePart } = splitDateTime(receipt?.createdAt)
   const tableName = String(receipt?.tableName || '').trim()
+  const cashierName = String(receipt?.createdByName || '').trim()
   const activeItems = (Array.isArray(receipt?.items) ? receipt.items : []).filter((it) => String(it?.status || '') !== 'cancelled')
   const cancelledItems = (Array.isArray(receipt?.items) ? receipt.items : []).filter((it) => String(it?.status || '') === 'cancelled')
   const subtotal = Number(receipt?.totals?.subtotal ?? receipt?.totals?.total ?? 0)
@@ -121,13 +135,20 @@ const buildReceiptContent = (receipt) => {
   const discountPercent = Number(receipt?.discountPercent || 0)
   const paidTotal = Number(receipt?.paidTotal ?? receipt?.totals?.paidTotal ?? 0)
   const balanceDue = Number(receipt?.balanceDue ?? receipt?.totals?.balanceDue ?? Math.max(0, grandTotal - paidTotal))
+  const displayBalance = Number(receipt?.displayBalance ?? 0)
   const lines = []
 
+  lines.push(center('HOS GELDINIZ').trimEnd())
   lines.push(line('=').trimEnd())
-  lines.push(pairRow('Fis No:', String(orderNo)).trimEnd())
-  lines.push(pairRow('Tarih:', dateText).trimEnd())
+  lines.push(pairRow('Fis No:', String(receiptNo)).trimEnd())
+  if (String(orderNo).trim() && String(orderNo).trim() !== '-') {
+    lines.push(pairRow('Siparis No:', String(orderNo)).trimEnd())
+  }
   if (tableName) lines.push(pairRow('Masa:', tableName).trimEnd())
-  lines.push(pairRow('Durum:', String(receipt?.paymentStatus || '') === 'paid' ? 'ODENDI' : 'ODENMEDI').trimEnd())
+  lines.push(pairRow('Tarih:', datePart).trimEnd())
+  if (timePart) lines.push(pairRow('Saat:', timePart).trimEnd())
+  if (cashierName) lines.push(pairRow('Kasiyer:', cashierName).trimEnd())
+  lines.push(pairRow('Durum:', deriveReceiptStatus(receipt)).trimEnd())
   lines.push(line('-').trimEnd())
 
   for (const item of activeItems) {
@@ -145,8 +166,9 @@ const buildReceiptContent = (receipt) => {
     lines.push(center('IPTAL URUNLER').trimEnd())
     lines.push(line('-').trimEnd())
     for (const item of cancelledItems) {
-      const name = `${toPrintAscii(item?.nameSnapshot || '-')} x${Math.max(1, Number(item?.qty || 1))}`
-      lines.push(name)
+      const name = `IPTAL - ${toPrintAscii(item?.nameSnapshot || '-')}`
+      lines.push(...wrapText(name))
+      lines.push(`x${Math.max(1, Number(item?.qty || 1))}`)
       lines.push(...wrapText(`Iptal sebebi: ${String(item?.note || '').trim() || 'Sebep belirtilmedi'}`))
       lines.push('')
     }
@@ -159,6 +181,7 @@ const buildReceiptContent = (receipt) => {
   }
   lines.push(pairRow('Odenen:', money(paidTotal)).trimEnd())
   lines.push(pairRow('Kalan:', money(balanceDue)).trimEnd())
+  lines.push(pairRow('Bakiye:', money(displayBalance)).trimEnd())
   lines.push(pairRow('TOPLAM:', money(grandTotal)).trimEnd())
   lines.push(pairRow('Odeme:', derivePaymentType(receipt)).trimEnd())
   if (receipt?.note) {
