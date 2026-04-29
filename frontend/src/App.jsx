@@ -23,6 +23,7 @@ import DeliveryOrdersPage from './pages/DeliveryOrdersPage.jsx'
 import KitchenPage from './pages/KitchenPage.jsx'
 import KitchenBulkPage from './pages/KitchenBulkPage.jsx'
 import ReportsSales from './pages/ReportsSales.jsx'
+import ReportsPage from './pages/ReportsPage.jsx'
 import _ProductReportPage from './pages/ProductReportPage.jsx'
 import TablesPage from './pages/TablesPage.jsx'
 import ReceiptPage from './pages/ReceiptPage.jsx'
@@ -201,6 +202,7 @@ export default function App() {
           <Route path="app/walkin/:orderId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />
           <Route path="app/delivery" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'view_delivery']} system="kermes"><DeliveryOrdersPage /></ProtectedRoute>} />
           <Route path="app/delivery/:orderId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'view_delivery']} system="kermes"><DeliveryOrdersPage /></ProtectedRoute>} />
+          <Route path="app/reports" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><ReportsPage /></ProtectedRoute>} />
           <Route path="app/reports/sales" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['closed_tables_page_view']} system="kermes"><ReportsSales /></ProtectedRoute>} />
           <Route path="app/product-report" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><ProductReportPage /></ProtectedRoute>} />
           <Route path="app/accounts" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['view_accounts', 'manage_accounts']} permissionsMode="any" system="kermes"><AccountsPage /></ProtectedRoute>} />

@@ -36,14 +36,14 @@ export default function SettingsBranchCards({
               key={c.id}
               type="button"
               onClick={() => onSelectBranchId(c.id)}
-              className="card"
+              className={isSelected ? 'card branch-summary-card is-active' : 'card branch-summary-card'}
               style={{
                 padding: 12,
                 textAlign: 'left',
                 cursor: 'pointer',
                 background: '#ffffff',
-                borderColor: isSelected ? '#16a34a' : 'var(--border)',
-                boxShadow: isSelected ? '0 0 0 2px rgba(22,163,74,0.15)' : 'none'
+                borderColor: isSelected ? 'rgba(37, 99, 235, 0.18)' : 'var(--border)',
+                boxShadow: isSelected ? '0 18px 40px rgba(37, 99, 235, 0.12)' : '0 10px 26px rgba(15, 23, 42, 0.04)'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -61,4 +61,3 @@ export default function SettingsBranchCards({
     </div>
   )
 }
-

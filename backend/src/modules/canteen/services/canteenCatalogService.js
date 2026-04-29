@@ -16,6 +16,17 @@ const isDuplicateBarcodeError = (err) => {
   return Object.prototype.hasOwnProperty.call(keyPattern, 'barcode') || Object.prototype.hasOwnProperty.call(keyValue, 'barcode')
 }
 
+const isDuplicateProductNameError = (err) => {
+  const code = Number(err?.code || 0)
+  if (code !== 11000) return false
+  const keyPattern = err?.keyPattern || {}
+  const keyValue = err?.keyValue || {}
+  return (
+    Object.prototype.hasOwnProperty.call(keyPattern, 'nameNormalized') ||
+    Object.prototype.hasOwnProperty.call(keyValue, 'nameNormalized')
+  )
+}
+
 export const listCategories = async (tenantId, branchId) => {
   const items = await catRepo.listByTenantAndBranch(tenantId, branchId)
   return items.map(c => ({ id: c.id, name: c.name }))
@@ -76,7 +87,12 @@ export const createProduct = async (tenantId, branchId, input) => {
   if (!name) throw error('name_required', 'Ürün adı zorunludur', 400)
   const barcode = normalizeBarcode(input?.barcode)
   if (!barcode) throw error('validation_error', 'Barkod zorunludur', 400)
+  const rawPrice = input?.price
+  if (rawPrice === undefined || rawPrice === null || String(rawPrice).trim() === '') {
+    throw error('price_required', 'Satış fiyatı zorunludur', 400)
+  }
   const price = Number(input?.price || 0)
+  if (!Number.isFinite(price) || price < 0) throw error('validation_error', 'Satış fiyatı geçersiz', 400)
   const costPrice = Number(input?.costPrice || 0)
   const vatRate = Number(input?.vatRate || 0)
   const categoryId = input?.categoryId ? String(input.categoryId) : null
@@ -112,6 +128,7 @@ export const createProduct = async (tenantId, branchId, input) => {
     }
   } catch (err) {
     if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayıtlı', 409)
+    if (isDuplicateProductNameError(err)) throw error('duplicate_product_name', 'Bu şubede aynı isimde ürün zaten kayıtlı', 409)
     throw err
   }
 }
@@ -163,6 +180,7 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
     }
   } catch (err) {
     if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayıtlı', 409)
+    if (isDuplicateProductNameError(err)) throw error('duplicate_product_name', 'Bu şubede aynı isimde ürün zaten kayıtlı', 409)
     throw err
   }
 }

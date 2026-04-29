@@ -32,7 +32,6 @@ export default function AutoPrintInfoCard({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <div>
           <div style={{ fontWeight: 800 }}>Print Agent</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Otomatik yazdirma icin bu bilgisayarda PenPOS Print Agent calismalidir.</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ fontWeight: 800, color: statusColor }}>{statusText}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yazicilar: {Number(printerCount || 0)}</div>

@@ -452,15 +452,12 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   const note = safeText(noteText)
   const q = Math.max(1, Number(qty || 1))
   const amount = safeText(amountText) || `${q} ADET`
-  const rawW = Math.max(20, Number(widthMm || 50))
-  const rawH = Math.max(20, Number(heightMm || 30))
-  const w = Math.max(rawW, rawH)
-  const h = Math.min(rawW, rawH)
-  const marginMm = Math.max(1.5, Math.min(4, Math.min(w, h) * 0.06))
+  const w = Math.max(20, Number(widthMm || 50))
+  const h = Math.max(20, Number(heightMm || 30))
+  const marginMm = Math.max(0, Math.min(0.8, Math.min(w, h) * 0.015))
 
   const doc = new PDFDocument({
     size: [mmToPt(w), mmToPt(h)],
-    layout: 'landscape',
     margins: { top: mmToPt(marginMm), left: mmToPt(marginMm), right: mmToPt(marginMm), bottom: mmToPt(marginMm) }
   })
   applyTrFont(doc)
@@ -474,7 +471,7 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
   const contentHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom
   const qtyText = amount
-  const blockGap = Math.max(mmToPt(1.5), contentHeight * 0.06)
+  const blockGap = Math.max(mmToPt(0.8), contentHeight * 0.03)
   const topBlockHeight = top ? Math.max(mmToPt(6), contentHeight * 0.2) : 0
   const noteBlockHeight = note ? Math.max(mmToPt(5), contentHeight * 0.18) : 0
   const qtyBlockHeight = Math.max(mmToPt(6), contentHeight * 0.18)
@@ -498,7 +495,6 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   const noteHeight = note ? doc.font('Helvetica').fontSize(noteSize).heightOfString(note, { width: contentWidth, align: 'center' }) : 0
   const qtyHeight = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(qtyText, { width: contentWidth, align: 'center', lineBreak: false })
   const totalUsedHeight = topHeight + productHeightUsed + noteHeight + qtyHeight + (blockGap * totalGapCount)
-
   let y = doc.page.margins.top + Math.max(0, (contentHeight - totalUsedHeight) / 2)
 
   useFont(doc, 'trBold')

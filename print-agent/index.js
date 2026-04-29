@@ -242,6 +242,99 @@ const compareVersions = (left, right) => {
   return 0
 }
 
+const toTsplAscii = (value) => String(value || '')
+  .replace(/İ/g, 'I')
+  .replace(/İ/g, 'I')
+  .replace(/ı/g, 'i')
+  .replace(/Ş/g, 'S')
+  .replace(/ş/g, 's')
+  .replace(/Ğ/g, 'G')
+  .replace(/ğ/g, 'g')
+  .replace(/Ü/g, 'U')
+  .replace(/ü/g, 'u')
+  .replace(/Ö/g, 'O')
+  .replace(/ö/g, 'o')
+  .replace(/Ç/g, 'C')
+  .replace(/ç/g, 'c')
+  .replace(/"/g, "'")
+
+const splitLabelLine = (text, maxLen = 22) => {
+  const src = toTsplAscii(text).trim()
+  if (!src) return ['']
+  const words = src.split(/\s+/g).filter(Boolean)
+  const lines = []
+  let current = ''
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word
+    if (next.length <= maxLen) {
+      current = next
+      continue
+    }
+    if (current) lines.push(current)
+    current = word
+  }
+  if (current) lines.push(current)
+  return lines.slice(0, 2)
+}
+
+const centerDots = (text, pageWidthDots, fontWidthDots) => {
+  const width = Math.max(0, String(text || '').length * fontWidthDots)
+  return Math.max(8, Math.floor((pageWidthDots - width) / 2))
+}
+
+const buildLabelBlocks = ({ top, productLines, note, amount }) => {
+  const blocks = []
+  if (top) blocks.push({ text: top, font: '3', fontWidth: 24, height: 26 })
+  for (const line of productLines) blocks.push({ text: line, font: '4', fontWidth: 32, height: 32 })
+  if (note) blocks.push({ text: note, font: '3', fontWidth: 24, height: 24 })
+  blocks.push({ text: amount, font: '3', fontWidth: 24, height: 26 })
+  return blocks.filter((block) => String(block.text || '').trim())
+}
+
+const buildTsplLabelPayload = (content, options = {}) => {
+  const lines = String(content || '').split(/\r?\n/g).map((line) => line.trim()).filter(Boolean)
+  const top = toTsplAscii(lines[0] || '')
+  const productLines = splitLabelLine(lines[1] || '-', 20)
+  const amount = toTsplAscii(lines[2] || '1 ADET')
+  const note = toTsplAscii(lines[3] || '')
+  const widthMm = Math.max(20, Number(options?.widthMm || 60))
+  const heightMm = Math.max(20, Number(options?.heightMm || 40))
+  const widthDots = Math.round(widthMm * 8)
+  const heightDots = Math.round(heightMm * 8)
+  const gapMm = Math.max(0, Number(options?.gapMm || 2))
+  const marginDots = Math.max(8, Math.round(2 * 8))
+  const innerWidthDots = Math.max(40, widthDots - (marginDots * 2))
+  const innerHeightDots = Math.max(40, heightDots - (marginDots * 2))
+  const cmd = [
+    `SIZE ${widthMm} mm,${heightMm} mm`,
+    `GAP ${gapMm} mm,0 mm`,
+    'DIRECTION 1',
+    'REFERENCE 0,0',
+    'OFFSET 0 mm',
+    'DENSITY 8',
+    'SPEED 4',
+    'CLS'
+  ]
+
+  const blocks = buildLabelBlocks({ top, productLines, note, amount })
+  const totalHeight = blocks.reduce((sum, block) => sum + block.height, 0)
+  const gapDots = blocks.length > 1
+    ? Math.max(8, Math.floor((innerHeightDots - totalHeight) / (blocks.length - 1)))
+    : 0
+  const usedHeight = totalHeight + (gapDots * Math.max(0, blocks.length - 1))
+  let y = marginDots + Math.max(0, Math.floor((innerHeightDots - usedHeight) / 2))
+
+  for (const block of blocks) {
+    const x = marginDots + centerDots(block.text, innerWidthDots, block.fontWidth) - 8
+    cmd.push(`TEXT ${Math.max(marginDots, x)},${y},"${block.font}",0,1,1,"${block.text}"`)
+    y += block.height + gapDots
+  }
+
+  cmd.push('PRINT 1,1')
+  cmd.push('')
+  return cmd.join('\r\n')
+}
+
 const describeError = (error) => {
   const message = String(error?.message || error || '').trim()
   const cause = error?.cause
@@ -318,10 +411,11 @@ const startStatusServer = ({ port, getStatus, log }) => {
 const printPdf = async ({ sumatraPath, printerName, pdfPath, orientation = 'portrait' }) => {
   const exe = String(sumatraPath || '').trim()
   const prn = String(printerName || '').trim()
-  const dir = String(orientation || '').trim().toLowerCase() === 'landscape' ? 'landscape' : 'portrait'
+  const dir = String(orientation || '').trim().toLowerCase()
   if (!exe) throw new Error('sumatraPath missing')
   if (!prn) throw new Error('printerName missing')
-  await run(exe, ['-print-to', prn, '-print-settings', `noscale,${dir}`, '-silent', pdfPath], { timeoutMs: 30000 })
+  const printSettings = dir === 'landscape' || dir === 'portrait' ? `noscale,${dir}` : 'noscale'
+  await run(exe, ['-print-to', prn, '-print-settings', printSettings, '-silent', pdfPath], { timeoutMs: 30000 })
 }
 
 const psQuote = (value) => `'${String(value || '').replace(/'/g, "''")}'`
@@ -660,10 +754,13 @@ const main = async () => {
     try {
       const printerName = String(job.printerName || job.printer || job?.printSettings?.printerName || '').trim()
       const copies = Math.max(1, Math.min(10, Number(job.copies || job?.printSettings?.copies || 1)))
-      const orientation = String(job?.type || '').trim().toLowerCase() === 'label' ? 'landscape' : 'portrait'
+      const orientation = String(job?.type || '').trim().toLowerCase() === 'label' ? 'auto' : 'portrait'
       const payloadType = String(job?.payloadType || '').trim().toLowerCase()
       const rawContent = String(job?.rawContent || '').trim()
       const pdfBase64 = String(job?.content?.data || job?.pdfBase64 || '')
+      const printOptions = job?.printSettings?.options && typeof job.printSettings.options === 'object'
+        ? job.printSettings.options
+        : {}
       if (!printerName) throw new Error('printerName missing')
 
       if (String(job?.type || '').trim().toLowerCase() === 'receipt' && payloadType === 'raw' && rawContent) {
@@ -671,6 +768,17 @@ const main = async () => {
         try {
           for (let i = 0; i < copies; i++) {
             await printRawText({ printerName, content: rawContent, txtPath: txtTmp })
+          }
+          await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
+        } finally {
+          await fs.unlink(txtTmp).catch(() => {})
+        }
+      } else if (String(job?.type || '').trim().toLowerCase() === 'label' && payloadType === 'raw' && rawContent) {
+        const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
+        const tsplPayload = buildTsplLabelPayload(rawContent, printOptions)
+        try {
+          for (let i = 0; i < copies; i++) {
+            await printRawText({ printerName, content: tsplPayload, txtPath: txtTmp })
           }
           await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
         } finally {

@@ -111,7 +111,7 @@ export default function ReportsSales() {
       </div>
       {error && <div style={{ color: '#ef4444' }}>{error}</div>}
       <div className="reportsSummaryRow">
-        <div className="card" style={{ flex: 1 }}>
+        <div className="card kpi-card" style={{ flex: 1 }}>
           <div>Toplam Ciro</div>
           <div style={{ fontSize: 24, fontWeight: 800 }}>{Number(summary.totalSales || 0).toFixed(2)} TL</div>
           <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)' }}>
@@ -125,7 +125,7 @@ export default function ReportsSales() {
             </div>
           )}
         </div>
-        <div className="card" style={{ flex: 1 }}>
+        <div className="card kpi-card" style={{ flex: 1 }}>
           <div>Kapalı Sipariş Sayısı</div>
           <div style={{ fontSize: 24, fontWeight: 800 }}>{summary.count}</div>
         </div>

@@ -6,6 +6,8 @@ import Modal from '../../components/Modal.jsx'
 import CanteenBulkProductsExcelCard from '../components/CanteenBulkProductsExcelCard.jsx'
 
 const normalize = (s) => String(s || '').toLowerCase().trim()
+const hasValue = (s) => String(s ?? '').trim() !== ''
+const parseLocaleNumber = (s) => Number(String(s || '').replace(',', '.'))
 
 export default function CanteenSettingsProductsPage() {
   const { me } = useOutletContext()
@@ -100,6 +102,15 @@ export default function CanteenSettingsProductsPage() {
     return items.filter(p => normalize(p.name).includes(nq))
   }, [items, q])
 
+  const isCreateFormValid =
+    canManage &&
+    hasValue(name) &&
+    hasValue(barcode) &&
+    hasValue(selectedBranchId) &&
+    hasValue(sellPrice) &&
+    Number.isFinite(parseLocaleNumber(sellPrice)) &&
+    parseLocaleNumber(sellPrice) >= 0
+
   const create = async (e) => {
     e.preventDefault()
     if (!canManage) return
@@ -114,14 +125,20 @@ export default function CanteenSettingsProductsPage() {
       toast.error('Barkod zorunlu')
       return
     }
-    const price = Number(String(sellPrice || '').replace(',', '.'))
-    const cost = Number(String(buyPrice || '').replace(',', '.'))
+    const price = parseLocaleNumber(sellPrice)
+    const cost = parseLocaleNumber(buyPrice)
     if (!String(name || '').trim()) {
       setError('Ürün adı zorunlu')
       return
     }
+    if (!hasValue(sellPrice)) {
+      setError('Satış fiyatı zorunlu')
+      toast.error('Satış fiyatı zorunlu')
+      return
+    }
     if (!Number.isFinite(price) || price < 0) {
       setError('Satış fiyatı geçersiz')
+      toast.error('Satış fiyatı geçersiz')
       return
     }
     setError('')
@@ -139,6 +156,7 @@ export default function CanteenSettingsProductsPage() {
     })
     if (!res?.ok) {
       if (res?.code === 'duplicate_barcode') toast.error('Bu barkod zaten kayıtlı')
+      if (res?.code === 'price_required') toast.error('Satış fiyatı zorunlu')
       setError(res?.message || 'Ürün eklenemedi')
       return
     }
@@ -226,7 +244,7 @@ export default function CanteenSettingsProductsPage() {
 
       {branches.length === 0 && (
         <div className="card" style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#92400e' }}>
-          Şube yok, önce Şube Ayarları’ndan şube ekleyin.
+          Şube yok, önce Şube Ayarları'ndan şube ekleyin.
         </div>
       )}
 
@@ -288,7 +306,7 @@ export default function CanteenSettingsProductsPage() {
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Satış Fiyatı</div>
             <input className="input" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} disabled={!canManage} />
           </label>
-          <button className="btn btn--primary btn--full" disabled={!canManage || !String(name || '').trim() || !String(barcode || '').trim() || !String(selectedBranchId || '').trim()}>Ekle</button>
+          <button className="btn btn--primary btn--full" type="submit" disabled={!isCreateFormValid}>Ekle</button>
         </div>
 
         <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

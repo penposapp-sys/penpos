@@ -169,7 +169,6 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
   const { createJob, resolveActiveStationForJob, resolveStationPrinterConfig } = await import('./printingService.js')
 
   const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
-  if (!labelProfile || labelProfile.isActive === false) return
   const options = labelProfile?.options && typeof labelProfile.options === 'object' ? labelProfile.options : {}
   const autoPrintOnOrder = options.autoPrintOnOrder === true
   const printOnReady = options.printOnReady === true
@@ -189,17 +188,24 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     .map((it) => String(it?.menuItemId || '').trim())
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
 
-  const labelEnabledDocs = menuItemIds.length > 0
-    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds }, printLabelEnabled: true }).select('_id categoryId').lean()
+  const labelCandidateDocs = menuItemIds.length > 0
+    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds } }).select('_id categoryId printLabelEnabled').lean()
     : []
 
-  const labelEnabledMap = new Map((labelEnabledDocs || []).map((doc) => [String(doc?._id || ''), String(doc?.categoryId || '')]))
-  const labelItems = safeItems.filter((it) => labelEnabledMap.has(String(it?.menuItemId || '')))
+  const labelCandidateMap = new Map((labelCandidateDocs || []).map((doc) => [
+    String(doc?._id || ''),
+    {
+      categoryId: String(doc?.categoryId || ''),
+      printLabelEnabled: doc?.printLabelEnabled === true
+    }
+  ]))
+  const labelItems = safeItems.filter((it) => labelCandidateMap.has(String(it?.menuItemId || '')))
   if (labelItems.length === 0) return
 
   const top = await buildLabelTopLine(order)
   for (const it of labelItems) {
-    const categoryId = labelEnabledMap.get(String(it?.menuItemId || '')) || ''
+    const itemConfig = labelCandidateMap.get(String(it?.menuItemId || '')) || { categoryId: '', printLabelEnabled: false }
+    const categoryId = String(itemConfig.categoryId || '')
     const activeStation = await resolveActiveStationForJob({
       tenantId,
       system: 'kermes',
@@ -214,6 +220,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
           triggerMode: mode
         })
       : null
+    if (itemConfig.printLabelEnabled !== true && !stationPrinter) continue
     if (activeStation && !stationPrinter) continue
     const name = String(it?.nameSnapshot || '').trim() || '-'
     const qty = Math.max(1, Number(it?.qty || 1))
@@ -225,7 +232,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
 
     await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
       type: 'label',
-      profileId: String(labelProfile.id),
+      profileId: labelProfile && labelProfile.isActive !== false ? String(labelProfile.id) : undefined,
       payload: { type: 'raw', content: payload },
       meta: {
         orderId: String(order.id),

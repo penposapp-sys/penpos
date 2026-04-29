@@ -152,6 +152,7 @@ export default function Layout() {
 
     if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) {
       items.push({ path: '/kermes/app/dashboard', label: 'Anasayfa', icon: IconHome, show: true })
+      items.push({ path: '/kermes/app/reports', label: 'Raporlar', icon: IconFileCheck, show: true })
     }
     if (user.role === 'tenant_admin' || perms.includes('manage_tables')) {
       items.push({ path: '/kermes/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
