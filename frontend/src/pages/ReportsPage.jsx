@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { api } from '../lib/apiClient.js'
+import { api, apiDownload } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { buildBranchQueryParams, normalizeBranchIds } from '../lib/branchQuery.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import BranchFilterCard from '../components/BranchFilterCard.jsx'
+import { downloadBlob } from '../lib/download.js'
+import { useTheme } from '../theme/ThemeContext.jsx'
 
 const CARD_STYLE = {
   border: '1px solid #e2e8f0',
@@ -28,7 +30,7 @@ const STATUS_COLORS = {
   red: { fg: '#b91c1c', bg: '#fee2e2' }
 }
 
-const EMPTY_SUMMARY = {
+export const EMPTY_SUMMARY = {
   totalRevenue: 0,
   totalPaid: 0,
   averageOrder: 0,
@@ -36,7 +38,7 @@ const EMPTY_SUMMARY = {
   orderCount: 0
 }
 
-const EMPTY_DATASETS = {
+export const EMPTY_DATASETS = {
   dashboard: null,
   products: [],
   cancelledProducts: [],
@@ -53,7 +55,7 @@ const todayYmd = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-const reportDefinitions = [
+export const reportDefinitions = [
   { key: 'salesSummary', title: 'Satis Ozeti', icon: '₺', description: 'Ciro, tahsilat, siparis adedi ve ortalama sepet.', detailTitle: 'Detayli Satis Ozeti Raporu', metrics: ['Toplam Ciro', 'Net Satis', 'Toplam Tahsilat', 'Ortalama Sepet'], tableColumns: ['Tarih', 'Siparis', 'Brut Satis', 'Iptal', 'Net Satis', 'Tahsilat'] },
   { key: 'paymentDistribution', title: 'Odeme Dagilimi', icon: '💳', description: 'Nakit, kart, online odeme ve acik hesap dagilimi.', detailTitle: 'Detayli Odeme Dagilimi Raporu', metrics: ['Nakit', 'Kredi Karti', 'Online', 'Acik Hesap'], tableColumns: ['Saat', 'Odeme Tipi', 'Islem Sayisi', 'Tutar', 'Oran'] },
   { key: 'productPerformance', title: 'Urun Performansi', icon: '🍽', description: 'En cok satan urunler, adet, ciro ve karlilik.', detailTitle: 'Detayli Urun Performansi Raporu', metrics: ['Satilan Urun', 'Toplam Adet', 'Urun Cirosu', 'Kar Orani'], tableColumns: ['Urun', 'Kategori', 'Adet', 'Birim Fiyat', 'Ciro', 'Kar'] },
@@ -127,27 +129,70 @@ const formatDurationMinutes = (start, end) => {
 
 const safeArray = (value) => Array.isArray(value) ? value : []
 
-const buildHourlyCustomerBars = (datasets) => {
-  const fromDashboard = safeArray(datasets.dashboard?.customers?.hourly)
-    .map((item, index) => ({
-      label: String(item?.hour || `${String(index).padStart(2, '0')}:00`).slice(0, 5),
-      value: Number(item?.count || 0)
-    }))
-    .filter((item) => item.label)
+const filterOrdersByDashboardRange = (datasets, orders) => {
+  const start = String(datasets?.dashboard?.range?.start || '').trim()
+  const end = String(datasets?.dashboard?.range?.end || '').trim()
+  if (!start || !end) return safeArray(orders)
 
-  if (fromDashboard.length > 0 && fromDashboard.some((item) => item.value > 0)) return fromDashboard
+  const from = new Date(`${start}T00:00:00`)
+  const to = new Date(`${end}T23:59:59.999`)
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return safeArray(orders)
 
-  const bucket = new Map(Array.from({ length: 24 }).map((_, hour) => [`${String(hour).padStart(2, '0')}:00`, 0]))
-  safeArray(datasets.orders).forEach((order) => {
-    const raw = order?.closedAt || order?.createdAt
+  return safeArray(orders).filter((order) => {
+    const raw = order?.createdAt || order?.closedAt || order?.updatedAt
+    const ts = new Date(raw).getTime()
+    if (Number.isNaN(ts)) return false
+    return ts >= from.getTime() && ts <= to.getTime()
+  })
+}
+
+export const buildHourlyAnalyticsRows = (datasets, options = {}) => {
+  const sourceOrders = options.useDashboardRangeOnly
+    ? filterOrdersByDashboardRange(datasets, datasets?.orders)
+    : safeArray(datasets?.orders)
+  const bucket = new Map(Array.from({ length: 24 }).map((_, hour) => [`${String(hour).padStart(2, '0')}:00`, {
+    label: `${String(hour).padStart(2, '0')}:00`,
+    count: 0,
+    tableCount: 0,
+    deliveryCount: 0,
+    walkInCount: 0,
+    revenue: 0
+  }]))
+
+  sourceOrders.forEach((order) => {
+    const raw = order?.createdAt || order?.closedAt
     const date = new Date(raw)
     if (Number.isNaN(date.getTime())) return
     const key = `${String(date.getHours()).padStart(2, '0')}:00`
-    bucket.set(key, (bucket.get(key) || 0) + 1)
+    const row = bucket.get(key)
+    if (!row) return
+    row.count += 1
+    row.revenue += toMoney(order?.netTotal || 0)
+    if (String(order?.saleType || '').trim() === 'delivery') row.deliveryCount += 1
+    else if (String(order?.tableName || '').trim()) row.tableCount += 1
+    else row.walkInCount += 1
   })
 
-  return Array.from(bucket.entries()).map(([label, value]) => ({ label, value }))
+  const rows = Array.from(bucket.values())
+  if (rows.some((item) => item.count > 0)) return rows
+
+  return safeArray(datasets.dashboard?.customers?.hourly).map((item, index) => ({
+    label: String(item?.hour || `${String(index).padStart(2, '0')}:00`).slice(0, 5),
+    count: Number(item?.count || 0),
+    tableCount: 0,
+    deliveryCount: 0,
+    walkInCount: 0,
+    revenue: 0
+  }))
 }
+
+const buildHourlyCustomerBars = (datasets, options = {}) => buildHourlyAnalyticsRows(datasets, options).map((item) => ({
+  label: item.label,
+  value: item.count,
+  tableCount: item.tableCount,
+  deliveryCount: item.deliveryCount,
+  revenue: item.revenue
+}))
 
 const buildWeeklyCustomerBars = (datasets) => {
   const labels = ['Pzt', 'Sal', 'Car', 'Per', 'Cum', 'Cmt', 'Paz']
@@ -304,94 +349,155 @@ function buildCategoryRevenueRows(datasets) {
   }, new Map()).values()).sort((a, b) => b.revenue - a.revenue)
 }
 
-function MainRevenuePanel({ datasets, period, setPeriod }) {
+export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle = true, headerAction = null, useDashboardRangeOnly = false }) {
+  const { theme } = useTheme()
   const chartMode = period === 'week' ? 'week' : 'day'
   const bars = chartMode === 'week'
     ? buildWeeklyCustomerBars(datasets)
-    : buildHourlyCustomerBars(datasets)
+    : buildHourlyCustomerBars(datasets, { useDashboardRangeOnly })
   const max = bars.reduce((best, item) => Math.max(best, item.value), 0) || 1
+  const hourlyRows = buildHourlyAnalyticsRows(datasets, { useDashboardRangeOnly })
+  const peakRow = hourlyRows.reduce((best, item) => item.count > (best?.count || 0) ? item : best, hourlyRows[0] || { label: '-', count: 0, tableCount: 0, deliveryCount: 0 })
+  const totalCustomers = hourlyRows.reduce((sum, item) => sum + Number(item.count || 0), 0)
+  const totalTables = hourlyRows.reduce((sum, item) => sum + Number(item.tableCount || 0), 0)
+  const totalDelivery = hourlyRows.reduce((sum, item) => sum + Number(item.deliveryCount || 0), 0)
+  const statCards = [
+    { label: 'Toplam Musteri', value: String(totalCustomers) },
+    { label: 'Yogun Saat', value: peakRow?.label || '-' },
+    { label: 'Masa Siparisi', value: String(totalTables) },
+    { label: 'Paket Siparisi', value: String(totalDelivery) }
+  ]
+  const chartInnerWidth = Math.max(100, bars.length * 36)
 
   return (
-    <div style={{ ...CARD_STYLE, padding: 24 }}>
+    <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Saatlik Musteri Analizi</h2>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Saatlik Musteri Analizi</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
             {chartMode === 'week' ? 'Hafta icinde musteri hareketi ve yogunluk.' : 'Gun icinde musteri hareketi ve yogunluk.'}
           </p>
         </div>
-        <div style={{ borderRadius: 18, background: '#f1f5f9', padding: 4, display: 'flex', gap: 4 }}>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => setPeriod('today')}
-            style={{
-              borderRadius: 12,
-              background: chartMode === 'day' ? '#ffffff' : 'transparent',
-              borderColor: chartMode === 'day' ? '#cbd5e1' : 'transparent',
-              color: chartMode === 'day' ? '#020617' : '#94a3b8',
-              padding: '8px 12px',
-              fontSize: 12,
-              fontWeight: 900
-            }}
-          >
-            Gunluk
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => setPeriod('week')}
-            style={{
-              borderRadius: 12,
-              background: chartMode === 'week' ? '#ffffff' : 'transparent',
-              borderColor: chartMode === 'week' ? '#cbd5e1' : 'transparent',
-              color: chartMode === 'week' ? '#020617' : '#94a3b8',
-              padding: '8px 12px',
-              fontSize: 12,
-              fontWeight: 900
-            }}
-          >
-            Haftalik
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {headerAction}
+          {showModeToggle && (
+            <div style={{ borderRadius: 18, background: theme.accentSoft, padding: 4, display: 'flex', gap: 4 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setPeriod('today')}
+                style={{
+                  borderRadius: 12,
+                  background: chartMode === 'day' ? theme.accent : 'transparent',
+                  borderColor: chartMode === 'day' ? theme.accent : 'transparent',
+                  color: chartMode === 'day' ? '#ffffff' : theme.accentText,
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  fontWeight: 900
+                }}
+              >
+                Gunluk
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setPeriod('week')}
+                style={{
+                  borderRadius: 12,
+                  background: chartMode === 'week' ? theme.accent : 'transparent',
+                  borderColor: chartMode === 'week' ? theme.accent : 'transparent',
+                  color: chartMode === 'week' ? '#ffffff' : theme.accentText,
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  fontWeight: 900
+                }}
+              >
+                Haftalik
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ marginTop: 28, display: 'flex', height: 230, alignItems: 'flex-end', gap: 10 }}>
-        {bars.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>Musteri verisi bulunamadi.</div>
-        ) : bars.map((bar) => (
-          <div key={bar.label} style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <div title={`${bar.label}: ${bar.value} musteri`} style={{ width: '100%', height: `${Math.max(18, Math.round((bar.value / max) * 100))}%`, borderTopLeftRadius: 18, borderTopRightRadius: 18, background: 'rgba(79, 70, 229, 0.82)' }} />
-            <span style={{ fontSize: 10, color: '#94a3b8' }}>{bar.label}</span>
+      <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+        {statCards.map((item) => (
+          <div key={item.label} style={{ borderRadius: 18, background: theme.accentSoft, padding: '12px 14px', minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: theme.accentText, fontWeight: 700 }}>{item.label}</div>
+            <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900, color: theme.text, overflowWrap: 'anywhere' }}>{item.value}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: 24, paddingTop: 10, borderTop: `1px solid ${theme.border}`, overflowX: 'auto', overflowY: 'hidden' }}>
+        {bars.length === 0 ? (
+          <div style={{ color: '#64748b', fontSize: 13 }}>Musteri verisi bulunamadi.</div>
+        ) : (
+          <div style={{ display: 'flex', width: `${chartInnerWidth}px`, minWidth: '100%', height: 230, alignItems: 'stretch', gap: 8 }}>
+            {bars.map((bar) => (
+              <div key={bar.label} style={{ display: 'flex', flex: 1, minWidth: 28, flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', width: '100%', flex: 1, alignItems: 'flex-end' }}>
+                  <div
+                    title={`${bar.label}: ${bar.value} musteri`}
+                    style={{
+                      width: '100%',
+                      height: `${Math.max(18, Math.round((bar.value / max) * 100))}%`,
+                      minHeight: bar.value > 0 ? 18 : 0,
+                      borderTopLeftRadius: 18,
+                      borderTopRightRadius: 18,
+                      borderBottomLeftRadius: 12,
+                      borderBottomRightRadius: 12,
+                      background: theme.gradient,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-end',
+                      boxShadow: `0 12px 28px ${theme.accentSoft}`
+                    }}
+                  >
+                    {!!bar.deliveryCount && (
+                      <div style={{ height: `${Math.max(8, Math.round((bar.deliveryCount / Math.max(1, bar.value)) * 100))}%`, background: theme.accentSoft, opacity: 0.9 }} />
+                    )}
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap' }}>{bar.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function PaymentOverviewPanel({ datasets, summary }) {
+export function PaymentOverviewPanel({ datasets, summary, headerAction = null }) {
+  const { theme } = useTheme()
   const rows = [
-    ['Nakit', toMoney(datasets.dashboard?.sales?.byMethod?.cash || 0)],
-    ['Kredi Karti', toMoney(datasets.dashboard?.sales?.byMethod?.pos || 0)],
-    ['Acik Hesap', toMoney(datasets.dashboard?.sales?.byMethod?.account || 0)]
+    ['Nakit', toMoney(datasets.dashboard?.sales?.collectedByMethod?.cash ?? datasets.dashboard?.sales?.byMethod?.cash ?? 0)],
+    ['Kart / POS', toMoney(datasets.dashboard?.sales?.collectedByMethod?.pos ?? datasets.dashboard?.sales?.byMethod?.pos ?? 0)],
+    ['Banka', toMoney(datasets.dashboard?.sales?.collectedByMethod?.bank ?? datasets.dashboard?.sales?.byMethod?.bank ?? 0)],
+    ['Acik Hesap', toMoney(datasets.dashboard?.sales?.accountChargedTotal ?? datasets.dashboard?.sales?.byMethod?.account ?? 0)]
   ]
   return (
-    <div style={{ ...CARD_STYLE, padding: 24 }}>
-      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Odeme Ozeti</h2>
-      <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Tahsilat kanallarina gore dagilim.</p>
+    <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Odeme Ozeti</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Tahsilat kanallarina gore dagilim.</p>
+        </div>
+        {headerAction}
+      </div>
 
       <div style={{ marginTop: 24, display: 'grid', gap: 18 }}>
         {rows.map(([label, amount]) => {
           const ratio = summary.totalRevenue > 0 ? Math.min(100, Math.round((amount / summary.totalRevenue) * 100)) : 0
           return (
             <div key={label}>
-              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14 }}>
-                <b>{label}</b>
-                <span style={{ fontWeight: 900 }}>{fmtTl(amount, 0)}</span>
+              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14, minWidth: 0 }}>
+                <b style={{ color: theme.text }}>{label}</b>
+                <span style={{ fontWeight: 900, color: theme.accentText, textAlign: 'right' }}>{fmtTl(amount, 0)}</span>
               </div>
-              <div style={{ height: 12, borderRadius: 999, background: '#f1f5f9' }}>
-                <div style={{ width: `${ratio}%`, height: 12, borderRadius: 999, background: '#020617' }} />
+              <div style={{ height: 12, borderRadius: 999, background: theme.accentSoft }}>
+                <div style={{ width: `${ratio}%`, height: 12, borderRadius: 999, background: theme.gradient }} />
               </div>
             </div>
           )
@@ -401,18 +507,22 @@ function PaymentOverviewPanel({ datasets, summary }) {
   )
 }
 
-function TopSellersPanel({ datasets }) {
+export function TopSellersPanel({ datasets, headerAction = null }) {
+  const { theme } = useTheme()
   const rows = safeArray(datasets.products).slice(0, 6)
   return (
-    <div style={{ ...CARD_STYLE, padding: 24 }}>
-      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>En Cok Satanlar</h2>
+    <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>En Cok Satanlar</h2>
+        {headerAction}
+      </div>
       <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
         {rows.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: 13 }}>Satis verisi bulunamadi.</div>
         ) : rows.map((item, index) => (
-          <div key={`${item.menuItemId || item.name}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 18, background: '#f8fafc', padding: '14px 16px' }}>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{`${index + 1}. ${String(item.name || '-').toUpperCase('tr-TR')}`}</div>
-            <div style={{ fontSize: 16 }}>{`${Number(item.qty || 0)} adet`}</div>
+          <div key={`${item.menuItemId || item.name}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 18, background: theme.accentSoft, padding: '14px 16px', minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: theme.text, minWidth: 0, overflowWrap: 'anywhere' }}>{`${index + 1}. ${String(item.name || '-').toUpperCase('tr-TR')}`}</div>
+            <div style={{ fontSize: 16, color: theme.accentText, whiteSpace: 'nowrap', fontWeight: 800 }}>{`${Number(item.qty || 0)} adet`}</div>
           </div>
         ))}
       </div>
@@ -420,23 +530,27 @@ function TopSellersPanel({ datasets }) {
   )
 }
 
-function CategoryRevenuePanel({ datasets, summary }) {
+export function CategoryRevenuePanel({ datasets, summary, headerAction = null }) {
+  const { theme } = useTheme()
   const rows = buildCategoryRevenueRows(datasets).slice(0, 5)
   const max = rows.reduce((best, item) => Math.max(best, item.revenue), 0) || 1
   return (
-    <div style={{ ...CARD_STYLE, padding: 24 }}>
-      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Kategori Cirosu</h2>
+    <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Kategori Cirosu</h2>
+        {headerAction}
+      </div>
       <div style={{ marginTop: 22, display: 'grid', gap: 18 }}>
         {rows.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: 13 }}>Kategori bazli veri bulunamadi.</div>
         ) : rows.map((item) => (
           <div key={item.name}>
-            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14 }}>
-              <b>{item.name}</b>
-              <span>{fmtTl(item.revenue, 0)}</span>
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14, minWidth: 0 }}>
+              <b style={{ color: theme.text, minWidth: 0, overflowWrap: 'anywhere' }}>{item.name}</b>
+              <span style={{ color: theme.accentText, whiteSpace: 'nowrap', fontWeight: 800 }}>{fmtTl(item.revenue, 0)}</span>
             </div>
-            <div style={{ height: 8, borderRadius: 999, background: '#eef2ff' }}>
-              <div style={{ width: `${Math.max(8, Math.round((item.revenue / max) * 100))}%`, height: 8, borderRadius: 999, background: '#3b5eea' }} />
+            <div style={{ height: 8, borderRadius: 999, background: theme.accentSoft }}>
+              <div style={{ width: `${Math.max(8, Math.round((item.revenue / max) * 100))}%`, height: 8, borderRadius: 999, background: theme.gradient }} />
             </div>
           </div>
         ))}
@@ -525,9 +639,58 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
 
 function ReportDetail({ report, onClose, detailData, isMobilePortrait }) {
   const metricGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
+  const [bounds, setBounds] = useState({ top: 24, left: 24, width: null, height: null })
+
+  useEffect(() => {
+    const updateBounds = () => {
+      try {
+        const main = document.querySelector('main')
+        if (!main) return
+        const rect = main.getBoundingClientRect()
+        setBounds({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height
+        })
+      } catch {}
+    }
+
+    updateBounds()
+    window.addEventListener('resize', updateBounds)
+    return () => window.removeEventListener('resize', updateBounds)
+  }, [])
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(2, 6, 23, 0.4)', backdropFilter: 'blur(6px)', padding: 24 }}>
-      <div style={{ height: '100%', overflow: 'auto', borderRadius: 32, background: '#ffffff', padding: 24, boxShadow: '0 25px 50px rgba(15, 23, 42, 0.25)' }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: bounds.top,
+        left: bounds.left,
+        width: bounds.width || 'calc(100vw - 48px)',
+        height: bounds.height || 'calc(100vh - 48px)',
+        zIndex: 80,
+        background: 'rgba(15, 23, 42, 0.22)',
+        backdropFilter: 'blur(6px)',
+        padding: isMobilePortrait ? 12 : 20,
+        display: 'grid',
+        alignItems: 'start',
+        overflow: 'hidden',
+        borderRadius: 34
+      }}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          height: '100%',
+          overflow: 'auto',
+          borderRadius: 32,
+          background: '#ffffff',
+          padding: 24,
+          boxShadow: '0 25px 50px rgba(15, 23, 42, 0.18)'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 30, fontWeight: 900 }}>{report.detailTitle}</h2>
@@ -545,7 +708,7 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait }) {
           ))}
         </div>
 
-        <div style={{ marginTop: 24, border: '1px solid #e2e8f0', borderRadius: 24, overflow: 'hidden' }}>
+        <div style={{ marginTop: 24, border: '1px solid #e2e8f0', borderRadius: 24, overflowX: 'auto', overflowY: 'hidden' }}>
           <table className="table" style={{ width: '100%' }}>
             <thead>
               <tr style={{ background: '#f8fafc' }}>
@@ -576,7 +739,7 @@ const buildCategoryMaps = (datasets) => {
   return { categoryNameById, menuById }
 }
 
-const buildSummary = (datasets) => {
+export const buildSummary = (datasets) => {
   const dashboard = datasets.dashboard || {}
   const sales = dashboard.sales || {}
   const cancelled = dashboard.cancelled || {}
@@ -602,11 +765,11 @@ const buildCustomerRows = (orders) => {
   return Array.from(map.entries()).map(([name, value]) => ({ name, ...value })).sort((a, b) => b.count - a.count || b.spend - a.spend)
 }
 
-const buildReportDetailData = (report, datasets, summary) => {
+export const buildReportDetailData = (report, datasets, summary) => {
   const dashboard = datasets.dashboard || {}
   const sales = dashboard.sales || {}
   const cancelled = dashboard.cancelled || {}
-  const hourly = safeArray(dashboard.customers?.hourly)
+  const hourly = buildHourlyAnalyticsRows(datasets)
   const products = safeArray(datasets.products)
   const cancelledProducts = safeArray(datasets.cancelledProducts)
   const orders = safeArray(datasets.orders)
@@ -630,7 +793,7 @@ const buildReportDetailData = (report, datasets, summary) => {
     }
   })
 
-  const hourlyPeak = hourly.reduce((best, item) => Number(item?.count || 0) > Number(best?.count || 0) ? item : best, hourly[0] || { hour: '-', count: 0 })
+  const hourlyPeak = hourly.reduce((best, item) => Number(item?.count || 0) > Number(best?.count || 0) ? item : best, hourly[0] || { label: '-', count: 0, revenue: 0 })
   const categoryRows = Array.from(productWithMeta.reduce((map, item) => {
     const key = item.categoryName || '-'
     const prev = map.get(key) || { category: key, itemCount: 0, qty: 0, revenue: 0 }
@@ -688,9 +851,9 @@ const buildReportDetailData = (report, datasets, summary) => {
       'Pay Orani': categoryRows[0] ? fmtPct((categoryRows[0].revenue / Math.max(1, summary.totalRevenue)) * 100) : 'Veri yok'
     },
     hourlyDensity: {
-      'Yogun Saat': String(hourlyPeak?.hour || 'Veri yok'),
+      'Yogun Saat': String(hourlyPeak?.label || 'Veri yok'),
       'Siparis Adedi': String(hourlyPeak?.count || 0),
-      'Saatlik Ciro': fmtTl(summary.averageOrder * Number(hourlyPeak?.count || 0)),
+      'Saatlik Ciro': fmtTl(hourlyPeak?.revenue || 0),
       'Ortalama Sepet': fmtTl(summary.averageOrder, 0)
     },
     waiterPerformance: {
@@ -776,7 +939,7 @@ const buildReportDetailData = (report, datasets, summary) => {
     ].filter((row) => toMoney(String(row.Tutar).replace(/[^\d,.-]/g, '').replace(',', '.')) >= 0),
     productPerformance: productWithMeta.slice(0, 20).map((item) => ({ Urun: item.name || '-', Kategori: item.categoryName || '-', Adet: String(item.qty || 0), 'Birim Fiyat': fmtTl(item.price || 0), Ciro: fmtTl(item.revenue || 0), Kar: '-' })),
     categoryRevenue: categoryRows.slice(0, 20).map((item) => ({ Kategori: item.category, 'Urun Adedi': String(item.itemCount), 'Satis Adedi': String(item.qty), Ciro: fmtTl(item.revenue), Oran: fmtPct((item.revenue / Math.max(1, summary.totalRevenue)) * 100) })),
-    hourlyDensity: hourly.map((item) => ({ Saat: item.hour, Siparis: String(item.count || 0), Masa: '-', Paket: '-', Ciro: fmtTl((summary.averageOrder || 0) * Number(item.count || 0)) })),
+    hourlyDensity: hourly.map((item) => ({ Saat: item.label, Siparis: String(item.count || 0), Masa: String(item.tableCount || 0), Paket: String(item.deliveryCount || 0), Ciro: fmtTl(item.revenue || 0) })),
     waiterPerformance: [],
     tableTurnover: orders.filter((order) => String(order.tableName || '').trim()).slice(0, 20).map((order) => ({ Masa: order.tableName || '-', Acilis: fmtTime(order.createdAt), Kapanis: fmtTime(order.closedAt), Sure: formatDurationMinutes(order.createdAt, order.closedAt), Tutar: fmtTl(order.netTotal || 0) })),
     openAccount: accounts.slice(0, 20).map((account) => ({ Cari: account.name || '-', 'Son Islem': fmtDate(account.createdAt), Borc: fmtTl(account.balance || 0), Tahsilat: fmtTl(0), Kalan: fmtTl(account.balance || 0) })),
@@ -818,6 +981,7 @@ export default function ReportsPage() {
   const [branchOptions, setBranchOptions] = useState([])
   const [selectedReport, setSelectedReport] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
   const [rangeLabel, setRangeLabel] = useState(formatRangeLabel())
   const [summary, setSummary] = useState(EMPTY_SUMMARY)
@@ -825,6 +989,10 @@ export default function ReportsPage() {
 
   const selectedKey = selectedBranches.join(',')
   const detailData = useMemo(() => selectedReport ? buildReportDetailData(selectedReport, datasets, summary) : null, [selectedReport, datasets, summary])
+  const hourlyReport = useMemo(() => reportDefinitions.find((report) => report.key === 'hourlyDensity') || null, [])
+  const paymentReport = useMemo(() => reportDefinitions.find((report) => report.key === 'paymentDistribution') || null, [])
+  const topSellersReport = useMemo(() => reportDefinitions.find((report) => report.key === 'productPerformance') || null, [])
+  const categoryRevenueReport = useMemo(() => reportDefinitions.find((report) => report.key === 'categoryRevenue') || null, [])
 
   useEffect(() => {
     if (allowedIds.length > 0 && selectedBranches.length === 0) {
@@ -942,8 +1110,42 @@ export default function ReportsPage() {
     load()
   }, [period, rangeStart, rangeEnd, selectedKey])
 
+  useEffect(() => {
+    const onExport = async () => {
+      if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) return
+
+      const { params } = buildBranchQueryParams(selectedBranches)
+      if (!params) return
+
+      const range = period === 'range'
+        ? { period: 'range', start: rangeStart, end: rangeEnd }
+        : buildDateRange(period)
+
+      const exportParams = new URLSearchParams(params)
+      exportParams.set('period', range.period)
+      if (range.start) exportParams.set('start', range.start)
+      if (range.end) exportParams.set('end', range.end)
+
+      setExporting(true)
+      try {
+        const res = await apiDownload(`/api/reports/export?${exportParams.toString()}`, {
+          silent: true,
+          skipBranchHeader: true,
+          suppressBranchModal: true
+        })
+        if (!res?.ok || !res?.blob) return
+        downloadBlob(res.blob, res.filename || 'rapor.xlsx')
+      } finally {
+        setExporting(false)
+      }
+    }
+
+    window.addEventListener('reports:export-request', onExport)
+    return () => window.removeEventListener('reports:export-request', onExport)
+  }, [period, rangeStart, rangeEnd, selectedKey])
+
   return (
-    <div style={{ display: 'grid', gap: 20 }}>
+    <div style={{ position: 'relative', display: 'grid', gap: 20 }}>
       <ReportFilter
         period={period}
         setPeriod={setPeriod}
@@ -959,15 +1161,32 @@ export default function ReportsPage() {
       {error && <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#7f1d1d' }}>{error}</div>}
       <ReportSummaryCards summary={summary} datasets={datasets} isMobilePortrait={isMobilePortrait} />
       <div style={{ display: 'grid', gap: 20, gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1.2fr) minmax(0, 0.8fr)' }}>
-        <MainRevenuePanel datasets={datasets} period={period} setPeriod={setPeriod} />
-        <PaymentOverviewPanel datasets={datasets} summary={summary} />
+        <MainRevenuePanel
+          datasets={datasets}
+          period={period}
+          setPeriod={setPeriod}
+          showModeToggle={false}
+          headerAction={hourlyReport ? <button className="btn" type="button" onClick={() => setSelectedReport(hourlyReport)}>Detay</button> : null}
+        />
+        <PaymentOverviewPanel
+          datasets={datasets}
+          summary={summary}
+          headerAction={paymentReport ? <button className="btn" type="button" onClick={() => setSelectedReport(paymentReport)}>Detay</button> : null}
+        />
       </div>
       <div style={{ display: 'grid', gap: 20, gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)' }}>
-        <TopSellersPanel datasets={datasets} />
-        <CategoryRevenuePanel datasets={datasets} summary={summary} />
+        <TopSellersPanel
+          datasets={datasets}
+          headerAction={topSellersReport ? <button className="btn" type="button" onClick={() => setSelectedReport(topSellersReport)}>Detay</button> : null}
+        />
+        <CategoryRevenuePanel
+          datasets={datasets}
+          summary={summary}
+          headerAction={categoryRevenueReport ? <button className="btn" type="button" onClick={() => setSelectedReport(categoryRevenueReport)}>Detay</button> : null}
+        />
       </div>
       <ReportCatalog onSelect={setSelectedReport} isMobilePortrait={isMobilePortrait} />
-      {loading && <div style={{ color: '#64748b', fontSize: 13 }}>Rapor verileri sistemden yukleniyor...</div>}
+      {(loading || exporting) && <div style={{ color: '#64748b', fontSize: 13 }}>{exporting ? 'Rapor dosyasi hazirlaniyor...' : 'Rapor verileri sistemden yukleniyor...'}</div>}
       {selectedReport && <ReportDetail report={selectedReport} onClose={() => setSelectedReport(null)} detailData={detailData} isMobilePortrait={isMobilePortrait} />}
     </div>
   )

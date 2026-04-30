@@ -1,35 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { api, apiDownload } from '../lib/apiClient.js'
-import { toast } from '../lib/toast.js'
+import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAppDate } from '../context/AppDateContext.jsx'
 import { buildBranchQueryParams, normalizeBranchIds } from '../lib/branchQuery.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
-import { downloadBlob } from '../lib/download.js'
 import BranchFilterCard from '../components/BranchFilterCard.jsx'
-
-const REPORT_DIRECTORY_ITEMS = [
-  'Garson performans raporu',
-  'Urun karlilik raporu',
-  'Saatlik yogunluk raporu',
-  'Iptal / fire neden raporu',
-  'Odeme tipi dagilim raporu',
-  'Acik hesap / cari takip raporu',
-  'Masa devir hizi raporu',
-  'Stok tuketim raporu',
-  'Paket servis raporu',
-  'KDV / vergi raporu',
-  'Mutfak hazirlama suresi raporu',
-  'Kurye performans raporu',
-  'Urun bekleme suresi raporu',
-  'Gun sonu mutabakat raporu',
-  'En cok satan urunler raporu',
-  'En az satan urunler raporu',
-  'Kategori bazli ciro raporu',
-  'Indirim raporu',
-  'Iade raporu',
-  'Ortalama sepet tutari raporu'
-]
+import { ReportsSalesContent } from './ReportsSales.jsx'
+import {
+  reportDefinitions,
+  EMPTY_DATASETS as EMPTY_REPORT_DATASETS,
+  EMPTY_SUMMARY as EMPTY_REPORT_SUMMARY,
+  buildSummary as buildReportsSummary,
+  buildReportDetailData,
+  MainRevenuePanel,
+  PaymentOverviewPanel,
+  TopSellersPanel,
+  CategoryRevenuePanel
+} from './ReportsPage.jsx'
 
 const STATUS_COLORS = {
   green: { fg: '#166534', bg: '#dcfce7', chip: '#22c55e' },
@@ -90,10 +77,24 @@ const SkeletonCard = ({ height = 120 }) => (
   </div>
 )
 
-function KpiCard({ title, value, note, trend, tone = 'neutral' }) {
+function KpiCard({ title, value, note, trend, tone = 'neutral', onClick, clickable = false }) {
   const colors = STATUS_COLORS[tone] || STATUS_COLORS.neutral
   return (
-    <div style={{ ...CARD_STYLE, padding: 20, display: 'grid', gap: 10 }}>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...CARD_STYLE,
+        padding: 20,
+        display: 'grid',
+        gap: 10,
+        border: '1px solid #e2e8f0',
+        cursor: clickable ? 'pointer' : 'default',
+        textAlign: 'left',
+        width: '100%',
+        transition: 'transform 160ms ease, box-shadow 160ms ease'
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>{title}</div>
         <span style={{ background: colors.bg, color: colors.fg, borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 900 }}>
@@ -101,22 +102,134 @@ function KpiCard({ title, value, note, trend, tone = 'neutral' }) {
         </span>
       </div>
       <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
-      <div style={{ color: '#94a3b8', fontSize: 12 }}>{note}</div>
-    </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ color: '#94a3b8', fontSize: 12 }}>{note}</div>
+        {clickable && <div style={{ color: '#64748b', fontSize: 11, fontWeight: 800 }}>Detay</div>}
+      </div>
+    </button>
   )
 }
 
-function InfoCard({ title, value, note }) {
+function InfoCard({ title, value, note, onClick, clickable = false }) {
   return (
-    <div style={{ ...CARD_STYLE, padding: 20 }}>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...CARD_STYLE,
+        padding: 20,
+        border: '1px solid #e2e8f0',
+        cursor: clickable ? 'pointer' : 'default',
+        textAlign: 'left',
+        width: '100%'
+      }}
+    >
       <div style={{ color: '#64748b', fontSize: 13 }}>{title}</div>
       <div style={{ marginTop: 10, fontSize: 28, fontWeight: 900 }}>{value}</div>
-      <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>{note}</div>
+      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ color: '#94a3b8', fontSize: 12 }}>{note}</div>
+        {clickable && <div style={{ color: '#64748b', fontSize: 11, fontWeight: 800 }}>Detay</div>}
+      </div>
+    </button>
+  )
+}
+
+function DetailModal({ open, title, subtitle, items, renderContent, contentWidth = 'min(860px, 100%)', onClose }) {
+  if (!open) return null
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 90,
+        background: 'rgba(15, 23, 42, 0.42)',
+        backdropFilter: 'blur(6px)',
+        padding: 24,
+        display: 'grid',
+        placeItems: 'center'
+      }}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: contentWidth,
+          maxHeight: 'calc(100vh - 48px)',
+          overflow: 'auto',
+          borderRadius: 30,
+          background: '#ffffff',
+          boxShadow: '0 32px 80px rgba(15, 23, 42, 0.24)',
+          padding: 24,
+          display: 'grid',
+          gap: 16
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900 }}>{title}</div>
+            {!!subtitle && <div style={{ marginTop: 6, color: '#64748b', fontSize: 14 }}>{subtitle}</div>}
+          </div>
+          <button className="btn" onClick={onClose}>Kapat</button>
+        </div>
+
+        {typeof renderContent === 'function' ? renderContent() : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {Array.isArray(items) && items.length > 0 ? items.map((item, index) => (
+            <div key={`${title}-${index}-${item.title || item.label || item.name || 'item'}`} className="card" style={{ padding: 18, display: 'grid', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {item.dotColor && <span style={{ width: 10, height: 10, borderRadius: '50%', background: item.dotColor }} />}
+                  <div style={{ fontWeight: 900, fontSize: 18 }}>{item.title || item.label || item.name || 'Detay'}</div>
+                </div>
+                {item.badge && (
+                  <span style={{ borderRadius: 999, padding: '6px 10px', background: '#eef2ff', color: '#3730a3', fontSize: 11, fontWeight: 900 }}>
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+              {item.note && <div style={{ color: '#334155', fontSize: 14 }}>{item.note}</div>}
+              {item.message && <div style={{ color: '#334155', fontSize: 14 }}>{item.message}</div>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {item.time && <span className="page-pill">{item.time}</span>}
+                {item.duration && <span className="page-pill">{item.duration}</span>}
+                {item.balance && <span className="page-pill">Bakiye: {item.balance}</span>}
+                {item.orderId && <span className="page-pill">Siparis: {item.orderId}</span>}
+                {item.value && <span className="page-pill">{item.value}</span>}
+              </div>
+              {Array.isArray(item.details) && item.details.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {item.details.map((detail, detailIndex) => (
+                    <div
+                      key={`${detail.label}-${detailIndex}`}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        padding: '10px 12px',
+                        borderRadius: 16,
+                        background: '#f8fafc',
+                        borderTop: detail.dividerBefore ? '2px solid #cbd5e1' : 'none',
+                        marginTop: detail.dividerBefore ? 6 : 0
+                      }}
+                    >
+                      <div style={{ color: '#64748b', fontSize: 13, fontWeight: detail.emphasis ? 800 : 500 }}>{detail.label}</div>
+                      <div style={{ fontWeight: 800, fontSize: 13, textAlign: 'right' }}>{detail.value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            )) : (
+              <div className="card" style={{ color: '#64748b' }}>Detay verisi bulunamadi.</div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function LiveActivityPanel({ items }) {
+function LiveActivityPanel({ items, onOpenDetail }) {
   return (
     <div style={{ ...CARD_STYLE, minHeight: 360, padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -129,8 +242,14 @@ function LiveActivityPanel({ items }) {
 
       <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
         {items.map((item, index) => (
-          <div
+          <button
             key={`${item.title}-${item.note}-${index}`}
+            type="button"
+            onClick={() => onOpenDetail?.({
+              title: item.title,
+              subtitle: 'Canli islem detayi',
+              items: [item]
+            })}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -138,7 +257,11 @@ function LiveActivityPanel({ items }) {
               gap: 12,
               borderRadius: 20,
               background: '#f8fafc',
-              padding: '16px 18px'
+              padding: '16px 18px',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -149,14 +272,64 @@ function LiveActivityPanel({ items }) {
               </div>
             </div>
             <span style={{ color: '#94a3b8', fontSize: 12, whiteSpace: 'nowrap' }}>{item.time}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>
   )
 }
 
-function SystemStatusPanel({ statuses, alerts }) {
+function OpenTablesPanel({ items, onOpenDetail }) {
+  return (
+    <div style={{ ...CARD_STYLE, minHeight: 360, padding: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Acik Masalar</h2>
+        <span style={{ color: '#64748b', fontSize: 12, fontWeight: 800 }}>{items.length} masa</span>
+      </div>
+
+      <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
+        {items.length > 0 ? items.map((item, index) => (
+          <button
+            key={`${item.title}-${index}`}
+            type="button"
+            onClick={() => onOpenDetail?.({
+              title: item.title,
+              subtitle: 'Acik masa detayi',
+              items: [item]
+            })}
+            style={{
+              display: 'grid',
+              gap: 10,
+              borderRadius: 20,
+              background: '#f8fafc',
+              padding: '16px 18px',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ fontWeight: 900 }}>{item.title}</div>
+              <span style={{ color: '#0f172a', fontSize: 13, fontWeight: 900 }}>{item.balance}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <span className="page-pill">{item.duration}</span>
+              {item.time && <span className="page-pill">{item.time}</span>}
+            </div>
+            <div style={{ color: '#64748b', fontSize: 13 }}>{item.note}</div>
+          </button>
+        )) : (
+          <div style={{ borderRadius: 20, background: '#f8fafc', padding: '16px 18px', color: '#64748b', fontSize: 14 }}>
+            Acik masa bulunmuyor.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SystemStatusPanel({ statuses, alerts, onOpenDetail }) {
   return (
     <div style={{ ...CARD_STYLE, minHeight: 360, padding: 24 }}>
       <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Sistem Durumu</h2>
@@ -165,11 +338,20 @@ function SystemStatusPanel({ statuses, alerts }) {
         {statuses.map((item) => {
           const colors = STATUS_COLORS[item.tone] || STATUS_COLORS.neutral
           return (
-            <div key={item.label} style={{ position: 'relative', borderRadius: 20, background: '#f8fafc', padding: 18 }}>
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => onOpenDetail?.({
+                title: item.label,
+                subtitle: 'Sistem durum detayi',
+                items: [{ title: item.label, value: item.value, note: item.note || 'Sistem durumu izleniyor.', badge: item.tone?.toUpperCase?.() || 'DURUM' }]
+              })}
+              style={{ position: 'relative', borderRadius: 20, background: '#f8fafc', padding: 18, border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
               <div style={{ color: '#64748b', fontSize: 12 }}>{item.label}</div>
               <div style={{ marginTop: 6, fontSize: 22, fontWeight: 900 }}>{item.value}</div>
               <span style={{ position: 'absolute', right: 16, top: 16, width: 10, height: 10, borderRadius: '50%', background: colors.chip }} />
-            </div>
+            </button>
           )
         })}
       </div>
@@ -178,13 +360,22 @@ function SystemStatusPanel({ statuses, alerts }) {
         {alerts.map((item, index) => {
           const colors = STATUS_COLORS[item.tone] || STATUS_COLORS.orange
           return (
-            <div key={`${item.title}-${index}`} style={{ border: `1px solid ${colors.bg}`, background: item.bg || '#fff7ed', borderRadius: 20, padding: 16 }}>
+            <button
+              key={`${item.title}-${index}`}
+              type="button"
+              onClick={() => onOpenDetail?.({
+                title: item.title,
+                subtitle: 'Uyari detayi',
+                items: [{ ...item, note: item.message }]
+              })}
+              style={{ border: `1px solid ${colors.bg}`, background: item.bg || '#fff7ed', borderRadius: 20, padding: 16, textAlign: 'left', cursor: 'pointer', width: '100%' }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <div style={{ fontWeight: 900, color: colors.fg }}>{item.title}</div>
                 <span style={{ fontSize: 11, fontWeight: 900, color: colors.fg }}>{item.badge}</span>
               </div>
               <div style={{ marginTop: 6, color: colors.fg, fontSize: 13 }}>{item.message}</div>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -193,18 +384,20 @@ function SystemStatusPanel({ statuses, alerts }) {
 }
 
 function OperationsDashboard({ loading, error, snapshot, isMobilePortrait }) {
+  const [detailState, setDetailState] = useState({ open: false, title: '', subtitle: '', items: [], renderContent: null, contentWidth: 'min(860px, 100%)' })
+
   if (loading && !snapshot) {
     return (
       <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
           <SkeletonCard height={144} />
           {!isMobilePortrait && <SkeletonCard height={144} />}
           {!isMobilePortrait && <SkeletonCard height={144} />}
           {!isMobilePortrait && <SkeletonCard height={144} />}
-          {!isMobilePortrait && <SkeletonCard height={144} />}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
           <SkeletonCard height={132} />
+          {!isMobilePortrait && <SkeletonCard height={132} />}
           {!isMobilePortrait && <SkeletonCard height={132} />}
           {!isMobilePortrait && <SkeletonCard height={132} />}
         </div>
@@ -222,295 +415,262 @@ function OperationsDashboard({ loading, error, snapshot, isMobilePortrait }) {
   }
 
   const data = snapshot || buildFallbackOperationsSnapshot()
-  const kpiGrid = isMobilePortrait ? '1fr' : 'repeat(5, minmax(0, 1fr))'
-  const opsGrid = isMobilePortrait ? '1fr' : 'repeat(3, minmax(0, 1fr))'
-  const bottomGrid = isMobilePortrait ? '1fr' : 'minmax(0, 1.15fr) minmax(0, 0.85fr)'
+  const displayKpis = data.kpis.filter((item) => item.title !== 'Iptal / Fire')
+  const cancelKpi = data.kpis.find((item) => item.title === 'Iptal / Fire')
+  const displayOperationCards = [
+    {
+      title: 'Kapanan Masalar',
+      value: String(data.kpis.find((item) => item.title === 'Toplam Ciro')?.detail?.items?.[0]?.badge?.split(' ')?.[0] || 0),
+      note: 'Kapanan siparisleri ac',
+      detail: {
+        title: 'Kapanan Masalar',
+        subtitle: 'Kapanan masalar sayfasi',
+        renderContent: () => <ReportsSalesContent embedded />,
+        contentWidth: 'min(1180px, 100%)'
+      }
+    },
+    ...data.operationCards
+      .filter((item) => item.title === 'Hazirlanacak Siparis' || item.title === 'Paket Siparis'),
+    ...(cancelKpi ? [{
+      title: 'Iptal Urunler',
+      value: cancelKpi.value,
+      note: 'Iptal edilen urunler',
+      detail: cancelKpi.detail ? { ...cancelKpi.detail, title: 'Iptal Urunler Detayi' } : undefined
+    }] : [])
+  ]
+  const kpiGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
+  const opsGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
+  const bottomGrid = isMobilePortrait ? '1fr' : 'minmax(0, 1.05fr) minmax(0, 0.8fr) minmax(0, 0.9fr)'
+  const openDetail = (payload) => setDetailState({
+    open: true,
+    title: payload.title || 'Detay',
+    subtitle: payload.subtitle || '',
+    items: payload.items || [],
+    renderContent: payload.renderContent || null,
+    contentWidth: payload.contentWidth || 'min(860px, 100%)'
+  })
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <div style={{ display: 'grid', gridTemplateColumns: kpiGrid, gap: 12 }}>
-        {data.kpis.map((item) => (
-          <KpiCard key={item.title} {...item} />
+        {displayKpis.map((item) => (
+          <KpiCard
+            key={item.title}
+            {...item}
+            clickable={!!item.detail && ((Array.isArray(item.detail?.items) && item.detail.items.length > 0) || typeof item.detail?.renderContent === 'function')}
+            onClick={item.detail ? () => openDetail(item.detail) : undefined}
+          />
         ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: opsGrid, gap: 12 }}>
-        {data.operationCards.map((item) => (
-          <InfoCard key={item.title} {...item} />
+        {displayOperationCards.map((item) => (
+          <InfoCard
+            key={item.title}
+            {...item}
+            clickable={!!item.detail && ((Array.isArray(item.detail?.items) && item.detail.items.length > 0) || typeof item.detail?.renderContent === 'function')}
+            onClick={item.detail ? () => openDetail(item.detail) : undefined}
+          />
         ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: bottomGrid, gap: 20 }}>
-        <LiveActivityPanel items={data.liveItems} />
-        <SystemStatusPanel statuses={data.statuses} alerts={data.alerts} />
+        <LiveActivityPanel items={data.liveItems} onOpenDetail={openDetail} />
+        <OpenTablesPanel items={data.openTables} onOpenDetail={openDetail} />
+        <SystemStatusPanel statuses={data.statuses} alerts={data.alerts} onOpenDetail={openDetail} />
       </div>
+
+      <DetailModal
+        open={detailState.open}
+        title={detailState.title}
+        subtitle={detailState.subtitle}
+        items={detailState.items}
+        renderContent={detailState.renderContent}
+        contentWidth={detailState.contentWidth}
+        onClose={() => setDetailState((current) => ({ ...current, open: false }))}
+      />
     </div>
   )
 }
 
 function LegacyDashboardContent({
   isMobilePortrait,
-  period,
-  setPeriod,
-  rangeStart,
-  setRangeStart,
-  rangeEnd,
-  setRangeEnd,
-  data,
-  loading,
-  error,
-  exporting,
-  onExport,
   branchOptions,
-  user,
   selectedBranches,
   setSelectedBranches,
   operationsLoading,
   operationsError,
-  operationsSnapshot
+  operationsSnapshot,
+  reportsLoading,
+  reportsError,
+  reportsSummary,
+  reportsDatasets
 }) {
-  const sales = data?.sales || null
-  const products = Array.isArray(data?.products) ? data.products : []
-  const customers = data?.customers || null
-  const hourly = Array.isArray(customers?.hourly) ? customers.hourly : []
-  const cancelled = data?.cancelled || null
-
   return (
     <div className="dashboard-page" style={{ display: 'grid', gap: 10 }}>
-      <div className="card" style={{ display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {[
-              { key: 'today', label: 'Bugun' },
-              { key: 'week', label: 'Bu Hafta' },
-              { key: 'month', label: 'Bu Ay' },
-              { key: 'year', label: 'Bu Yil' },
-              { key: 'range', label: 'Aralik' }
-            ].map((b) => {
-              const active = period === b.key
-              return (
-                <button
-                  key={b.key}
-                  className="btn"
-                  aria-pressed={active}
-                  onClick={() => {
-                    setPeriod(b.key)
-                    if (b.key !== 'range') {
-                      setRangeStart(todayYmd())
-                      setRangeEnd(todayYmd())
-                    }
-                  }}
-                >
-                  {b.label}
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>
-              {data?.range?.start && data?.range?.end ? `Aralik: ${data.range.start} -> ${data.range.end}` : ''}
-            </div>
-            <button className="btn" onClick={onExport} disabled={exporting || loading}>
-              {exporting ? 'Indiriliyor...' : 'Rapor Indir'}
-            </button>
-          </div>
+      {branchOptions.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <BranchFilterCard
+            branchOptions={branchOptions}
+            selectedBranches={selectedBranches}
+            setSelectedBranches={setSelectedBranches}
+            title="Sube Filtresi"
+            compact
+            iconOnly
+          />
         </div>
-
-        {period === 'range' && (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Baslangic</div>
-              <input type="date" className="input" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
-            </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bitis</div>
-              <input type="date" className="input" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
-            </label>
-          </div>
-        )}
-      </div>
-
-      {branchOptions.length > 1 && (user?.role === 'tenant_admin' || user?.role === 'superadmin') && (
-        <BranchFilterCard
-          branchOptions={branchOptions}
-          selectedBranches={selectedBranches}
-          setSelectedBranches={setSelectedBranches}
-          title="Sube Sec"
-        />
       )}
-
       <OperationsDashboard
         loading={operationsLoading}
         error={operationsError}
         snapshot={operationsSnapshot}
         isMobilePortrait={isMobilePortrait}
       />
+      <ReportsOverviewDashboard
+        loading={reportsLoading}
+        error={reportsError}
+        summary={reportsSummary}
+        datasets={reportsDatasets}
+        isMobilePortrait={isMobilePortrait}
+      />
+    </div>
+  )
+}
 
-      {error && (
-        <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', display: 'grid', gap: 10 }}>
-          <div style={{ fontWeight: 800, color: '#b91c1c' }}>Rapor yuklenemedi</div>
-          <div style={{ color: 'var(--muted)' }}>{error}</div>
-          <div>
-            <button className="btn" onClick={() => toast.error(error)}>Detay</button>
+function ReportDetailView({ report, detailData, isMobilePortrait }) {
+  const metricGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: metricGrid, gap: 12 }}>
+        {report.metrics.map((metric) => (
+          <div key={metric} style={{ borderRadius: 18, background: '#f8fafc', padding: 16 }}>
+            <div style={{ fontSize: 12, color: '#64748b' }}>{metric}</div>
+            <div style={{ marginTop: 10, fontSize: 24, fontWeight: 900 }}>{detailData.metricValues?.[metric] ?? 'Veri yok'}</div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
 
-      {!error && (
-        <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : '1 / -1', display: 'grid', gap: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontWeight: 800 }}>Rapor Merkezi</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                Sistemin isleyisini degistirmeden eklenen rapor basliklari.
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{REPORT_DIRECTORY_ITEMS.length} rapor basligi</div>
-          </div>
-          <div className="report-directory-grid">
-            {REPORT_DIRECTORY_ITEMS.map((title, index) => (
-              <div key={title} className="report-directory-card">
-                <div className="report-directory-card__badge">{String(index + 1).padStart(2, '0')}</div>
-                <div className="report-directory-card__title">{title}</div>
-                <div className="report-directory-card__meta">Gorsel rapor kutusu olarak eklendi</div>
-              </div>
+      <div style={{ border: '1px solid #e2e8f0', borderRadius: 24, overflowX: 'auto', overflowY: 'hidden' }}>
+        <table className="table" style={{ width: '100%' }}>
+          <thead>
+            <tr style={{ background: '#f8fafc' }}>
+              {report.tableColumns.map((col) => <th key={col} style={{ padding: '14px 16px', fontWeight: 900, textAlign: 'left' }}>{col}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {!Array.isArray(detailData.rows) || detailData.rows.length === 0 ? (
+              <tr>
+                <td colSpan={report.tableColumns.length} style={{ padding: '18px 16px', color: '#64748b' }}>Bu rapor icin sistemde uygun veri bulunamadi.</td>
+              </tr>
+            ) : detailData.rows.map((row, rowIndex) => (
+              <tr key={`${report.key}-${rowIndex}`}>
+                {report.tableColumns.map((col) => <td key={col} style={{ padding: '14px 16px', color: '#475569' }}>{row[col] ?? '-'}</td>)}
+              </tr>
             ))}
-          </div>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ReportsOverviewDashboard({ loading, error, summary, datasets, isMobilePortrait }) {
+  const [detailState, setDetailState] = useState({ open: false, report: null, detailData: null })
+  const reportPanels = useMemo(() => ([
+    reportDefinitions.find((item) => item.key === 'hourlyDensity'),
+    reportDefinitions.find((item) => item.key === 'paymentDistribution'),
+    reportDefinitions.find((item) => item.key === 'productPerformance'),
+    reportDefinitions.find((item) => item.key === 'categoryRevenue')
+  ].filter(Boolean)), [])
+
+  const openReportDetail = (report) => {
+    if (!report || !datasets?.dashboard) return
+    setDetailState({
+      open: true,
+      report,
+      detailData: buildReportDetailData(report, datasets, summary)
+    })
+  }
+
+  if (loading && !datasets?.dashboard) {
+    return (
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
+        <SkeletonCard height={320} />
+        <SkeletonCard height={320} />
+        <SkeletonCard height={320} />
+        <SkeletonCard height={320} />
+      </div>
+    )
+  }
+
+  if (error && !datasets?.dashboard) {
+    return (
+      <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', display: 'grid', gap: 8 }}>
+        <div style={{ fontWeight: 900, color: '#b91c1c' }}>Rapor panelleri yuklenemedi</div>
+        <div style={{ color: '#7f1d1d' }}>{error}</div>
+      </div>
+    )
+  }
+
+  if (!datasets?.dashboard) return null
+
+  const detailButton = (report) => (
+    <button className="btn" type="button" onClick={() => openReportDetail(report)}>Detay</button>
+  )
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900 }}>Rapor Ozeti</h2>
+          <div style={{ marginTop: 4, color: '#64748b', fontSize: 13 }}>Ana sayfadaki analizler sadece bugunun verisini gosterir.</div>
         </div>
-      )}
+      </div>
 
-      {loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-          <SkeletonCard />
-          {!isMobilePortrait && <SkeletonCard />}
-          {!isMobilePortrait && <SkeletonCard />}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 20 }}>
+        <div style={{ minWidth: 0 }}>
+          <MainRevenuePanel
+            datasets={datasets}
+            period="today"
+            setPeriod={() => {}}
+            showModeToggle={false}
+            useDashboardRangeOnly
+            headerAction={detailButton(reportPanels[0])}
+          />
         </div>
-      )}
-
-      {!loading && !error && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(12, minmax(0, 1fr))', gap: 12 }}>
-          <div className="card kpi-card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 4', display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <div style={{ fontWeight: 800 }}>Satis Ozeti</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Siparis: {sales ? Number(sales.orderCount || 0) : 0}</div>
-            </div>
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Toplam Ciro</div>
-              <div style={{ fontWeight: 900, fontSize: 28 }}>{fmtTl(sales?.totalRevenue || 0)}</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Toplam Tahsilat</div>
-                <div style={{ fontWeight: 800 }}>{fmtTl(sales?.totalPaid || 0)}</div>
-              </div>
-              {toMoney(sales?.overpayTotal || 0) > 0.01 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <div style={{ color: '#b91c1c' }}>Fazla Tahsilat</div>
-                  <div style={{ fontWeight: 900, color: '#b91c1c' }}>{fmtTl(sales?.overpayTotal || 0)}</div>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Nakit</div>
-                <div style={{ fontWeight: 700 }}>{fmtTl(sales?.byMethod?.cash || 0)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>POS/Kart</div>
-                <div style={{ fontWeight: 700 }}>{fmtTl(sales?.byMethod?.pos || 0)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Banka</div>
-                <div style={{ fontWeight: 700 }}>{fmtTl(sales?.byMethod?.bank || 0)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Cari</div>
-                <div style={{ fontWeight: 700 }}>{fmtTl(sales?.byMethod?.account || 0)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 3', display: 'grid', gap: 10, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <div style={{ fontWeight: 800 }}>Urun Raporu (Top 10)</div>
-              <Link to="/kermes/app/product-report" style={{ fontSize: 12, color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}>Tumunu Gor</Link>
-            </div>
-            {products.length === 0 ? (
-              <div style={{ color: 'var(--muted)' }}>Kayit yok</div>
-            ) : isMobilePortrait ? (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {(products || []).map((p) => (
-                  <div key={`${p.menuItemId}-${p.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff', display: 'grid', gap: 6 }}>
-                    <div style={{ fontWeight: 800 }} className="breakAny">{p.name}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
-                      <div style={{ color: 'var(--muted)' }}>Adet</div>
-                      <div style={{ fontWeight: 800 }}>{Number(p.qty || 0)}</div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
-                      <div style={{ color: 'var(--muted)' }}>Ciro</div>
-                      <div style={{ fontWeight: 900 }}>{fmtTl(p.revenue || 0)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: 8 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 110px', gap: 8, fontSize: 12, color: 'var(--muted)' }}>
-                  <div>Urun</div>
-                  <div style={{ textAlign: 'right' }}>Adet</div>
-                  <div style={{ textAlign: 'right' }}>Ciro</div>
-                </div>
-                {(products || []).map((p) => (
-                  <div key={`${p.menuItemId}-${p.name}`} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 110px', gap: 8, alignItems: 'center' }}>
-                    <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Number(p.qty || 0)}</div>
-                    <div style={{ textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmtTl(p.revenue || 0)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card kpi-card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 2', display: 'grid', gap: 10, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <div style={{ fontWeight: 800 }}>Iptal Urunler</div>
-              <Link to="/kermes/app/product-report" style={{ fontSize: 12, color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}>Detay</Link>
-            </div>
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazir sonrasi iptal tutari</div>
-              <div style={{ fontWeight: 900, fontSize: 24, color: '#b91c1c' }}>{fmtTl(cancelled?.totalRevenue || 0)}</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Iptal Adedi</div>
-                <div style={{ fontWeight: 800 }}>{Number(cancelled?.totalQty || 0)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Urun Cesidi</div>
-                <div style={{ fontWeight: 800 }}>{Number(cancelled?.itemCount || 0)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card" style={{ gridColumn: isMobilePortrait ? undefined : 'span 3', display: 'grid', gap: 10, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <div style={{ fontWeight: 800 }}>Musteri Yogunlugu</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Toplam: {Number(customers?.totalCustomers || 0)}</div>
-            </div>
-            <div style={{ display: 'grid', gap: 6, maxHeight: 260, overflowY: 'auto', paddingRight: 4 }}>
-              {hourly.map((h) => {
-                const max = hourly.reduce((m, x) => Math.max(m, Number(x.count || 0)), 0) || 1
-                const w = Math.round((Number(h.count || 0) / max) * 100)
-                return (
-                  <div key={h.hour} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 32px', gap: 8, alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{h.hour}</div>
-                    <div style={{ height: 10, borderRadius: 999, background: '#eef2ff', overflow: 'hidden' }}>
-                      <div style={{ width: `${w}%`, height: '100%', background: '#2563eb' }} />
-                    </div>
-                    <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700 }}>{Number(h.count || 0)}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+        <div style={{ minWidth: 0 }}>
+          <PaymentOverviewPanel
+            datasets={datasets}
+            summary={summary}
+            headerAction={detailButton(reportPanels[1])}
+          />
         </div>
-      )}
+        <div style={{ minWidth: 0 }}>
+          <TopSellersPanel
+            datasets={datasets}
+            headerAction={detailButton(reportPanels[2])}
+          />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <CategoryRevenuePanel
+            datasets={datasets}
+            summary={summary}
+            headerAction={detailButton(reportPanels[3])}
+          />
+        </div>
+      </div>
+
+      <DetailModal
+        open={detailState.open}
+        title={detailState.report?.detailTitle || detailState.report?.title || 'Rapor Detayi'}
+        subtitle={detailState.report?.description || ''}
+        items={[]}
+        renderContent={detailState.report && detailState.detailData
+          ? () => <ReportDetailView report={detailState.report} detailData={detailState.detailData} isMobilePortrait={isMobilePortrait} />
+          : null}
+        contentWidth="min(1180px, 100%)"
+        onClose={() => setDetailState({ open: false, report: null, detailData: null })}
+      />
     </div>
   )
 }
@@ -520,14 +680,14 @@ const buildFallbackOperationsSnapshot = () => ({
     { title: 'Toplam Ciro', value: '0,00 TL', note: 'Bugun', trend: '+0%', tone: 'green' },
     { title: 'Tahsilat', value: '0,00 TL', note: 'Bugun', trend: '+0%', tone: 'blue' },
     { title: 'Ortalama Hesap', value: '0,00 TL', note: 'Siparis basi', trend: '+0%', tone: 'orange' },
-    { title: 'Iptal / Fire', value: '0,00 TL', note: 'Kontrol gerekli', trend: '+0%', tone: 'red' },
     { title: 'Acik Hesap', value: '0,00 TL', note: 'Toplam', trend: '+0%', tone: 'blue' }
   ],
   operationCards: [
-    { title: 'Acik Masalar', value: '0', note: 'Serviste olan masalar' },
     { title: 'Hazirlanacak Siparis', value: '0', note: 'Mutfakta bekleyenler' },
-    { title: 'Paket Siparis', value: '0', note: 'Yolda olanlar' }
+    { title: 'Paket Siparis', value: '0', note: 'Yolda olanlar' },
+    { title: 'Iptal Urunler', value: '0', note: 'Iptal edilen urunler' }
   ],
+  openTables: [],
   liveItems: [
     { title: 'Masa', note: 'Veri bekleniyor', time: 'Simdi', dotColor: '#3b82f6' },
     { title: 'Paket', note: 'Veri bekleniyor', time: 'Simdi', dotColor: '#10b981' },
@@ -558,11 +718,24 @@ const getTrendText = (value, inverse = false) => {
   return `${sign}${safe}%`
 }
 
-const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes, stationRes, online }) => {
+const ACTIVE_KITCHEN_ITEM_STATUSES = ['open', 'sent', 'cooking']
+
+const getKitchenOrderItems = (order) => {
+  if (Array.isArray(order?.items) && order.items.length > 0) return order.items
+  const batches = Array.isArray(order?.batches) ? order.batches : []
+  return batches.flatMap((batch) => Array.isArray(batch?.items) ? batch.items : [])
+}
+
+const getKitchenActiveItems = (order) => (
+  getKitchenOrderItems(order).filter((item) => ACTIVE_KITCHEN_ITEM_STATUSES.includes(String(item?.status || '').trim()))
+)
+
+const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes, stationRes, online, orderDetailsById }) => {
   const sales = reportRes?.sales || {}
   const cancelled = reportRes?.cancelled || {}
   const tables = Array.isArray(tableRes?.tables) ? tableRes.tables : []
   const activeByTable = tableRes?.activeByTable || {}
+  const paidByTable = tableRes?.paidByTable || {}
   const kitchenOrders = Array.isArray(kitchenRes?.orders) ? kitchenRes.orders : []
   const deliveryOrders = Array.isArray(deliveryRes?.orders) ? deliveryRes.orders : []
   const stations = Array.isArray(stationRes?.stations) ? stationRes.stations : []
@@ -572,17 +745,19 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
     return !!activeByTable[id]?.hasActive
   }).length
 
-  const waitingKitchenCount = kitchenOrders.reduce((sum, order) => {
-    const items = Array.isArray(order?.items) ? order.items : []
-    const activeCount = items.filter((item) => ['open', 'sent', 'cooking'].includes(String(item?.status || '').trim())).length
-    return sum + activeCount
-  }, 0)
+  const pendingKitchenOrders = kitchenOrders
+    .map((order) => {
+      const allItems = getKitchenOrderItems(order)
+      const activeItems = getKitchenActiveItems(order)
+      return { ...order, allItems, activeItems }
+    })
+    .filter((order) => order.activeItems.length > 0)
+
+  const waitingKitchenCount = pendingKitchenOrders.reduce((sum, order) => sum + order.activeItems.length, 0)
 
   const totalRevenue = toMoney(sales?.totalRevenue || 0)
-  const totalPaid = toMoney(sales?.totalPaid || 0)
+  const totalPaid = toMoney((sales?.collectedTotal ?? sales?.totalPaid) || 0)
   const orderCount = Math.max(0, Number(sales?.orderCount || 0))
-  const averageCheck = orderCount > 0 ? totalRevenue / orderCount : 0
-  const openAccountValue = Math.max(0, totalRevenue - totalPaid)
   const cancelledValue = toMoney(cancelled?.totalRevenue || 0)
 
   const activeStation = stations.find((station) => station?.isActive === true) || null
@@ -591,7 +766,21 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
   const agentOnline = heartbeatAgeMs !== null && heartbeatAgeMs < 15000
   const agentStale = heartbeatAgeMs !== null && heartbeatAgeMs >= 15000 && heartbeatAgeMs < 60000
 
-  const liveItems = buildLiveItems({ tables, activeByTable, kitchenOrders, deliveryOrders, sales })
+  const liveItems = buildLiveItems({ tables, activeByTable, kitchenOrders: pendingKitchenOrders, deliveryOrders, sales })
+  const openTables = buildOpenTablesItems({ tables, activeByTable, paidByTable, orderDetailsById })
+  const cashValue = toMoney((sales?.collectedByMethod?.cash ?? sales?.byMethod?.cash) || 0)
+  const posValue = toMoney((sales?.collectedByMethod?.pos ?? sales?.byMethod?.pos) || 0)
+  const bankValue = toMoney((sales?.collectedByMethod?.bank ?? sales?.byMethod?.bank) || 0)
+  const chargedToAccountValue = toMoney((sales?.accountChargedTotal ?? sales?.byMethod?.account) || 0)
+  const accountCollectionValue = toMoney(sales?.accountCollectionTotal || 0)
+  const totalRevenueWithAccount = totalRevenue + chargedToAccountValue
+  const averageCheck = orderCount > 0 ? totalRevenueWithAccount / orderCount : 0
+  const currentAccountBalanceValue = toMoney(sales?.currentAccountBalance || 0)
+  const overpayValue = toMoney(sales?.overpayTotal || 0)
+  const balanceDueSigned = toMoney(sales?.balanceDueSigned || 0)
+  const openOrderBalanceTotal = openTables.reduce((sum, item) => sum + toMoney(item?.rawBalanceValue || 0), 0)
+  const explicitOpenAccountValue = Math.max(0, balanceDueSigned) + currentAccountBalanceValue + openOrderBalanceTotal
+  const openAccountValue = currentAccountBalanceValue + openOrderBalanceTotal
   const statuses = [
     { label: 'Yazici', value: agentOnline ? 'Bagli' : agentStale ? 'Yavas' : 'Bekliyor', tone: agentOnline ? 'green' : 'orange' },
     { label: 'API', value: 'Online', tone: 'green' },
@@ -627,21 +816,242 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
 
   return {
     kpis: [
-      { title: 'Toplam Ciro', value: fmtTl(totalRevenue), note: 'Bugun', trend: getTrendText(12.5), tone: 'green' },
-      { title: 'Tahsilat', value: fmtTl(totalPaid), note: 'Bugun', trend: getTrendText(9.3), tone: 'blue' },
-      { title: 'Ortalama Hesap', value: `${formatDecimal(averageCheck)} TL`, note: 'Siparis basi', trend: getTrendText(6.1), tone: 'orange' },
-      { title: 'Iptal / Fire', value: fmtTl(cancelledValue), note: 'Kontrol gerekli', trend: getTrendText(-3.8), tone: 'red' },
-      { title: 'Acik Hesap', value: fmtTl(openAccountValue), note: 'Toplam', trend: '+0', tone: 'blue' }
+      {
+        title: 'Toplam Ciro',
+        value: fmtTl(totalRevenueWithAccount),
+        note: 'Bugun',
+        trend: getTrendText(12.5),
+        tone: 'green',
+        detail: {
+          title: 'Toplam Ciro Detayi',
+          subtitle: 'Bugunku ciro ve tahsilat kirilimlari',
+          items: [
+            {
+              title: 'Genel Ozet',
+              value: fmtTl(totalRevenueWithAccount),
+              badge: `${orderCount} siparis`,
+              note: 'Toplam ciroya ulasan tum odeme ve acik hesap kirilimlari.',
+              details: [
+                { label: 'Toplam Ciro', value: fmtTl(totalRevenueWithAccount) },
+                { label: 'Nakit', value: fmtTl(cashValue) },
+                { label: 'Banka', value: fmtTl(bankValue) },
+                { label: 'K. Karti / POS', value: fmtTl(posValue) },
+                { label: 'Cariye Yazilan', value: fmtTl(chargedToAccountValue) }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        title: 'Tahsilat',
+        value: fmtTl(totalPaid),
+        note: 'Bugun',
+        trend: getTrendText(9.3),
+        tone: 'blue',
+        detail: {
+          title: 'Tahsilat Detayi',
+          subtitle: 'Bugun alinan odemelerin yontemlere gore dagilimi',
+          items: [
+            {
+              title: 'Odeme Yontemleri',
+              value: fmtTl(totalPaid),
+              badge: 'Tahsilat',
+              note: 'Kasaya giren ve cariye yazilan tahsilatlar.',
+              details: [
+                { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
+                { label: 'Nakit', value: fmtTl(cashValue) },
+                { label: 'Banka', value: fmtTl(bankValue) },
+                { label: 'K. Karti / POS', value: fmtTl(posValue) },
+                { label: 'Fazla Tahsilat', value: fmtTl(overpayValue) },
+                { label: 'Cari Tahsilati', value: fmtTl(accountCollectionValue), dividerBefore: true, emphasis: true }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        title: 'Ortalama Hesap',
+        value: `${formatDecimal(averageCheck)} TL`,
+        note: 'Siparis basi',
+        trend: getTrendText(6.1),
+        tone: 'orange',
+        detail: {
+          title: 'Ortalama Hesap Detayi',
+          subtitle: 'Siparis basi ortalama ve gunluk ozet',
+          items: [
+            {
+              title: 'Siparis Ortalamasi',
+              value: `${formatDecimal(averageCheck)} TL`,
+              badge: `${orderCount} siparis`,
+              note: 'Secili gun icin ortalama hesap tutari.',
+              details: [
+                { label: 'Siparis Sayisi', value: String(orderCount) },
+                { label: 'Toplam Ciro', value: fmtTl(totalRevenueWithAccount) },
+                { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
+                { label: 'Cari Bakiyesi', value: fmtTl(currentAccountBalanceValue) },
+                { label: 'Bekleyen Acik Hesap', value: fmtTl(explicitOpenAccountValue) },
+                { label: 'Siparis Basi Ortalama', value: `${formatDecimal(averageCheck)} TL` }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        title: 'Iptal / Fire',
+        value: fmtTl(cancelledValue),
+        note: 'Kontrol gerekli',
+        trend: getTrendText(-3.8),
+        tone: 'red',
+        detail: {
+          title: 'Iptal / Fire Detayi',
+          subtitle: 'Iptal edilen urunlerin gunluk ozet verisi',
+          items: [
+            {
+              title: 'Iptal Ozeti',
+              value: fmtTl(cancelledValue),
+              badge: `${Number(cancelled?.itemCount || 0)} urun`,
+              note: 'Fire verisi ayri tutulmuyorsa iptal tutari uzerinden izlenir.',
+              details: [
+                { label: 'Iptal Tutarı', value: fmtTl(cancelledValue) },
+                { label: 'Iptal Edilen Urun', value: String(Number(cancelled?.itemCount || 0)) },
+                { label: 'Iptal Adedi', value: String(Number(cancelled?.totalQty || 0)) },
+                { label: 'Fire', value: '0,00 TL' }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        title: 'Acik Hesap',
+        value: fmtTl(openAccountValue),
+        note: 'Toplam',
+        trend: '+0',
+        tone: 'blue',
+        detail: {
+          title: 'Acik Hesap Detayi',
+          subtitle: 'Cari ve tahsil edilmemis bakiye ozetleri',
+          items: [
+            {
+              title: 'Cari / Acik Hesap',
+              value: fmtTl(openAccountValue),
+              badge: 'Takip',
+              note: 'Tahsil edilmemis bakiye ve cariye yazilan satislar.',
+              details: [
+                { label: 'Guncel Cari Bakiyesi', value: fmtTl(currentAccountBalanceValue) },
+                { label: 'Acilan Cari Borcu', value: fmtTl(chargedToAccountValue) },
+                { label: 'Acik Masa Bekleyeni', value: fmtTl(openOrderBalanceTotal) },
+                { label: 'Bekleyen Acik Hesap', value: fmtTl(explicitOpenAccountValue) },
+                { label: 'Toplam Ciro', value: fmtTl(totalRevenueWithAccount) },
+                { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
+                { label: 'Net Acik Hesap Gosterimi', value: fmtTl(openAccountValue) }
+              ]
+            }
+          ]
+        }
+      }
     ],
     operationCards: [
-      { title: 'Acik Masalar', value: String(openTableCount), note: 'Serviste olan masalar' },
-      { title: 'Hazirlanacak Siparis', value: String(waitingKitchenCount), note: 'Mutfakta bekleyenler' },
-      { title: 'Paket Siparis', value: String(deliveryOrders.length), note: 'Yolda olanlar' }
+      {
+        title: 'Acik Masalar',
+        value: String(openTableCount),
+        note: 'Serviste olan masalar',
+        detail: {
+          title: 'Acik Masalar Detayi',
+          subtitle: 'Serviste olan masalarin listesi',
+          items: openTables.length > 0 ? openTables : [{ title: 'Acik masa yok', note: 'Su anda serviste aktif masa bulunmuyor.' }]
+        }
+      },
+      {
+        title: 'Hazirlanacak Siparis',
+        value: String(waitingKitchenCount),
+        note: 'Mutfakta bekleyenler',
+        detail: {
+          title: 'Hazirlanacak Siparisler',
+          subtitle: 'Mutfakta acik durumda bekleyen siparis kalemleri',
+          items: pendingKitchenOrders.length > 0
+            ? pendingKitchenOrders.map((order, index) => ({
+                title: String(order?.tableName || order?.customerName || `Siparis ${index + 1}`),
+                note: `${order.activeItems.length} urun islemde`,
+                time: formatTimeAgo(order?.createdAt),
+                orderId: String(order?.orderNo || order?.id || ''),
+                details: [
+                  { label: 'Toplam Urun', value: String(order.allItems.length) },
+                  {
+                    label: 'Bekleyen Urun',
+                    value: String(order.activeItems.length)
+                  },
+                  { label: 'Olusturma', value: order?.createdAt ? new Date(order.createdAt).toLocaleString('tr-TR') : '-' }
+                ]
+              }))
+            : [{ title: 'Bekleyen siparis yok', note: 'Mutfakta sira bekleyen siparis bulunmuyor.' }]
+        }
+      },
+      {
+        title: 'Paket Siparis',
+        value: String(deliveryOrders.length),
+        note: 'Yolda olanlar',
+        detail: {
+          title: 'Paket Siparisleri',
+          subtitle: 'Aktif paket siparislerinin durumu',
+          items: deliveryOrders.length > 0
+            ? deliveryOrders.map((order, index) => ({
+                title: `Paket #${String(order?.orderNo || order?.id || index + 1).slice(-6)}`,
+                note: String(order?.customerName || order?.deliveryStatus || order?.status || 'Aktif siparis'),
+                time: formatTimeAgo(order?.updatedAt || order?.createdAt),
+                orderId: String(order?.orderNo || order?.id || ''),
+                details: [
+                  { label: 'Durum', value: String(order?.deliveryStatus || order?.status || '-') },
+                  { label: 'Musteri', value: String(order?.customerName || '-') },
+                  { label: 'Telefon', value: String(order?.customerPhone || '-') },
+                  { label: 'Tutar', value: fmtTl(order?.paidTotal || order?.netTotal || order?.total || 0) }
+                ]
+              }))
+            : [{ title: 'Aktif paket siparis yok', note: 'Yolda olan veya hazirlanan paket siparis bulunmuyor.' }]
+        }
+      }
     ],
+    openTables,
     liveItems,
     statuses,
     alerts
   }
+}
+
+const buildOpenTablesItems = ({ tables, activeByTable, paidByTable, orderDetailsById }) => {
+  return tables
+    .map((table) => {
+      const id = String(table?.id || table?._id || '')
+      const active = activeByTable[id]
+      if (!active?.hasActive || !active?.orderId) return null
+      const paid = paidByTable[id] || {}
+      const order = orderDetailsById?.[active.orderId] || {}
+      const createdAt = paid?.createdAt || order?.createdAt || table?.updatedAt || table?.createdAt
+      const elapsed = getElapsedMinutes(createdAt)
+      const balanceValue = Number(order?.balanceDue ?? order?.totals?.balanceDue ?? order?.remainingBalance ?? 0)
+      return {
+        title: String(table?.name || 'Masa'),
+        note: String(paid?.createdByName || order?.createdByName || 'Aktif servis suruyor'),
+        time: formatTimeAgo(createdAt),
+        duration: elapsed !== null ? `${elapsed} dk acik` : 'Sure hesaplanamadi',
+        balance: fmtTl(balanceValue),
+        rawBalanceValue: balanceValue,
+        orderId: String(order?.orderNo || active.orderId || '').slice(-8),
+        dotColor: '#3b82f6',
+        details: [
+          { label: 'Masa', value: String(table?.name || '-') },
+          { label: 'Siparis durumu', value: String(active?.status || order?.status || '-') },
+          { label: 'Acilis', value: createdAt ? new Date(createdAt).toLocaleString('tr-TR') : '-' },
+          { label: 'Acik kalma', value: elapsed !== null ? `${elapsed} dk` : '-' },
+          { label: 'Bakiye', value: fmtTl(balanceValue) }
+        ]
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aDuration = Number(String(a.duration || '').split(' ')[0] || 0)
+      const bDuration = Number(String(b.duration || '').split(' ')[0] || 0)
+      return bDuration - aDuration
+    })
 }
 
 const buildLiveItems = ({ tables, activeByTable, kitchenOrders, deliveryOrders, sales }) => {
@@ -679,7 +1089,7 @@ const buildLiveItems = ({ tables, activeByTable, kitchenOrders, deliveryOrders, 
   const kitchenEntry = kitchenOrders[0]
     ? {
         title: String(kitchenOrders[0]?.tableName || kitchenOrders[0]?.customerName || 'Mutfak'),
-        note: `${(Array.isArray(kitchenOrders[0]?.items) ? kitchenOrders[0].items.length : 0)} urun hazirlaniyor`,
+        note: `${getKitchenActiveItems(kitchenOrders[0]).length} urun hazirlaniyor`,
         time: formatTimeAgo(kitchenOrders[0]?.createdAt),
         dotColor: '#ef4444'
       }
@@ -688,24 +1098,28 @@ const buildLiveItems = ({ tables, activeByTable, kitchenOrders, deliveryOrders, 
   return [tableEntry, deliveryEntry, cashierEntry, kitchenEntry].filter(Boolean)
 }
 
+const getElapsedMinutes = (value) => {
+  if (!value) return null
+  const ts = new Date(value).getTime()
+  if (!Number.isFinite(ts)) return null
+  return Math.max(0, Math.floor((Date.now() - ts) / 60000))
+}
+
 export default function Dashboard() {
-  const { tenantCtx, user, allowedBranchIds } = useAuth()
+  const { allowedBranchIds } = useAuth()
   const { isMobilePortrait } = useResponsiveFlags()
+  const { selectedDate } = useAppDate()
 
   const allowedIds = useMemo(() => normalizeBranchIds(allowedBranchIds), [allowedBranchIds])
-  const [period, setPeriod] = useState('today')
-  const [rangeStart, setRangeStart] = useState(todayYmd())
-  const [rangeEnd, setRangeEnd] = useState(todayYmd())
-  const [selectedBranches, setSelectedBranches] = useState([])
   const [branchOptions, setBranchOptions] = useState([])
-
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [data, setData] = useState(null)
-  const [exporting, setExporting] = useState(false)
+  const [selectedBranches, setSelectedBranches] = useState([])
   const [operationsLoading, setOperationsLoading] = useState(false)
   const [operationsError, setOperationsError] = useState('')
   const [operationsSnapshot, setOperationsSnapshot] = useState(null)
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportsError, setReportsError] = useState('')
+  const [reportsSummary, setReportsSummary] = useState(EMPTY_REPORT_SUMMARY)
+  const [reportsDatasets, setReportsDatasets] = useState(EMPTY_REPORT_DATASETS)
 
   const initBranchesRef = useRef(false)
 
@@ -735,58 +1149,14 @@ export default function Dashboard() {
 
   const selectedBranchesKey = selectedBranches.join(',')
 
-  const query = useMemo(() => {
-    const p = new URLSearchParams()
-    p.set('period', period)
-    if (period === 'range') {
-      p.set('start', rangeStart)
-      p.set('end', rangeEnd)
-    }
-    const { params } = buildBranchQueryParams(selectedBranches)
-    if (params) {
-      for (const [k, v] of params.entries()) p.set(k, v)
-    }
-    return p
-  }, [period, rangeStart, rangeEnd, selectedBranchesKey])
-
-  useEffect(() => {
-    const run = async () => {
-      if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) {
-        setData(null)
-        setError('Sube seciniz')
-        return
-      }
-      if (period === 'range') {
-        if (!rangeStart || !rangeEnd) return
-        if (rangeStart > rangeEnd) {
-          setData(null)
-          setError('Baslangic tarihi, bitis tarihinden buyuk olamaz')
-          return
-        }
-      }
-
-      setLoading(true)
-      setError('')
-      const res = await api(`/api/reports/dashboard?${query.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true })
-      if (!res?.ok) {
-        setError(String(res?.message || 'Rapor yuklenemedi'))
-        setData(null)
-        setLoading(false)
-        return
-      }
-      setData(res)
-      setLoading(false)
-    }
-
-    const t = setTimeout(run, 200)
-    return () => clearTimeout(t)
-  }, [query])
-
   useEffect(() => {
     const run = async () => {
       if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) {
         setOperationsSnapshot(buildFallbackOperationsSnapshot())
         setOperationsError('Sube seciniz')
+        setReportsSummary(EMPTY_REPORT_SUMMARY)
+        setReportsDatasets(EMPTY_REPORT_DATASETS)
+        setReportsError('Sube seciniz')
         return
       }
 
@@ -794,11 +1164,16 @@ export default function Dashboard() {
       if (!params) {
         setOperationsSnapshot(buildFallbackOperationsSnapshot())
         setOperationsError('Sube seciniz')
+        setReportsSummary(EMPTY_REPORT_SUMMARY)
+        setReportsDatasets(EMPTY_REPORT_DATASETS)
+        setReportsError('Sube seciniz')
         return
       }
 
       const reportParams = new URLSearchParams(params)
-      reportParams.set('period', 'today')
+      reportParams.set('period', 'range')
+      reportParams.set('start', selectedDate)
+      reportParams.set('end', selectedDate)
 
       const deliveryParams = new URLSearchParams(params)
       deliveryParams.set('status', 'active')
@@ -806,85 +1181,98 @@ export default function Dashboard() {
       deliveryParams.set('page', '1')
 
       setOperationsLoading(true)
+      setReportsLoading(true)
       setOperationsError('')
+      setReportsError('')
 
       try {
-        const [reportRes, tableRes, kitchenRes, deliveryRes, stationRes] = await Promise.all([
+        const [reportRes, tableRes, kitchenRes, deliveryRes, stationRes, productsRes, ordersRes, accountsRes, menuItemsRes, categoriesRes] = await Promise.all([
           api(`/api/reports/dashboard?${reportParams.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api(`/api/pos/tables/overview?${params.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api(`/api/kitchen/orders?${params.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api(`/api/pos/delivery/orders?${deliveryParams.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
-          api('/api/printing/stations?system=kermes', { silent: true })
+          api('/api/printing/stations?system=kermes', { silent: true }),
+          api(`/api/reports/products?${reportParams.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
+          api(`/api/reports/orders?${reportParams.toString()}&status=closed`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
+          api('/api/accounts?limit=50', { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
+          api('/api/tenant/menu-items?active=true', { silent: true }),
+          api('/api/tenant/categories?active=true', { silent: true })
         ])
 
+        const activeOrderIds = Array.from(new Set(
+          Object.values(tableRes?.activeByTable || {})
+            .map((entry) => String(entry?.orderId || ''))
+            .filter(Boolean)
+        ))
+
+        const orderDetailResults = await Promise.allSettled(
+          activeOrderIds.map((orderId) => api(`/api/pos/orders/${orderId}`, { silent: true, suppressBranchModal: true }))
+        )
+
+        const orderDetailsById = {}
+        orderDetailResults.forEach((result, index) => {
+          if (result.status !== 'fulfilled') return
+          const res = result.value
+          if (!res?.ok) return
+          const order = res?.order || res?.data || res
+          orderDetailsById[activeOrderIds[index]] = order
+        })
+
         const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false
-        const snapshot = createOperationsSnapshot({ reportRes, tableRes, kitchenRes, deliveryRes, stationRes, online })
+        const snapshot = createOperationsSnapshot({ reportRes, tableRes, kitchenRes, deliveryRes, stationRes, online, orderDetailsById })
         setOperationsSnapshot(snapshot)
+
+        if (!reportRes?.ok) {
+          setReportsError(String(reportRes?.message || 'Raporlar yuklenemedi'))
+          setReportsSummary(EMPTY_REPORT_SUMMARY)
+          setReportsDatasets(EMPTY_REPORT_DATASETS)
+        } else {
+          const safeArray = (value) => Array.isArray(value) ? value : []
+          const nextDatasets = {
+            dashboard: reportRes,
+            products: safeArray(productsRes?.items),
+            cancelledProducts: safeArray(productsRes?.cancelledItems),
+            orders: safeArray(ordersRes?.orders),
+            accounts: safeArray(accountsRes?.accounts),
+            deliveryOrders: safeArray(deliveryRes?.orders),
+            kitchenOrders: safeArray(kitchenRes?.orders),
+            menuItems: safeArray(menuItemsRes?.items),
+            categories: safeArray(categoriesRes?.categories)
+          }
+          setReportsDatasets(nextDatasets)
+          setReportsSummary(buildReportsSummary(nextDatasets))
+        }
       } catch (err) {
         setOperationsError(String(err?.message || 'Yeni dashboard yuklenemedi'))
         setOperationsSnapshot(buildFallbackOperationsSnapshot())
+        setReportsError(String(err?.message || 'Rapor panelleri yuklenemedi'))
+        setReportsSummary(EMPTY_REPORT_SUMMARY)
+        setReportsDatasets(EMPTY_REPORT_DATASETS)
       } finally {
         setOperationsLoading(false)
+        setReportsLoading(false)
       }
     }
 
     run()
     const pollId = window.setInterval(run, 15000)
     return () => window.clearInterval(pollId)
-  }, [selectedBranchesKey])
-
-  const onExport = async () => {
-    if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) {
-      toast.error('Sube seciniz')
-      return
-    }
-    if (period === 'range') {
-      if (!rangeStart || !rangeEnd) return
-      if (rangeStart > rangeEnd) {
-        toast.error('Baslangic tarihi, bitis tarihinden buyuk olamaz')
-        return
-      }
-    }
-    setExporting(true)
-    try {
-      const res = await apiDownload(`/api/reports/export?${query.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true })
-      if (!res?.ok || !res?.blob) {
-        toast.error(String(res?.error?.message || 'Rapor indirilemedi'))
-        setExporting(false)
-        return
-      }
-      const filename = res.filename || `rapor_${todayYmd().replaceAll('-', '')}.xlsx`
-      downloadBlob(res.blob, filename)
-      toast.success('Rapor indirildi')
-    } catch (err) {
-      toast.error(String(err?.message || 'Rapor indirilemedi'))
-    } finally {
-      setExporting(false)
-    }
-  }
+  }, [selectedBranchesKey, selectedDate])
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <LegacyDashboardContent
         isMobilePortrait={isMobilePortrait}
-        period={period}
-        setPeriod={setPeriod}
-        rangeStart={rangeStart}
-        setRangeStart={setRangeStart}
-        rangeEnd={rangeEnd}
-        setRangeEnd={setRangeEnd}
-        data={data}
-        loading={loading}
-        error={error}
-        exporting={exporting}
-        onExport={onExport}
         branchOptions={branchOptions}
-        user={user}
         selectedBranches={selectedBranches}
         setSelectedBranches={setSelectedBranches}
         operationsLoading={operationsLoading}
         operationsError={operationsError}
         operationsSnapshot={operationsSnapshot}
+        reportsLoading={reportsLoading}
+        reportsError={reportsError}
+        reportsSummary={reportsSummary}
+        reportsDatasets={reportsDatasets}
       />
     </div>
   )

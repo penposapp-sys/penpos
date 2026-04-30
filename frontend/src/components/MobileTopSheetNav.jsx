@@ -32,6 +32,12 @@ export default function MobileTopSheetNav({ open, title, items, onClose, onSelec
                   type="button"
                   className="topSheetItem"
                   data-active={i.active ? 'true' : 'false'}
+                  style={i.active ? {
+                    background: 'var(--canteen-nav-active-bg, #e5e7eb)',
+                    borderColor: 'var(--canteen-nav-active-border, #d1d5db)',
+                    color: 'var(--canteen-nav-active-text, #111827)',
+                    boxShadow: 'var(--canteen-nav-active-shadow, none)'
+                  } : undefined}
                   onClick={() => {
                     try { onSelect?.(i) } catch {}
                     try { onClose?.() } catch {}
@@ -48,4 +54,3 @@ export default function MobileTopSheetNav({ open, title, items, onClose, onSelec
     </>
   )
 }
-

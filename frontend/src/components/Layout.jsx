@@ -1,22 +1,42 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useRef } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Users as IconTenant } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import BranchSelectorModal from './BranchSelectorModal.jsx'
 import MobileTopSheetNav from './MobileTopSheetNav.jsx'
+import { useTheme } from '../theme/ThemeContext.jsx'
+import { useAppDate } from '../context/AppDateContext.jsx'
+
+const todayYmd = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const { user, logout, tenantCtx } = useAuth()
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
-  const [desktopCollapsed, setDesktopCollapsed] = useState(true)
+  const { themeKey, theme } = useTheme()
+  const { selectedDate, setSelectedDate } = useAppDate()
+  const dateInputRef = useRef(null)
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    if (pathname === '/kermes/app/dashboard') return
+    const today = todayYmd()
+    if (selectedDate !== today) setSelectedDate(today)
+  }, [pathname, selectedDate, setSelectedDate])
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -167,9 +187,6 @@ export default function Layout() {
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) {
       items.push({ path: '/kermes/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true })
     }
-    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) {
-      items.push({ path: '/kermes/app/reports/sales', label: 'Kapanan Masalar', icon: IconFileCheck, show: true })
-    }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) {
       items.push({ path: '/kermes/app/accounts', label: 'Cari Hesaplar', icon: IconWallet, show: true })
     }
@@ -188,7 +205,9 @@ export default function Layout() {
         to: item.path,
         label: item.label,
         icon: item.icon,
-        active: pathname === item.path || (item.path !== '/kermes/app/kitchen' && pathname.startsWith(item.path + '/'))
+        active: pathname === item.path
+          || (item.path === '/kermes/app/tables' && pathname === '/kermes/app/pos')
+          || (item.path !== '/kermes/app/kitchen' && pathname.startsWith(item.path + '/'))
       }))
   }, [pathname, items])
 
@@ -196,12 +215,31 @@ export default function Layout() {
     .filter((item) => item.active)
     .sort((a, b) => String(b.to || '').length - String(a.to || '').length)[0]
 
-  const gridCols = isMobilePortrait
-    ? '1fr'
-    : (desktopCollapsed ? `${isTablet ? 64 : 56}px 1fr` : '220px 1fr')
+  const activeIndex = navItems.findIndex((item) => item.to === current?.to)
+  const accountLabel = String(user?.name || user?.fullName || user?.username || user?.email || 'Kullanici').trim()
+  const pageTitle = pathname === '/kermes/app/pos'
+    ? (String(location.state?.tableName || '').trim() || current?.label || 'Masalar')
+    : (current?.label || 'Panel')
+  const isDashboardPage = pathname === '/kermes/app/dashboard'
+  const isReportsPage = pathname === '/kermes/app/reports'
+  const isMonoTheme = themeKey === 'mono'
+  const topbarDate = useMemo(() => {
+    const value = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date()
+    return value.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  }, [selectedDate])
+
+  const sidebarWidth = desktopCollapsed ? 94 : 228
+  const navButtonWidth = desktopCollapsed ? 58 : 188
+  const navItemHeight = desktopCollapsed ? 42 : 44
+  const navItemGap = 6
+  const navStep = navItemHeight + navItemGap
 
   return (
-    <div className="app" style={{ gridTemplateColumns: gridCols, gridTemplateRows: '56px 1fr' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#eef1f7', color: '#0f172a' }}>
       <BranchSelectorModal />
       <MobileTopSheetNav
         open={isMobilePortrait && mobileMenuOpen}
@@ -213,59 +251,339 @@ export default function Layout() {
           nav(item.to)
         }}
       />
-      <header className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            className="hamburger-btn"
-            style={{ width: 36, height: 28, display: 'grid', placeItems: 'center' }}
-            aria-label="Menu"
-            onClick={() => {
-              if (isMobilePortrait) setMobileMenuOpen((value) => !value)
-              else setDesktopCollapsed((value) => !value)
+      <div style={{ display: 'flex', height: '100%', alignItems: 'stretch', gap: 12, padding: isMobilePortrait ? 12 : 16, overflow: 'hidden' }}>
+        {!isMobilePortrait && (
+          <aside
+            style={{
+              position: 'relative',
+              zIndex: 20,
+              height: '100%',
+              flexShrink: 0,
+              width: sidebarWidth,
+              overflow: 'hidden',
+              borderRadius: 34,
+              background: theme.sidebar,
+              padding: 12,
+              boxShadow: '0 24px 48px rgba(15, 23, 42, 0.22)',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
-            ☰
-          </button>
-          <div
-            style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', alignItems: 'center' }}
-            aria-label="PenPOS"
+            <div
+              style={{
+                marginBottom: 12,
+                width: '100%',
+                flexShrink: 0,
+                display: 'flex',
+                justifyContent: 'center'
+              }}
+            >
+              <div
+                onClick={() => setDesktopCollapsed((value) => !value)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setDesktopCollapsed((value) => !value)
+                  }
+                }}
+                style={{
+                  width: desktopCollapsed ? 64 : 140,
+                  height: 64,
+                  display: 'grid',
+                  placeItems: 'center',
+                  borderRadius: 22,
+                  background: '#ffffff',
+                  boxShadow: '0 18px 40px rgba(15, 23, 42, 0.16)',
+                  cursor: 'pointer',
+                  transition: 'width 500ms ease'
+                }}
+                aria-label="Sidebari Ac Kapat"
+              >
+                <img
+                  src={desktopCollapsed ? '/logo-1.png' : '/logo-2.png'}
+                  alt="PenPOS"
+                  style={{
+                    width: desktopCollapsed ? 36 : 110,
+                    height: desktopCollapsed ? 36 : 40,
+                    objectFit: 'contain',
+                    pointerEvents: 'none',
+                    display: 'block'
+                  }}
+                  onError={(e) => { e.currentTarget.src = '/penpos%20logo.png' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, overflow: 'hidden' }}>
+            <nav style={{ position: 'relative', minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 4, paddingRight: 4, paddingTop: 16, paddingBottom: 24 }}>
+              <div style={{ position: 'relative', width: navButtonWidth, marginLeft: 'auto', marginRight: desktopCollapsed ? 'auto' : 0, display: 'grid', gap: navItemGap, paddingTop: 2 }}>
+                {activeIndex >= 0 && (
+                  <div
+                    style={{
+                      pointerEvents: 'none',
+                      position: 'absolute',
+                      left: 0,
+                      top: 2,
+                      zIndex: 0,
+                      height: navItemHeight,
+                      width: navButtonWidth,
+                      borderRadius: 22,
+                      background: 'rgba(255,255,255,0.95)',
+                      boxShadow: theme.activeGlow,
+                      transition: 'transform 500ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms ease',
+                      transform: `translateY(${activeIndex * navStep}px)`,
+                      border: '1px solid rgba(255,255,255,0.6)'
+                    }}
+                  />
+                )}
+
+                {navItems.map((item) => {
+                  const Icon = item.icon
+                  const active = item.to === current?.to
+
+                  return (
+                    <button
+                    className="sidebar-menu-button"
+                    key={item.to}
+                    type="button"
+                    onClick={() => {
+                      nav(item.to)
+                      if (!desktopCollapsed) setDesktopCollapsed(true)
+                    }}
+                    title={item.label}
+                    style={{
+                        position: 'relative',
+                        zIndex: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        height: navItemHeight,
+                        width: navButtonWidth,
+                        justifyContent: desktopCollapsed ? 'center' : 'flex-start',
+                        gap: desktopCollapsed ? 0 : 8,
+                        padding: desktopCollapsed ? 0 : '0 12px',
+                        borderRadius: 22,
+                        border: 'none',
+                        background: 'transparent',
+                        color: active ? '#0f172a' : (isMonoTheme ? '#334155' : 'rgba(255,255,255,0.78)'),
+                        transition: 'all 300ms ease'
+                      }}
+                    >
+                      {!active && (
+                        <span
+                          className="sidebar-menu-hover"
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: 22,
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      )}
+                      <span style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: desktopCollapsed ? 0 : 8 }}>
+                        <span
+                          style={{
+                            position: 'relative',
+                            zIndex: 10,
+                            display: 'grid',
+                            width: desktopCollapsed ? 32 : 34,
+                            height: desktopCollapsed ? 32 : 34,
+                            placeItems: 'center',
+                            borderRadius: 15,
+                            background: active ? theme.accent : (isMonoTheme ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.08)'),
+                            color: active ? '#ffffff' : (isMonoTheme ? '#0f172a' : '#ffffff'),
+                            boxShadow: active ? theme.activeGlow : 'none',
+                            transform: active ? 'scale(1.05)' : 'scale(1)'
+                          }}
+                        >
+                          {Icon ? <Icon size={13} /> : null}
+                        </span>
+
+                        {!desktopCollapsed && (
+                          <span style={{ position: 'relative', zIndex: 10, fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.label}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </nav>
+            <div style={{ marginTop: 'auto', paddingTop: 10, display: 'grid', gap: 6, justifyItems: desktopCollapsed ? 'center' : 'end' }}>
+              {!desktopCollapsed && (
+                <div style={{ width: navButtonWidth, color: 'rgba(255,255,255,0.72)', fontSize: 11.5, fontWeight: 800, padding: '0 6px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {accountLabel}
+                </div>
+              )}
+              <button
+                className="sidebar-menu-button"
+                type="button"
+                onClick={logout}
+                style={{
+                  width: navButtonWidth,
+                  height: navItemHeight,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: desktopCollapsed ? 'center' : 'flex-start',
+                  gap: desktopCollapsed ? 0 : 8,
+                  padding: desktopCollapsed ? 0 : '0 12px',
+                  borderRadius: 22,
+                  border: 'none',
+                  background: desktopCollapsed ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.95)',
+                  color: desktopCollapsed ? '#ffffff' : '#0f172a',
+                  cursor: 'pointer',
+                  fontWeight: 900
+                }}
+                title="Cikis"
+              >
+                <span
+                  className="sidebar-menu-hover"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: 22,
+                    pointerEvents: 'none'
+                  }}
+                />
+                <span style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: desktopCollapsed ? 0 : 8 }}>
+                  <span
+                    style={{
+                      display: 'grid',
+                      width: desktopCollapsed ? 32 : 34,
+                      height: desktopCollapsed ? 32 : 34,
+                      placeItems: 'center',
+                      borderRadius: 15,
+                      background: desktopCollapsed ? 'rgba(255,255,255,0.08)' : theme.accent,
+                      color: desktopCollapsed ? '#ffffff' : '#ffffff'
+                    }}
+                  >
+                    <IconLogin size={13} />
+                  </span>
+                  {!desktopCollapsed && <span>Cikis</span>}
+                </span>
+              </button>
+            </div>
+            </div>
+          </aside>
+        )}
+
+        <main style={{ position: 'relative', zIndex: 10, minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 34, background: '#ffffff', padding: isMobilePortrait ? 14 : 18, boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)' }}>
+          <header
+            className="topbar"
+            style={{
+              marginBottom: 16,
+              background: 'transparent',
+              borderBottom: 'none',
+              boxShadow: 'none',
+              padding: 0,
+              flexShrink: 0,
+              position: 'static'
+            }}
           >
-            <img src="/penpos%20logo.png" alt="PenPOS" style={{ height: 28, pointerEvents: 'none' }} onError={(e) => { e.currentTarget.src = '/penpos-logo.png' }} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontWeight: 600 }}>
-          {current && <span className="page-pill">{current.label}</span>}
-          {!user && 'Giris Yap'}
-        </div>
-        <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {user && <button className="btn" onClick={logout}>Cikis</button>}
-          </div>
-        </div>
-      </header>
-      {!isMobilePortrait && (
-        <aside className={desktopCollapsed ? 'sidebar icon-rail' : 'sidebar'}>
-          <nav style={{ display: 'grid', gap: 8 }}>
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const active = !!item.active
-              return (
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                flexWrap: 'wrap',
+                padding: isMobilePortrait ? '16px 18px' : '18px 22px',
+                borderRadius: 34,
+                background: theme.topbar,
+                border: `1px solid ${theme.border}`,
+                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {isMobilePortrait && (
+                  <button
+                    className="hamburger-btn"
+                    style={{ width: 40, height: 36, display: 'grid', placeItems: 'center', borderRadius: 14 }}
+                    aria-label="Menu"
+                    onClick={() => setMobileMenuOpen((value) => !value)}
+                  >
+                    ≡
+                  </button>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 18 : 26 }}>
+                  <span>{pageTitle}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button
-                  key={item.to}
+                  className="btn"
                   type="button"
-                  className={active ? 'active nav-link' : 'nav-link'}
-                  onClick={() => nav(item.to)}
-                  style={{ justifyContent: desktopCollapsed ? 'center' : 'flex-start', display: 'flex', alignItems: 'center', gap: 8 }}
+                  onClick={() => {
+                    if (!isDashboardPage) return
+                    const input = dateInputRef.current
+                    if (!input) return
+                    if (typeof input.showPicker === 'function') {
+                      input.showPicker()
+                      return
+                    }
+                    input.focus()
+                    input.click()
+                  }}
+                  style={{ position: 'relative', borderRadius: 16, background: '#ffffff', fontWeight: 800, overflow: 'hidden', cursor: isDashboardPage ? 'pointer' : 'default' }}
                 >
-                  <span className="nav-icon">{Icon ? <Icon size={18} /> : null}</span>
-                  {!desktopCollapsed && <span className="nav-label">{item.label}</span>}
+                  {topbarDate}
+                  {isDashboardPage && (
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      value={selectedDate}
+                      onChange={(event) => setSelectedDate(event.target.value)}
+                      style={{
+                        position: 'absolute',
+                        width: 1,
+                        height: 1,
+                        right: 0,
+                        bottom: 0,
+                        opacity: 0,
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  )}
                 </button>
-              )
-            })}
-          </nav>
-        </aside>
-      )}
-      <main className="main"><Outlet /></main>
+
+                {isReportsPage && (
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => {
+                      try {
+                        window.dispatchEvent(new CustomEvent('reports:export-request'))
+                      } catch {}
+                    }}
+                    style={{
+                      borderRadius: 16,
+                      background: theme.accent,
+                      borderColor: theme.accent,
+                      color: '#ffffff',
+                      fontWeight: 900,
+                      boxShadow: theme.activeGlow
+                    }}
+                  >
+                    Rapor Indir
+                  </button>
+                )}
+              </div>
+            </div>
+          </header>
+
+          <section style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: isMobilePortrait ? 0 : 2 }}>
+            <div style={{ minWidth: 0, minHeight: '100%' }}>
+              <div className="main" style={{ minHeight: '100%', padding: 0 }}>
+                <Outlet />
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   )
 }

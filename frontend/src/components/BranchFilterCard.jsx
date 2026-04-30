@@ -39,7 +39,8 @@ export default function BranchFilterCard({
   selectedBranches,
   setSelectedBranches,
   title = 'Sube Sec',
-  compact = false
+  compact = false,
+  iconOnly = false
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -80,20 +81,33 @@ export default function BranchFilterCard({
                 className="btn"
                 onClick={() => setOpen((current) => !current)}
                 style={{
-                  borderRadius: compact ? 14 : 18,
+                  borderRadius: iconOnly ? 16 : (compact ? 14 : 18),
                   background: '#0f172a',
                   borderColor: '#0f172a',
                   color: '#ffffff',
-                  padding: compact ? '10px 14px' : '12px 16px',
+                  padding: iconOnly ? '10px 12px' : (compact ? '10px 14px' : '12px 16px'),
                   fontWeight: 900,
-                  fontSize: compact ? 13 : 14
+                  fontSize: compact ? 13 : 14,
+                  minWidth: iconOnly ? 44 : undefined,
+                  minHeight: iconOnly ? 44 : undefined
                 }}
+                title={title}
               >
-                {title}
+                {iconOnly ? (
+                  <span style={{ display: 'grid', placeItems: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M4 7l1-3h14l1 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M4 7v3a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0V7" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                      <path d="M5 10v11h14V10" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  </span>
+                ) : title}
               </button>
-              <span style={{ color: '#475569', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                {selectedNames.length > 0 ? `${selectedNames.length} sube secili` : 'Tum subeler secili degil'}
-              </span>
+              {!iconOnly && (
+                <span style={{ color: '#475569', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  {selectedNames.length > 0 ? `${selectedNames.length} sube secili` : 'Tum subeler secili degil'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -144,7 +158,8 @@ export default function BranchFilterCard({
             style={compact ? {
               position: 'absolute',
               top: 'calc(100% + 10px)',
-              left: 0,
+              left: iconOnly ? 'auto' : 0,
+              right: iconOnly ? 0 : 'auto',
               zIndex: 40,
               minWidth: 320,
               maxWidth: 520,

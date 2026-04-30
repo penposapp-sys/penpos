@@ -580,8 +580,16 @@ export default function PosPage() {
   }, [order?.id, order?.servingType])
   useEffect(() => {
     const loadPaymentSettings = async () => {
+      const allowed = Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String).filter(Boolean) : []
+      const selectedBranchId = (() => {
+        try { return String(localStorage.getItem('selectedBranchId') || '').trim() } catch { return '' }
+      })()
+      if (!selectedBranchId) {
+        setPayMethods([])
+        return
+      }
       try {
-        const res = await api('/api/tenant/payment-settings')
+        const res = await api('/api/tenant/payment-settings', { silent: true, suppressBranchModal: true })
         if (res?.success === false) {
           setPayMethods([])
           return
@@ -593,7 +601,7 @@ export default function PosPage() {
       } catch {}
     }
     loadPaymentSettings()
-  }, [])
+  }, [Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : ''])
 
   const addItem = async (menuItem) => {
     setError('')
@@ -1597,26 +1605,25 @@ export default function PosPage() {
       </div>
 
     <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Ödeme Al">
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+      <div className="payment-modal-stack">
+        <div className="payment-meta-line">
           {tableName ? `Masa: ${tableName}` : 'Masasız'} • {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş —'}
         </div>
 
         <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ display: 'grid', gap: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="payment-summary-card">
+            <div className="payment-summary-row">
               <div style={{ color: 'var(--muted)' }}>Brüt</div>
               <div style={{ fontWeight: 600 }}>{grossTotal.toFixed(2)} TL</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <div className="payment-summary-row payment-summary-row--editor">
               <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="payment-summary-actions">
                 <input
                   type="number"
                   min="0"
                   max="100"
                   className="input"
-                  style={{ width: 120 }}
                   value={discountDraft}
                   onChange={(e) => setDiscountDraft(e.target.value)}
                   disabled={!canTakePayment || busy}
@@ -1626,19 +1633,19 @@ export default function PosPage() {
                 </button>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="payment-summary-row">
               <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
               <div style={{ fontWeight: 600 }}>{discountTotal.toFixed(2)} TL</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="payment-summary-row">
               <div style={{ color: 'var(--muted)' }}>Net</div>
               <div style={{ fontWeight: 700 }}>{netTotal.toFixed(2)} TL</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="payment-summary-row">
               <div style={{ color: 'var(--muted)' }}>Ödenen</div>
               <div style={{ fontWeight: 600 }}>{paidTotal.toFixed(2)} TL</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="payment-summary-row">
               <div style={{ color: 'var(--muted)' }}>{signedBalanceLabel}</div>
               <div style={{ fontWeight: 700 }}>{signedBalanceValue.toFixed(2)} TL</div>
             </div>
@@ -1648,9 +1655,9 @@ export default function PosPage() {
         {previousLines.length > 0 && (
           <div className="card" style={{ borderColor: 'var(--border)' }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Önceki Ödemeler</div>
-            <div style={{ display: 'grid', gap: 8 }}>
+            <div className="payment-history-list">
               {previousLines.map((r) => (
-                <div key={`${r.kind}:${r.id}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <div key={`${r.kind}:${r.id}`} className="payment-history-row">
                   <div style={{ display: 'grid' }}>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
                     <div style={{ fontWeight: 600 }}>
@@ -1682,7 +1689,7 @@ export default function PosPage() {
           <div style={{ display: 'grid', gap: 10 }}>
             <div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yöntem</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="payment-method-grid">
                 {payMethods.map((m) => {
                   const active = paymentMethod === m.key
                   return (
@@ -1722,12 +1729,12 @@ export default function PosPage() {
               <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
             </label>
             {paymentMethod === 'cash' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)' }}>
+              <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
                 <div>Paraüstü</div>
                 <div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="payment-actions">
               <button className="btn" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
                 Ödeme Ekle
               </button>

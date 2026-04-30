@@ -33,27 +33,6 @@ export default function CanteenReportsPage() {
   const [error, setError] = useState('')
   const [exporting, setExporting] = useState(false)
 
-  const backendBase = () => {
-    try {
-      const raw = String(import.meta.env.VITE_API_URL || '').trim()
-      if (raw) {
-        const u = new URL(raw)
-        u.port = '4000'
-        u.pathname = ''
-        u.search = ''
-        u.hash = ''
-        return u.toString().replace(/\/+$/, '')
-      }
-    } catch {
-    }
-    try {
-      const host = String(window.location?.hostname || '').trim()
-      if (host) return `http://${host}:4000`
-    } catch {
-    }
-    return '/api'
-  }
-
   const downloadAllExcel = async () => {
     if (!canExport) return
     setExporting(true)
@@ -62,7 +41,7 @@ export default function CanteenReportsPage() {
       const token = (() => {
         try { return String(localStorage.getItem('token_canteen') || '') } catch { return '' }
       })()
-      const url = `${backendBase()}/api/canteen/reports/export?${qs}`
+      const url = `/api/canteen/reports/export?${qs}`
       const res = await fetch(url, {
         method: 'GET',
         headers: {

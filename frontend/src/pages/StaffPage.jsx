@@ -31,7 +31,7 @@ export default function StaffPage({ systemType }) {
     return (
       <div style={{ display: 'grid', gap: 12 }}>
         {(PERMISSION_GROUPS_TR || []).map((group) => (
-          <div key={group.title} className="card" style={{ borderColor: 'var(--border)' }}>
+          <div key={group.title} className="card card--stable" style={{ borderColor: 'var(--border)' }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>{group.title}</div>
             <div style={{ display: 'grid', gap: 10 }}>
               {(group.items || []).map((it) => (

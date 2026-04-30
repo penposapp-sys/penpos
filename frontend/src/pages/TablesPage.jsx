@@ -40,7 +40,7 @@ const getBorderColor = (active, paid, elapsedMinutes) => {
   return '#22c55e'
 }
 
-export default function TablesPage() {
+export function TablesManagementContent({ embedded = false }) {
   const nav = useNavigate()
   const { allowedBranchIds } = useAuth()
   const { ids: allowed } = buildBranchQueryParams(allowedBranchIds)
@@ -231,11 +231,11 @@ export default function TablesPage() {
 
     const active = activeByTable[tableId]
     if (active?.hasActive && active?.orderId) {
-      nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
+      nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true, tableName: table?.name || '' } })
       return
     }
 
-    nav(`/kermes/app/pos?tableId=${tableId}`, { state: { fromTables: true } })
+    nav(`/kermes/app/pos?tableId=${tableId}`, { state: { fromTables: true, tableName: table?.name || '' } })
   }
 
   const openMerge = (table) => {
@@ -269,7 +269,7 @@ export default function TablesPage() {
 
       const active = latest?.activeByTable?.[targetTable?.id]
       if (active?.orderId) {
-        nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true } })
+        nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true, tableName: targetTable?.name || '' } })
       }
     } catch (err) {
       const message = parseApiError(err)
@@ -279,12 +279,6 @@ export default function TablesPage() {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="stickyTop" style={{ paddingBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>Masalar</h3>
-        </div>
-      </div>
-
       {Array.isArray(allowedBranchIds) && allowed.length === 0 && (
         <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', marginBottom: 12 }}>
           <div style={{ fontWeight: 800, color: '#b91c1c' }}>
@@ -491,4 +485,8 @@ export default function TablesPage() {
       </Modal>
     </div>
   )
+}
+
+export default function TablesPage() {
+  return <TablesManagementContent />
 }

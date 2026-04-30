@@ -1507,8 +1507,9 @@ export const cancelOrderService = async (tenantId, id) => {
   const now = new Date()
   const isDelivery = String(order.saleType || '') === 'delivery'
   for (const it of order.items || []) {
-    if (it && (it.status === 'open' || it.status === 'sent')) {
+    if (it && it.status !== 'cancelled') {
       it.status = 'cancelled'
+      it.cancelledAt = now
     }
   }
   order.status = 'cancelled'

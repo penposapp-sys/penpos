@@ -7,6 +7,53 @@ import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
+import { useTheme } from '../theme/ThemeContext.jsx'
+import { themeKeys, themes } from '../theme/themeConfig.js'
+
+function ThemeSelector() {
+  const { themeKey, setThemeKey } = useTheme()
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+      {themeKeys.map((key) => {
+        const item = themes[key]
+        const selected = themeKey === key
+
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setThemeKey(key)}
+            style={{
+              borderRadius: 24,
+              border: `1px solid ${selected ? '#0f172a' : '#e2e8f0'}`,
+              background: selected ? '#0f172a' : '#f8fafc',
+              color: selected ? '#ffffff' : '#334155',
+              padding: 16,
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'transform 180ms ease, box-shadow 180ms ease',
+              boxShadow: selected ? '0 18px 36px rgba(15, 23, 42, 0.18)' : '0 10px 22px rgba(15, 23, 42, 0.05)'
+            }}
+          >
+            <div style={{ height: 48, borderRadius: 18, background: item.gradient }} />
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontWeight: 900 }}>{item.name}</div>
+              {selected && (
+                <span style={{ borderRadius: 999, background: '#ffffff', color: '#0f172a', padding: '4px 8px', fontSize: 11, fontWeight: 900 }}>
+                  Secili
+                </span>
+              )}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: selected ? 'rgba(255,255,255,0.72)' : '#94a3b8', lineHeight: 1.5 }}>
+              Yan bar, ust bar, aktif menu kapsulu ve aksiyon butonlari tema rengine gore guncellenir.
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -314,6 +361,14 @@ export const SettingsSystemContent = () => {
               ))
             )}
           </div>
+        </div>
+
+        <div className="card" style={{ borderColor: 'var(--border)' }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Tema Secenekleri</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+            Mevcut sistem temasi korunur. Buradaki secimler eski sistemin ustune ek olarak uygulanir.
+          </div>
+          <ThemeSelector />
         </div>
 
         {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}

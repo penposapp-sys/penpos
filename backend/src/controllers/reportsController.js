@@ -2,6 +2,7 @@ import { sendError } from '../utils/errors.js'
 import Order from '../models/Order.js'
 import Table from '../models/Table.js'
 import AccountTransaction from '../models/AccountTransaction.js'
+import CustomerAccount from '../models/CustomerAccount.js'
 import mongoose from 'mongoose'
 import { ensureFeature, ensureNotExpired } from '../services/planService.js'
 import { applyBranchFilter, buildBranchMatch } from '../utils/branchFilter.js'
@@ -525,7 +526,8 @@ export const orders = async (req, res) => {
   try {
     await ensureNotExpired(req.user.tenantId, req.user.id)
     await ensureFeature(req.user.tenantId, 'reports')
-    const { from, to, status } = req.query || {}
+    const { period, start, end, status } = req.query || {}
+    const { from, to } = getLocalRangeExclusive(period, start, end)
     const branchIds = Array.isArray(req.branchIds) ? req.branchIds.map(String).filter(Boolean) : []
     if (branchIds.length === 0) {
       return res.status(403).json({
@@ -541,14 +543,12 @@ export const orders = async (req, res) => {
       if (status === 'closed') filter.status = { $in: ['closed', 'completed'] }
       else filter.status = status
     }
-    if (from || to) {
-      const effectiveDateExpr = { $ifNull: ['$closedAt', '$updatedAt'] }
-      const fromStart = from ? startOfDayLocal(from) : null
-      const toStart = to ? startOfDayLocal(to) : null
-      const and = []
-      if (fromStart) and.push({ $gte: [effectiveDateExpr, fromStart] })
-      if (toStart) and.push({ $lt: [effectiveDateExpr, addDaysLocal(toStart, 1)] })
-      if (and.length > 0) filter.$expr = { $and: and }
+    const effectiveDateExpr = { $ifNull: ['$closedAt', '$updatedAt'] }
+    filter.$expr = {
+      $and: [
+        { $gte: [effectiveDateExpr, from] },
+        { $lt: [effectiveDateExpr, to] }
+      ]
     }
     
     if (!status) {
@@ -758,9 +758,14 @@ export const dashboard = async (req, res) => {
     const sales = {
       totalRevenue: 0,
       totalPaid: 0,
+      collectedTotal: 0,
+      accountChargedTotal: 0,
+      accountCollectionTotal: 0,
       overpayTotal: 0,
       balanceDueSigned: 0,
       byMethod: { cash: 0, pos: 0, bank: 0, account: 0 },
+      collectedByMethod: { cash: 0, pos: 0, bank: 0, account: 0 },
+      currentAccountBalance: 0,
       orderCount: 0
     }
 
@@ -780,7 +785,11 @@ export const dashboard = async (req, res) => {
         const amt = toMoneySafe(p?.amount)
         const bucket = normalizeMethod(p?.methodBucket || p?.method)
         if (bucket === 'account') accountPaidExplicit += amt
-        else nonAccountPaid += amt
+        else {
+          nonAccountPaid += amt
+          sales.collectedByMethod[bucket] = toMoneySafe(sales.collectedByMethod[bucket]) + amt
+          sales.collectedTotal += amt
+        }
         sales.byMethod[bucket] = toMoneySafe(sales.byMethod[bucket]) + amt
       }
 
@@ -815,12 +824,71 @@ export const dashboard = async (req, res) => {
       hourlyCounts.set(hh, (hourlyCounts.get(hh) || 0) + 1)
     }
 
-    const [orderProducts, manualProducts, legacyManualProducts, cancelledProducts] = await Promise.all([
+    const collectionFilterBase = applyBranchFilter({
+      tenantId: req.user.tenantId,
+      source: 'collection',
+      type: 'credit',
+      isDeleted: { $ne: true },
+      createdAt: { $gte: from, $lt: to }
+    }, branchIds)
+
+    const accountChargeFilterBase = applyBranchFilter({
+      tenantId: req.user.tenantId,
+      type: 'debit',
+      isDeleted: { $ne: true },
+      createdAt: { $gte: from, $lt: to },
+      source: { $in: ['order_veresiye', 'manual'] }
+    }, branchIds)
+
+    const accountFilterBase = applyBranchFilter({
+      tenantId: req.user.tenantId,
+      isActive: true
+    }, branchIds)
+
+    const [orderProducts, manualProducts, legacyManualProducts, cancelledProducts, collectionRows, accountChargeRows, accountBalanceAgg] = await Promise.all([
       aggregateOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
       aggregateManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
       aggregateLegacyManualAccountProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
-      aggregateCancelledOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to })
+      aggregateCancelledOrderProducts({ tenantId: req.user.tenantId, branchIds, fromDate: from, toDate: to }),
+      AccountTransaction.find(collectionFilterBase)
+        .select({ amount: 1, method: 1, methodBucket: 1 })
+        .lean(),
+      AccountTransaction.find(accountChargeFilterBase)
+        .select({ amount: 1 })
+        .lean(),
+      CustomerAccount.aggregate([
+        { $match: accountFilterBase },
+        {
+          $group: {
+            _id: null,
+            balanceTotal: {
+              $sum: {
+                $cond: [
+                  { $gt: ['$balance', 0] },
+                  '$balance',
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ])
     ])
+
+    for (const tx of collectionRows || []) {
+      const amt = toMoneySafe(tx?.amount)
+      const bucket = normalizeMethod(tx?.methodBucket || tx?.method)
+      sales.collectedByMethod[bucket] = toMoneySafe(sales.collectedByMethod[bucket]) + amt
+      sales.collectedTotal += amt
+      sales.accountCollectionTotal += amt
+    }
+
+    for (const tx of accountChargeRows || []) {
+      sales.accountChargedTotal += toMoneySafe(tx?.amount)
+    }
+
+    sales.currentAccountBalance = toMoneySafe(accountBalanceAgg?.[0]?.balanceTotal || 0)
+
     const products = mergeProductRows(orderProducts, manualProducts, legacyManualProducts).slice(0, 10)
     const cancelledSummaryRows = mergeProductRows(cancelledProducts)
     const cancelled = {
@@ -840,6 +908,9 @@ export const dashboard = async (req, res) => {
       sales: {
         totalRevenue: toMoneySafe(sales.totalRevenue),
         totalPaid: toMoneySafe(sales.totalPaid),
+        collectedTotal: toMoneySafe(sales.collectedTotal),
+        accountChargedTotal: toMoneySafe(sales.accountChargedTotal),
+        accountCollectionTotal: toMoneySafe(sales.accountCollectionTotal),
         overpayTotal: toMoneySafe(sales.overpayTotal),
         balanceDueSigned: toMoneySafe(sales.balanceDueSigned),
         byMethod: {
@@ -848,6 +919,13 @@ export const dashboard = async (req, res) => {
           bank: toMoneySafe(sales.byMethod.bank),
           account: toMoneySafe(sales.byMethod.account)
         },
+        collectedByMethod: {
+          cash: toMoneySafe(sales.collectedByMethod.cash),
+          pos: toMoneySafe(sales.collectedByMethod.pos),
+          bank: toMoneySafe(sales.collectedByMethod.bank),
+          account: toMoneySafe(sales.collectedByMethod.account)
+        },
+        currentAccountBalance: toMoneySafe(sales.currentAccountBalance),
         orderCount: Number(sales.orderCount || 0)
       },
       products: products.map(p => ({

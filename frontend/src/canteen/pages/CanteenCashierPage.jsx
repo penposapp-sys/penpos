@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
+import { useTheme } from '../../theme/ThemeContext.jsx'
 
 const money = (n) => {
   const v = Number(n || 0)
@@ -12,6 +13,7 @@ const normalize = (s) => String(s || '').toLowerCase().trim()
 
 export default function CanteenCashierPage() {
   const { me, session } = useOutletContext()
+  const { theme, themeKey } = useTheme()
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [q, setQ] = useState('')
@@ -56,6 +58,23 @@ export default function CanteenCashierPage() {
   })
 
   const [branchModalOpen, setBranchModalOpen] = useState(false)
+
+  const softProductCardStyle = useMemo(() => {
+    const borderColor = theme.border
+    const accentRgb = (() => {
+      const hex = String(theme.accent || '').replace('#', '')
+      if (hex.length !== 6) return '17,24,39'
+      const r = parseInt(hex.slice(0, 2), 16)
+      const g = parseInt(hex.slice(2, 4), 16)
+      const b = parseInt(hex.slice(4, 6), 16)
+      return `${r}, ${g}, ${b}`
+    })()
+    return {
+      borderColor,
+      background: `linear-gradient(180deg, ${theme.accentSoft} 0%, rgba(${accentRgb}, ${themeKey === 'mono' ? '0.05' : '0.1'}) 100%)`,
+      boxShadow: `0 14px 34px rgba(${accentRgb}, ${themeKey === 'mono' ? '0.08' : '0.12'})`
+    }
+  }, [theme, themeKey])
 
   const scheduleBarcodeFocus = (delayMs = 250) => {
     setTimeout(() => {
@@ -615,17 +634,17 @@ export default function CanteenCashierPage() {
                 type="button"
                 className="card"
                 onClick={() => addToCart(p)}
-                style={{ cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6, borderColor: 'var(--border)' }}
+                style={{ ...softProductCardStyle, cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6 }}
               >
-                <div style={{ fontWeight: 700, lineHeight: 1.2 }}>{p.name}</div>
+                <div style={{ fontWeight: 800, lineHeight: 1.2, color: theme.text }}>{p.name}</div>
                 {p.branchId && (
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 12, color: theme.accentText }}>
                     {(allowedBranches.find(b => String(b.id) === String(p.branchId))?.name) || 'Şube'}
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-                  <div style={{ color: 'var(--muted)', fontSize: 13 }}>{money(p.price)} ₺</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <div style={{ color: theme.accentText, fontSize: 13, fontWeight: 700 }}>{money(p.price)} ₺</div>
+                  <div style={{ fontSize: 12, color: 'rgba(15,23,42,0.62)' }}>
                     {p.stockTrackingEnabled === true ? `Stok: ${Number(p.stockQty || 0)}` : 'Stok: —'}
                   </div>
                 </div>

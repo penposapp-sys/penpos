@@ -14,12 +14,32 @@ export default function SidebarNav({ items, collapsed, onNavigate }) {
           onClick: () => {
             try { onNavigate?.(i) } catch {}
           },
-          style: { justifyContent: collapsed ? 'center' : 'flex-start', display: 'flex', alignItems: 'center', gap: 10 }
+          style: {
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            background: active ? 'var(--canteen-nav-active-bg, #e5e7eb)' : 'transparent',
+            color: active ? 'var(--canteen-nav-active-text, #111827)' : 'var(--canteen-nav-text, #6b7280)',
+            borderColor: active ? 'var(--canteen-nav-active-border, transparent)' : 'transparent',
+            boxShadow: active ? 'var(--canteen-nav-active-shadow, none)' : 'none'
+          }
         }
 
         const content = (
           <>
-            {!!Icon && <span className="nav-icon"><Icon size={18} /></span>}
+            {!!Icon && (
+              <span
+                className="nav-icon"
+                style={{
+                  background: active ? 'var(--canteen-nav-icon-active-bg, #111827)' : 'var(--canteen-nav-icon-bg, rgba(255,255,255,0.08))',
+                  color: active ? 'var(--canteen-nav-icon-active-text, #ffffff)' : 'var(--canteen-nav-icon-text, currentColor)',
+                  boxShadow: active ? 'var(--canteen-nav-icon-active-shadow, none)' : 'none'
+                }}
+              >
+                <Icon size={18} />
+              </span>
+            )}
             {!collapsed && <span className="nav-label">{i.label}</span>}
           </>
         )
@@ -41,4 +61,3 @@ export default function SidebarNav({ items, collapsed, onNavigate }) {
     </nav>
   )
 }
-

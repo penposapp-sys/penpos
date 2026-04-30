@@ -6,7 +6,7 @@ import { toast } from '../lib/toast.js'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import { trPaymentMethodLabel, trStatusLabel } from '../i18n/tr.js'
 
-export default function ReportsSales() {
+export function ReportsSalesContent({ embedded = false }) {
   const { allowedBranchIds, user } = useAuth()
 
   const toYmd = (d) => {
@@ -95,7 +95,7 @@ export default function ReportsSales() {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="stickyTop" style={{ display: 'grid', gap: 10, paddingBottom: 12 }}>
+      <div className={embedded ? undefined : 'stickyTop'} style={{ display: 'grid', gap: 10, paddingBottom: 12 }}>
         <h3 style={{ margin: 0 }}>Kapanan Masalar</h3>
         <form onSubmit={onSearch} className="reportsFilters">
           <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ minWidth: 160 }} />
@@ -404,4 +404,8 @@ export default function ReportsSales() {
       />
     </div>
   )
+}
+
+export default function ReportsSales() {
+  return <ReportsSalesContent />
 }

@@ -22,7 +22,7 @@ export default function AccountDetailPage() {
   const { id } = useParams()
   const loc = useLocation()
   const { isMobilePortrait } = useResponsiveFlags()
-  const { user } = useAuth()
+  const { user, allowedBranchIds } = useAuth()
 
   const orderIdFromUrl = useMemo(() => {
     try {
@@ -131,8 +131,15 @@ export default function AccountDetailPage() {
     if (!canCollect) return
     let cancelled = false
     const run = async () => {
+      const selectedBranchId = (() => {
+        try { return String(localStorage.getItem('selectedBranchId') || '').trim() } catch { return '' }
+      })()
+      if (!selectedBranchId) {
+        setCollectMethods([])
+        return
+      }
       try {
-        const res = await api('/api/tenant/payment-settings', { silent: true })
+        const res = await api('/api/tenant/payment-settings', { silent: true, suppressBranchModal: true })
         if (cancelled) return
         if (res?.success === false) {
           setCollectMethods([])
@@ -148,7 +155,7 @@ export default function AccountDetailPage() {
     }
     run()
     return () => { cancelled = true }
-  }, [canCollect])
+  }, [canCollect, Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : ''])
 
   useEffect(() => {
     const run = async () => {

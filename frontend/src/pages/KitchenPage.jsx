@@ -8,6 +8,23 @@ import { servingTypeLabelTR } from '../utils/servingType.js'
 import { useKitchenMenuFilters } from '../lib/useKitchenMenuFilters.js'
 import { useKitchenAlertSound } from '../lib/useKitchenAlertSound.js'
 
+const SpeakerIcon = ({ muted = false }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M5 9v6h4l5 4V5l-5 4H5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    {muted ? (
+      <>
+        <path d="M17 9l4 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M21 9l-4 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </>
+    ) : (
+      <>
+        <path d="M18 9.5a4.5 4.5 0 0 1 0 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M20.5 7a8 8 0 0 1 0 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </>
+    )}
+  </svg>
+)
+
 const STATUS_LABELS_TR = {
   open: 'Bekliyor',
   sent: 'Hazirlaniyor',
@@ -515,8 +532,7 @@ export default function KitchenPage() {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="stickyTop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>Mutfaga Gelen Siparisler</h3>
+      <div className="stickyTop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn" onClick={() => setViewMode('grouped')} aria-pressed={viewMode === 'grouped'}>Toplu</button>
           <button type="button" className="btn" onClick={() => setViewMode('separate')} aria-pressed={viewMode === 'separate'}>Ayri</button>
@@ -531,7 +547,7 @@ export default function KitchenPage() {
             }}
             title={soundEnabled ? 'Ses Acik (Kapat)' : 'Ses Kapali (Ac)'}
           >
-            {soundEnabled ? 'S' : 'M'}
+            <SpeakerIcon muted={!soundEnabled} />
           </button>
         </div>
       </div>
