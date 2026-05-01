@@ -550,6 +550,24 @@ export default function Layout() {
                   )}
                 </button>
 
+                {isMobilePortrait && user && (
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={logout}
+                    style={{
+                      borderRadius: 16,
+                      background: theme.accent,
+                      borderColor: theme.accent,
+                      color: '#ffffff',
+                      fontWeight: 900,
+                      boxShadow: theme.activeGlow
+                    }}
+                  >
+                    Cikis
+                  </button>
+                )}
+
                 {isReportsPage && (
                   <button
                     className="btn"

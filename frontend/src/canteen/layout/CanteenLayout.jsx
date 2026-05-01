@@ -44,6 +44,17 @@ export default function CanteenLayout() {
   }, [mobileMenuOpen])
 
   useEffect(() => {
+    try {
+      if (isMobilePortrait) document.body.classList.add('mobile-ui')
+      else document.body.classList.remove('mobile-ui')
+    } catch {}
+
+    return () => {
+      try { document.body.classList.remove('mobile-ui') } catch {}
+    }
+  }, [isMobilePortrait])
+
+  useEffect(() => {
     const run = async () => {
       const token = localStorage.getItem(tokenKey)
       if (!token) {
