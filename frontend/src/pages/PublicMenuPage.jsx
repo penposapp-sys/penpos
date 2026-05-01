@@ -2,6 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 
+function formatMoney(value) {
+  const amount = Number(value || 0)
+  return `₺${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function buildInfoTags(item, categoryName) {
+  const tags = []
+  if (categoryName) tags.push(categoryName)
+  if (item?.isPopular) tags.push('Populer')
+  if (item?.isFeatured) tags.push('Onerilen')
+  if (item?.stockTracked) tags.push('Stok takipli')
+  if (Number(item?.price || 0) > 0) tags.push(formatMoney(item.price))
+  return tags.slice(0, 4)
+}
+
 export default function PublicMenuPage() {
   const { tenantSlug } = useParams()
   const [loading, setLoading] = useState(true)
@@ -9,7 +24,7 @@ export default function PublicMenuPage() {
   const [tenant, setTenant] = useState(null)
   const [categories, setCategories] = useState([])
   const [items, setItems] = useState([])
-  const [activeCategoryId, setActiveCategoryId] = useState('')
+  const [activeCategoryId, setActiveCategoryId] = useState('all')
   const [q, setQ] = useState('')
   const [detail, setDetail] = useState(null)
   const sectionRefs = useRef({})
@@ -23,7 +38,7 @@ export default function PublicMenuPage() {
         const res = await api(`/api/public/menu?tenantSlug=${encodeURIComponent(String(tenantSlug || '').trim())}`, { silent: true, skipBranchHeader: true })
         if (!mounted) return
         if (res?.success === false) {
-          setError(res?.message || 'Menü bulunamadı')
+          setError(res?.message || 'Menu bulunamadi')
           setTenant(null)
           setCategories([])
           setItems([])
@@ -34,10 +49,10 @@ export default function PublicMenuPage() {
         setTenant(res?.tenant || null)
         setCategories(cats)
         setItems(its)
-        setActiveCategoryId(cats[0]?.id || '')
+        setActiveCategoryId('all')
       } catch (e) {
         if (!mounted) return
-        setError(e?.message || 'Menü yüklenemedi')
+        setError(e?.message || 'Menu yuklenemedi')
         setTenant(null)
         setCategories([])
         setItems([])
@@ -48,6 +63,17 @@ export default function PublicMenuPage() {
     run()
     return () => { mounted = false }
   }, [tenantSlug])
+
+  useEffect(() => {
+    document.title = tenant?.name ? `${tenant.name} | Dijital Menu` : 'PenPOS | Dijital Menu'
+  }, [tenant?.name])
+
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', !!detail)
+    return () => {
+      document.body.classList.remove('modal-open')
+    }
+  }, [detail])
 
   const apiOrigin = useMemo(() => {
     const fallback = '/api'
@@ -67,76 +93,65 @@ export default function PublicMenuPage() {
     return `${apiOrigin}${raw.startsWith('/') ? '' : '/'}${raw}`
   }, [tenant?.logoUrl, apiOrigin])
 
+  const normalizedQuery = String(q || '').trim().toLocaleLowerCase('tr-TR')
+
   const filteredItems = useMemo(() => {
-    const query = String(q || '').trim().toLowerCase()
     const list = Array.isArray(items) ? items : []
-    return list
-      .filter(i => {
-        if (!query) return true
-        const name = String(i?.name || '').toLowerCase()
-        const desc = String(i?.description || '').toLowerCase()
-        return name.includes(query) || desc.includes(query)
-      })
-  }, [items, q])
+    return list.filter((item) => {
+      if (!normalizedQuery) return true
+      const categoryName = String(categories.find((category) => String(category?.id) === String(item?.categoryId))?.name || '')
+      const haystack = `${item?.name || ''} ${item?.description || ''} ${categoryName}`.toLocaleLowerCase('tr-TR')
+      return haystack.includes(normalizedQuery)
+    })
+  }, [items, categories, normalizedQuery])
 
   const visibleCategories = useMemo(() => {
-    const cats = Array.isArray(categories) ? categories : []
-    if (!String(q || '').trim()) return cats
-    const set = new Set((Array.isArray(filteredItems) ? filteredItems : []).map(i => String(i?.categoryId || '')))
-    return cats.filter(c => set.has(String(c?.id || '')))
-  }, [categories, filteredItems, q])
+    const matchedIds = new Set(filteredItems.map((item) => String(item?.categoryId || '')))
+    return categories.filter((category) => matchedIds.has(String(category?.id || '')))
+  }, [categories, filteredItems])
+
+  const categoryTabs = useMemo(() => {
+    return [{ id: 'all', name: 'Tumu' }, ...visibleCategories.map((category) => ({ id: String(category.id), name: category.name }))]
+  }, [visibleCategories])
+
+  const visibleProducts = useMemo(() => {
+    if (activeCategoryId === 'all') return filteredItems
+    return filteredItems.filter((item) => String(item?.categoryId || '') === String(activeCategoryId))
+  }, [filteredItems, activeCategoryId])
 
   const itemsByCategoryId = useMemo(() => {
     const map = new Map()
-    for (const i of (Array.isArray(filteredItems) ? filteredItems : [])) {
-      const k = String(i?.categoryId || '').trim()
-      if (!k) continue
-      const prev = map.get(k)
-      if (prev) prev.push(i)
-      else map.set(k, [i])
+    for (const item of filteredItems) {
+      const key = String(item?.categoryId || '').trim()
+      if (!key) continue
+      const prev = map.get(key)
+      if (prev) prev.push(item)
+      else map.set(key, [item])
     }
     return map
   }, [filteredItems])
 
+  const featuredItem = visibleProducts[0] || filteredItems[0] || items[0] || null
+
   useEffect(() => {
-    const list = Array.isArray(visibleCategories) ? visibleCategories : []
-    const ids = list.map(c => String(c?.id || '')).filter(Boolean)
-    if (ids.length === 0) return
-    const current = String(activeCategoryId || '')
-    if (!current || !ids.includes(current)) {
-      setActiveCategoryId(ids[0])
-    }
+    if (activeCategoryId === 'all') return
+    const exists = visibleCategories.some((category) => String(category?.id) === String(activeCategoryId))
+    if (!exists) setActiveCategoryId('all')
   }, [visibleCategories, activeCategoryId])
-
-  useEffect(() => {
-    const list = Array.isArray(visibleCategories) ? visibleCategories : []
-    const ids = list.map(c => String(c?.id || '')).filter(Boolean)
-    if (ids.length === 0) return
-
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter(e => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
-        const id = visible[0]?.target?.getAttribute('data-category-id')
-        if (id) setActiveCategoryId(String(id))
-      },
-      { root: null, threshold: 0.15, rootMargin: '-120px 0px -70% 0px' }
-    )
-
-    for (const id of ids) {
-      const el = sectionRefs.current?.[id]
-      if (el) obs.observe(el)
-    }
-
-    return () => {
-      try { obs.disconnect() } catch {}
-    }
-  }, [visibleCategories])
 
   const scrollToCategory = (id) => {
     const key = String(id || '').trim()
-    if (!key) return
+    if (!key || key === 'all') {
+      setActiveCategoryId('all')
+      const first = visibleCategories[0]
+      const firstEl = first ? sectionRefs.current?.[String(first.id)] : null
+      if (firstEl) {
+        try { firstEl.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch { firstEl.scrollIntoView() }
+      }
+      return
+    }
+
+    setActiveCategoryId(key)
     const el = sectionRefs.current?.[key]
     if (!el) return
     try {
@@ -148,152 +163,217 @@ export default function PublicMenuPage() {
 
   if (loading) {
     return (
-      <div className="main qr-menu" style={{ maxWidth: 980, margin: '0 auto', padding: 16 }}>
-        <div className="card">Yükleniyor…</div>
+      <div className="digital-public-menu-page">
+        <div className="digital-public-menu-shell">
+          <div className="card">Menu yukleniyor...</div>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="main qr-menu" style={{ maxWidth: 980, margin: '0 auto', padding: 16 }}>
-        <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
-          <div style={{ fontWeight: 800, color: '#b91c1c' }}>Menü açılamadı</div>
-          <div style={{ color: 'var(--muted)', marginTop: 6 }}>{error}</div>
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <Link to="/login" className="btn">Giriş</Link>
+      <div className="digital-public-menu-page">
+        <div className="digital-public-menu-shell">
+          <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
+            <div style={{ fontWeight: 800, color: '#b91c1c' }}>Menu acilamadi</div>
+            <div style={{ color: 'var(--muted)', marginTop: 6 }}>{error}</div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Link to="/login" className="btn">Giris</Link>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="main qr-menu" style={{ maxWidth: 860, margin: '0 auto', padding: 16 }}>
-      <div className="qr-header">
-        {!!logoSrc && (
-          <img
-            className="qr-logo"
-            src={logoSrc}
-            alt="Logo"
-            width={112}
-            height={112}
-            loading="eager"
-            onError={(e) => { e.currentTarget.style.display = 'none' }}
-          />
-        )}
-        <h1 className="qr-title">{tenant?.name || 'Menü'}</h1>
-        <p className="qr-subtitle">Hoşgeldiniz</p>
-        <div className="qr-search">
-          <input className="input" placeholder="Ara..." value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-      </div>
+    <div className="digital-public-menu-page">
+      <div className="digital-public-menu-shell qr-menu">
+        <header className="digital-public-menu-header">
+          <div className="digital-public-menu-brand-row">
+            <div className="digital-public-menu-brand-copy">
+              <h1 className="digital-public-menu-title">{tenant?.name || 'PenPOS Restaurant'}</h1>
+            </div>
+          </div>
 
-      <div className="category-bar">
-        <div className="category-bar-inner">
-          {visibleCategories.map(c => {
-            const id = String(c?.id || '').trim()
-            const active = id && String(activeCategoryId) === id
-            return (
-              <button
-                key={id}
-                type="button"
-                className={`category-pill${active ? ' is-active' : ''}`}
-                onClick={() => scrollToCategory(id)}
-              >
-                {c.name}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="menu-content">
-        {visibleCategories.map(c => {
-          const id = String(c?.id || '').trim()
-          const list = itemsByCategoryId.get(id) || []
-          if (!id) return null
-          return (
-            <section
-              key={id}
-              className="menu-section"
-              data-category-id={id}
-              ref={(el) => {
-                if (!el) delete sectionRefs.current[id]
-                else sectionRefs.current[id] = el
-              }}
-            >
-              <h2 className="menu-section-title">{c.name}</h2>
-              <div className="menu-rows">
-                {list.map(i => (
-                  <button
-                    key={i.id}
-                    type="button"
-                    className="menu-row"
-                    onClick={() => setDetail(i)}
-                  >
-                    {String(i?.imageUrl || '').trim() ? (
-                      <img
-                        className="menu-row-img"
-                        src={i.imageUrl}
-                        alt={i.name}
-                        loading="lazy"
-                        onError={(e) => { e.currentTarget.style.display = 'none' }}
-                      />
-                    ) : (
-                      <div className="menu-row-img menu-row-img-placeholder" aria-hidden="true" />
-                    )}
-                    <div className="menu-row-content">
-                      <div className="menu-row-top">
-                        <div className="menu-row-name">{i.name}</div>
-                        <div className="menu-row-price">{Number(i.price || 0).toFixed(2)} TL</div>
-                      </div>
-                      {!!String(i?.description || '').trim() && (
-                        <div className="menu-row-sub">{i.description}</div>
-                      )}
-                    </div>
-                  </button>
-                ))}
-                {list.length === 0 && (
-                  <div className="menu-empty">Bu kategoride ürün yok</div>
-                )}
+          {featuredItem && (
+            <section className="digital-public-menu-hero">
+              <div className="digital-public-menu-hero-copy">
+                <div className="digital-public-menu-hero-pill">Bugunun onerisi</div>
+                <h2>{featuredItem.name}</h2>
+                <p>Detaylari gormek icin urune dokunun.</p>
               </div>
+              <button type="button" className="digital-public-menu-hero-thumb" onClick={() => setDetail(featuredItem)}>
+                {!!featuredItem.imageUrl ? (
+                  <img src={featuredItem.imageUrl} alt={featuredItem.name} />
+                ) : (
+                  <div className="digital-public-menu-hero-placeholder" aria-hidden="true">🍽️</div>
+                )}
+              </button>
             </section>
-          )
-        })}
+          )}
 
-        {visibleCategories.length === 0 && (
-          <div className="card" style={{ color: 'var(--muted)' }}>Ürün bulunamadı</div>
-        )}
+          <label className="digital-public-menu-search">
+            <span className="digital-public-menu-search-icon" aria-hidden="true">🔍</span>
+            <input
+              className="digital-public-menu-search-input"
+              placeholder="Urun, kategori veya aciklama ara..."
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+            />
+          </label>
+
+          <div className="digital-public-menu-tabbar">
+            {categoryTabs.map((category) => {
+              const isActive = String(activeCategoryId) === String(category.id)
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`digital-public-menu-tab${isActive ? ' is-active' : ''}`}
+                  onClick={() => scrollToCategory(category.id)}
+                >
+                  {category.name}
+                </button>
+              )
+            })}
+          </div>
+        </header>
+
+        <main className="digital-public-menu-content">
+          <div className="digital-public-menu-content-head">
+            <div>
+              <h3>{activeCategoryId === 'all' ? 'Tumu' : categories.find((category) => String(category.id) === String(activeCategoryId))?.name || 'Menu'}</h3>
+              <p>{visibleProducts.length} urun listeleniyor</p>
+            </div>
+            <div className="digital-public-menu-mode-pill">Menu modu</div>
+          </div>
+
+          {activeCategoryId === 'all' ? (
+            <div className="digital-public-menu-sections">
+              {visibleCategories.map((category) => {
+                const categoryId = String(category.id)
+                const categoryItems = itemsByCategoryId.get(categoryId) || []
+                return (
+                  <section
+                    key={categoryId}
+                    className="digital-public-menu-section"
+                    ref={(element) => {
+                      if (!element) delete sectionRefs.current[categoryId]
+                      else sectionRefs.current[categoryId] = element
+                    }}
+                  >
+                    <div className="digital-public-menu-section-head">
+                      <h4>{category.name}</h4>
+                      <span>{categoryItems.length} urun</span>
+                    </div>
+                    <div className="digital-public-menu-grid">
+                      {categoryItems.map((item, index) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="digital-public-menu-card"
+                          style={{ animationDelay: `${index * 40}ms` }}
+                          onClick={() => setDetail(item)}
+                        >
+                          {!!item.imageUrl ? (
+                            <img className="digital-public-menu-card-image" src={item.imageUrl} alt={item.name} />
+                          ) : (
+                            <div className="digital-public-menu-card-image digital-public-menu-card-image--placeholder" aria-hidden="true">🍽️</div>
+                          )}
+                          <div className="digital-public-menu-card-body">
+                            <div className="digital-public-menu-card-top">
+                              <h5>{item.name}</h5>
+                              <span>{formatMoney(item.price)}</span>
+                            </div>
+                            <p>{item.description || 'Detaylar icin dokunun.'}</p>
+                            <div className="digital-public-menu-card-foot">
+                              <span>Detaylari gor</span>
+                              <span className="digital-public-menu-card-arrow" aria-hidden="true">›</span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="digital-public-menu-grid">
+              {visibleProducts.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="digital-public-menu-card"
+                  style={{ animationDelay: `${index * 40}ms` }}
+                  onClick={() => setDetail(item)}
+                >
+                  {!!item.imageUrl ? (
+                    <img className="digital-public-menu-card-image" src={item.imageUrl} alt={item.name} />
+                  ) : (
+                    <div className="digital-public-menu-card-image digital-public-menu-card-image--placeholder" aria-hidden="true">🍽️</div>
+                  )}
+                  <div className="digital-public-menu-card-body">
+                    <div className="digital-public-menu-card-top">
+                      <h5>{item.name}</h5>
+                      <span>{formatMoney(item.price)}</span>
+                    </div>
+                    <p>{item.description || 'Detaylar icin dokunun.'}</p>
+                    <div className="digital-public-menu-card-foot">
+                      <span>Detaylari gor</span>
+                      <span className="digital-public-menu-card-arrow" aria-hidden="true">›</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {visibleProducts.length === 0 && (
+            <div className="digital-public-menu-empty">
+              <h4>Sonuc bulunamadi</h4>
+              <p>Arama ifadesini degistirip yeniden deneyin.</p>
+            </div>
+          )}
+        </main>
       </div>
 
       {detail && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setDetail(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'grid', placeItems: 'center', padding: 16, zIndex: 60 }}
-        >
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)', display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
-              <div>
-                <div className="qr-modal-name">{detail.name}</div>
-                <div className="qr-modal-price">{Number(detail.price || 0).toFixed(2)} TL</div>
-              </div>
-              <button className="btn" onClick={() => setDetail(null)}>Kapat</button>
+        <div className="digital-public-menu-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDetail(null)}>
+          <div className="digital-public-menu-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="digital-public-menu-modal-image-wrap">
+              {!!detail.imageUrl ? (
+                <img className="digital-public-menu-modal-image" src={detail.imageUrl} alt={detail.name} />
+              ) : (
+                <div className="digital-public-menu-modal-image digital-public-menu-modal-image--placeholder" aria-hidden="true">🍽️</div>
+              )}
+              <button type="button" className="digital-public-menu-modal-close" onClick={() => setDetail(null)}>×</button>
             </div>
-            {!!detail.imageUrl && (
-              <img
-                src={detail.imageUrl}
-                alt={detail.name}
-                style={{ width: '100%', height: 260, objectFit: 'cover', borderRadius: 12, background: '#f3f4f6' }}
-                loading="lazy"
-                onError={(e) => { e.currentTarget.style.display = 'none' }}
-              />
-            )}
-            {!!detail.description && (
-              <div className="qr-modal-desc">{detail.description}</div>
-            )}
+
+            <div className="digital-public-menu-modal-body">
+              <div className="digital-public-menu-modal-head">
+                <div>
+                  <h3>{detail.name}</h3>
+                  <p>{detail.description || 'Bu urun icin ek aciklama bulunmuyor.'}</p>
+                </div>
+                <div className="digital-public-menu-modal-price">{formatMoney(detail.price)}</div>
+              </div>
+
+              <div className="digital-public-menu-modal-info">
+                <h4>Urun Bilgisi</h4>
+                <div className="digital-public-menu-modal-tags">
+                  {buildInfoTags(detail, categories.find((category) => String(category.id) === String(detail.categoryId))?.name).map((tag) => (
+                    <span key={tag} className="digital-public-menu-modal-tag">{tag}</span>
+                  ))}
+                </div>
+              </div>
+
+              <button type="button" className="digital-public-menu-modal-action" onClick={() => setDetail(null)}>
+                Menuyu Incelemeye Devam Et
+              </button>
+            </div>
           </div>
         </div>
       )}

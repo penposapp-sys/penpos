@@ -34,6 +34,7 @@ import Toast from './components/Toast.jsx'
 import AccountsPage from './pages/AccountsPage.jsx'
 import AccountDetailPage from './pages/AccountDetailPage.jsx'
 import PublicMenuPage from './pages/PublicMenuPage.jsx'
+import DigitalMenuPage from './pages/DigitalMenuPage.tsx'
 import QrMenuSettingsPage from './pages/QrMenuSettingsPage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
@@ -107,6 +108,8 @@ export default function App() {
       <Toast />
       <Routes>
         <Route path="/menu/:tenantSlug" element={<PublicMenuPage />} />
+        <Route path="/digital-menu" element={<DigitalMenuPage />} />
+        <Route path="/qr-menu" element={<DigitalMenuPage />} />
         <Route path="/canteen/login" element={<CanteenLogin />} />
         <Route path="/canteen" element={<CanteenLayout />}>
           <Route index element={<Navigate to="/canteen/kasa" replace />} />
