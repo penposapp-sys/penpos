@@ -124,7 +124,7 @@ function ThemeSelector({ selectedThemeName, onSelectThemeName }) {
   )
 }
 
-function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onBack, rightSlot }) {
+function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onOpenSystemMenu, onBack, rightSlot }) {
   return (
     <div
       style={{
@@ -142,6 +142,28 @@ function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onBack, right
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        {onOpenSystemMenu ? (
+          <button
+            type="button"
+            onClick={onOpenSystemMenu}
+            style={{
+              height: 40,
+              width: 40,
+              borderRadius: 14,
+              border: '1px solid var(--settings-border)',
+              background: 'var(--app-surface)',
+              color: 'var(--app-text)',
+              fontSize: 18,
+              fontWeight: 900,
+              cursor: 'pointer',
+              boxShadow: '0 10px 18px rgba(15, 23, 42, 0.08)',
+            }}
+            aria-label="Sistem menüsünü aç veya kapat"
+          >
+            ≡
+          </button>
+        ) : null}
+
         {onToggleMenu ? (
           <button
             type="button"
@@ -223,6 +245,9 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
       <style>{`
         .settings-home { width: 100%; }
         .settings-center-panel {
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
           border: 1px solid var(--settings-border);
           border-radius: 24px;
           padding: 14px;
@@ -234,6 +259,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
         .settings-search-row {
           display: flex;
           align-items: center;
+          min-width: 0;
           gap: 14px;
           margin: 0 0 14px;
           padding: 12px;
@@ -244,6 +270,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
         }
         .settings-search-box {
           flex: 1;
+          min-width: 0;
           min-height: 56px;
           display: flex;
           align-items: center;
@@ -256,13 +283,15 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
         .settings-search-box input {
           border: 0;
           outline: 0;
+          min-width: 0;
           width: 100%;
           font-weight: 700;
           color: var(--app-text);
           background: transparent;
         }
-        .settings-filter-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .settings-filter-list { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; max-width: 100%; }
         .settings-filter-list button {
+          max-width: 100%;
           border: 1px solid var(--settings-border);
           border-radius: 999px;
           background: var(--app-button-bg);
@@ -338,6 +367,10 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           .settings-search-row { flex-direction: column; align-items: stretch; }
         }
         @media (max-width: 768px) {
+          .settings-center-panel { padding: 12px; }
+          .settings-search-row { padding: 10px; }
+          .settings-search-box { min-height: 50px; padding: 0 14px; }
+          .settings-filter-list button { padding: 9px 12px; font-size: 11px; }
           .settings-card-grid { grid-template-columns: 1fr; }
         }
       `}</style>
@@ -607,6 +640,12 @@ export default function SettingsPage() {
     setSettingsMenuOpen(false)
   }
 
+  const openSystemMenu = () => {
+    try {
+      window.dispatchEvent(new Event('layout:toggle-mobile-menu'))
+    } catch {}
+  }
+
   if (isMobilePortrait) {
     if (isRoot) {
       return (
@@ -615,6 +654,7 @@ export default function SettingsPage() {
             title="Ayarlar"
             subtitle="Ayar bölümlerini buradan yönetin"
             icon="AY"
+            onOpenSystemMenu={openSystemMenu}
             rightSlot={
               <div style={{ minHeight: 40, padding: '0 14px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center' }}>
                 {todayLabel}
@@ -644,6 +684,7 @@ export default function SettingsPage() {
           title={current?.label || 'Ayarlar'}
           subtitle={current?.description || ''}
           icon={current?.icon || 'AY'}
+          onOpenSystemMenu={openSystemMenu}
           onToggleMenu={() => setSettingsMenuOpen((value) => !value)}
           onBack={goSettingsHome}
         />
@@ -743,7 +784,7 @@ export default function SettingsPage() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: settingsMenuOpen ? '300px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+                gridTemplateColumns: settingsMenuOpen ? 'minmax(260px, 300px) minmax(0, 1fr)' : 'minmax(0, 1fr)',
                 gap: 12,
                 alignItems: 'start',
                 minWidth: 0,

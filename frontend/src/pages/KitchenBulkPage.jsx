@@ -5,9 +5,11 @@ import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import MenuItemFilterDrawer from '../components/MenuItemFilterDrawer.jsx'
 import { useKitchenMenuFilters } from '../lib/useKitchenMenuFilters.js'
 import { useKitchenAlertSound } from '../lib/useKitchenAlertSound.js'
+import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 
 export default function KitchenBulkPage() {
   const { allowedBranchIds } = useAuth()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [items, setItems] = useState([])
   const [error, setError] = useState('')
   const doneLocalRef = useRef(new Set())
@@ -252,7 +254,7 @@ export default function KitchenBulkPage() {
 
       {error && <div className="card theme-card" style={{ borderColor: '#ef4444', color: '#fca5a5', marginBottom: 12 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : (isTablet ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))'), gap: 12, alignItems: 'start', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: 10 }}>
           <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocağa Atılmamış Urunler</div>
           {renderBulkCards(waitingItems, 'waiting')}

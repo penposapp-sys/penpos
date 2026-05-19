@@ -13,8 +13,8 @@ export default function BranchSelectorModal() {
   const canSelectBranch = user?.role === 'tenant_admin' || user?.role === 'staff'
 
   const currentSelected = useMemo(() => {
-    const v = localStorage.getItem('selectedBranchId')
-    return v ? String(v) : ''
+    const value = localStorage.getItem('selectedBranchId')
+    return value ? String(value) : ''
   }, [open])
 
   const normalizedAllowedIds = useMemo(() => {
@@ -42,19 +42,21 @@ export default function BranchSelectorModal() {
         if (!mounted) return
         const list = Array.isArray(res?.branches) ? res.branches : []
         const filtered = user?.role === 'tenant_admin'
-          ? list.filter(b => b.isActive !== false)
-          : list.filter(b => normalizedAllowedIds.includes(String(b?._id || b?.id || '')))
+          ? list.filter((branch) => branch.isActive !== false)
+          : list.filter((branch) => normalizedAllowedIds.includes(String(branch?._id || branch?.id || '')))
         setBranches(filtered)
-      } catch (e) {
+      } catch (err) {
         if (!mounted) return
-        setError(e?.message || 'Şubeler yüklenemedi')
+        setError(err?.message || 'Şubeler yüklenemedi')
         setBranches([])
       } finally {
         if (mounted) setLoading(false)
       }
     }
     load()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [open, canSelectBranch, user?.role, normalizedAllowedIds])
 
   useEffect(() => {
@@ -71,19 +73,25 @@ export default function BranchSelectorModal() {
   }, [open, canSelectBranch, user?.role, normalizedAllowedIds])
 
   const select = (id) => {
-    const bid = String(id || '')
-    if (!bid) return
-    localStorage.setItem('selectedBranchId', bid)
+    const branchId = String(id || '')
+    if (!branchId) return
+    localStorage.setItem('selectedBranchId', branchId)
     setOpen(false)
     try {
-      window.dispatchEvent(new CustomEvent('selected_branch_changed', { detail: { branchId: bid } }))
+      window.dispatchEvent(new CustomEvent('selected_branch_changed', { detail: { branchId } }))
     } catch {}
   }
 
   if (!canSelectBranch) return null
 
   return (
-    <Modal open={open} onClose={() => setOpen(false)} title="Şube seçimi gerekli">
+    <Modal
+      open={open}
+      onClose={() => setOpen(false)}
+      title="Şube seçimi gerekli"
+      dialogStyle={{ width: 'min(92vw, 560px)', marginInline: 'auto' }}
+      bodyStyle={{ padding: 18 }}
+    >
       <div style={{ display: 'grid', gap: 10 }}>
         <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
           <div style={{ fontWeight: 700, color: '#b91c1c' }}>Şube seçimi gerekli</div>
@@ -92,24 +100,28 @@ export default function BranchSelectorModal() {
           </div>
         </div>
 
-        {loading && <div style={{ color: 'var(--muted)' }}>Şubeler yükleniyor…</div>}
+        {loading && <div style={{ color: 'var(--muted)' }}>Şubeler yükleniyor...</div>}
         {!!error && <div style={{ color: '#ef4444' }}>{error}</div>}
 
         {!loading && branches.length === 0 && !error && (
-          <div style={{ color: 'var(--muted)' }}>{user?.role === 'staff' ? 'Şube yetkiniz yok' : 'Şube bulunamadı. Önce şube oluşturun.'}</div>
+          <div style={{ color: 'var(--muted)' }}>
+            {user?.role === 'staff' ? 'Şube yetkiniz yok' : 'Şube bulunamadı. Önce şube oluşturun.'}
+          </div>
         )}
 
         <div style={{ display: 'grid', gap: 8 }}>
-          {branches.map(b => (
+          {branches.map((branch) => (
             <button
-              key={b._id || b.id}
+              key={branch._id || branch.id}
               className="btn"
               style={{ justifyContent: 'space-between', display: 'flex' }}
-              onClick={() => select(b._id || b.id)}
+              onClick={() => select(branch._id || branch.id)}
               disabled={loading}
             >
-              <span>{b.name}</span>
-              <span style={{ color: 'var(--muted)' }}>{String(b._id || b.id) === currentSelected ? 'Seçili' : 'Seç'}</span>
+              <span>{branch.name}</span>
+              <span style={{ color: 'var(--muted)' }}>
+                {String(branch._id || branch.id) === currentSelected ? 'Seçili' : 'Seç'}
+              </span>
             </button>
           ))}
         </div>

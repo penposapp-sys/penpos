@@ -60,6 +60,15 @@ export default function Layout() {
   }, [mobileMenuOpen])
 
   useEffect(() => {
+    const handleToggleMobileMenu = () => {
+      if (!isMobilePortrait) return
+      setMobileMenuOpen((value) => !value)
+    }
+    window.addEventListener('layout:toggle-mobile-menu', handleToggleMobileMenu)
+    return () => window.removeEventListener('layout:toggle-mobile-menu', handleToggleMobileMenu)
+  }, [isMobilePortrait])
+
+  useEffect(() => {
     const enabled = !!(isMobilePortrait && (
       pathname.startsWith('/kermes/app/pos') ||
       pathname.startsWith('/kermes/app/walkin') ||
@@ -263,6 +272,13 @@ export default function Layout() {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
+    })
+  }, [selectedDate])
+  const topbarDateShort = useMemo(() => {
+    const value = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date()
+    return value.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'short'
     })
   }, [selectedDate])
 
@@ -542,7 +558,7 @@ export default function Layout() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: 16,
-                flexWrap: 'wrap',
+                flexWrap: isMobilePortrait ? 'nowrap' : 'wrap',
                 padding: isMobilePortrait ? '16px 18px' : '18px 22px',
                 borderRadius: 999,
                 background: theme.topbar,
@@ -551,7 +567,7 @@ export default function Layout() {
                 boxShadow: 'var(--topbar-shadow)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 auto' }}>
                 {isMobilePortrait && (
                   <button
                     className="hamburger-btn"
@@ -562,12 +578,12 @@ export default function Layout() {
                     ≡
                   </button>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 18 : 26 }}>
-                  <span>{pageTitle}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 16 : 26 }}>
+                  <span style={{ display: 'block', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pageTitle}</span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0, minWidth: 0 }}>
                 <button
                   className="btn"
                   type="button"
@@ -582,9 +598,9 @@ export default function Layout() {
                     input.focus()
                     input.click()
                   }}
-                  style={{ position: 'relative', borderRadius: 999, background: 'var(--surface-glass)', color: 'var(--app-text, var(--text))', border: '1px solid var(--border-soft)', fontWeight: 800, overflow: 'hidden', cursor: isDashboardPage ? 'pointer' : 'default', backdropFilter: 'var(--glass-blur)' }}
+                  style={{ position: 'relative', minWidth: 0, paddingInline: isMobilePortrait ? 10 : undefined, borderRadius: 999, background: 'var(--surface-glass)', color: 'var(--app-text, var(--text))', border: '1px solid var(--border-soft)', fontWeight: 800, overflow: 'hidden', cursor: isDashboardPage ? 'pointer' : 'default', backdropFilter: 'var(--glass-blur)' }}
                 >
-                  {topbarDate}
+                  {isMobilePortrait ? topbarDateShort : topbarDate}
                   {isDashboardPage && (
                     <input
                       ref={dateInputRef}
@@ -611,6 +627,7 @@ export default function Layout() {
                     onClick={logout}
                     style={{
                       borderRadius: 999,
+                      paddingInline: 12,
                       background: 'var(--app-contrast-surface)',
                       borderColor: 'var(--app-contrast-border)',
                       color: 'var(--app-contrast-text)',
@@ -633,6 +650,7 @@ export default function Layout() {
                     }}
                     style={{
                       borderRadius: 999,
+                      paddingInline: isMobilePortrait ? 12 : undefined,
                       background: 'var(--app-contrast-surface)',
                       borderColor: 'var(--app-contrast-border)',
                       color: 'var(--app-contrast-text)',

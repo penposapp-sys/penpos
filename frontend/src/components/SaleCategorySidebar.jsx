@@ -17,7 +17,17 @@ export default function SaleCategorySidebar({
             type="button"
             onClick={() => onSelect?.(c.id)}
             aria-pressed={String(activeCategoryId) === String(c.id)}
-            style={{ marginBottom: 8 }}
+            style={{
+              marginBottom: 8,
+              borderColor: String(activeCategoryId) === String(c.id) ? 'color-mix(in srgb, var(--theme-accent, #2563eb) 50%, var(--app-border, var(--border)))' : 'var(--app-border, var(--border))',
+              background: String(activeCategoryId) === String(c.id)
+                ? 'color-mix(in srgb, var(--theme-accent, #2563eb) 22%, var(--app-surface, var(--panel)))'
+                : 'var(--app-button-bg, var(--button-bg))',
+              color: 'var(--app-text, var(--text))',
+              boxShadow: String(activeCategoryId) === String(c.id)
+                ? 'inset 0 0 0 1px color-mix(in srgb, var(--theme-accent, #2563eb) 22%, transparent)'
+                : 'none'
+            }}
           >
             {c.name}
           </button>
@@ -27,4 +37,3 @@ export default function SaleCategorySidebar({
     </div>
   )
 }
-
