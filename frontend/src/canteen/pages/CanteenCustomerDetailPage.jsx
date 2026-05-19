@@ -73,7 +73,7 @@ export default function CanteenCustomerDetailPage() {
     if (!id) return
     load()
   }, [id])
-  useCanteenAutoRefresh(() => load({ background: true }), [id], { enabled: !!id && canView })
+  useCanteenAutoRefresh(() => load({ background: true }), [id], { enabled: false })
 
   useEffect(() => {
     if (!customer) return

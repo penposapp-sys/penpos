@@ -17,7 +17,7 @@ export default function CanteenBranchesPage() {
   }
 
   useEffect(() => { load() }, [])
-  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: true })
+  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: false })
 
   const create = async (e) => {
     e.preventDefault()

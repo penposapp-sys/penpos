@@ -34,7 +34,7 @@ export default function CanteenCustomersPage() {
   }
 
   useEffect(() => { load() }, [])
-  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: canView })
+  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: false })
 
   const filtered = useMemo(() => {
     const nq = normalize(q)

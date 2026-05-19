@@ -160,8 +160,7 @@ export default function CanteenCashierPage() {
   }, [])
   useCanteenAutoRefresh(() => {
     loadProducts({ background: true })
-    loadPaymentMethods()
-  }, [session?.allowedBranchIds], { enabled: canPos })
+  }, [session?.allowedBranchIds], { enabled: canPos, intervalMs: 15000 })
 
   const selectedPayMethod = useMemo(() => {
     return paymentMethods.find((method) => method.id === payMethod) || null

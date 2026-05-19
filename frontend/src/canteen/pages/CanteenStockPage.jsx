@@ -7,6 +7,7 @@ import CanteenBranchSelector from '../components/CanteenBranchSelector.jsx'
 import useScannerCapture from '../hooks/useScannerCapture.js'
 import { stockActionLabel, stockNoteLabel, stockSourceLabel } from '../utils/stockLabels.js'
 import { getStockCountDetail, getStockCounts } from '../lib/api.js'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const money = (n) => {
   const v = Number(n || 0)
@@ -15,6 +16,7 @@ const money = (n) => {
 
 export default function CanteenStockPage() {
   const { me } = useOutletContext()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const isAdmin = me?.role === 'tenant_admin'
   const perms = Array.isArray(me?.permissions) ? me.permissions : []
   const canStock = isAdmin || perms.includes('canteen_stock_manage') || perms.includes('canteen_stock_count') || perms.includes('canteen_settings_manage')
@@ -36,6 +38,7 @@ export default function CanteenStockPage() {
 
   const movementOnScanRef = useRef(null)
   const countOnScanRef = useRef(null)
+  const isCompact = isMobilePortrait || isTablet
 
   useScannerCapture({
     enabled: true,
@@ -69,13 +72,13 @@ export default function CanteenStockPage() {
         </div>
       </div>
 
-      {tab === 'movements' && <StockMovementsPanel branchId={branchId} onScanRef={movementOnScanRef} />}
-      {tab === 'count' && <StockCountPanel branchId={branchId} onScanRef={countOnScanRef} me={me} />}
+      {tab === 'movements' && <StockMovementsPanel branchId={branchId} onScanRef={movementOnScanRef} isCompact={isCompact} />}
+      {tab === 'count' && <StockCountPanel branchId={branchId} onScanRef={countOnScanRef} me={me} isCompact={isCompact} />}
     </div>
   )
 }
 
-function StockMovementsPanel({ branchId, onScanRef }) {
+function StockMovementsPanel({ branchId, onScanRef, isCompact = false }) {
   const barcodeRef = useRef(null)
   const [barcode, setBarcode] = useState('')
   const [type, setType] = useState('in')
@@ -241,7 +244,7 @@ function StockMovementsPanel({ branchId, onScanRef }) {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : '1fr 1fr', gap: 10 }}>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Miktar</div>
             <input
@@ -302,7 +305,7 @@ function StockMovementsPanel({ branchId, onScanRef }) {
   )
 }
 
-function StockCountPanel({ branchId, onScanRef, me }) {
+function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
   const barcodeRef = useRef(null)
   const [barcode, setBarcode] = useState('')
   const [qty, setQty] = useState('')
@@ -662,7 +665,7 @@ function StockCountPanel({ branchId, onScanRef, me }) {
         </div>
 
         {!!sessionId && (
-          <div className="stockCountScanRow">
+          <div className="stockCountScanRow" style={{ display: 'grid', gap: 10, gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))' }}>
             <label>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Barkod okut</div>
               <input
@@ -864,7 +867,7 @@ function StockCountPanel({ branchId, onScanRef, me }) {
       )}
 
       {summary && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, alignItems: 'start' }}>
           <CountList title="Fazla" items={extra} />
           <CountList title="Eksik" items={missing} />
           <CountList title="Aynı" items={same} />

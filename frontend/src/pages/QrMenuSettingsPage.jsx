@@ -3,6 +3,7 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import QRCode from 'qrcode'
 import { buildSafeBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
+import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 
 const pageTheme = {
   pageBg: 'radial-gradient(circle at top left, color-mix(in srgb, var(--theme-accent) 18%, transparent) 0, transparent 32%), radial-gradient(circle at bottom right, color-mix(in srgb, var(--theme-accent-hover) 14%, transparent) 0, transparent 28%), var(--app-bg)',
@@ -145,6 +146,7 @@ function OptionCard({ title, description, active, onClick, disabled }) {
 }
 
 export default function QrMenuSettingsPage() {
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -283,7 +285,7 @@ export default function QrMenuSettingsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${isMobilePortrait ? 240 : 320}px, 1fr))`, gap: 16 }}>
         <section style={cardStyle()}>
           <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Yayın Ayarları</div>
           <div style={{ fontSize: 12, color: 'var(--app-text)', marginBottom: 16 }}>Logo, kapak, açıklama, masa QR ve garson çağır blokları bu kartta toplanır.</div>
@@ -369,9 +371,9 @@ export default function QrMenuSettingsPage() {
         </div>
         <div style={{ display: 'grid', justifyItems: 'center' }}>
           {qrDataUrl ? (
-            <img src={qrDataUrl} alt="QR Code" style={{ width: 220, height: 220, borderRadius: 28, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface)', padding: 14, boxShadow: '0 16px 30px rgba(15, 23, 42, 0.18)' }} />
+            <img src={qrDataUrl} alt="QR Code" style={{ width: isMobilePortrait || isTablet ? 'min(220px, 100%)' : 220, height: isMobilePortrait || isTablet ? 'auto' : 220, aspectRatio: '1 / 1', borderRadius: 28, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface)', padding: 14, boxShadow: '0 16px 30px rgba(15, 23, 42, 0.18)' }} />
           ) : (
-            <div style={{ width: 220, height: 220, borderRadius: 28, border: `1px solid ${pageTheme.cardBorder}`, display: 'grid', placeItems: 'center', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 800 }}>
+            <div style={{ width: isMobilePortrait || isTablet ? 'min(220px, 100%)' : 220, height: isMobilePortrait || isTablet ? 'auto' : 220, minHeight: 220, aspectRatio: '1 / 1', borderRadius: 28, border: `1px solid ${pageTheme.cardBorder}`, display: 'grid', placeItems: 'center', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 800 }}>
               QR hazırlanıyor
             </div>
           )}

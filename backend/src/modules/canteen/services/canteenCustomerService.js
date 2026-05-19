@@ -454,6 +454,28 @@ export const loginPublicCustomerAccount = async (tenantId, input) => {
   }
 }
 
+export const updatePublicCustomerAccount = async (tenantId, customerId, input) => {
+  if (!mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Musteri hesabi bulunamadi', 404)
+
+  const existing = await customerRepo.findByIdAndTenant(customerId, tenantId)
+  if (!existing) throw error('not_found', 'Musteri hesabi bulunamadi', 404)
+
+  const updated = await updateCustomer(tenantId, null, customerId, {
+    name: input?.name,
+    phone: input?.phone,
+    address: input?.address,
+    note: input?.location,
+    favoriteProductIds: existing.favoriteProductIds
+  })
+
+  return {
+    customer: {
+      ...updated,
+      location: String(updated.note || '')
+    }
+  }
+}
+
 export const getCustomerFavoriteProductIds = async (tenantId, customerId) => {
   if (!mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Invalid id', 400)
   const customer = await customerRepo.findByIdAndTenant(customerId, tenantId)

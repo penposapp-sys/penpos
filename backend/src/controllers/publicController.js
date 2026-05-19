@@ -19,6 +19,7 @@ import {
   listCustomerMovements,
   listCustomerSales,
   registerPublicCustomerAccount,
+  updatePublicCustomerAccount,
   updateCustomerFavoriteProductIds,
   upsertPublicCustomerAccount
 } from '../modules/canteen/services/canteenCustomerService.js'
@@ -401,6 +402,25 @@ export const getPublicQrCustomerProfile = async (req, res) => {
     const payload = status >= 500
       ? { success: false, code: 'internal_error', message: 'Internal server error' }
       : { success: false, ...(err.payload || { code: 'error', message: err.message || 'İşlem başarısız' }) }
+    return res.status(status).json(payload)
+  }
+}
+
+export const updatePublicQrCustomerProfile = async (req, res) => {
+  try {
+    const tenantId = String(req.body?.tenantId || '').trim()
+    const customerId = String(req.body?.customerId || '').trim()
+    if (!mongoose.isValidObjectId(tenantId) || !mongoose.isValidObjectId(customerId)) {
+      return res.status(400).json({ success: false, code: 'invalid_request', message: 'Musteri bilgisi gecersiz' })
+    }
+
+    const result = await updatePublicCustomerAccount(tenantId, customerId, req.body || {})
+    return res.json({ success: true, ...result })
+  } catch (err) {
+    const status = err?.status || 500
+    const payload = status >= 500
+      ? { success: false, code: 'internal_error', message: 'Internal server error' }
+      : { success: false, ...(err.payload || { code: 'error', message: err.message || 'Islem basarisiz' }) }
     return res.status(status).json(payload)
   }
 }

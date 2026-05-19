@@ -31,7 +31,7 @@ export default function CanteenStaffPage() {
   }
 
   useEffect(() => { load() }, [])
-  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: true })
+  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: false })
 
   const togglePerm = (p) => {
     setPermissions(prev => {

@@ -282,7 +282,10 @@ export default function Layout() {
         onClose={() => setMobileMenuOpen(false)}
         onSelect={(item) => {
           if (!item?.to) return
-          nav(item.to)
+          setMobileMenuOpen(false)
+          window.setTimeout(() => {
+            nav(item.to)
+          }, 0)
         }}
       />
       <div style={{ display: 'flex', height: '100%', minHeight: 0, alignItems: isMobilePortrait ? 'stretch' : 'flex-start', gap: isSettingsRoute ? 10 : 12, padding: isMobilePortrait ? 12 : (isSettingsRoute ? 12 : 16) }}>
@@ -608,9 +611,9 @@ export default function Layout() {
                     onClick={logout}
                     style={{
                       borderRadius: 999,
-                      background: 'linear-gradient(180deg, #ffffff 0%, #d7dbe3 100%)',
-                      borderColor: 'rgba(255,255,255,0.28)',
-                      color: '#111111',
+                      background: 'var(--app-contrast-surface)',
+                      borderColor: 'var(--app-contrast-border)',
+                      color: 'var(--app-contrast-text)',
                       fontWeight: 900,
                       boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}
@@ -630,9 +633,9 @@ export default function Layout() {
                     }}
                     style={{
                       borderRadius: 999,
-                      background: 'linear-gradient(180deg, #ffffff 0%, #d7dbe3 100%)',
-                      borderColor: 'rgba(255,255,255,0.28)',
-                      color: '#111111',
+                      background: 'var(--app-contrast-surface)',
+                      borderColor: 'var(--app-contrast-border)',
+                      color: 'var(--app-contrast-text)',
                       fontWeight: 900,
                       boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}

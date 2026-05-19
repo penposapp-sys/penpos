@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
+import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 
 export default function SettingsDeliveryPage() {
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [query, setQuery] = useState('')
   const [customers, setCustomers] = useState([])
   const [selectedId, setSelectedId] = useState('')
@@ -33,6 +35,7 @@ export default function SettingsDeliveryPage() {
   }, [])
 
   useEffect(() => {
+    if (String(query || '').trim() === '') return
     const timer = setTimeout(() => {
       loadCustomers(query)
     }, 250)
@@ -73,7 +76,7 @@ export default function SettingsDeliveryPage() {
         <Link className="btn" to="/kermes/app/delivery">Paket Servise Git</Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait || isTablet ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr)', gap: 12 }}>
         <div className="card" style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
           <input className="input" placeholder="Isim veya telefon ara" value={query} onChange={(e) => setQuery(e.target.value)} />
           <div style={{ display: 'grid', gap: 8 }}>
@@ -103,7 +106,7 @@ export default function SettingsDeliveryPage() {
           </div>
         </div>
 
-        <div className="card" style={{ display: 'grid', gap: 12 }}>
+        <div className="card" style={{ display: 'grid', gap: 12, minWidth: 0 }}>
           {!selectedId && <div style={{ color: 'var(--muted)' }}>Detay icin musteri sec.</div>}
           {selectedId && detailLoading && <div style={{ color: 'var(--muted)' }}>Detay yukleniyor...</div>}
           {selectedId && !detailLoading && detail?.customer && (

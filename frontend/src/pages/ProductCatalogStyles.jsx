@@ -611,6 +611,25 @@ export default function ProductCatalogStyles() {
         .product-toolbar-status .product-select {
           width: 100%;
         }
+        .product-settings-section > button {
+          padding: 14px;
+          align-items: flex-start;
+        }
+        .product-toggle-card {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+        .product-inline-table-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .product-preview {
+          min-height: 240px;
+          padding: 14px;
+        }
+        .product-preview-thumb {
+          width: min(180px, 56vw);
+          height: min(180px, 56vw);
+        }
       }
     `}</style>
   )

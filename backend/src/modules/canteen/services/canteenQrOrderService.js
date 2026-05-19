@@ -144,6 +144,16 @@ const mapPaymentMeta = (paymentMethod, paymentStatus) => {
   return { paymentMethod: method, paymentStatus: 'pending' }
 }
 
+const mapSalePaymentMethod = (paymentMethod, paymentMethodType) => {
+  const method = normalizeText(paymentMethod)
+  const type = normalizeText(paymentMethodType)
+  if (type === 'account' || method === 'cari') return 'account'
+  if (type === 'cash' || method === 'cash_at_counter') return 'cash'
+  if (type === 'card') return 'card'
+  if (type === 'bank') return 'bank'
+  return method
+}
+
 const computeDiscountSummary = (subtotal, discountPercentInput) => {
   const safeSubtotal = roundMoney(subtotal)
   const rawPercent = toNumber(discountPercentInput)
@@ -316,8 +326,6 @@ export const createPublicQrOrder = async (input) => {
 
   if (!customerName) throw error('customer_name_required', 'Ad soyad zorunludur', 400)
   if (!customerPhone) throw error('customer_phone_required', 'Telefon zorunludur', 400)
-  if (!customerLocation) throw error('customer_location_required', 'Teslimat / lokasyon bilgisi zorunludur', 400)
-
   await ensureTenant(tenantId)
   await ensureBranch(tenantId, branchId)
 
@@ -558,6 +566,27 @@ export const updateQrOrderPayment = async (tenantId, branchId, actorUserId, orde
         isActive: true
       })
     }
+  }
+  if (status === 'paid' && !order.relatedSaleId) {
+    const salePaymentMethod = requestedMethod && !PAYMENT_METHODS.has(requestedMethod)
+      ? requestedMethod
+      : mapSalePaymentMethod(method, paymentDetails.paymentMethodType)
+    const sale = await createSale(tenantId, String(order.branchId), actorUserId, {
+      items: (order.items || []).map((item) => ({
+        productId: String(item.productId || ''),
+        qty: Number(item.quantity || 0)
+      })),
+      channel: 'qr',
+      note: `QR siparisi ${order.orderNumber} odeme ile satisa donustu`,
+      discountPercent: financials.discountPercent,
+      payment: {
+        method: salePaymentMethod,
+        amount: financials.total,
+        note: order.customerNote || '',
+        customerId: order.cariId ? String(order.cariId) : undefined
+      }
+    })
+    order.relatedSaleId = sale.id
   }
   order.paymentStatus = status
   order.paymentMethod = method

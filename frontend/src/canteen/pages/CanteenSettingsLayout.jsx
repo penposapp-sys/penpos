@@ -52,6 +52,30 @@ function SettingsChromeStyle() {
       .canteen-settings-shell,
       .canteen-settings-shell * { box-sizing: border-box; }
       .canteen-settings-shell { min-height: 100%; color: var(--settings-text); background: var(--settings-shell-bg); }
+      .canteen-settings-shell,
+      .canteen-settings-shell > *,
+      .canteen-settings-shell section,
+      .canteen-settings-shell article,
+      .canteen-settings-shell div,
+      .canteen-settings-shell form {
+        min-width: 0;
+        max-width: 100%;
+      }
+      .canteen-settings-shell img,
+      .canteen-settings-shell canvas,
+      .canteen-settings-shell svg {
+        max-width: 100%;
+        height: auto;
+      }
+      .canteen-settings-shell button,
+      .canteen-settings-shell a,
+      .canteen-settings-shell span,
+      .canteen-settings-shell p,
+      .canteen-settings-shell h1,
+      .canteen-settings-shell h2,
+      .canteen-settings-shell h3 {
+        overflow-wrap: anywhere;
+      }
       .canteen-settings-shell .card {
         background: linear-gradient(180deg, var(--settings-panel-bg), var(--settings-panel-soft)) !important;
         color: var(--settings-text) !important;

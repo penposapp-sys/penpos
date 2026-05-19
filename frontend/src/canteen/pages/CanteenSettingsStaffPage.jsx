@@ -3,6 +3,7 @@ import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
 import { getPermissionLabel } from '../utils/permissionLabels.js'
 import CanteenSettingsSection, { CanteenSettingsCard } from '../components/CanteenSettingsSection.jsx'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const PERMS = [
   { key: 'canteen_pos_access', label: 'Kasa' },
@@ -43,6 +44,7 @@ function SelectionChip({ checked, label, onToggle }) {
 }
 
 export default function CanteenSettingsStaffPage() {
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [items, setItems] = useState([])
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(false)
@@ -73,6 +75,7 @@ export default function CanteenSettingsStaffPage() {
   const branchSet = useMemo(() => new Set(branchIds), [branchIds])
   const editPermSet = useMemo(() => new Set(editPermissions), [editPermissions])
   const editBranchSet = useMemo(() => new Set(editBranchIds), [editBranchIds])
+  const isCompact = isMobilePortrait || isTablet
 
   const load = async (options = {}) => {
     const background = options?.background === true
@@ -251,7 +254,7 @@ export default function CanteenSettingsStaffPage() {
     >
       {error ? <CanteenSettingsCard style={{ padding: 16, borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>{error}</CanteenSettingsCard> : null}
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)' }}>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'minmax(0, 1.05fr) minmax(0, 1fr)' }}>
         <CanteenSettingsCard style={{ padding: 20 }}>
           <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Yeni Personel</div>
           <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5, marginBottom: 14 }}>

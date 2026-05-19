@@ -67,6 +67,23 @@ function formatPrintMoney(value) {
   return `${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
 }
 
+function toPdfSafeText(value) {
+  return String(value ?? '')
+    .replaceAll('İ', 'I')
+    .replaceAll('İ', 'I')
+    .replaceAll('ı', 'i')
+    .replaceAll('Ş', 'S')
+    .replaceAll('ş', 's')
+    .replaceAll('Ğ', 'G')
+    .replaceAll('ğ', 'g')
+    .replaceAll('Ü', 'U')
+    .replaceAll('ü', 'u')
+    .replaceAll('Ö', 'O')
+    .replaceAll('ö', 'o')
+    .replaceAll('Ç', 'C')
+    .replaceAll('ç', 'c')
+}
+
 function paymentMethodLabel(value, order = null) {
   const customLabel = String(order?.paymentMethodLabel || order?.paymentMethodName || '').trim()
   if (customLabel) return customLabel
@@ -280,6 +297,326 @@ function buildQrOrderReceiptHtml(order) {
   </div>
 </body>
 </html>`
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const source = toPdfSafeText(text).replace(/\s+/g, ' ').trim()
+  if (!source) return ['-']
+  const words = source.split(' ')
+  const lines = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (!current || ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate
+      continue
+    }
+    lines.push(current)
+    current = word
+  }
+  if (current) lines.push(current)
+  return lines.length > 0 ? lines : ['-']
+}
+
+function pdfEscape(value) {
+  return String(value ?? '')
+    .replaceAll('\\', '\\\\')
+    .replaceAll('(', '\\(')
+    .replaceAll(')', '\\)')
+}
+
+function numberToPdf(value) {
+  return Number(value || 0).toFixed(2).replace(/\.00$/, '')
+}
+
+function bytesFromString(value) {
+  return new TextEncoder().encode(String(value || ''))
+}
+
+function canvasToJpegBytes(canvas, quality = 0.92) {
+  const dataUrl = canvas.toDataURL('image/jpeg', quality)
+  const base64 = dataUrl.split(',')[1] || ''
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function concatPdfParts(parts) {
+  const normalized = parts.map((part) => {
+    if (part instanceof Uint8Array) return part
+    return bytesFromString(part)
+  })
+  const total = normalized.reduce((sum, part) => sum + part.length, 0)
+  const output = new Uint8Array(total)
+  let offset = 0
+  for (const part of normalized) {
+    output.set(part, offset)
+    offset += part.length
+  }
+  return output
+}
+
+function buildSingleImagePdf({ imageBytes, imageWidth, imageHeight, pageWidth, pageHeight, margin = 18 }) {
+  const drawableWidth = Math.max(1, pageWidth - (margin * 2))
+  const drawableHeight = Math.max(1, pageHeight - (margin * 2))
+  const imageRatio = imageWidth / Math.max(1, imageHeight)
+  let drawWidth = drawableWidth
+  let drawHeight = drawWidth / Math.max(imageRatio, 0.0001)
+  if (drawHeight > drawableHeight) {
+    drawHeight = drawableHeight
+    drawWidth = drawHeight * imageRatio
+  }
+  const drawX = (pageWidth - drawWidth) / 2
+  const drawY = pageHeight - drawHeight - margin
+  const contentStream = `q
+${numberToPdf(drawWidth)} 0 0 ${numberToPdf(drawHeight)} ${numberToPdf(drawX)} ${numberToPdf(drawY)} cm
+/Im0 Do
+Q`
+  const contentBytes = bytesFromString(contentStream)
+  const objects = [
+    bytesFromString('<< /Type /Catalog /Pages 2 0 R >>'),
+    bytesFromString('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    bytesFromString(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${numberToPdf(pageWidth)} ${numberToPdf(pageHeight)}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`),
+    concatPdfParts([
+      `<< /Type /XObject /Subtype /Image /Width ${Math.round(imageWidth)} /Height ${Math.round(imageHeight)} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`,
+      imageBytes,
+      '\nendstream'
+    ]),
+    concatPdfParts([
+      `<< /Length ${contentBytes.length} >>\nstream\n`,
+      contentBytes,
+      '\nendstream'
+    ])
+  ]
+
+  let offset = bytesFromString('%PDF-1.4\n').length
+  const offsets = [0]
+  const parts = ['%PDF-1.4\n']
+  for (let i = 0; i < objects.length; i++) {
+    offsets.push(offset)
+    const head = bytesFromString(`${i + 1} 0 obj\n`)
+    const tail = bytesFromString('\nendobj\n')
+    parts.push(head, objects[i], tail)
+    offset += head.length + objects[i].length + tail.length
+  }
+  const xrefOffset = offset
+  const xrefRows = ['0000000000 65535 f \n']
+  for (let i = 1; i < offsets.length; i++) {
+    xrefRows.push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`)
+  }
+  parts.push(`xref\n0 ${objects.length + 1}\n${xrefRows.join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`)
+  return concatPdfParts(parts)
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.setTimeout(() => URL.revokeObjectURL(url), 15000)
+}
+
+function buildQrOrderReceiptPdfCanvas(order) {
+  const width = 1240
+  const estimatedHeight = Math.max(1320, 760 + ((Array.isArray(order?.items) ? order.items.length : 0) * 150))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = estimatedHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('PDF olusturulamadi')
+
+  const pagePadding = 56
+  const lineColor = '#d1d5db'
+  const textColor = '#111827'
+  const mutedColor = '#6b7280'
+  const accentColor = '#b45309'
+  const contentWidth = width - (pagePadding * 2)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.textBaseline = 'top'
+
+  let y = pagePadding
+
+  const drawCentered = (text, font, color, nextGap = 38) => {
+    ctx.font = font
+    ctx.fillStyle = color
+    const safe = toPdfSafeText(text)
+    const measure = ctx.measureText(safe)
+    ctx.fillText(safe, Math.max(pagePadding, (width - measure.width) / 2), y)
+    y += nextGap
+  }
+
+  const drawDivider = () => {
+    ctx.strokeStyle = lineColor
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(pagePadding, y)
+    ctx.lineTo(width - pagePadding, y)
+    ctx.stroke()
+    y += 18
+  }
+
+  const drawLabelValue = (label, value) => {
+    const left = pagePadding
+    const right = width - pagePadding
+    const gap = 18
+    const labelWidth = 250
+    const valueWidth = Math.max(120, contentWidth - labelWidth - gap)
+    ctx.font = '600 26px Arial'
+    ctx.fillStyle = mutedColor
+    const labelText = toPdfSafeText(label)
+    ctx.fillText(labelText, left, y)
+    ctx.font = '700 26px Arial'
+    ctx.fillStyle = textColor
+    const lines = wrapCanvasText(ctx, value || '-', valueWidth)
+    let lineY = y
+    for (const line of lines) {
+      const safeLine = toPdfSafeText(line)
+      const measure = ctx.measureText(safeLine)
+      ctx.fillText(safeLine, Math.max(left + labelWidth + gap, right - measure.width), lineY)
+      lineY += 34
+    }
+    y = Math.max(y + 34, lineY) + 6
+  }
+
+  const drawBlock = (title, text) => {
+    ctx.font = '700 26px Arial'
+    ctx.fillStyle = textColor
+    ctx.fillText(toPdfSafeText(title), pagePadding, y)
+    y += 34
+    ctx.font = '400 24px Arial'
+    ctx.fillStyle = mutedColor
+    const lines = wrapCanvasText(ctx, text || '-', contentWidth)
+    for (const line of lines) {
+      ctx.fillText(toPdfSafeText(line), pagePadding, y)
+      y += 30
+    }
+    y += 8
+  }
+
+  drawCentered('Siparis Fisi', '900 42px Arial', textColor, 44)
+  drawCentered(order?.branchName || 'QR Siparis', '700 24px Arial', accentColor, 32)
+  if (order?.branchName) {
+    drawCentered(`QR Siparis ${order?.orderNumber || order?.id || ''}`, '700 20px Arial', mutedColor, 28)
+  }
+  drawDivider()
+
+  drawLabelValue('Siparis No', order?.orderNumber || order?.id || '-')
+  drawLabelValue('Tarih', formatDate(order?.createdAt))
+  drawLabelValue('Siparis Durumu', statusMeta[order?.orderStatus]?.label || String(order?.orderStatus || '-'))
+  drawLabelValue('Odeme Durumu', paymentMeta[order?.paymentStatus]?.label || String(order?.paymentStatus || '-'))
+  drawLabelValue('Odeme Tipi', paymentMethodLabel(order?.paymentMethod, order))
+
+  const customerLines = [
+    order?.customerName ? `Musteri: ${order.customerName}` : '',
+    order?.customerPhone ? `Telefon: ${order.customerPhone}` : '',
+    order?.customerLocation ? `Lokasyon: ${order.customerLocation}` : '',
+    order?.customerAddress ? `Adres: ${order.customerAddress}` : '',
+    order?.branchName ? `Sube: ${order.branchName}` : ''
+  ].filter(Boolean)
+  if (customerLines.length > 0) {
+    drawDivider()
+    drawBlock('Musteri Bilgileri', customerLines.join('  |  '))
+  }
+
+  drawDivider()
+  ctx.font = '800 28px Arial'
+  ctx.fillStyle = textColor
+  ctx.fillText('Urunler', pagePadding, y)
+  y += 44
+
+  const items = Array.isArray(order?.items) ? order.items : []
+  if (items.length === 0) {
+    ctx.font = '400 24px Arial'
+    ctx.fillStyle = mutedColor
+    ctx.fillText('Urun bulunamadi.', pagePadding, y)
+    y += 40
+  } else {
+    for (const item of items) {
+      ctx.font = '700 26px Arial'
+      ctx.fillStyle = textColor
+      const itemNameWidth = contentWidth - 220
+      const nameLines = wrapCanvasText(ctx, item?.productName || '-', itemNameWidth)
+      const totalText = formatPrintMoney(item?.totalPrice || 0)
+      const firstLine = toPdfSafeText(nameLines[0] || '-')
+      ctx.fillText(firstLine, pagePadding, y)
+      const totalMeasure = ctx.measureText(toPdfSafeText(totalText))
+      ctx.fillText(toPdfSafeText(totalText), width - pagePadding - totalMeasure.width, y)
+      y += 34
+      ctx.font = '400 23px Arial'
+      ctx.fillStyle = mutedColor
+      for (let index = 1; index < nameLines.length; index++) {
+        ctx.fillText(toPdfSafeText(nameLines[index]), pagePadding, y)
+        y += 30
+      }
+      const metaText = `${Number(item?.quantity || 0)} adet x ${formatPrintMoney(item?.unitPrice || 0)}`
+      ctx.fillText(toPdfSafeText(metaText), pagePadding, y)
+      y += 30
+      if (item?.note) {
+        const noteLines = wrapCanvasText(ctx, `Not: ${item.note}`, contentWidth)
+        for (const noteLine of noteLines) {
+          ctx.fillText(toPdfSafeText(noteLine), pagePadding, y)
+          y += 30
+        }
+      }
+      y += 14
+      drawDivider()
+    }
+  }
+
+  drawLabelValue('Ara Toplam', formatPrintMoney(order?.subtotal ?? order?.total ?? 0))
+  if (Number(order?.discountTotal || 0) > 0) {
+    const discountLabel = Number(order?.discountPercent || 0) > 0
+      ? `Indirim (%${Number(order?.discountPercent || 0).toLocaleString('tr-TR')})`
+      : 'Indirim'
+    drawLabelValue(discountLabel, `- ${formatPrintMoney(order?.discountTotal || 0)}`)
+  }
+  drawLabelValue('Toplam', formatPrintMoney(order?.total || 0))
+
+  if (order?.customerNote) {
+    drawDivider()
+    drawBlock('Musteri Notu', order.customerNote)
+  }
+
+  y += 10
+  ctx.font = '700 22px Arial'
+  ctx.fillStyle = mutedColor
+  const footerText = 'PenPOS QR Siparis'
+  const footerMeasure = ctx.measureText(footerText)
+  ctx.fillText(footerText, (width - footerMeasure.width) / 2, y)
+  y += 36
+
+  const cropped = document.createElement('canvas')
+  cropped.width = canvas.width
+  cropped.height = Math.min(canvas.height, Math.max(760, Math.ceil(y + pagePadding)))
+  const croppedCtx = cropped.getContext('2d')
+  if (!croppedCtx) throw new Error('PDF olusturulamadi')
+  croppedCtx.fillStyle = '#ffffff'
+  croppedCtx.fillRect(0, 0, cropped.width, cropped.height)
+  croppedCtx.drawImage(canvas, 0, 0)
+  return cropped
+}
+
+function downloadQrOrderReceiptPdf(order) {
+  const canvas = buildQrOrderReceiptPdfCanvas(order)
+  const pdfBytes = buildSingleImagePdf({
+    imageBytes: canvasToJpegBytes(canvas),
+    imageWidth: canvas.width,
+    imageHeight: canvas.height,
+    pageWidth: 419.53,
+    pageHeight: 595.28,
+    margin: 12
+  })
+  const safeOrderNo = pdfEscape(toPdfSafeText(order?.orderNumber || order?.id || 'siparis'))
+    .replace(/[^\w\-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'siparis'
+  downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `siparis-fisi-${safeOrderNo}.pdf`)
 }
 
 function openQrOrderReceiptPrint(order) {
@@ -550,6 +887,9 @@ export default function CanteenQrOrdersPage() {
     if (typeof window === 'undefined') return false
     return window.innerWidth <= 560
   })
+  const mobileCardScale = isNarrowMobile
+    ? { pad: 12, radius: 18, gap: 10, image: 52, productImage: 36, title: 13, meta: 12, button: 12 }
+    : { pad: 10, radius: 18, gap: 9, image: 48, productImage: 32, title: 11, meta: 12, button: 11 }
   const [filters, setFilters] = useState({
     status: '',
     paymentStatus: '',
@@ -651,7 +991,7 @@ export default function CanteenQrOrdersPage() {
     load()
     loadPaymentMethods()
   }, [canView, queryString])
-  useCanteenAutoRefresh(() => load({ background: true }), [queryString], { enabled: canView })
+  useCanteenAutoRefresh(() => load({ background: true }), [queryString], { enabled: canView, intervalMs: 3000 })
 
   const callAction = async (path, options = {}) => {
     const response = await api(path, {
@@ -751,6 +1091,14 @@ export default function CanteenQrOrdersPage() {
       openQrOrderReceiptPrint(order)
     } catch (err) {
       setError(err?.message || 'Siparis fisi acilamadi.')
+    }
+  }
+
+  const downloadOrderReceiptPdf = (order) => {
+    try {
+      downloadQrOrderReceiptPdf(order)
+    } catch (err) {
+      setError(err?.message || 'Siparis fisi PDF olarak indirilemedi.')
     }
   }
 
@@ -961,31 +1309,31 @@ export default function CanteenQrOrdersPage() {
               }}
               style={{
                 margin: 0,
-                padding: isMobile ? 8 : 12,
-                borderRadius: isMobile ? 16 : 22,
+                padding: isMobile ? mobileCardScale.pad : 12,
+                borderRadius: isMobile ? mobileCardScale.radius : 22,
                 border: '1px solid var(--app-border, var(--border))',
                 background: 'linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 98%, transparent), var(--app-surface-soft, var(--panelElevated)))',
                 boxShadow: 'var(--card-shadow)',
                 display: 'grid',
-                gap: isMobile ? 8 : 10,
+                gap: isMobile ? mobileCardScale.gap : 10,
                 cursor: 'pointer',
                 transition: 'transform 160ms ease, box-shadow 160ms ease'
               }}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: `${isMobile ? 42 : 68}px minmax(0, 1fr)`, gap: isMobile ? 8 : 12, alignItems: 'flex-start' }}>
-                <ProductImage product={leadItem} alt={leadItem?.productName || order.customerName} width={isMobile ? 42 : 68} height={isMobile ? 42 : 68} style={{ width: isMobile ? 42 : 68, height: isMobile ? 42 : 68, objectFit: 'cover', borderRadius: isMobile ? 12 : 18, boxShadow: '0 10px 22px rgba(15, 23, 42, 0.1)' }} />
+              <div style={{ display: 'grid', gridTemplateColumns: `${isMobile ? mobileCardScale.image : 68}px minmax(0, 1fr)`, gap: isMobile ? 10 : 12, alignItems: 'flex-start' }}>
+                <ProductImage product={leadItem} alt={leadItem?.productName || order.customerName} width={isMobile ? mobileCardScale.image : 68} height={isMobile ? mobileCardScale.image : 68} style={{ width: isMobile ? mobileCardScale.image : 68, height: isMobile ? mobileCardScale.image : 68, objectFit: 'cover', borderRadius: isMobile ? 14 : 18, boxShadow: '0 10px 22px rgba(15, 23, 42, 0.1)' }} />
                 <div style={{ display: 'grid', gap: 10, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: isMobile ? 8 : 12, alignItems: 'flex-start' }}>
                     <div style={{ display: 'grid', gap: 5, minWidth: 0 }}>
-                      <div style={{ fontSize: isMobile ? 9 : 13, fontWeight: 950, color: 'var(--app-text, var(--text))', lineHeight: 1.2 }}>
+                      <div style={{ fontSize: isMobile ? mobileCardScale.title : 13, fontWeight: 950, color: 'var(--app-text, var(--text))', lineHeight: 1.25 }}>
                         {order.customerName || 'Misafir'}
                       </div>
-                      <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontWeight: 800, fontSize: isMobile ? 9 : 13 }}>{order.customerPhone || '-'}</div>
-                      <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: isMobile ? 9 : 13, fontWeight: 700 }}>{order.orderNumber || '-'}</div>
+                      <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontWeight: 800, fontSize: isMobile ? mobileCardScale.meta : 13 }}>{order.customerPhone || '-'}</div>
+                      <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: isMobile ? mobileCardScale.meta : 13, fontWeight: 700, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{order.orderNumber || '-'}</div>
                     </div>
 
                     <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
-                      <div style={{ fontSize: isMobile ? 9 : 13, fontWeight: 950, color: 'var(--app-text, var(--text))', lineHeight: 1.2 }}>{formatMoney(order.total)}</div>
+                      <div style={{ fontSize: isMobile ? mobileCardScale.title : 13, fontWeight: 950, color: 'var(--app-text, var(--text))', lineHeight: 1.25 }}>{formatMoney(order.total)}</div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <Badge meta={orderBadge} />
                         <Badge meta={paymentBadge} />
@@ -995,18 +1343,18 @@ export default function CanteenQrOrdersPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(108px, 1fr))', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(108px, 1fr))', gap: isMobile ? 10 : 8 }}>
                 <SummaryField label="Siparis No" value={order.orderNumber} compact={isMobile} />
                 <SummaryField label="Urun Adedi" value={`${itemCount} adet`} compact={isMobile} />
                 <SummaryField label="Tarih / Saat" value={formatDate(order.createdAt)} compact={isMobile} />
               </div>
 
               {leadItem ? (
-                <div style={{ display: 'flex', gap: isMobile ? 8 : 10, alignItems: 'center', minWidth: 0, borderRadius: isMobile ? 12 : 16, padding: isMobile ? 7 : 9, background: 'color-mix(in srgb, var(--app-surface-soft) 88%, transparent)', border: '1px solid var(--app-border, var(--border))' }}>
-                  <ProductImage product={leadItem} alt={leadItem.productName} width={isMobile ? 28 : 42} height={isMobile ? 28 : 42} style={{ width: isMobile ? 28 : 42, height: isMobile ? 28 : 42, objectFit: 'cover', borderRadius: isMobile ? 8 : 12 }} />
+                <div style={{ display: 'flex', gap: isMobile ? 10 : 10, alignItems: 'center', minWidth: 0, borderRadius: isMobile ? 14 : 16, padding: isMobile ? 10 : 9, background: 'color-mix(in srgb, var(--app-surface-soft) 88%, transparent)', border: '1px solid var(--app-border, var(--border))' }}>
+                  <ProductImage product={leadItem} alt={leadItem.productName} width={isMobile ? mobileCardScale.productImage : 42} height={isMobile ? mobileCardScale.productImage : 42} style={{ width: isMobile ? mobileCardScale.productImage : 42, height: isMobile ? mobileCardScale.productImage : 42, objectFit: 'cover', borderRadius: isMobile ? 10 : 12 }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 900, color: 'var(--app-text, var(--text))', fontSize: isMobile ? 9 : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leadItem.productName}</div>
-                    <div style={{ fontSize: isMobile ? 9 : 13, color: 'var(--app-text-secondary, var(--muted))', marginTop: 2, fontWeight: 700 }}>
+                    <div style={{ fontWeight: 900, color: 'var(--app-text, var(--text))', fontSize: isMobile ? mobileCardScale.meta : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leadItem.productName}</div>
+                    <div style={{ fontSize: isMobile ? mobileCardScale.meta : 13, color: 'var(--app-text-secondary, var(--muted))', marginTop: 2, fontWeight: 700 }}>
                       {leadItem.quantity} adet
                       {Array.isArray(order.items) && order.items.length > 1 ? ` • +${order.items.length - 1} urun daha` : ''}
                     </div>
@@ -1014,15 +1362,15 @@ export default function CanteenQrOrdersPage() {
                 </div>
               ) : null}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: isMobile ? 8 : 14, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: isMobile ? 10 : 14, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'grid', gap: 4 }}>
-                  <div style={{ fontSize: isMobile ? 9 : 13, color: 'var(--app-text-muted, var(--muted))', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6 }}>Teslim Bilgisi</div>
-                  <div style={{ fontSize: isMobile ? 9 : 13, color: 'var(--app-text-secondary, var(--muted))', fontWeight: 800 }}>
+                  <div style={{ fontSize: isMobile ? mobileCardScale.meta : 13, color: 'var(--app-text-muted, var(--muted))', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6 }}>Teslim Bilgisi</div>
+                  <div style={{ fontSize: isMobile ? mobileCardScale.meta : 13, color: 'var(--app-text-secondary, var(--muted))', fontWeight: 800, lineHeight: 1.3, overflowWrap: 'anywhere' }}>
                     {order.branchName ? `${order.branchName} • ` : ''}
                     {order.customerLocation || 'Lokasyon yok'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'none', gap: 8, width: isMobile ? '100%' : 'auto' }}>
                   <button
                     className="btn"
                     type="button"
@@ -1030,7 +1378,7 @@ export default function CanteenQrOrdersPage() {
                       event.stopPropagation()
                       setSelectedOrderId(order.id)
                     }}
-                    style={{ borderRadius: isMobile ? 12 : 14, padding: isMobile ? '8px 10px' : '10px 14px', fontWeight: 900, fontSize: isMobile ? 9 : 13 }}
+                    style={{ borderRadius: isMobile ? 14 : 14, padding: isMobile ? '10px 12px' : '10px 14px', fontWeight: 900, fontSize: isMobile ? mobileCardScale.button : 13, minHeight: isMobile ? 42 : undefined }}
                   >
                     Detay Ac
                   </button>
@@ -1043,10 +1391,11 @@ export default function CanteenQrOrdersPage() {
                       transferToCari(order, true)
                     }}
                     style={{
-                      borderRadius: isMobile ? 12 : 14,
-                      padding: isMobile ? '8px 10px' : '10px 14px',
+                      borderRadius: isMobile ? 14 : 14,
+                      padding: isMobile ? '10px 12px' : '10px 14px',
                       fontWeight: 900,
-                      fontSize: isMobile ? 9 : 13,
+                      fontSize: isMobile ? mobileCardScale.button : 13,
+                      minHeight: isMobile ? 42 : undefined,
                       background: cariDisabled ? 'var(--app-surface-soft, var(--panelElevated))' : 'color-mix(in srgb, var(--theme-accent) 16%, var(--app-surface))',
                       borderColor: 'var(--app-border, var(--border))',
                       color: cariDisabled ? 'var(--app-text-muted, var(--muted))' : 'var(--theme-accent-text, var(--app-text))',
@@ -1212,6 +1561,7 @@ export default function CanteenQrOrdersPage() {
             <SectionBlock title="Hizli Islemler">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn" type="button" onClick={() => printOrderReceipt(selected)} style={{ fontSize: 13 }}>Siparis Fisi Yazdir</button>
+                <button className="btn" type="button" onClick={() => downloadOrderReceiptPdf(selected)} style={{ fontSize: 13 }}>Siparis Fisi PDF Indir</button>
                 <button className="btn" type="button" onClick={() => updateStatus(selected, 'cancelled')} style={{ fontSize: 13 }}>Iptal Et</button>
                 <button className="btn" type="button" onClick={() => removeOrder(selected)} style={{ fontSize: 13 }}>Sil</button>
               </div>

@@ -8,6 +8,7 @@ import {
   getPublicQrCustomerProfile,
   loginPublicQrCustomer,
   registerPublicQrCustomer,
+  updatePublicQrCustomerProfile,
   updatePublicQrCustomerFavorites,
   upsertPublicQrCustomer
 } from '../controllers/publicController.js'
@@ -24,6 +25,7 @@ router.post('/qr-customer/session', upsertPublicQrCustomer)
 router.post('/qr-customer/register', registerPublicQrCustomer)
 router.post('/qr-customer/login', loginPublicQrCustomer)
 router.get('/qr-customer/profile', getPublicQrCustomerProfile)
+router.put('/qr-customer/profile', updatePublicQrCustomerProfile)
 router.put('/qr-customer/favorites', updatePublicQrCustomerFavorites)
 router.get('/website-settings', getPublicWebsiteSettings)
 router.get('/sites/:slug', getPublicTenantWebsite)

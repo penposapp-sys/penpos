@@ -216,7 +216,7 @@ export default function ProductReportPage() {
 
               <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10 }}>
                 {items.map((r) => (
-                  <div key={`${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff', display: 'grid', gap: 6 }}>
+                  <div key={`${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--app-surface, var(--panel))', display: 'grid', gap: 6 }}>
                     <div style={{ fontWeight: 800 }}>{r.name}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ color: 'var(--muted)', fontSize: 12 }}>Adet</div>
@@ -269,7 +269,7 @@ export default function ProductReportPage() {
 
               <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10 }}>
                 {cancelledItems.map((r) => (
-                  <div key={`cancelled-${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff', display: 'grid', gap: 6 }}>
+                  <div key={`cancelled-${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--app-surface, var(--panel))', display: 'grid', gap: 6 }}>
                     <div style={{ fontWeight: 800 }}>{r.name}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ color: 'var(--muted)', fontSize: 12 }}>İptal Adedi</div>

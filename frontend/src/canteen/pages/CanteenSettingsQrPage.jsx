@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
 import { qrThemes } from '../components/CanteenQrPreview.jsx'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const getSelectedTheme = (themeId) => qrThemes.find((item) => item.id === themeId) || qrThemes[0]
 
@@ -31,6 +32,7 @@ const SOFT_CARD_STYLE = {
 
 export default function CanteenSettingsQrPage() {
   const { me } = useOutletContext()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const canManage = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('manage_settings'))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -51,6 +53,7 @@ export default function CanteenSettingsQrPage() {
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [message, setMessage] = useState('')
   const [qrCodeMap, setQrCodeMap] = useState({})
+  const isCompact = isMobilePortrait || isTablet
 
   const visibleBranches = useMemo(() => {
     const active = (Array.isArray(branches) ? branches : []).filter((branch) => branch.isActive !== false)
@@ -490,8 +493,9 @@ export default function CanteenSettingsQrPage() {
                         src={qrDataUrl}
                         alt={`${branchCard.name} QR Code`}
                         style={{
-                          width: 220,
-                          height: 220,
+                          width: isCompact ? 'min(220px, 100%)' : 220,
+                          height: isCompact ? 'auto' : 220,
+                          aspectRatio: '1 / 1',
                           borderRadius: 28,
                           border: '1px solid color-mix(in srgb, var(--theme-accent) 14%, var(--app-border))',
                           background: '#ffffff',
@@ -502,8 +506,10 @@ export default function CanteenSettingsQrPage() {
                     ) : (
                       <div
                         style={{
-                          width: 220,
-                          height: 220,
+                          width: isCompact ? 'min(220px, 100%)' : 220,
+                          height: isCompact ? 'auto' : 220,
+                          minHeight: 220,
+                          aspectRatio: '1 / 1',
                           borderRadius: 28,
                           border: '1px solid color-mix(in srgb, var(--theme-accent) 14%, var(--app-border))',
                           display: 'grid',

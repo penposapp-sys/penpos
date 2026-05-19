@@ -5,6 +5,7 @@ import { toast } from '../../lib/toast.js'
 import Modal from '../../components/Modal.jsx'
 import CanteenBulkProductsExcelCard from '../components/CanteenBulkProductsExcelCard.jsx'
 import { PRODUCT_PLACEHOLDER } from '../components/CanteenQrPreview.jsx'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const normalize = (value) => String(value || '').toLowerCase().trim()
 const hasValue = (value) => String(value ?? '').trim() !== ''
@@ -53,6 +54,7 @@ function CategoryCard({ category, onEdit, onRemove, canManage }) {
 
 export default function CanteenSettingsProductsPage() {
   const { me } = useOutletContext()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [items, setItems] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
@@ -85,6 +87,7 @@ export default function CanteenSettingsProductsPage() {
 
   const [branches, setBranches] = useState([])
   const [allowedIds, setAllowedIds] = useState([])
+  const isCompact = isMobilePortrait || isTablet
 
   const canManage = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('manage_menu'))
 
@@ -424,6 +427,25 @@ export default function CanteenSettingsProductsPage() {
         .canteen-settings-products-page button:not(.btn--primary):not(.btn--danger) {
           color: var(--app-text) !important;
         }
+        .canteen-settings-products-page .products-row-card {
+          min-width: 0;
+        }
+        @media (max-width: 768px) {
+          .canteen-settings-products-page .products-row-card {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+          .canteen-settings-products-page .products-row-main {
+            min-width: 0;
+          }
+          .canteen-settings-products-page .products-row-actions {
+            width: 100%;
+            justify-content: stretch;
+            flex-wrap: wrap;
+          }
+          .canteen-settings-products-page .products-row-actions > * {
+            flex: 1 1 140px;
+          }
+        }
       `}</style>
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
@@ -475,7 +497,7 @@ export default function CanteenSettingsProductsPage() {
 
       {canManage ? <CanteenBulkProductsExcelCard branchId={selectedBranchId} onImportDone={() => load(selectedBranchId)} /> : null}
 
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)' }}>
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'minmax(0, 1.2fr) minmax(0, 0.8fr)' }}>
         <form className="card" onSubmit={create}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Yeni Ürün</div>
           <div className="productsCreateGrid">
@@ -545,23 +567,23 @@ export default function CanteenSettingsProductsPage() {
         </label>
         <div style={{ display: 'grid', gap: 8 }}>
           {filtered.map((item) => (
-            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 12, alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div key={item.id} className="products-row-card" style={{ display: 'grid', gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : '1fr auto', gap: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 12, alignItems: 'center' }}>
+              <div className="products-row-main" style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
                 <img
                   src={item.imageUrl || PRODUCT_PLACEHOLDER}
                   onError={(event) => { event.currentTarget.src = PRODUCT_PLACEHOLDER }}
                   alt={item.name}
                   style={{ width: 54, height: 54, borderRadius: 16, objectFit: 'cover', background: '#f8fafc', flexShrink: 0 }}
                 />
-                <div>
-                  <div style={{ fontWeight: 700 }}>{item.name}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{item.name}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{item.categoryName || 'Diğer Ürünler'}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>Barkod: {item.barcode || '-'}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>Stok: {Number(item.stockQty || 0)}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>Satış: {Number(item.price || 0).toFixed(2)} ₺</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className="products-row-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: isCompact ? 'stretch' : 'flex-end' }}>
                 <button className="btn btn--compact" type="button" onClick={() => openEdit(item)} disabled={!canManage}>Düzenle</button>
                 <button className="btn btn--danger btn--compact" type="button" onClick={() => remove(item.id)} disabled={!canManage}>Sil</button>
               </div>

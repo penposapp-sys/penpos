@@ -101,7 +101,7 @@ function Header({ settings, onOpenLogin, onOpenSystems }) {
       {open ? (
         <div className="lp-mobile-nav">
           <a href="#sistemler" onClick={(event) => { setOpen(false); onOpenSystems?.(event) }}>Sistemler</a>
-          <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>\u00D6zellikler</a>
+          <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>Özellikler</a>
           <a href="#fiyat" onClick={() => setOpen(false)}>Fiyat</a>
           <a href="#egitim" onClick={() => setOpen(false)}>Eğitim Videoları</a>
           <button type="button" onClick={() => { setOpen(false); onOpenLogin() }}>Giriş Yap</button>

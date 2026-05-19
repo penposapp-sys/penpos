@@ -130,7 +130,7 @@ function ReportFilter({ period, setPeriod, rangeStart, setRangeStart, rangeEnd, 
           disabled={loading || exporting}
           style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '10px 16px', fontWeight: 900 }}
         >
-          {exporting ? 'HazÄ±rlanÄ±yor' : 'Excel Aktar'}
+          {exporting ? 'Haz?rlan?yor' : 'Excel Aktar'}
         </button>
         {period === 'range' ? (
           <>
@@ -642,7 +642,7 @@ export default function CanteenReportsPage() {
   useEffect(() => {
     load()
   }, [qs])
-  useCanteenAutoRefresh(() => load({ background: true }), [qs], { enabled: canView, intervalMs: 15000 })
+  useCanteenAutoRefresh(() => load({ background: true }), [qs], { enabled: false })
 
   if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
@@ -709,7 +709,7 @@ export default function CanteenReportsPage() {
       <ReportCatalog onSelect={handleCatalogSelect} />
       <div style={{ ...CARD_STYLE, padding: 16, display: 'none', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>
-          {(loading || exporting) ? (exporting ? 'Rapor dosyasÄ± hazÄ±rlanÄ±yor...' : 'Rapor verileri sistemden yÃ¼kleniyor...') : 'Rapor dosyasÄ±nÄ± buradan dÄ±ÅŸa aktarabilirsiniz.'}
+          {(loading || exporting) ? (exporting ? 'Rapor dosyas? haz?rlan?yor...' : 'Rapor verileri sistemden y?kleniyor...') : 'Rapor dosyas?n? buradan d??a aktarabilirsiniz.'}
         </div>
         <button
           type="button"
@@ -718,10 +718,10 @@ export default function CanteenReportsPage() {
           disabled={loading || exporting}
           style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '14px 18px', fontWeight: 900 }}
         >
-          {exporting ? 'HazÄ±rlanÄ±yor' : 'Excel Aktar'}
+          {exporting ? 'Haz?rlan?yor' : 'Excel Aktar'}
         </button>
       </div>
-      {(loading || exporting) ? <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>{exporting ? 'Rapor dosyası hazırlanıyor...' : 'Rapor verileri sistemden yükleniyor...'}</div> : null}
+      {(loading || exporting) ? <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>{exporting ? 'Rapor dosyas? haz?rlan?yor...' : 'Rapor verileri sistemden y?kleniyor...'}</div> : null}
       <ZReportModal
         open={zReportOpen}
         report={zReportData}

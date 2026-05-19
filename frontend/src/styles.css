@@ -46,6 +46,9 @@
   --modal-backdrop: rgba(15, 23, 42, 0.42);
   --surface-strong: #111111;
   --surface-strong-contrast: #ffffff;
+  --app-contrast-surface: #ffffff;
+  --app-contrast-text: #111111;
+  --app-contrast-border: #d1d5db;
   --surface-glass: rgba(255,255,255,0.66);
   --body-backdrop:
     radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 24%),
@@ -1550,6 +1553,9 @@
   --modal-backdrop: rgba(4, 6, 10, 0.62);
   --surface-strong: #f3f4f6;
   --surface-strong-contrast: #111111;
+  --app-contrast-surface: #121211;
+  --app-contrast-text: #f4f1ec;
+  --app-contrast-border: rgba(255,255,255,0.12);
   --surface-glass: rgba(255,255,255,0.06);
   --body-backdrop:
     radial-gradient(circle at 50% 42%, rgba(42, 40, 37, 0.88) 0%, rgba(23, 22, 21, 0.35) 35%, transparent 68%),
@@ -3972,14 +3978,9 @@ textarea::placeholder {
 }
 
 .btn--primary {
-  background:
-    linear-gradient(
-      180deg,
-      #ffffff 0%,
-      #d7dbe3 100%
-    );
-  border-color: rgba(255,255,255,0.28);
-  color: #111111;
+  background: var(--app-contrast-surface);
+  border-color: var(--app-contrast-border);
+  color: var(--app-contrast-text);
   font-weight: 600;
   box-shadow: 0 14px 32px rgba(0,0,0,0.18);
 }
@@ -4293,8 +4294,8 @@ textarea::placeholder {
   }
 }
 .btn--primary:hover {
-  background: linear-gradient(180deg, #ffffff 0%, #e4e7ed 100%);
-  border-color: rgba(255,255,255,0.38);
+  background: color-mix(in srgb, var(--app-contrast-surface) 88%, var(--app-surface-soft, var(--panelElevated)));
+  border-color: color-mix(in srgb, var(--app-contrast-border) 78%, var(--app-border, var(--border)));
 }
 .btn--danger {
   background: #ef4444;
@@ -4995,19 +4996,19 @@ textarea::placeholder {
 }
 
 .qr-menu button.card {
-  color: #111111;
+  color: var(--app-text, var(--text));
   font: inherit;
 }
 
 .qr-menu .qr-product-name {
-  color: #000000;
+  color: var(--app-text, var(--text));
   font-weight: 600;
   font-size: 15px;
   line-height: 1.25;
 }
 
 .qr-menu .qr-product-price {
-  color: #000000;
+  color: var(--app-text, var(--text));
   font-weight: 700;
   font-size: 14px;
   line-height: 1.2;
@@ -5016,20 +5017,20 @@ textarea::placeholder {
 }
 
 .qr-menu .qr-product-desc {
-  color: #444444;
+  color: var(--app-text-secondary, var(--text-secondary));
   font-size: 12px;
   line-height: 1.35;
 }
 
 .qr-menu .qr-modal-name {
-  color: #000000;
+  color: var(--app-text, var(--text));
   font-weight: 600;
   font-size: 18px;
   line-height: 1.2;
 }
 
 .qr-menu .qr-modal-price {
-  color: #000000;
+  color: var(--app-text, var(--text));
   font-weight: 700;
   font-size: 15px;
   line-height: 1.2;
@@ -5037,14 +5038,14 @@ textarea::placeholder {
 }
 
 .qr-menu .qr-modal-desc {
-  color: #444444;
+  color: var(--app-text-secondary, var(--text-secondary));
 }
 
 .qr-menu .category-pill {
   appearance: none;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  color: #000000;
+  background: var(--app-surface, var(--panel));
+  border: 1px solid var(--app-border, var(--border));
+  color: var(--app-text, var(--text));
   padding: 10px 14px;
   border-radius: 999px;
   cursor: pointer;
@@ -5054,13 +5055,13 @@ textarea::placeholder {
 }
 
 .qr-menu .category-pill:hover {
-  border-color: #9ca3af;
+  border-color: var(--border-hover, var(--app-border, var(--border)));
 }
 
 .qr-menu .category-pill.is-active {
-  border-color: #22c55e;
-  background: #f0fdf4;
-  color: #000000;
+  border-color: var(--theme-accent, #22c55e);
+  background: color-mix(in srgb, var(--theme-accent, #22c55e) 18%, var(--app-surface, var(--panel)));
+  color: var(--theme-accent-text, var(--app-text, var(--text)));
 }
 
 .qr-menu .qr-header {
@@ -5076,8 +5077,8 @@ textarea::placeholder {
   height: 112px;
   border-radius: 18px;
   object-fit: contain;
-  background: #ffffff;
-  border: 1px solid var(--border);
+  background: var(--app-surface, var(--panel));
+  border: 1px solid var(--app-border, var(--border));
 }
 
 .qr-menu .qr-title {
@@ -5085,14 +5086,14 @@ textarea::placeholder {
   font-size: 22px;
   font-weight: 800;
   line-height: 1.2;
-  color: #000000;
+  color: var(--app-text, var(--text));
 }
 
 .qr-menu .qr-subtitle {
   margin: 0;
   font-size: 13px;
   line-height: 1.2;
-  color: #444444;
+  color: var(--app-text-secondary, var(--text-secondary));
 }
 
 .qr-menu .qr-search {

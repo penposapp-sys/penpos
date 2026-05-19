@@ -266,7 +266,7 @@ export function ReportsSalesContent({ embedded = false }) {
             return (
               <div
                 key={o.id}
-                style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff' }}
+                style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--app-surface, var(--panel))' }}
                 onClick={async () => {
                   await toggleExpanded(o.id)
                 }}

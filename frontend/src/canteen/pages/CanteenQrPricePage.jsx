@@ -9,6 +9,7 @@ import ProductImage from '../../components/ProductImage.jsx'
 const CUSTOMER_FORM = { name: '', phone: '', location: '', address: '', note: '' }
 const LOGIN_FORM = { phone: '', password: '' }
 const REGISTER_FORM = { name: '', phone: '', password: '', passwordRepeat: '', location: '', address: '' }
+const PROFILE_FORM = { name: '', phone: '', location: '', address: '' }
 const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
 const PUBLIC_QR_THEME_STYLES = {
   light: {
@@ -115,7 +116,7 @@ const TEXT = {
   total: 'Genel Toplam',
   linkedAccountOrder: 'Sipariş kaydı hesabınıza bağlanacak',
   fallbackLocation: 'Lokasyon hesap bilgisinden alınacak',
-  locationPlaceholder: 'Lokasyon / Sınıf / Masa *',
+  locationPlaceholder: 'Lokasyon / Sınıf / Masa',
   addressPlaceholder: 'Adres',
   orderNote: 'Sipariş notu',
   creatingOrder: 'Sipariş oluşturuluyor...',
@@ -158,7 +159,8 @@ const TEXT = {
   passwordRequired: 'Telefon ve şifre zorunlu',
   registerFailed: 'Hesap oluşturulamadı',
   passwordMismatch: 'Şifreler aynı değil',
-  registerSuccess: 'Hesap açıldı ve carilere kaydedildi'
+  registerSuccess: 'Hesap açıldı ve carilere kaydedildi',
+  profileSaved: 'Hesap bilgileri güncellendi'
 }
 const ICON_MARKUP = {
   menu: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
@@ -450,6 +452,9 @@ export default function CanteenQrPricePage() {
   const [registerForm, setRegisterForm] = useState(REGISTER_FORM)
   const [customerSession, setCustomerSession] = useState(null)
   const [customerProfile, setCustomerProfile] = useState(null)
+  const [profileForm, setProfileForm] = useState(PROFILE_FORM)
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [profileSaving, setProfileSaving] = useState(false)
   const [favoriteIds, setFavoriteIds] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [successOrder, setSuccessOrder] = useState(null)
@@ -557,13 +562,20 @@ export default function CanteenQrPricePage() {
     setCustomerProfile(response)
     if (Array.isArray(response.favoriteProductIds)) setFavoriteIds(response.favoriteProductIds.map(String))
     if (response.customer) {
+      const nextProfileForm = {
+        name: response.customer.name || session.name || '',
+        phone: response.customer.phone || session.phone || '',
+        location: response.customer.note || session.location || '',
+        address: response.customer.address || session.address || ''
+      }
       setCustomerSession({
         customerId: response.customer.id,
         name: response.customer.name,
         phone: response.customer.phone,
-        location: response.customer.note || session.location || '',
-        address: response.customer.address || ''
+        location: nextProfileForm.location,
+        address: nextProfileForm.address
       })
+      setProfileForm(nextProfileForm)
     }
   }
 
@@ -939,10 +951,68 @@ export default function CanteenQrPricePage() {
   const logoutAccount = () => {
     setCustomerSession(null)
     setCustomerProfile(null)
+    setProfileForm(PROFILE_FORM)
+    setProfileEditing(false)
     setExpandedOrderId('')
     setLoginForm(LOGIN_FORM)
     try { localStorage.removeItem(sessionStorageKey) } catch {}
     toast.success('Müşteri oturumu kapatıldı')
+  }
+
+  const submitProfileUpdate = async () => {
+    if (!tenantId || !customerSession?.customerId) return
+    if (!safeText(profileForm.name) || !normalizePhone(profileForm.phone)) {
+      toast.error('Ad soyad ve telefon zorunlu')
+      return
+    }
+
+    setProfileSaving(true)
+    const response = await api('/api/public/qr-customer/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        tenantId,
+        customerId: customerSession.customerId,
+        name: profileForm.name,
+        phone: profileForm.phone,
+        location: profileForm.location,
+        address: profileForm.address
+      }),
+      silent: true,
+      portalOverride: 'restaurant',
+      skipBranchHeader: true,
+      suppressAuthRedirect: true
+    })
+    setProfileSaving(false)
+
+    if (!response?.success || !response?.customer) {
+      toast.error(response?.message || 'Hesap güncellenemedi')
+      return
+    }
+
+    const nextSession = {
+      customerId: customerSession.customerId,
+      name: response.customer.name,
+      phone: response.customer.phone,
+      location: response.customer.location || response.customer.note || '',
+      address: response.customer.address || ''
+    }
+    setCustomerSession(nextSession)
+    setCustomerProfile((current) => current ? {
+      ...current,
+      customer: {
+        ...(current.customer || {}),
+        ...response.customer,
+        balance: current.customer?.balance ?? response.customer.balance ?? 0
+      }
+    } : current)
+    setProfileForm({
+      name: nextSession.name,
+      phone: nextSession.phone,
+      location: nextSession.location,
+      address: nextSession.address
+    })
+    setProfileEditing(false)
+    toast.success(TEXT.profileSaved)
   }
 
   const repeatPastOrder = (order) => {
@@ -989,8 +1059,8 @@ export default function CanteenQrPricePage() {
       toast.error('Sepette tek şube ürünleri olmalı')
       return
     }
-    if (!customerSession?.customerId && (!safeText(customerForm.name) || !normalizePhone(customerForm.phone) || !safeText(customerForm.location))) {
-      toast.error('Ad soyad, telefon ve lokasyon zorunlu')
+    if (!customerSession?.customerId && (!safeText(customerForm.name) || !normalizePhone(customerForm.phone))) {
+      toast.error('Ad soyad ve telefon zorunlu')
       return
     }
 
@@ -1431,7 +1501,7 @@ export default function CanteenQrPricePage() {
                 <>
                   <label className="qr-ref-field"><input value={customerForm.name} onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ad Soyad *" /></label>
                   <label className="qr-ref-field"><input value={customerForm.phone} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Telefon *" /></label>
-                  <label className="qr-ref-field"><input value={customerForm.location} onChange={(event) => setCustomerForm((current) => ({ ...current, location: event.target.value }))} placeholder="Lokasyon / Sınıf / Masa *" /></label>
+                  <label className="qr-ref-field"><input value={customerForm.location} onChange={(event) => setCustomerForm((current) => ({ ...current, location: event.target.value }))} placeholder="Lokasyon / Sınıf / Masa" /></label>
                   <label className="qr-ref-field"><input value={customerForm.address} onChange={(event) => setCustomerForm((current) => ({ ...current, address: event.target.value }))} placeholder="Adres" /></label>
                 </>
               )}
@@ -1494,6 +1564,46 @@ export default function CanteenQrPricePage() {
                     <strong>{customerSession.name}</strong>
                     <div>{customerSession.phone}</div>
                     <div>{"Bor\u00e7 Durumu:"} {formatMoney(customerProfile?.balance || customerProfile?.customer?.balance || 0)}</div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    <div className="qr-ref-section-title" style={{ marginTop: 0 }}>
+                      <strong style={{ color: 'var(--app-text)', fontSize: 18 }}>Hesap Bilgileri</strong>
+                      <button
+                        type="button"
+                        className="qr-ref-link"
+                        onClick={() => {
+                          if (profileEditing) {
+                            setProfileForm({
+                              name: customerSession?.name || '',
+                              phone: customerSession?.phone || '',
+                              location: customerSession?.location || '',
+                              address: customerSession?.address || ''
+                            })
+                          }
+                          setProfileEditing((current) => !current)
+                        }}
+                      >
+                        {profileEditing ? 'Vazgeç' : 'Düzenle'}
+                      </button>
+                    </div>
+                    {profileEditing ? (
+                      <>
+                        <label className="qr-ref-field"><input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ad Soyad *" /></label>
+                        <label className="qr-ref-field"><input value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Telefon *" /></label>
+                        <label className="qr-ref-field"><input value={profileForm.location} onChange={(event) => setProfileForm((current) => ({ ...current, location: event.target.value }))} placeholder="Lokasyon / Sınıf / Bölüm" /></label>
+                        <label className="qr-ref-field"><input value={profileForm.address} onChange={(event) => setProfileForm((current) => ({ ...current, address: event.target.value }))} placeholder="Adres" /></label>
+                        <button type="button" className="qr-ref-full" onClick={submitProfileUpdate} disabled={profileSaving}>
+                          {profileSaving ? 'Kaydediliyor...' : 'Bilgileri Kaydet'}
+                        </button>
+                      </>
+                    ) : (
+                      <div className="qr-ref-note">
+                        <strong>{customerSession.name}</strong><br />
+                        {customerSession.phone || '-'}<br />
+                        {customerSession.location || 'Lokasyon girilmemiş'}<br />
+                        {customerSession.address || 'Adres girilmemiş'}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'grid', gap: 10 }}>
                     <strong>{TEXT.pastOrders}</strong>

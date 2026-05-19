@@ -65,7 +65,7 @@ export default function EditCustomerModal({ open, onClose, customer, onSaved }) 
   return (
     <Modal open={open} onClose={close} title="Cari Düzenle">
       <form onSubmit={save} style={{ display: 'grid', gap: 10 }}>
-        <div className="card" style={{ borderColor: 'var(--border)', background: '#fff', display: 'grid', gap: 6 }}>
+        <div className="card" style={{ borderColor: 'var(--border)', background: 'var(--app-surface, var(--panel))', display: 'grid', gap: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>Borç / Bakiye</div>
             <div style={{ fontWeight: 800 }}>{money(customer?.balance || 0)} ₺</div>
@@ -93,4 +93,3 @@ export default function EditCustomerModal({ open, onClose, customer, onSaved }) 
     </Modal>
   )
 }
-

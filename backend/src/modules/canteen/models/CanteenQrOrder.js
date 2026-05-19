@@ -18,7 +18,7 @@ const schema = new mongoose.Schema({
   customerName: { type: String, required: true },
   customerPhone: { type: String, required: true, index: true },
   customerEmail: { type: String, default: '' },
-  customerLocation: { type: String, required: true },
+  customerLocation: { type: String, default: '' },
   customerAddress: { type: String, default: '' },
   customerNote: { type: String, default: '' },
   items: { type: [qrOrderItemSchema], default: [] },
