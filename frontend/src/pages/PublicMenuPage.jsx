@@ -183,17 +183,6 @@ export default function PublicMenuPage() {
     if (!validIds.has(String(selectedCategory || 'all'))) setSelectedCategory('all')
   }, [categoryTabs, selectedCategory])
 
-  useEffect(() => {
-    console.log('[PublicMenuPage] menu debug', {
-      products,
-      categories,
-      visibleProducts,
-      groupedProducts: Object.fromEntries(groupedProducts),
-      selectedCategory,
-      searchTerm
-    })
-  }, [products, categories, visibleProducts, groupedProducts, selectedCategory, searchTerm])
-
   if (loading) {
     return (
       <div className="digital-public-menu-page">

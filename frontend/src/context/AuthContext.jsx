@@ -75,11 +75,6 @@ export const AuthProvider = ({ children }) => {
         const user = meRes?.user
         const normalized = user ? { ...user, permissions: normalizePermissions(user.permissions) } : null
         setUser(normalized)
-        if (import.meta.env.DEV && normalized) {
-          try {
-            console.log('[AUTH]', { role: normalized.role, systemType: normalized.systemType || null, permissions: normalized.permissions, branchId: normalized.branchId || null, branchIds: normalized.branchIds || [] })
-          } catch {}
-        }
         if (normalized?.tenantId) {
           const ctxRes = await api('/api/tenant/context', { silent: true, portalOverride })
           setTenantCtx(ctxRes?.ok ? ctxRes : null)

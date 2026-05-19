@@ -666,7 +666,7 @@ export default function CanteenQrPricePage() {
         if (label.includes('al') && label.includes('Saat')) strong.textContent = TEXT.workingHours
       })
     }
-  }, [loading, error, payload, view, categoryMode, activeCategoryId, customerSession, customerProfile, favoriteIds, cart, selectedProduct, successOrder, submitting, menuOpen, accountMode, query, tenantId])
+  }, [loading, error, payload, view, categoryMode, activeCategoryId, favoriteIds, cart.length, selectedProduct, successOrder, menuOpen, accountMode, query])
 
   const categories = useMemo(() => Array.isArray(payload?.categories) ? payload.categories : [], [payload])
   const products = useMemo(() => Array.isArray(payload?.products) ? payload.products : [], [payload])

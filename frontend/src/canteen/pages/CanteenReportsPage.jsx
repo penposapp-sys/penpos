@@ -7,6 +7,7 @@ import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import ZReportModal from '../../features/reports/ZReportModal.tsx'
 import BranchFilterCard from '../../components/BranchFilterCard.jsx'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const REPORT_BRANCH_SELECTION_STORAGE_KEY = 'selectedReportBranchIds_canteen'
 
@@ -172,7 +173,8 @@ function ReportFilterCompact({
   exporting,
   branchOptions,
   selectedBranches,
-  setSelectedBranches
+  setSelectedBranches,
+  compact = false
 }) {
   const tabs = [
     { key: 'today', label: 'Bugun' },
@@ -185,7 +187,7 @@ function ReportFilterCompact({
 
   return (
     <div style={{ ...CARD_STYLE, padding: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', overflow: 'visible' }}>
+      <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', overflow: 'visible', flexDirection: compact ? 'column' : 'row' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
           {tabs.map((tab) => {
             const active = period === tab.key
@@ -213,7 +215,7 @@ function ReportFilterCompact({
           })}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'end', gap: 10, flexWrap: 'wrap', flexShrink: 0, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'end', gap: 10, flexWrap: 'wrap', flexShrink: 0, justifyContent: 'flex-end', width: compact ? '100%' : 'auto' }}>
           <BranchFilterCard
             branchOptions={branchOptions}
             selectedBranches={selectedBranches}
@@ -234,7 +236,7 @@ function ReportFilterCompact({
                 setRangeStart(e.target.value)
                 if (period !== 'range') setPeriod('range')
               }}
-              style={{ minHeight: controlHeight, height: controlHeight, paddingTop: 0, paddingBottom: 0, minWidth: 168 }}
+              style={{ minHeight: controlHeight, height: controlHeight, paddingTop: 0, paddingBottom: 0, minWidth: compact ? 144 : 168 }}
             />
           </label>
 
@@ -248,7 +250,7 @@ function ReportFilterCompact({
                 setRangeEnd(e.target.value)
                 if (period !== 'range') setPeriod('range')
               }}
-              style={{ minHeight: controlHeight, height: controlHeight, paddingTop: 0, paddingBottom: 0, minWidth: 168 }}
+              style={{ minHeight: controlHeight, height: controlHeight, paddingTop: 0, paddingBottom: 0, minWidth: compact ? 144 : 168 }}
             />
           </label>
 
@@ -267,7 +269,7 @@ function ReportFilterCompact({
   )
 }
 
-function MainPanel({ summary, methodRows }) {
+function MainPanel({ summary, methodRows, compact = false }) {
   const max = methodRows.reduce((best, item) => Math.max(best, Number(item.value || 0)), 0) || 1
   return (
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden' }}>
@@ -280,7 +282,7 @@ function MainPanel({ summary, methodRows }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+      <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: compact ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
         {[
           { label: 'Toplam İşlem', value: String(Number(summary?.saleCount || 0)) },
           { label: 'Toplam Ciro', value: `${money(summary?.totalRevenue || 0)} ₺` },
@@ -399,6 +401,8 @@ function ReportCatalog({ onSelect }) {
 export default function CanteenReportsPage() {
   const { me, session } = useOutletContext()
   const { theme } = useTheme()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
+  const isCompact = isMobilePortrait || isTablet
   const canView = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('canteen_reports_view'))
   const canExport = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_reports_export') || me.permissions.includes('canteen_reports_view')))
 
@@ -638,7 +642,7 @@ export default function CanteenReportsPage() {
   useEffect(() => {
     load()
   }, [qs])
-  useCanteenAutoRefresh(() => load({ background: true }), [qs], { enabled: canView })
+  useCanteenAutoRefresh(() => load({ background: true }), [qs], { enabled: canView, intervalMs: 15000 })
 
   if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
@@ -657,22 +661,23 @@ export default function CanteenReportsPage() {
         branchOptions={branchOptions}
         selectedBranches={selectedBranchIds}
         setSelectedBranches={setSelectedBranchIds}
+        compact={isCompact}
       />
       {!!error ? <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#7f1d1d' }}>{error}</div> : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
         <KpiCard title="Net Satış" value={`${money(summary?.totalRevenue || 0)} ₺`} note="Seçili dönem" trend="+0%" tone="green" />
         <KpiCard title="İşlem" value={String(Number(summary?.saleCount || 0))} note="Toplam adet" trend="+0%" tone="blue" />
         <KpiCard title="Ortalama Sepet" value={`${money(summary?.avgBasket || 0)} ₺`} note="Sipariş başı" trend="+0%" tone="orange" />
         <KpiCard title="Z Özeti" value={methodRows.length > 0 ? 'Hazır' : 'Boş'} note="Ödeme görünümü" trend="+0%" tone="red" />
       </div>
 
-      <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)' }}>
-        <MainPanel summary={summary || {}} methodRows={methodRows} />
+      <div style={{ display: 'grid', gap: 20, gridTemplateColumns: isCompact ? '1fr' : 'minmax(0, 1.2fr) minmax(0, 0.8fr)' }}>
+        <MainPanel summary={summary || {}} methodRows={methodRows} compact={isCompact} />
         <SidePanel summary={summary || {}} methodRows={methodRows} />
       </div>
 
-      <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)' }}>
+      <div style={{ display: 'grid', gap: 20, gridTemplateColumns: isCompact ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)' }}>
         <ListPanel
           title={tab === 'products' ? 'En Çok Satan Ürünler' : 'Z Raporu Özeti'}
           rows={tab === 'products' ? products.slice(0, 6) : methodRows}
