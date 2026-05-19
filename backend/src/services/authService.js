@@ -1,12 +1,18 @@
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { signToken } from '../utils/jwt.js'
 import { error } from '../utils/errors.js'
+import { sendMail } from '../utils/mailer.js'
 import { findByEmail, findById, findByUsername } from '../repositories/userRepository.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { error as logError, info } from '../utils/logger.js'
+import { getUserAccessibleBranchIds } from '../utils/branchVisibility.js'
+import { normalizePackageType } from '../utils/systemType.js'
+import User from '../models/User.js'
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 const normalizeIdentifier = (value) => String(value || '').trim().toLowerCase()
+const RESET_PASSWORD_TTL_MS = 15 * 60 * 1000
 
 const normalizePortal = (portal) => {
   const p = String(portal || '').trim().toLowerCase()
@@ -17,19 +23,71 @@ const normalizePortal = (portal) => {
   return p
 }
 
+const buildResetPasswordUrl = (token) => {
+  const baseUrl = String(process.env.APP_URL || 'https://penpos.cloud').trim().replace(/\/+$/, '')
+  return `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`
+}
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(String(token || '')).digest('hex')
+
+const resolveForgotFilter = (portal) => {
+  const normalizedPortal = normalizePortal(portal)
+  if (normalizedPortal === 'platform') return { role: { $in: ['platform_admin', 'superadmin'] } }
+  if (normalizedPortal === 'canteen') return { systemType: 'kantin' }
+  if (normalizedPortal === 'kermes') return { systemType: 'kermes' }
+  return { role: { $nin: ['platform_admin', 'superadmin'] } }
+}
+
+const resolveLoginPathForUser = (user) => {
+  if (user?.role === 'platform_admin' || user?.role === 'superadmin') return '/platform-login'
+  if (user?.systemType === 'kantin') return '/canteen/login'
+  return '/login/restoran'
+}
+
+const buildResetPasswordMail = ({ name, resetUrl }) => {
+  const safeName = String(name || 'PenPOS Kullanıcısı').trim() || 'PenPOS Kullanıcısı'
+  return {
+    subject: 'PenPOS Şifre Sıfırlama',
+    text: [
+      `Merhaba ${safeName},`,
+      '',
+      'Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın:',
+      resetUrl,
+      '',
+      'Bu bağlantı 15 dakika geçerlidir.',
+      'Eğer bu işlemi siz yapmadıysanız bu e-postayı dikkate almayabilirsiniz.',
+    ].join('\n'),
+    html: `
+      <div style="font-family:Arial,Helvetica,sans-serif;background:#f8fafc;padding:32px;color:#0f172a">
+        <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f3;border-radius:24px;padding:32px;box-shadow:0 18px 48px rgba(15,23,42,0.08)">
+          <div style="font-size:28px;font-weight:800;margin-bottom:12px">PenPOS Şifre Sıfırlama</div>
+          <p style="font-size:15px;line-height:1.7;color:#334155;margin:0 0 18px">Merhaba ${safeName}, şifrenizi yenilemek için aşağıdaki butona tıklayın.</p>
+          <a href="${resetUrl}" style="display:inline-block;padding:14px 22px;border-radius:14px;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:800">Şifremi Sıfırla</a>
+          <p style="font-size:13px;line-height:1.7;color:#64748b;margin:18px 0 0">Bu bağlantı 15 dakika geçerlidir.</p>
+          <p style="font-size:13px;line-height:1.7;color:#64748b;margin:10px 0 0">Buton çalışmazsa bu bağlantıyı tarayıcınıza yapıştırın:</p>
+          <p style="font-size:13px;line-height:1.7;color:#0f766e;word-break:break-all;margin:6px 0 0">${resetUrl}</p>
+        </div>
+      </div>
+    `,
+  }
+}
+
 export const login = async (identifier, password, _portal, { requestId } = {}) => {
   const normalizedIdentifier = normalizeIdentifier(identifier)
   const portal = normalizePortal(_portal)
   const isEmail = normalizedIdentifier.includes('@')
+  const portalSystemType = portal === 'kermes'
+    ? 'kermes'
+    : (portal === 'canteen' ? 'kantin' : null)
   const portalUsernameFilter = portal === 'platform'
     ? { role: { $in: ['platform_admin', 'superadmin'] } }
-    : (portal === 'kermes' ? { systemType: 'kermes' } : (portal === 'canteen' ? { systemType: 'kantin' } : {}))
+    : (portalSystemType ? { systemType: portalSystemType } : {})
 
   let user = null
 
   try {
     user = isEmail
-      ? await findByEmail(normalizedIdentifier)
+      ? await findByEmail(normalizedIdentifier, portal === 'platform' ? portalUsernameFilter : (portalSystemType ? { systemType: portalSystemType } : {}))
       : (await findByUsername(normalizedIdentifier, portal ? portalUsernameFilter : {}))
         || (await findByUsername(normalizedIdentifier))
 
@@ -72,7 +130,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     }
   }
   let branchId = user.branchId || null
-  let branchIds = Array.isArray(user.branchIds) ? user.branchIds.map(String).filter(Boolean) : []
+  let branchIds = getUserAccessibleBranchIds(user)
 
   const isPlatformUser = user.role === 'platform_admin' || user.role === 'superadmin'
   if (!isPlatformUser && !user.tenantId) {
@@ -99,6 +157,12 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
       if (portal === 'kermes' && systemType !== 'kermes') throw error('wrong_portal', 'Wrong portal', 403)
       if (portal === 'canteen' && systemType !== 'kantin') throw error('wrong_portal', 'Wrong portal', 403)
     }
+  }
+
+  if (tenant && !tenant.vertical) {
+    tenant.vertical = normalizePackageType(tenant.systemType, 'restaurant')
+    tenant.businessType = tenant.vertical
+    await tenant.save().catch(() => {})
   }
 
   if (user.role === 'staff') {
@@ -180,7 +244,11 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
       role: user.role,
       tenantId: isPlatformUser ? null : (user.tenantId || null),
       permissions: user.permissions || [],
-      systemType
+      systemType,
+      vertical: normalizePackageType(systemType),
+      branchId,
+      branchIds,
+      accessibleBranchIds: user.role === 'staff' ? branchIds : []
     }
     return { token, user: userDto }
   } catch (err) {
@@ -204,6 +272,63 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     }
 
     throw err
+  }
+}
+
+export const forgotPassword = async (email, portal) => {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail) throw error('invalid_email', 'Lütfen geçerli bir e-posta adresi girin.', 400)
+
+  const filter = resolveForgotFilter(portal)
+  const user = await findByEmail(normalizedEmail, filter)
+  if (!user || !user.isActive || user.isDeleted || user.status !== 'active') {
+    return { success: true, message: 'Eğer bu e-posta sistemde kayıtlıysa şifre sıfırlama bağlantısı gönderildi.' }
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex')
+  const hashedToken = hashResetToken(rawToken)
+  const expiresAt = new Date(Date.now() + RESET_PASSWORD_TTL_MS)
+
+  user.resetPasswordToken = hashedToken
+  user.resetPasswordExpires = expiresAt
+  await user.save()
+
+  const resetUrl = buildResetPasswordUrl(rawToken)
+  const mail = buildResetPasswordMail({ name: user.name, resetUrl })
+  await sendMail({
+    to: user.email,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+  })
+
+  return { success: true, message: 'Eğer bu e-posta sistemde kayıtlıysa şifre sıfırlama bağlantısı gönderildi.' }
+}
+
+export const resetPassword = async (token, newPassword) => {
+  const rawToken = String(token || '').trim()
+  const nextPassword = String(newPassword || '')
+
+  if (!rawToken) throw error('token_required', 'Şifre sıfırlama bağlantısı geçersiz.', 400)
+  if (nextPassword.length < 6) throw error('password_too_short', 'Şifre en az 6 karakter olmalıdır.', 400)
+
+  const hashedToken = hashResetToken(rawToken)
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: new Date() },
+  })
+
+  if (!user) throw error('invalid_reset_token', 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.', 400)
+
+  user.passwordHash = await bcrypt.hash(nextPassword, 10)
+  user.resetPasswordToken = null
+  user.resetPasswordExpires = null
+  await user.save()
+
+  return {
+    success: true,
+    message: 'Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz.',
+    loginPath: resolveLoginPathForUser(user),
   }
 }
 
@@ -250,7 +375,8 @@ export const me = async (userId) => {
     tenantId: user.tenantId || null,
     permissions: user.permissions || [],
     systemType: user.systemType || null,
-    branchIds: Array.isArray(user.branchIds) ? user.branchIds.map(String) : [],
+    branchIds: getUserAccessibleBranchIds(user),
+    accessibleBranchIds: getUserAccessibleBranchIds(user),
     tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status, systemType: tenant.systemType || null } : null,
     branch
   }

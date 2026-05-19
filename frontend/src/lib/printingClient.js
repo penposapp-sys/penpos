@@ -120,6 +120,15 @@ const deriveReceiptStatus = (receipt) => {
   return String(receipt?.paymentStatus || '') === 'paid' ? 'ODENDI' : 'ODENMEDI'
 }
 
+const deriveDeliveryPaymentLine = (receipt) => {
+  if (String(receipt?.paymentStatus || '') === 'paid') return 'Odemesi alindi'
+  const plannedStatus = String(receipt?.deliveryPaymentStatus || '').trim()
+  if (plannedStatus === 'already_paid') return 'Odemesi alindi'
+  const plannedLabel = String(receipt?.deliveryPaymentMethodLabel || receipt?.deliveryPaymentMethod || '').trim()
+  if (plannedStatus === 'pay_on_delivery' && plannedLabel) return plannedLabel
+  return ''
+}
+
 const buildReceiptContent = (receipt) => {
   const businessName = String(receipt?.businessName || 'PENPOS').trim()
   const receiptNo = receipt?.receiptNo || String(receipt?.id || '').slice(-8).toUpperCase() || '-'
@@ -127,6 +136,12 @@ const buildReceiptContent = (receipt) => {
   const { datePart, timePart } = splitDateTime(receipt?.createdAt)
   const tableName = String(receipt?.tableName || '').trim()
   const cashierName = String(receipt?.createdByName || '').trim()
+  const saleType = String(receipt?.saleType || '').trim()
+  const isPackage = saleType === 'delivery'
+  const customerName = String(receipt?.customerName || '').trim()
+  const customerPhone = String(receipt?.customerPhone || '').trim()
+  const customerAddress = String(receipt?.customerAddress || '').trim()
+  const deliveryPaymentLine = deriveDeliveryPaymentLine(receipt)
   const activeItems = (Array.isArray(receipt?.items) ? receipt.items : []).filter((it) => String(it?.status || '') !== 'cancelled')
   const cancelledItems = (Array.isArray(receipt?.items) ? receipt.items : []).filter((it) => String(it?.status || '') === 'cancelled')
   const subtotal = Number(receipt?.totals?.subtotal ?? receipt?.totals?.total ?? 0)
@@ -139,10 +154,20 @@ const buildReceiptContent = (receipt) => {
   const lines = []
 
   lines.push(center('HOS GELDINIZ').trimEnd())
+  if (isPackage) {
+    lines.push(center('*** PAKET SERVIS ***').trimEnd())
+    if (customerName) lines.push(...wrapText(`Musteri: ${customerName}`))
+    if (customerPhone) lines.push(...wrapText(`Telefon: ${customerPhone}`))
+    if (customerAddress) {
+      lines.push('Adres:')
+      lines.push(...wrapText(customerAddress))
+    }
+    if (deliveryPaymentLine) lines.push(...wrapText(`Odeme: ${deliveryPaymentLine}`))
+  }
   lines.push(line('=').trimEnd())
   lines.push(pairRow('Fis No:', String(receiptNo)).trimEnd())
   if (String(orderNo).trim() && String(orderNo).trim() !== '-') {
-    lines.push(pairRow('Siparis No:', String(orderNo)).trimEnd())
+    lines.push(pairRow('Sipariş No:', String(orderNo)).trimEnd())
   }
   if (tableName) lines.push(pairRow('Masa:', tableName).trimEnd())
   lines.push(pairRow('Tarih:', datePart).trimEnd())
@@ -169,7 +194,7 @@ const buildReceiptContent = (receipt) => {
       const name = `IPTAL - ${toPrintAscii(item?.nameSnapshot || '-')}`
       lines.push(...wrapText(name))
       lines.push(`x${Math.max(1, Number(item?.qty || 1))}`)
-      lines.push(...wrapText(`Iptal sebebi: ${String(item?.note || '').trim() || 'Sebep belirtilmedi'}`))
+      lines.push(...wrapText(`İptal sebebi: ${String(item?.note || '').trim() || 'Sebep belirtilmedi'}`))
       lines.push('')
     }
   }
@@ -177,13 +202,13 @@ const buildReceiptContent = (receipt) => {
   lines.push(line('-').trimEnd())
   lines.push(pairRow('Ara Toplam:', money(subtotal)).trimEnd())
   if (discountPercent > 0 || discountTotal > 0) {
-    lines.push(pairRow(`Indirim${discountPercent > 0 ? ` (%${discountPercent})` : ''}:`, money(discountTotal)).trimEnd())
+    lines.push(pairRow(`İndirim${discountPercent > 0 ? ` (%${discountPercent})` : ''}:`, money(discountTotal)).trimEnd())
   }
   lines.push(pairRow('Odenen:', money(paidTotal)).trimEnd())
   lines.push(pairRow('Kalan:', money(balanceDue)).trimEnd())
   lines.push(pairRow('Bakiye:', money(displayBalance)).trimEnd())
   lines.push(pairRow('TOPLAM:', money(grandTotal)).trimEnd())
-  lines.push(pairRow('Odeme:', derivePaymentType(receipt)).trimEnd())
+  lines.push(pairRow('Ödeme:', derivePaymentType(receipt)).trimEnd())
   if (receipt?.note) {
     lines.push(line('-').trimEnd())
     lines.push(...wrapText(`Genel Not: ${String(receipt.note || '').trim()}`))
@@ -199,7 +224,7 @@ const buildReceiptContent = (receipt) => {
     `${toPrintAscii(businessName).toUpperCase()}\n`,
     cmd.boldOff,
     cmd.alignLeft,
-    `${lines.join('\n')}\n`,
+    `${lines.join('\n')}\n\n`,
     '\n\n',
     cmd.cut
   ].join('')
@@ -209,8 +234,8 @@ export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1 } = {
   const sys = normalizeSystem(system)
   const oid = String(orderId || '').trim()
   const copies = Math.max(1, Math.min(10, Number(copyCount || 1)))
-  if (!oid) throw new Error('Siparis bulunamadi')
-  if (sys !== 'kermes') throw new Error('Bu ekran icin fis yazdirma henuz desteklenmiyor')
+  if (!oid) throw new Error('Sipariş bulunamadı')
+  if (sys !== 'kermes') throw new Error('Bu ekran için fis yazdırma henuz desteklenmiyor')
 
   const receiptRes = await api(`/api/pos/orders/${encodeURIComponent(oid)}/receipt`, { silent: true })
   const receipt = receiptRes?.receipt || null
@@ -223,7 +248,7 @@ export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1 } = {
       system: sys,
       type: 'receipt',
       payload: { type: 'raw', content },
-      meta: { orderId: String(receipt.id), copies }
+      meta: { orderId: String(receipt.id), copies, receiptRole: 'cashier' }
     },
     silent: true
   })

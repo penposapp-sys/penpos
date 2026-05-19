@@ -112,7 +112,7 @@ export default function KitchenBulkPage() {
       })
       await load()
     } catch (err) {
-      setError(err?.message || 'Islem basarisiz')
+      setError(err?.message || 'İşlem başarısız')
     }
   }
 
@@ -137,7 +137,7 @@ export default function KitchenBulkPage() {
         const isWeightBased = !!card?.isWeightBased
         const cardWeightGrams = Number(card?.weightGrams || 0) || 0
         return (
-          <div key={`${String(card?.menuItemId || '')}|${String(cardWeightGrams || '')}|${String(card?.status || '')}`} className="card" style={{ padding: 12 }}>
+          <div key={`${String(card?.menuItemId || '')}|${String(cardWeightGrams || '')}|${String(card?.status || '')}`} className="card theme-card" style={{ padding: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.25 }}>
               <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(card?.name || '-')}</div>
               <div style={{ whiteSpace: 'nowrap' }}>
@@ -161,16 +161,19 @@ export default function KitchenBulkPage() {
                       gridTemplateColumns: '1fr auto',
                       alignItems: 'center',
                       gap: 10,
-                      border: '1px solid var(--border)',
+                      border: '1px solid var(--app-border, var(--border))',
                       borderRadius: 10,
                       padding: '10px 12px',
-                      background: actionMode === 'cooking' ? '#dbeafe' : '#fff'
+                      background: actionMode === 'cooking'
+                        ? 'color-mix(in srgb, #2563eb 18%, var(--app-surface-2, var(--app-surface-soft)))'
+                        : 'var(--app-surface-2, var(--app-surface-soft))',
+                      color: 'var(--app-text)'
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ marginBottom: 4 }}>
                         <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>
-                          {tableName || 'Siparis'}
+                          {tableName || 'Sipariş'}
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -187,8 +190,9 @@ export default function KitchenBulkPage() {
                           minWidth: 52,
                           padding: '3px 10px',
                           borderRadius: 999,
-                          background: '#eef2ff',
-                          color: '#1d4ed8',
+                          background: 'color-mix(in srgb, #2563eb 18%, var(--app-surface))',
+                          color: 'var(--app-text)',
+                          border: '1px solid color-mix(in srgb, #2563eb 38%, var(--app-border))',
                           fontWeight: 800,
                           fontSize: 14
                         }}
@@ -220,8 +224,8 @@ export default function KitchenBulkPage() {
   )
 
   return (
-    <div className="main">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+    <div className="main theme-page">
+      <div className="theme-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, padding: 12, borderRadius: 16 }}>
         <div>
           <h3 style={{ margin: 0 }}>{'Toplu Ürün Hazırlama'}</h3>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{`${totalCards} ürün`}</div>
@@ -246,15 +250,15 @@ export default function KitchenBulkPage() {
         </div>
       </div>
 
-      {error && <div className="card" style={{ borderColor: '#ef4444', color: '#ef4444', marginBottom: 12 }}>{error}</div>}
+      {error && <div className="card theme-card" style={{ borderColor: '#ef4444', color: '#fca5a5', marginBottom: 12 }}>{error}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 10 }}>
-          <div className="card" style={{ fontWeight: 800 }}>Ocaga Atilmamis Urunler</div>
+          <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocağa Atılmamış Urunler</div>
           {renderBulkCards(waitingItems, 'waiting')}
         </div>
         <div style={{ display: 'grid', gap: 10 }}>
-          <div className="card" style={{ fontWeight: 800 }}>Ocaktaki Urunler</div>
+          <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocaktaki Urunler</div>
           {renderBulkCards(stoveItems, 'cooking')}
         </div>
       </div>

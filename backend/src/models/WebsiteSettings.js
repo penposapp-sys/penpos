@@ -1,0 +1,80 @@
+import mongoose from 'mongoose'
+
+const featureSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  icon: { type: String, default: '' },
+  title: { type: String, default: '' },
+  text: { type: String, default: '' },
+  sortOrder: { type: Number, default: 0 },
+  active: { type: Boolean, default: true }
+}, { _id: false })
+
+const systemCardSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  type: { type: String, enum: ['restaurant', 'market'], required: true },
+  title: { type: String, default: '' },
+  description: { type: String, default: '' },
+  bullets: { type: [String], default: [] },
+  active: { type: Boolean, default: true }
+}, { _id: false })
+
+const pricingPlanSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, default: '' },
+  price: { type: String, default: '' },
+  period: { type: String, default: '' },
+  description: { type: String, default: '' },
+  items: { type: [String], default: [] },
+  popular: { type: Boolean, default: false },
+  buttonText: { type: String, default: '' },
+  buttonUrl: { type: String, default: '' },
+  active: { type: Boolean, default: true },
+  sortOrder: { type: Number, default: 0 }
+}, { _id: false })
+
+const trainingVideoSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  title: { type: String, default: '' },
+  description: { type: String, default: '' },
+  youtubeUrl: { type: String, default: '' },
+  category: { type: String, enum: ['general', 'restaurant', 'market'], default: 'general' },
+  active: { type: Boolean, default: true },
+  sortOrder: { type: Number, default: 0 }
+}, { _id: false })
+
+const integrationSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, default: '' },
+  description: { type: String, default: '' },
+  active: { type: Boolean, default: true },
+  sortOrder: { type: Number, default: 0 }
+}, { _id: false })
+
+const schema = new mongoose.Schema({
+  key: { type: String, default: 'primary', unique: true, index: true },
+  siteTitle: { type: String, default: '' },
+  siteDescription: { type: String, default: '' },
+  heroTitle: { type: String, default: '' },
+  heroDescription: { type: String, default: '' },
+  trialDays: { type: Number, default: 7 },
+  primaryCtaText: { type: String, default: '' },
+  secondaryCtaText: { type: String, default: '' },
+  restaurantLoginUrl: { type: String, default: '/login?type=restaurant' },
+  marketLoginUrl: { type: String, default: '/login?type=market' },
+  registerUrl: { type: String, default: '/register' },
+  whatsappUrl: { type: String, default: '' },
+  phone: { type: String, default: '' },
+  email: { type: String, default: '' },
+  address: { type: String, default: '' },
+  features: { type: [featureSchema], default: [] },
+  systemCards: { type: [systemCardSchema], default: [] },
+  pricingPlans: { type: [pricingPlanSchema], default: [] },
+  trainingVideos: { type: [trainingVideoSchema], default: [] },
+  integrations: { type: [integrationSchema], default: [] },
+  seoTitle: { type: String, default: '' },
+  seoDescription: { type: String, default: '' },
+  seoKeywords: { type: String, default: '' },
+  isPublished: { type: Boolean, default: true }
+}, { collection: 'website_settings', timestamps: true })
+
+export default mongoose.model('WebsiteSettings', schema)

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/apiClient.js'
 import { getPermissionLabel } from '../utils/permissionLabels.js'
+import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 
 const PERMS = [
   { key: 'canteen_pos_access', label: 'POS' },
@@ -21,14 +22,16 @@ export default function CanteenStaffPage() {
 
   const permSet = useMemo(() => new Set(permissions), [permissions])
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setLoading(true)
     const res = await api('/api/canteen/staff', { silent: true, skipBranchHeader: true })
     setItems(Array.isArray(res?.staff) ? res.staff : [])
-    setLoading(false)
+    if (!background) setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: true })
 
   const togglePerm = (p) => {
     setPermissions(prev => {
@@ -73,7 +76,7 @@ export default function CanteenStaffPage() {
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanıcı Adı</div>
-            <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ornek: kantin1" />
+            <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ornek: magaza1" />
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta</div>

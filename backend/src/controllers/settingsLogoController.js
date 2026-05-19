@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
-import Tenant from '../models/Tenant.js'
 import { error } from '../utils/errors.js'
+import { syncTenantLogoSettings, removeTenantLogoFiles } from '../services/businessSettingsService.js'
 
 const MAX_BYTES = 2 * 1024 * 1024
 const ALLOWED_MIME = new Map([
@@ -12,12 +12,6 @@ const ALLOWED_MIME = new Map([
 
 const ensureDir = async (dir) => {
   await fs.mkdir(dir, { recursive: true })
-}
-
-const safeUnlink = async (filePath) => {
-  try {
-    await fs.unlink(filePath)
-  } catch {}
 }
 
 const getTenantDir = (tenantId) => path.join(process.cwd(), 'uploads', `tenant-${tenantId}`)
@@ -51,26 +45,27 @@ export const uploadLogo = async (req, res) => {
   await fs.writeFile(target, file.buffer)
 
   const logoUrl = normalizePublicLogoUrl(tenantId, ext)
-  const t = await Tenant.findByIdAndUpdate(tenantId, { logoUrl }, { new: true })
+  const logo = await syncTenantLogoSettings(tenantId, {
+    url: logoUrl,
+    fileName: filename,
+    mimeType: mime,
+    size: file.buffer.length,
+  })
+  const t = await Tenant.findById(tenantId).lean()
   if (!t) throw error('not_found', 'Tenant not found', 404)
 
-  return res.json({ success: true, logoUrl })
+  return res.json({ success: true, logoUrl, logo })
 }
 
 export const removeLogo = async (req, res) => {
   const tenantId = req.user?.tenantId
   if (!tenantId) throw error('missing_tenant', 'Tenant required', 403)
 
-  const dir = getTenantDir(tenantId)
-  await Promise.all([
-    safeUnlink(path.join(dir, 'logo.png')),
-    safeUnlink(path.join(dir, 'logo.jpg')),
-    safeUnlink(path.join(dir, 'logo.webp'))
-  ])
+  await removeTenantLogoFiles(tenantId)
 
-  const t = await Tenant.findByIdAndUpdate(tenantId, { logoUrl: '' }, { new: true })
+  const logo = await syncTenantLogoSettings(tenantId, { url: '', fileName: '', mimeType: '', size: 0 })
+  const t = await Tenant.findById(tenantId).lean()
   if (!t) throw error('not_found', 'Tenant not found', 404)
 
-  return res.json({ success: true, logoUrl: '' })
+  return res.json({ success: true, logoUrl: '', logo })
 }
-

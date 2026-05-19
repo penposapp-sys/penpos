@@ -3,7 +3,12 @@ import { sendError } from '../utils/errors.js'
 
 export const list = async (req, res) => {
   try {
-    const items = await listCategories(req.user.tenantId, req.query || {})
+    const query = {
+      ...(req.query || {}),
+      branchIds: req.query?.branchIds,
+      branchId: req.query?.branchId || req.branch?.id || null
+    }
+    const items = await listCategories(req.user.tenantId, query)
     res.json({ categories: items })
   } catch (err) {
     sendError(res, err)

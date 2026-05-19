@@ -3,7 +3,6 @@ export const paymentLabel = (key) => {
   if (t === 'cash') return 'Nakit'
   if (t === 'pos' || t === 'card') return 'POS'
   if (t === 'bank') return 'Banka'
-  if (t === 'account') return 'Cari / Veresiye'
+  if (t === 'account' || t === 'credit') return 'Cari / Veresiye'
   return String(key || '')
 }
-

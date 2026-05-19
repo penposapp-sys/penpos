@@ -5,10 +5,16 @@ import AccountTransaction from '../models/AccountTransaction.js'
 import CustomerAccount from '../models/CustomerAccount.js'
 import mongoose from 'mongoose'
 import { ensureFeature, ensureNotExpired } from '../services/planService.js'
+import { normalizePaymentMethod } from '../services/paymentSettingsService.js'
 import { applyBranchFilter, buildBranchMatch } from '../utils/branchFilter.js'
 import { normalizeMethod } from '../utils/paymentMethodMap.js'
 import { addDaysLocal, getLocalRangeExclusive, startOfDayLocal } from '../utils/dateRange.js'
 import XLSX from 'xlsx'
+import { findTenantById } from '../repositories/tenantRepository.js'
+import { findAllByTenantAny as listReportBranchesByTenant } from '../repositories/branchRepository.js'
+import MenuItem from '../models/MenuItem.js'
+import User from '../models/User.js'
+import { buildZReportThermalPayload } from '../utils/zReportFormatter.js'
 
 const toYmd = (d) => {
   const dt = d instanceof Date ? d : new Date(d)
@@ -43,6 +49,191 @@ const toMoneySafe = (v) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
 }
+
+const roundMoney = (value) => Math.round(toMoneySafe(value) * 100) / 100
+
+const computeActiveGrossTotal = (items = []) => {
+  const safeItems = Array.isArray(items) ? items : []
+  return safeItems
+    .filter((it) => it && String(it.status || '') !== 'cancelled')
+    .reduce((sum, it) => {
+      const qty = Math.max(0, toMoneySafe(it?.qty || 0))
+      const subtotal = toMoneySafe(it?.subtotal)
+      const fallbackSubtotal = qty > 0 ? (toMoneySafe(it?.priceSnapshot) * qty) : toMoneySafe(it?.priceSnapshot)
+      return sum + (subtotal > 0 ? subtotal : fallbackSubtotal)
+    }, 0)
+}
+
+const computeOrderDiscountAmount = (order) => {
+  const grossTotal = computeActiveGrossTotal(order?.items)
+  const pct = Math.max(0, Math.min(100, toMoneySafe(order?.discountPercent)))
+  return Math.max(0, (grossTotal * pct) / 100)
+}
+
+const normalizeText = (value) => String(value || '')
+  .trim()
+  .toLocaleLowerCase('tr-TR')
+
+const buildFirstNonEmptyStringExpr = (candidates, fallback = 'Bilinmeyen Ürün') => (
+  (Array.isArray(candidates) ? candidates : []).reduceRight((acc, candidate) => ({
+    $let: {
+      vars: {
+        value: {
+          $trim: {
+            input: {
+              $convert: {
+                input: candidate,
+                to: 'string',
+                onError: '',
+                onNull: ''
+              }
+            }
+          }
+        }
+      },
+      in: {
+        $cond: [
+          { $gt: [{ $strLenCP: '$$value' }, 0] },
+          '$$value',
+          acc
+        ]
+      }
+    }
+  }), fallback)
+)
+
+const buildZReportPaymentSummary = () => ({
+  cash: 0,
+  card: 0,
+  mealCard: 0,
+  online: 0,
+  credit: 0
+})
+
+const buildZReportChannelSummary = () => ({
+  table: 0,
+  takeaway: 0,
+  pickup: 0
+})
+
+const classifyZReportPayment = (payment) => {
+  const method = normalizeText(payment?.method)
+  const label = normalizeText(payment?.methodLabel)
+  const bucket = normalizeText(payment?.methodBucket)
+  const combined = `${method} ${label} ${bucket}`
+
+  if (combined.includes('yemek') || combined.includes('meal')) return 'mealCard'
+  if (combined.includes('online') || combined.includes('web') || combined.includes('link')) return 'online'
+  if (bucket === 'cash' || method === 'cash' || method === 'nakit') return 'cash'
+  if (bucket === 'account' || method === 'account' || method === 'veresiye') return 'credit'
+  if (bucket === 'bank') return 'card'
+  if (bucket === 'card' || bucket === 'pos' || method === 'card' || method === 'kart' || method === 'pos' || method === 'credit' || combined.includes('kredi')) return 'card'
+  return 'card'
+}
+
+const toReportDateExpr = {
+  $ifNull: [
+    '$closedAt',
+    {
+      $ifNull: [
+        '$paidAt',
+        { $ifNull: ['$updatedAt', '$createdAt'] }
+      ]
+    }
+  ]
+}
+
+const buildZReportAllowedBranchScope = async (req) => {
+  const tenantId = req.user?.tenantId
+  const tenant = await findTenantById(tenantId)
+  const tenantAllowed = Array.isArray(tenant?.allowedBranchIds) ? tenant.allowedBranchIds.map(String) : []
+  const staffAllowed = String(req.user?.role || '') === 'staff'
+    ? (Array.isArray(req.user?.branchIds) && req.user.branchIds.length > 0
+      ? req.user.branchIds.map(String)
+      : (req.user?.branchId ? [String(req.user.branchId)] : []))
+    : null
+  const effectiveAllowed = staffAllowed
+    ? tenantAllowed.filter((id) => staffAllowed.includes(String(id)))
+    : tenantAllowed
+
+  const activeBranches = await listReportBranchesByTenant(tenantId)
+  const activeBranchMap = new Map((activeBranches || []).map((branch) => [String(branch._id), branch]))
+  const activeAllowed = effectiveAllowed.filter((id) => activeBranchMap.has(String(id)))
+
+  const requestedBranchId = String(req.query?.branchId || '').trim()
+  if (requestedBranchId && requestedBranchId !== 'all') {
+    if (!mongoose.Types.ObjectId.isValid(requestedBranchId)) {
+      const err = new Error('Invalid branch id')
+      err.status = 400
+      err.payload = { code: 'invalid_request', message: 'Invalid branch id' }
+      throw err
+    }
+    if (!activeAllowed.includes(requestedBranchId)) {
+      const err = new Error('Branch not allowed')
+      err.status = 403
+      err.payload = { code: 'branch_not_allowed', message: 'Bu şubeye erişim yetkin yok' }
+      throw err
+    }
+    return {
+      branchId: requestedBranchId,
+      branchName: String(activeBranchMap.get(requestedBranchId)?.name || 'Şube'),
+      branchIds: [requestedBranchId],
+      activeBranchMap,
+      tenant
+    }
+  }
+
+  if (activeAllowed.length === 0) {
+    const err = new Error('No active branches')
+    err.status = 403
+    err.payload = { code: 'no_allowed_branches', message: 'Kullanıcıya atanmış aktif şube yok' }
+    throw err
+  }
+
+  return {
+    branchId: 'all',
+    branchName: 'Tüm Şubeler',
+    branchIds: activeAllowed,
+    activeBranchMap,
+    tenant
+  }
+}
+
+const pushMoney = (target, key, amount) => {
+  target[key] = roundMoney(toMoneySafe(target[key]) + toMoneySafe(amount))
+}
+
+const createPaymentBreakdownMap = () => new Map()
+
+const pushPaymentBreakdown = (map, payment, amountOverride = null) => {
+  const amount = amountOverride === null ? toMoneySafe(payment?.amount) : toMoneySafe(amountOverride)
+  if (amount <= 0) return
+  const normalized = normalizePaymentMethod(payment || {})
+  const methodId = String(normalized?.methodId || payment?.methodId || payment?.method || 'other').trim() || 'other'
+  const methodName = String(normalized?.methodName || payment?.methodName || payment?.methodLabel || 'Diğer').trim() || 'Diğer'
+  const methodType = String(normalized?.methodType || payment?.methodType || 'other').trim() || 'other'
+  const key = `${methodId}::${methodName}`
+  const current = map.get(key) || {
+    methodId,
+    methodName,
+    methodType,
+    totalAmount: 0,
+    count: 0,
+  }
+  current.totalAmount += amount
+  current.count += 1
+  map.set(key, current)
+}
+
+const finalizePaymentBreakdown = (map) => Array.from(map.values())
+  .map((row) => ({
+    methodId: row.methodId,
+    methodName: row.methodName,
+    methodType: row.methodType,
+    totalAmount: roundMoney(row.totalAmount),
+    count: Number(row.count || 0),
+  }))
+  .sort((a, b) => (b.totalAmount - a.totalAmount) || (b.count - a.count) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
 
 const buildScopedMatches = (tenantId, branchIds = []) => {
   const tenantIdStr = String(tenantId || '')
@@ -103,6 +294,11 @@ const parseLegacyManualProductNote = (note, amount) => {
 
 const aggregateOrderProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
   const { tenantMatch, branchMatch } = buildScopedMatches(tenantId, branchIds)
+  const nameExpr = buildFirstNonEmptyStringExpr([
+    '$items.nameSnapshot',
+    '$items.productName',
+    '$mi.name'
+  ])
   const menuItemIdExpr = {
     $cond: [
       { $eq: [{ $type: '$items.menuItemId' }, 'objectId'] },
@@ -253,7 +449,7 @@ const aggregateOrderProducts = async ({ tenantId, branchIds, fromDate, toDate })
         _id: '$menuItemIdObj',
         productId: { $first: '$menuItemIdObj' },
         menuItemId: { $first: '$menuItemIdObj' },
-        name: { $first: { $ifNull: ['$items.nameSnapshot', { $ifNull: ['$mi.name', 'Bilinmeyen Ürün'] }] } },
+        name: { $first: nameExpr },
         qty: { $sum: qtyExpr },
         revenue: { $sum: revenueExpr }
       }
@@ -277,6 +473,9 @@ const aggregateOrderProducts = async ({ tenantId, branchIds, fromDate, toDate })
 
 const aggregateManualAccountProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
   const { tenantMatch, branchMatch } = buildScopedMatches(tenantId, branchIds)
+  const nameExpr = buildFirstNonEmptyStringExpr([
+    '$lines.name'
+  ])
   const menuItemIdExpr = {
     $cond: [
       { $eq: [{ $type: '$lines.menuItemId' }, 'objectId'] },
@@ -342,7 +541,7 @@ const aggregateManualAccountProducts = async ({ tenantId, branchIds, fromDate, t
         _id: '$menuItemIdObj',
         productId: { $first: '$menuItemIdObj' },
         menuItemId: { $first: '$menuItemIdObj' },
-        name: { $first: { $ifNull: ['$lines.name', 'Bilinmeyen Ürün'] } },
+        name: { $first: nameExpr },
         qty: { $sum: qtyExpr },
         revenue: { $sum: revenueExpr }
       }
@@ -389,6 +588,11 @@ const aggregateLegacyManualAccountProducts = async ({ tenantId, branchIds, fromD
 
 const aggregateCancelledOrderProducts = async ({ tenantId, branchIds, fromDate, toDate }) => {
   const { tenantMatch, branchMatch } = buildScopedMatches(tenantId, branchIds)
+  const nameExpr = buildFirstNonEmptyStringExpr([
+    '$items.nameSnapshot',
+    '$items.productName',
+    '$mi.name'
+  ])
   const menuItemIdExpr = {
     $cond: [
       { $eq: [{ $type: '$items.menuItemId' }, 'objectId'] },
@@ -500,7 +704,7 @@ const aggregateCancelledOrderProducts = async ({ tenantId, branchIds, fromDate, 
         _id: '$menuItemIdObj',
         productId: { $first: '$menuItemIdObj' },
         menuItemId: { $first: '$menuItemIdObj' },
-        name: { $first: { $ifNull: ['$items.nameSnapshot', { $ifNull: ['$mi.name', 'Bilinmeyen Ürün'] }] } },
+        name: { $first: nameExpr },
         qty: { $sum: qtyExpr },
         revenue: { $sum: revenueExpr }
       }
@@ -721,13 +925,18 @@ export const dashboard = async (req, res) => {
     const effectiveDateExpr = { $ifNull: ['$closedAt', '$updatedAt'] }
     let filter = {
       tenantId: req.user.tenantId,
-      status: { $in: ['closed', 'completed'] },
       $expr: {
         $and: [
           { $gte: [effectiveDateExpr, from] },
           { $lt: [effectiveDateExpr, to] }
         ]
-      }
+      },
+      $or: [
+        { status: { $in: ['closed', 'completed', 'paid'] } },
+        { paymentStatus: 'paid' },
+        { settlementType: 'veresiye' },
+        { 'payments.0': { $exists: true } }
+      ]
     }
     filter = applyBranchFilter(filter, branchIds)
 
@@ -735,14 +944,27 @@ export const dashboard = async (req, res) => {
       .select({ items: 1, discountPercent: 1, payments: 1, settlementType: 1, createdAt: 1, closedAt: 1, updatedAt: 1, saleType: 1 })
       .lean()
 
-    const computeNetTotal = (order) => {
-      const items = Array.isArray(order?.items) ? order.items : []
-      const itemsTotal = items
-        .filter(it => it && it.status !== 'cancelled')
-        .reduce((sum, it) => sum + toMoneySafe(it.subtotal), 0)
-      const pct = Math.max(0, Math.min(100, toMoneySafe(order?.discountPercent)))
-      const net = itemsTotal - (itemsTotal * pct) / 100
-      return Math.max(0, net)
+    const discountOnlyFilter = applyBranchFilter({
+      tenantId: req.user.tenantId,
+      discountPercent: { $gt: 0 },
+      status: { $nin: ['cancelled', 'merged'] },
+      $expr: {
+        $and: [
+          { $gte: [effectiveDateExpr, from] },
+          { $lt: [effectiveDateExpr, to] }
+        ]
+      }
+    }, branchIds)
+
+    const discountOnlyOrders = await Order.find(discountOnlyFilter)
+      .select({ _id: 1, items: 1, discountPercent: 1 })
+      .lean()
+
+    const computeOrderFinancials = (order) => {
+      const grossTotal = computeActiveGrossTotal(order?.items)
+      const discountTotal = computeOrderDiscountAmount(order)
+      const netTotal = Math.max(0, grossTotal - discountTotal)
+      return { grossTotal, discountTotal, netTotal }
     }
 
     const hourFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' })
@@ -758,6 +980,7 @@ export const dashboard = async (req, res) => {
     const sales = {
       totalRevenue: 0,
       totalPaid: 0,
+      discountTotal: 0,
       collectedTotal: 0,
       accountChargedTotal: 0,
       accountCollectionTotal: 0,
@@ -765,6 +988,8 @@ export const dashboard = async (req, res) => {
       balanceDueSigned: 0,
       byMethod: { cash: 0, pos: 0, bank: 0, account: 0 },
       collectedByMethod: { cash: 0, pos: 0, bank: 0, account: 0 },
+      paymentBreakdownMap: createPaymentBreakdownMap(),
+      collectedPaymentBreakdownMap: createPaymentBreakdownMap(),
       currentAccountBalance: 0,
       orderCount: 0
     }
@@ -775,7 +1000,9 @@ export const dashboard = async (req, res) => {
     for (const o of orders) {
       sales.orderCount += 1
 
-      const netTotalEffective = computeNetTotal(o)
+      const { discountTotal, netTotal } = computeOrderFinancials(o)
+      const netTotalEffective = netTotal
+      sales.discountTotal += discountTotal
       sales.totalRevenue += netTotalEffective
 
       const payments = Array.isArray(o?.payments) ? o.payments : []
@@ -789,14 +1016,17 @@ export const dashboard = async (req, res) => {
           nonAccountPaid += amt
           sales.collectedByMethod[bucket] = toMoneySafe(sales.collectedByMethod[bucket]) + amt
           sales.collectedTotal += amt
+          pushPaymentBreakdown(sales.collectedPaymentBreakdownMap, p)
         }
         sales.byMethod[bucket] = toMoneySafe(sales.byMethod[bucket]) + amt
+        pushPaymentBreakdown(sales.paymentBreakdownMap, p)
       }
 
       const isAccountSettlement = String(o?.settlementType || '') === 'veresiye'
       const implicitAccount = isAccountSettlement ? Math.max(0, netTotalEffective - (nonAccountPaid + accountPaidExplicit)) : 0
       if (implicitAccount > 0) {
         sales.byMethod.account = toMoneySafe(sales.byMethod.account) + implicitAccount
+        pushPaymentBreakdown(sales.paymentBreakdownMap, { methodId: 'credit', methodName: 'Veresiye', methodType: 'credit' }, implicitAccount)
       }
       const totalPaidOrder = nonAccountPaid + accountPaidExplicit + implicitAccount
       sales.totalPaid += totalPaidOrder
@@ -822,6 +1052,13 @@ export const dashboard = async (req, res) => {
       const effectiveTs = o.closedAt || o.updatedAt || o.createdAt
       const hh = getHour(effectiveTs)
       hourlyCounts.set(hh, (hourlyCounts.get(hh) || 0) + 1)
+    }
+
+    const includedOrderIds = new Set(orders.map((order) => String(order?._id || '')))
+    for (const discountOrder of discountOnlyOrders) {
+      const discountOrderId = String(discountOrder?._id || '')
+      if (!discountOrderId || includedOrderIds.has(discountOrderId)) continue
+      sales.discountTotal += computeOrderDiscountAmount(discountOrder)
     }
 
     const collectionFilterBase = applyBranchFilter({
@@ -881,6 +1118,7 @@ export const dashboard = async (req, res) => {
       sales.collectedByMethod[bucket] = toMoneySafe(sales.collectedByMethod[bucket]) + amt
       sales.collectedTotal += amt
       sales.accountCollectionTotal += amt
+      pushPaymentBreakdown(sales.collectedPaymentBreakdownMap, tx)
     }
 
     for (const tx of accountChargeRows || []) {
@@ -908,6 +1146,7 @@ export const dashboard = async (req, res) => {
       sales: {
         totalRevenue: toMoneySafe(sales.totalRevenue),
         totalPaid: toMoneySafe(sales.totalPaid),
+        discountTotal: toMoneySafe(sales.discountTotal),
         collectedTotal: toMoneySafe(sales.collectedTotal),
         accountChargedTotal: toMoneySafe(sales.accountChargedTotal),
         accountCollectionTotal: toMoneySafe(sales.accountCollectionTotal),
@@ -925,6 +1164,8 @@ export const dashboard = async (req, res) => {
           bank: toMoneySafe(sales.collectedByMethod.bank),
           account: toMoneySafe(sales.collectedByMethod.account)
         },
+        paymentBreakdown: finalizePaymentBreakdown(sales.paymentBreakdownMap),
+        collectedPaymentBreakdown: finalizePaymentBreakdown(sales.collectedPaymentBreakdownMap),
         currentAccountBalance: toMoneySafe(sales.currentAccountBalance),
         orderCount: Number(sales.orderCount || 0)
       },
@@ -1124,6 +1365,263 @@ export const products = async (req, res) => {
   }
 }
 
+export const zReport = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'reports')
+
+    const reportDate = String(req.query?.date || '').trim()
+    const from = startOfDayLocal(reportDate)
+    if (!from) {
+      return res.status(400).json({ success: false, code: 'invalid_request', message: 'date required (YYYY-MM-DD)' })
+    }
+    const to = addDaysLocal(from, 1)
+
+    const scope = await buildZReportAllowedBranchScope(req)
+
+    let filter = {
+      tenantId: req.user.tenantId,
+      $expr: {
+        $and: [
+          { $gte: [toReportDateExpr, from] },
+          { $lt: [toReportDateExpr, to] }
+        ]
+      },
+      $or: [
+        { status: { $in: ['closed', 'completed'] } },
+        { paymentStatus: 'paid' },
+        { settlementType: 'veresiye' },
+        { 'payments.0': { $exists: true } }
+      ]
+    }
+    filter = applyBranchFilter(filter, scope.branchIds)
+
+    const orders = await Order.find(filter)
+      .select({
+        _id: 1,
+        branchId: 1,
+        branchName: 1,
+        createdBy: 1,
+        createdByUserId: 1,
+        createdByUserName: 1,
+        createdByName: 1,
+        items: 1,
+        discountPercent: 1,
+        payments: 1,
+        settlementType: 1,
+        saleType: 1
+      })
+      .lean()
+
+    let discountOnlyFilter = {
+      tenantId: req.user.tenantId,
+      discountPercent: { $gt: 0 },
+      status: { $nin: ['cancelled', 'merged'] },
+      $expr: {
+        $and: [
+          { $gte: [toReportDateExpr, from] },
+          { $lt: [toReportDateExpr, to] }
+        ]
+      }
+    }
+    discountOnlyFilter = applyBranchFilter(discountOnlyFilter, scope.branchIds)
+
+    const discountOnlyOrders = await Order.find(discountOnlyFilter)
+      .select({ _id: 1, items: 1, discountPercent: 1 })
+      .lean()
+
+    const menuItemIds = Array.from(new Set(
+      orders.flatMap((order) => (Array.isArray(order?.items) ? order.items : []).map((item) => String(item?.menuItemId || '')).filter(Boolean))
+    )).filter((id) => mongoose.Types.ObjectId.isValid(id))
+
+    const staffIds = Array.from(new Set(
+      orders.map((order) => String(order?.createdByUserId || order?.createdBy || '')).filter((id) => mongoose.Types.ObjectId.isValid(id))
+    ))
+
+    const [menuItems, users] = await Promise.all([
+      menuItemIds.length > 0
+        ? MenuItem.find({ tenantId: req.user.tenantId, _id: { $in: menuItemIds } }).select({ name: 1, vatRate: 1 }).lean()
+        : [],
+      staffIds.length > 0
+        ? User.find({ tenantId: req.user.tenantId, _id: { $in: staffIds } }).select({ name: 1 }).lean()
+        : []
+    ])
+
+    const menuItemMap = new Map((menuItems || []).map((item) => [String(item._id), item]))
+    const userMap = new Map((users || []).map((user) => [String(user._id), String(user.name || '')]))
+
+    const summary = {
+      orderCount: 0,
+      productCount: 0,
+      grossSales: 0,
+      discountTotal: 0,
+      cancelTotal: 0,
+      netSales: 0,
+      payments: buildZReportPaymentSummary(),
+      paymentBreakdownMap: createPaymentBreakdownMap(),
+      salesChannels: buildZReportChannelSummary(),
+      vatBreakdown: []
+    }
+
+    const topProductMap = new Map()
+    const staffTotalsMap = new Map()
+    const branchTotalsMap = new Map()
+    const vatMap = new Map()
+
+    for (const order of orders) {
+      const branchId = String(order?.branchId || '')
+      const branchName = String(order?.branchName || scope.activeBranchMap.get(branchId)?.name || 'Silinmi_ ^ube')
+      const branchTotals = branchTotalsMap.get(branchId) || { branchName, orderCount: 0, netSales: 0 }
+      branchTotals.orderCount += 1
+      summary.orderCount += 1
+
+      const items = Array.isArray(order?.items) ? order.items : []
+      const activeItems = items.filter((item) => item && String(item.status || '') !== 'cancelled')
+      const cancelledItems = items.filter((item) => item && String(item.status || '') === 'cancelled')
+
+      const activeGross = activeItems.reduce((sum, item) => sum + toMoneySafe(item?.subtotal), 0)
+      const cancelledGross = cancelledItems.reduce((sum, item) => sum + toMoneySafe(item?.subtotal), 0)
+      const grossSales = activeGross + cancelledGross
+      const discountTotal = Math.max(0, activeGross * Math.max(0, Math.min(100, toMoneySafe(order?.discountPercent))) / 100)
+      const netSales = Math.max(0, grossSales - cancelledGross - discountTotal)
+
+      summary.grossSales += grossSales
+      summary.discountTotal += discountTotal
+      summary.cancelTotal += cancelledGross
+      summary.netSales += netSales
+      branchTotals.netSales += netSales
+
+      for (const item of activeItems) {
+        const qty = Math.max(0, toMoneySafe(item?.qty || 0))
+        const revenue = toMoneySafe(item?.subtotal)
+        summary.productCount += qty
+
+        const productName = String(item?.productName || item?.nameSnapshot || menuItemMap.get(String(item?.menuItemId || ''))?.name || 'Silinmiş Ürün')
+        const productKey = `${String(item?.menuItemId || 'manual')}|${productName}`
+        const productRow = topProductMap.get(productKey) || { name: productName, quantity: 0, total: 0 }
+        productRow.quantity += qty
+        productRow.total += revenue
+        topProductMap.set(productKey, productRow)
+
+        const vatRate = Number(menuItemMap.get(String(item?.menuItemId || ''))?.vatRate || 0)
+        const discountShare = activeGross > 0 ? (revenue / activeGross) * discountTotal : 0
+        const discountedRevenue = Math.max(0, revenue - discountShare)
+        const vatBase = vatRate > 0 ? (discountedRevenue / (1 + vatRate / 100)) : discountedRevenue
+        const vatAmount = Math.max(0, discountedRevenue - vatBase)
+        const vatRow = vatMap.get(String(vatRate)) || { rate: vatRate, amount: 0, vat: 0 }
+        vatRow.amount += vatBase
+        vatRow.vat += vatAmount
+        vatMap.set(String(vatRate), vatRow)
+      }
+
+      const payments = Array.isArray(order?.payments) ? order.payments : []
+      let explicitPaidTotal = 0
+      for (const payment of payments) {
+        const amount = toMoneySafe(payment?.amount)
+        const bucket = classifyZReportPayment(payment)
+        pushMoney(summary.payments, bucket, amount)
+        pushPaymentBreakdown(summary.paymentBreakdownMap, payment)
+        explicitPaidTotal += amount
+      }
+
+      const implicitCredit = String(order?.settlementType || '') === 'veresiye'
+        ? Math.max(0, netSales - explicitPaidTotal)
+        : 0
+      if (implicitCredit > 0) {
+        pushMoney(summary.payments, 'credit', implicitCredit)
+        pushPaymentBreakdown(summary.paymentBreakdownMap, { methodId: 'credit', methodName: 'Veresiye', methodType: 'credit' }, implicitCredit)
+      }
+
+      const saleType = String(order?.saleType || 'table')
+      if (saleType === 'delivery') pushMoney(summary.salesChannels, 'takeaway', netSales)
+      else if (saleType === 'walkin') pushMoney(summary.salesChannels, 'pickup', netSales)
+      else pushMoney(summary.salesChannels, 'table', netSales)
+
+      const staffId = String(order?.createdByUserId || order?.createdBy || '')
+      const staffName = String(order?.createdByUserName || order?.createdByName || userMap.get(staffId) || 'Silinmi_ Personel')
+      const staffRow = staffTotalsMap.get(staffName) || { staffName, orderCount: 0, total: 0 }
+      staffRow.orderCount += 1
+      staffRow.total += netSales
+      staffTotalsMap.set(staffName, staffRow)
+
+      branchTotalsMap.set(branchId, branchTotals)
+    }
+
+    const includedOrderIds = new Set(orders.map((order) => String(order?._id || '')))
+    for (const discountOrder of discountOnlyOrders) {
+      const discountOrderId = String(discountOrder?._id || '')
+      if (!discountOrderId || includedOrderIds.has(discountOrderId)) continue
+      summary.discountTotal += computeOrderDiscountAmount(discountOrder)
+    }
+
+    summary.grossSales = roundMoney(summary.grossSales)
+    summary.discountTotal = roundMoney(summary.discountTotal)
+    summary.cancelTotal = roundMoney(summary.cancelTotal)
+    summary.netSales = roundMoney(summary.netSales)
+    summary.vatBreakdown = Array.from(vatMap.values())
+      .map((row) => ({
+        rate: Number(row.rate || 0),
+        amount: roundMoney(row.amount),
+        vat: roundMoney(row.vat)
+      }))
+      .sort((a, b) => a.rate - b.rate)
+
+    const businessName = String(scope.tenant?.settings?.general?.companyName || scope.tenant?.name || 'PENPOS')
+    const responsePayload = {
+      date: reportDate,
+      branchId: scope.branchId,
+      branchName: scope.branchName,
+      businessName,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        ...summary,
+        payments: {
+          cash: roundMoney(summary.payments.cash),
+          card: roundMoney(summary.payments.card),
+          mealCard: roundMoney(summary.payments.mealCard),
+          online: roundMoney(summary.payments.online),
+          credit: roundMoney(summary.payments.credit)
+        },
+        paymentBreakdown: finalizePaymentBreakdown(summary.paymentBreakdownMap),
+        salesChannels: {
+          table: roundMoney(summary.salesChannels.table),
+          takeaway: roundMoney(summary.salesChannels.takeaway),
+          pickup: roundMoney(summary.salesChannels.pickup)
+        }
+      },
+      topProducts: Array.from(topProductMap.values())
+        .map((row) => ({
+          name: row.name,
+          quantity: roundMoney(row.quantity),
+          total: roundMoney(row.total)
+        }))
+        .sort((a, b) => (b.quantity - a.quantity) || (b.total - a.total) || String(a.name).localeCompare(String(b.name), 'tr'))
+        .slice(0, 10),
+      staffTotals: Array.from(staffTotalsMap.values())
+        .map((row) => ({
+          staffName: row.staffName,
+          orderCount: Number(row.orderCount || 0),
+          total: roundMoney(row.total)
+        }))
+        .sort((a, b) => (b.total - a.total) || (b.orderCount - a.orderCount) || String(a.staffName).localeCompare(String(b.staffName), 'tr')),
+      branchTotals: Array.from(branchTotalsMap.values())
+        .map((row) => ({
+          branchName: row.branchName,
+          orderCount: Number(row.orderCount || 0),
+          netSales: roundMoney(row.netSales)
+        }))
+        .sort((a, b) => (b.netSales - a.netSales) || String(a.branchName).localeCompare(String(b.branchName), 'tr'))
+    }
+
+    return res.json({
+      ...responsePayload,
+      thermal: buildZReportThermalPayload(responsePayload)
+    })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 const toFilenameTs = () => {
   const d = new Date()
   const y = d.getFullYear()
@@ -1251,7 +1749,7 @@ export const exportXlsx = async (req, res) => {
     const wb = XLSX.utils.book_new()
 
     const wsSummary = XLSX.utils.aoa_to_sheet([
-      ['Aralık', `${startYmd} → ${endYmd}`],
+      ['Aralık', `${startYmd} - ${endYmd}`],
       ['Sipariş', Number(sales.orderCount || 0)],
       [],
       ['Toplam Ciro', toMoneySafe(sales.totalRevenue)],

@@ -7,8 +7,8 @@ import mongoose from 'mongoose'
 
 export const summary = async (req, res) => {
   try {
-    const summary = await service.summary(req.user.tenantId, req.canteenBranchIds || [], req.query || {})
-    res.json({ success: true, summary })
+    const result = await service.summary(req.user.tenantId, req.canteenBranchIds || [], req.query || {})
+    res.json({ success: true, summary: result })
   } catch (err) {
     sendError(res, err)
   }
@@ -27,6 +27,15 @@ export const customers = async (req, res) => {
   try {
     const items = await service.customers(req.user.tenantId, req.canteenBranchIds || [])
     res.json({ success: true, items })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const zReport = async (req, res) => {
+  try {
+    const report = await service.zReport(req.user.tenantId, req.canteenBranchIds || [], req.query || {})
+    res.json({ success: true, ok: true, ...report })
   } catch (err) {
     sendError(res, err)
   }
@@ -63,54 +72,57 @@ export const exportAll = async (req, res) => {
     const customers = await customerService.listCustomers(req.user.tenantId)
 
     const productIds = topProducts
-      .map(p => String(p.productId || '').trim())
-      .filter(id => mongoose.isValidObjectId(id))
+      .map((item) => String(item.productId || '').trim())
+      .filter((id) => mongoose.isValidObjectId(id))
     const productRows = productIds.length > 0
-      ? await CanteenProduct.find({ tenantId: req.user.tenantId, _id: { $in: productIds.map(id => new mongoose.Types.ObjectId(id)) } }).select('_id barcode').lean()
+      ? await CanteenProduct.find({
+        tenantId: req.user.tenantId,
+        _id: { $in: productIds.map((id) => new mongoose.Types.ObjectId(id)) }
+      }).select('_id barcode').lean()
       : []
-    const barcodeById = new Map(productRows.map(r => [String(r._id), String(r.barcode || '')]))
+    const barcodeById = new Map(productRows.map((row) => [String(row._id), String(row.barcode || '')]))
 
     const wb = XLSX.utils.book_new()
 
-    const salesHeader = ['Tarih', 'İşlem Sayısı', 'Ciro', 'Ortalama Sepet', 'Nakit', 'POS', 'Banka', 'Cari/Veresiye']
-    const salesRows = (salesDaily.items || []).map(r => {
-      const by = r.byMethod || {}
-      const cash = Number(by.cash || 0)
-      const pos = Number(by.pos || 0) + Number(by.card || 0)
-      const bank = Number(by.bank || 0)
-      const account = Number(by.account || 0)
+    const paymentColumns = Array.isArray(salesDaily.methodColumns) ? salesDaily.methodColumns : []
+    const salesHeader = ['Tarih', 'İşlem Sayısı', 'Ciro', 'Ortalama Sepet', ...paymentColumns.map((item) => String(item?.name || item?.id || ''))]
+    const salesRows = (salesDaily.items || []).map((row) => {
+      const by = row.byMethod || {}
       return [
-        ymdToTr(r.day),
-        Number(r.saleCount || 0),
-        Number(r.totalRevenue || 0),
-        Number(r.avgBasket || 0),
-        cash,
-        pos,
-        bank,
-        account
+        ymdToTr(row.day),
+        Number(row.saleCount || 0),
+        Number(row.totalRevenue || 0),
+        Number(row.avgBasket || 0),
+        ...paymentColumns.map((item) => Number(by?.[String(item?.id || '')] || 0))
       ]
     })
     const wsSales = XLSX.utils.aoa_to_sheet([salesHeader, ...salesRows])
-    wsSales['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }]
-    XLSX.utils.book_append_sheet(wb, wsSales, 'Satış Raporu')
+    wsSales['!cols'] = [
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 16 },
+      ...paymentColumns.map((item) => ({ wch: Math.max(12, String(item?.name || '').length + 2) }))
+    ]
+    XLSX.utils.book_append_sheet(wb, wsSales, 'Satis Raporu')
 
-    const prodHeader = ['Ürün', 'Barkod', 'Adet', 'Ciro']
-    const prodRows = (topProducts || []).map(p => [
-      String(p.name || ''),
-      barcodeById.get(String(p.productId)) || '',
-      Number(p.qty || 0),
-      Number(p.total || 0)
+    const prodHeader = ['Urun', 'Barkod', 'Adet', 'Ciro']
+    const prodRows = (topProducts || []).map((item) => [
+      String(item.name || ''),
+      barcodeById.get(String(item.productId)) || '',
+      Number(item.qty || 0),
+      Number(item.total || 0)
     ])
     const wsProd = XLSX.utils.aoa_to_sheet([prodHeader, ...prodRows])
     wsProd['!cols'] = [{ wch: 32 }, { wch: 18 }, { wch: 10 }, { wch: 12 }]
-    XLSX.utils.book_append_sheet(wb, wsProd, 'En Çok Satılan Ürünler')
+    XLSX.utils.book_append_sheet(wb, wsProd, 'En Cok Satilan Urunler')
 
-    const custHeader = ['Cari Adı', 'Telefon', 'Borç/Bakiye', 'Son İşlem Tarihi']
-    const custRows = (customers || []).map(c => [
-      String(c.name || ''),
-      String(c.phone || ''),
-      Number(c.balance || 0),
-      c.lastActionAt ? new Date(c.lastActionAt).toLocaleString('tr-TR') : ''
+    const custHeader = ['Cari Adi', 'Telefon', 'Borc/Bakiye', 'Son Islem Tarihi']
+    const custRows = (customers || []).map((customer) => [
+      String(customer.name || ''),
+      String(customer.phone || ''),
+      Number(customer.balance || 0),
+      customer.lastActionAt ? new Date(customer.lastActionAt).toLocaleString('tr-TR') : ''
     ])
     const wsCust = XLSX.utils.aoa_to_sheet([custHeader, ...custRows])
     wsCust['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 20 }]

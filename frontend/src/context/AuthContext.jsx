@@ -7,12 +7,31 @@ const AuthContext = createContext()
 const resolveAllowedBranchIds = (normalizedUser, tenantProfile) => {
   const tenantAllowed = Array.isArray(tenantProfile?.allowedBranchIds) ? tenantProfile.allowedBranchIds.map(String).filter(Boolean) : []
   if (String(normalizedUser?.role || '') !== 'staff') return tenantAllowed
-  const staffAllowed = Array.isArray(normalizedUser?.branchIds) && normalizedUser.branchIds.length > 0
-    ? normalizedUser.branchIds.map(String).filter(Boolean)
-    : (normalizedUser?.branchId ? [String(normalizedUser.branchId)] : [])
+  const staffAllowed = Array.isArray(normalizedUser?.accessibleBranchIds) && normalizedUser.accessibleBranchIds.length > 0
+    ? normalizedUser.accessibleBranchIds.map(String).filter(Boolean)
+    : Array.isArray(normalizedUser?.branchIds) && normalizedUser.branchIds.length > 0
+      ? normalizedUser.branchIds.map(String).filter(Boolean)
+      : (normalizedUser?.branchId ? [String(normalizedUser.branchId)] : [])
   if (staffAllowed.length === 0) return tenantAllowed
   if (tenantAllowed.length === 0) return staffAllowed
   return tenantAllowed.filter(id => staffAllowed.includes(String(id)))
+}
+
+const persistActiveBranchSelection = (normalizedUser, branchIds = []) => {
+  const systemType = String(normalizedUser?.systemType || '').trim()
+  const primaryBranchId = String(normalizedUser?.branchId || '').trim()
+  const fallbackBranchId = Array.isArray(branchIds) && branchIds.length > 0 ? String(branchIds[0] || '').trim() : ''
+  const selectedBranchId = primaryBranchId || fallbackBranchId
+  if (!selectedBranchId) return
+
+  try {
+    if (systemType === 'kantin') {
+      localStorage.setItem('selectedBranchId_canteen', selectedBranchId)
+    } else {
+      localStorage.setItem('selectedBranchId', selectedBranchId)
+    }
+  } catch {
+  }
 }
 
 export const AuthProvider = ({ children }) => {
@@ -34,7 +53,7 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const tokenKey = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform')
+      const tokenKey = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform') || pathname.startsWith('/platform-login')
         ? 'token_platform'
         : 'token_restaurant'
       const token = localStorage.getItem(tokenKey)
@@ -76,9 +95,7 @@ export const AuthProvider = ({ children }) => {
         } else {
           const ids = resolveAllowedBranchIds(normalized, res?.tenant)
           setAllowedBranchIds(ids)
-          if (ids.length === 1) {
-            localStorage.setItem('selectedBranchId', String(ids[0]))
-          }
+          persistActiveBranchSelection(normalized, ids)
         }
       } catch {
         setAllowedBranchIds([])
@@ -145,9 +162,7 @@ export const AuthProvider = ({ children }) => {
         } else {
           const ids = resolveAllowedBranchIds(normalized, res?.tenant)
           setAllowedBranchIds(ids)
-          if (ids.length === 1) {
-            localStorage.setItem('selectedBranchId', String(ids[0]))
-          }
+          persistActiveBranchSelection(normalized, ids)
         }
       } catch {
         setAllowedBranchIds([])
@@ -160,15 +175,41 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
+    const pathname = (() => {
+      try {
+        return String(window.location?.pathname || '')
+      } catch {
+        return ''
+      }
+    })()
+    const nextPath = (() => {
+      if (pathname.startsWith('/canteen') || String(user?.systemType || '') === 'kantin') return '/canteen/login'
+      if (
+        pathname.startsWith('/platform') ||
+        pathname.startsWith('/platform-admin') ||
+        pathname.startsWith('/superadmin') ||
+        String(user?.role || '') === 'platform_admin' ||
+        String(user?.role || '') === 'superadmin'
+      ) {
+        return '/platform-login'
+      }
+      return '/login/restoran'
+    })()
+
     localStorage.removeItem('token_platform')
     localStorage.removeItem('token_restaurant')
+    localStorage.removeItem('token_canteen')
     localStorage.removeItem('selectedBranchId')
+    localStorage.removeItem('selectedBranchId_canteen')
     localStorage.removeItem('activeSystem')
     localStorage.removeItem('lastSystem')
     clearApiCache()
     setUser(null)
     setTenantCtx(null)
     setAllowedBranchIds([])
+    try {
+      if (typeof window !== 'undefined') window.location.replace(nextPath)
+    } catch {}
   }
 
   const refresh = async () => {
@@ -180,7 +221,7 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const portalOverride = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform')
+      const portalOverride = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform') || pathname.startsWith('/platform-login')
         ? 'platform'
         : 'restaurant'
       const meRes = await api('/api/auth/me', { silent: true, portalOverride })
@@ -203,9 +244,7 @@ export const AuthProvider = ({ children }) => {
           } else {
             const ids = resolveAllowedBranchIds(normalized, res?.tenant)
             setAllowedBranchIds(ids)
-            if (ids.length === 1) {
-              localStorage.setItem('selectedBranchId', String(ids[0]))
-            }
+            persistActiveBranchSelection(normalized, ids)
           }
         } catch {
           setAllowedBranchIds([])

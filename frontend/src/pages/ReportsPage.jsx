@@ -8,10 +8,11 @@ import { downloadBlob } from '../lib/download.js'
 import { useTheme } from '../theme/ThemeContext.jsx'
 
 const CARD_STYLE = {
-  border: '1px solid #e2e8f0',
+  border: '1px solid var(--border)',
   borderRadius: 28,
-  background: '#ffffff',
-  boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)'
+  background: 'var(--panel)',
+  color: 'var(--text)',
+  boxShadow: 'var(--card-shadow)'
 }
 
 const HERO_STYLE = {
@@ -45,6 +46,7 @@ export const EMPTY_DATASETS = {
   orders: [],
   accounts: [],
   deliveryOrders: [],
+  courierReportRows: [],
   kitchenOrders: [],
   menuItems: [],
   categories: []
@@ -56,22 +58,23 @@ const todayYmd = () => {
 }
 
 export const reportDefinitions = [
-  { key: 'salesSummary', title: 'Satis Ozeti', icon: '₺', description: 'Ciro, tahsilat, siparis adedi ve ortalama sepet.', detailTitle: 'Detayli Satis Ozeti Raporu', metrics: ['Toplam Ciro', 'Net Satis', 'Toplam Tahsilat', 'Ortalama Sepet'], tableColumns: ['Tarih', 'Siparis', 'Brut Satis', 'Iptal', 'Net Satis', 'Tahsilat'] },
-  { key: 'paymentDistribution', title: 'Odeme Dagilimi', icon: '💳', description: 'Nakit, kart, online odeme ve acik hesap dagilimi.', detailTitle: 'Detayli Odeme Dagilimi Raporu', metrics: ['Nakit', 'Kredi Karti', 'Online', 'Acik Hesap'], tableColumns: ['Saat', 'Odeme Tipi', 'Islem Sayisi', 'Tutar', 'Oran'] },
-  { key: 'productPerformance', title: 'Urun Performansi', icon: '🍽', description: 'En cok satan urunler, adet, ciro ve karlilik.', detailTitle: 'Detayli Urun Performansi Raporu', metrics: ['Satilan Urun', 'Toplam Adet', 'Urun Cirosu', 'Kar Orani'], tableColumns: ['Urun', 'Kategori', 'Adet', 'Birim Fiyat', 'Ciro', 'Kar'] },
-  { key: 'categoryRevenue', title: 'Kategori Cirosu', icon: '🧾', description: 'Kategori bazli satis ve ciro karsilastirmasi.', detailTitle: 'Detayli Kategori Cirosu Raporu', metrics: ['Kategori Sayisi', 'En Yuksek Kategori', 'Toplam Ciro', 'Pay Orani'], tableColumns: ['Kategori', 'Urun Adedi', 'Satis Adedi', 'Ciro', 'Oran'] },
-  { key: 'hourlyDensity', title: 'Saatlik Yogunluk', icon: '⏱', description: 'Gunun saatlerine gore siparis ve ciro yogunlugu.', detailTitle: 'Detayli Saatlik Yogunluk Raporu', metrics: ['Yogun Saat', 'Siparis Adedi', 'Saatlik Ciro', 'Ortalama Sepet'], tableColumns: ['Saat', 'Siparis', 'Masa', 'Paket', 'Ciro'] },
-  { key: 'waiterPerformance', title: 'Garson Performansi', icon: '🧑', description: 'Garson bazli siparis, masa, tahsilat ve servis hizi.', detailTitle: 'Detayli Garson Performans Raporu', metrics: ['Garson', 'Masa Sayisi', 'Satis', 'Servis Suresi'], tableColumns: ['Garson', 'Masa', 'Siparis', 'Ciro', 'Ortalama Sure'] },
-  { key: 'tableTurnover', title: 'Masa Devir Hizi', icon: '🪑', description: 'Masalarin doluluk suresi, kapanis hizi ve kullanim orani.', detailTitle: 'Detayli Masa Devir Hizi Raporu', metrics: ['Aktif Masa', 'Ortalama Sure', 'Kapanan Masa', 'Doluluk Orani'], tableColumns: ['Masa', 'Acilis', 'Kapanis', 'Sure', 'Tutar'] },
-  { key: 'openAccount', title: 'Acik Hesap / Cari', icon: '📒', description: 'Cari musteriler, acik bakiye ve odeme gecmisi.', detailTitle: 'Detayli Acik Hesap ve Cari Raporu', metrics: ['Acik Bakiye', 'Cari Sayisi', 'Tahsil Edilen', 'Geciken'], tableColumns: ['Cari', 'Son Islem', 'Borc', 'Tahsilat', 'Kalan'] },
-  { key: 'cancelWaste', title: 'Iptal / Fire', icon: '⚠', description: 'Iptal edilen urunler, fire nedenleri ve kayip tutar.', detailTitle: 'Detayli Iptal ve Fire Raporu', metrics: ['Iptal Tutari', 'Fire Tutari', 'Iptal Adedi', 'Kayip Orani'], tableColumns: ['Saat', 'Urun', 'Adet', 'Neden', 'Tutar', 'Personel'] },
-  { key: 'discounts', title: 'Indirimler', icon: '🏷', description: 'Uygulanan indirimler, kampanyalar ve yetkili kullanici.', detailTitle: 'Detayli Indirim Raporu', metrics: ['Indirim Tutari', 'Indirim Adedi', 'Ortalama Indirim', 'Yetkili'], tableColumns: ['Saat', 'Masa/Siparis', 'Indirim', 'Sebep', 'Yetkili'] },
-  { key: 'kitchenPrepTime', title: 'Mutfak Hazirlama Suresi', icon: '🔥', description: 'Urunlerin hazirlanma suresi ve geciken siparisler.', detailTitle: 'Detayli Mutfak Hazirlama Suresi Raporu', metrics: ['Ortalama Sure', 'Geciken Siparis', 'Hazirlanan', 'Bekleyen'], tableColumns: ['Siparis', 'Urun', 'Baslangic', 'Hazir', 'Sure'] },
-  { key: 'deliveryPerformance', title: 'Paket Servis Performansi', icon: '🛵', description: 'Paket siparis, kurye, teslimat suresi ve durum analizi.', detailTitle: 'Detayli Paket Servis Performans Raporu', metrics: ['Paket Sayisi', 'Yolda', 'Teslim', 'Ortalama Teslimat'], tableColumns: ['Siparis', 'Musteri', 'Kurye', 'Durum', 'Sure', 'Tutar'] },
-  { key: 'taxVat', title: 'KDV / Vergi', icon: '🏛', description: 'KDV oranlari, vergi matrahi ve toplam vergi.', detailTitle: 'Detayli KDV ve Vergi Raporu', metrics: ['Matrah', 'KDV', 'Toplam', 'Fis Sayisi'], tableColumns: ['Tarih', 'KDV Orani', 'Matrah', 'KDV', 'Toplam'] },
-  { key: 'cashierShift', title: 'Kasa / Vardiya', icon: '🧮', description: 'Vardiya acilis-kapanis, kasa farki ve tahsilat.', detailTitle: 'Detayli Kasa ve Vardiya Raporu', metrics: ['Acilis', 'Kapanis', 'Kasa Farki', 'Tahsilat'], tableColumns: ['Vardiya', 'Kullanici', 'Acilis', 'Kapanis', 'Fark'] },
-  { key: 'stockConsumption', title: 'Stok Tuketim', icon: '📦', description: 'Satisa gore dusen stok, kritik stok ve tuketim.', detailTitle: 'Detayli Stok Tuketim Raporu', metrics: ['Tuketilen', 'Kritik Stok', 'Stok Degeri', 'Eksik Urun'], tableColumns: ['Urun', 'Baslangic', 'Tuketim', 'Kalan', 'Durum'] },
-  { key: 'customerBehavior', title: 'Musteri Davranisi', icon: '👥', description: 'Tekrar gelen musteri, ortalama harcama ve tercih analizi.', detailTitle: 'Detayli Musteri Davranisi Raporu', metrics: ['Musteri', 'Tekrar Orani', 'Ortalama Harcama', 'Favori Urun'], tableColumns: ['Musteri', 'Ziyaret', 'Harcama', 'Favori Urun', 'Son Islem'] }
+  { key: 'salesSummary', title: 'Satis Ozeti', icon: '₺', description: 'Ciro, tahsilat, sipariş adedi ve ortalama sepet.', detailTitle: 'Detayli Satis Ozeti Raporu', metrics: ['Toplam Ciro', 'Net Satis', 'Toplam Tahsilat', 'Ortalama Sepet'], tableColumns: ['Tarih', 'Sipariş', 'Brut Satis', 'İptal', 'Net Satis', 'Tahsilat'] },
+  { key: 'paymentDistribution', title: 'Ödeme Dağılımı', icon: '💳', description: 'Nakit, kart, online ödeme ve açık hesap dağılımı.', detailTitle: 'Detayli Ödeme Dağılımı Raporu', metrics: ['Nakit', 'Kredi Kartı', 'Online', 'Açık Hesap'], tableColumns: ['Saat', 'Ödeme Tipi', 'İşlem Sayisi', 'Tutar', 'Oran'] },
+  { key: 'productPerformance', title: 'Ürün Performansi', icon: '🍽', description: 'En cok satan urunler, adet, ciro ve karlilik.', detailTitle: 'Detayli Ürün Performansi Raporu', metrics: ['Satilan Ürün', 'Toplam Adet', 'Ürün Cirosu', 'Kar Oranı'], tableColumns: ['Ürün', 'Kategori', 'Adet', 'Birim Fiyat', 'Ciro', 'Kar'] },
+  { key: 'categoryRevenue', title: 'Kategori Cirosu', icon: '🧾', description: 'Kategori bazli satis ve ciro karşılaştırması.', detailTitle: 'Detayli Kategori Cirosu Raporu', metrics: ['Kategori Sayisi', 'En Yuksek Kategori', 'Toplam Ciro', 'Pay Oranı'], tableColumns: ['Kategori', 'Ürün Adedi', 'Satis Adedi', 'Ciro', 'Oran'] },
+  { key: 'hourlyDensity', title: 'Saatlik Yoğunluk', icon: '⏱', description: 'Günün saatlerine göre sipariş ve ciro yogunlugu.', detailTitle: 'Detayli Saatlik Yoğunluk Raporu', metrics: ['Yogun Saat', 'Sipariş Adedi', 'Saatlik Ciro', 'Ortalama Sepet'], tableColumns: ['Saat', 'Sipariş', 'Masa', 'Paket', 'Ciro'] },
+  { key: 'waiterPerformance', title: 'Garson Performansi', icon: '🧑', description: 'Garson bazli sipariş, masa, tahsilat ve servis hizi.', detailTitle: 'Detayli Garson Performans Raporu', metrics: ['Garson', 'Masa Sayisi', 'Satis', 'Servis Süresi'], tableColumns: ['Garson', 'Masa', 'Sipariş', 'Ciro', 'Ortalama Süre'] },
+  { key: 'tableTurnover', title: 'Masa Devir Hizi', icon: '🪑', description: 'Masalarin doluluk süresi, kapanis hizi ve kullanim oranı.', detailTitle: 'Detayli Masa Devir Hizi Raporu', metrics: ['Aktif Masa', 'Ortalama Süre', 'Kapanan Masa', 'Doluluk Oranı'], tableColumns: ['Masa', 'Acilis', 'Kapanis', 'Süre', 'Tutar'] },
+  { key: 'openAccount', title: 'Acik Hesap / Cari', icon: '📒', description: 'Cari müşteriler, açık bakiye ve ödeme gecmisi.', detailTitle: 'Detayli Açık Hesap ve Cari Raporu', metrics: ['Açık Bakiye', 'Cari Sayisi', 'Tahsil Edilen', 'Geciken'], tableColumns: ['Cari', 'Son İşlem', 'Borç', 'Tahsilat', 'Kalan'] },
+  { key: 'cancelWaste', title: 'Iptal / Fire', icon: '⚠', description: 'İptal edilen urunler, fire nedenleri ve kayıp tutar.', detailTitle: 'Detayli İptal ve Fire Raporu', metrics: ['İptal Tutari', 'Fire Tutari', 'İptal Adedi', 'Kayıp Oranı'], tableColumns: ['Saat', 'Ürün', 'Adet', 'Neden', 'Tutar', 'Personel'] },
+  { key: 'discounts', title: 'Indirimler', icon: '🏷', description: 'Uygulanan indirimler, kampanyalar ve yetkili kullanıcı.', detailTitle: 'Detayli İndirim Raporu', metrics: ['İndirim Tutari', 'İndirim Adedi', 'Ortalama İndirim', 'Yetkili'], tableColumns: ['Saat', 'Masa/Siparis', 'İndirim', 'Sebep', 'Yetkili'] },
+  { key: 'kitchenPrepTime', title: 'Mutfak Hazırlama Süresi', icon: '🔥', description: 'Urunlerin hazirlanma süresi ve geciken siparisler.', detailTitle: 'Detayli Mutfak Hazırlama Süresi Raporu', metrics: ['Ortalama Süre', 'Geciken Sipariş', 'Hazırlanan', 'Bekleyen'], tableColumns: ['Sipariş', 'Ürün', 'Baslangic', 'Hazır', 'Süre'] },
+  { key: 'deliveryPerformance', title: 'Paket Servis Performansi', icon: '🛵', description: 'Paket sipariş, kurye, teslimat süresi ve durum analizi.', detailTitle: 'Detayli Paket Servis Performans Raporu', metrics: ['Paket Sayisi', 'Yolda', 'Teslim', 'Ortalama Teslimat'], tableColumns: ['Sipariş', 'Müşteri', 'Kurye', 'Durum', 'Süre', 'Tutar'] },
+  { key: 'courierReport', title: 'Kurye Raporu', icon: '🧾', description: 'Kurye bazlı atama, teslimat, tahsilat ve ortalama teslim süresi.', detailTitle: 'Detayli Kurye Raporu', metrics: ['Atanan Sipariş', 'Teslim Edilen', 'Tahsil Edilen', 'Ortalama Teslim'], tableColumns: ['Kurye', 'Atanan Sipariş', 'Teslim Edilen', 'Geri Dönen', 'İptal', 'Toplam Tutar', 'Tahsil Edilen', 'Veresiye', 'Ortalama Teslim Süresi'] },
+  { key: 'taxVat', title: 'KDV / Vergi', icon: '🏛', description: 'KDV oranlari, vergi matrahi ve toplam vergi.', detailTitle: 'Detayli KDV ve Vergi Raporu', metrics: ['Matrah', 'KDV', 'Toplam', 'Fis Sayisi'], tableColumns: ['Tarih', 'KDV Oranı', 'Matrah', 'KDV', 'Toplam'] },
+  { key: 'cashierShift', title: 'Kasa / Vardiya', icon: '🧮', description: 'Vardiya acilis-kapanis, kasa farki ve tahsilat.', detailTitle: 'Detayli Kasa ve Vardiya Raporu', metrics: ['Acilis', 'Kapanis', 'Kasa Farki', 'Tahsilat'], tableColumns: ['Vardiya', 'Kullanıcı', 'Acilis', 'Kapanis', 'Fark'] },
+  { key: 'stockConsumption', title: 'Stok Tuketim', icon: '📦', description: 'Satisa göre dusen stok, kritik stok ve tuketim.', detailTitle: 'Detayli Stok Tuketim Raporu', metrics: ['Tuketilen', 'Kritik Stok', 'Stok Değeri', 'Eksik Ürün'], tableColumns: ['Ürün', 'Baslangic', 'Tuketim', 'Kalan', 'Durum'] },
+  { key: 'customerBehavior', title: 'Müşteri Davranisi', icon: '👥', description: 'Tekrar gelen müşteri, ortalama harcama ve tercih analizi.', detailTitle: 'Detayli Müşteri Davranisi Raporu', metrics: ['Müşteri', 'Tekrar Oranı', 'Ortalama Harcama', 'Favori Ürün'], tableColumns: ['Müşteri', 'Ziyaret', 'Harcama', 'Favori Ürün', 'Son İşlem'] }
 ]
 
 const toMoney = (v) => {
@@ -128,6 +131,116 @@ const formatDurationMinutes = (start, end) => {
 }
 
 const safeArray = (value) => Array.isArray(value) ? value : []
+
+const normalizeLookupKey = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^\w]/g, '')
+  .toLowerCase()
+
+export const getRowValueByColumn = (row, column) => {
+  if (!row || typeof row !== 'object') return undefined
+  if (Object.prototype.hasOwnProperty.call(row, column)) return row[column]
+  const normalizedColumn = normalizeLookupKey(column)
+  const matchedKey = Object.keys(row).find((key) => normalizeLookupKey(key) === normalizedColumn)
+  return matchedKey ? row[matchedKey] : undefined
+}
+
+const escapeHtml = (value) => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+
+const buildProductReportPrintHtml = ({ report, detailData, rangeLabel, branchesLabel }) => {
+  const columns = safeArray(report?.tableColumns)
+  const rows = safeArray(detailData?.rows)
+
+  return `<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(report?.detailTitle || 'Ürün Raporu')}</title>
+  <style>
+    body { margin: 0; padding: 18px; font-family: Arial, sans-serif; color: #111827; background: #fff; }
+    .sheet { max-width: 960px; margin: 0 auto; }
+    .title { font-size: 22px; font-weight: 900; margin: 0 0 6px; }
+    .meta { color: #475569; font-size: 12px; margin-bottom: 4px; }
+    .divider { border-top: 2px solid #111827; margin: 14px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 12px; vertical-align: top; }
+    th { background: #f8fafc; font-weight: 800; }
+    .empty { padding: 24px; border: 1px solid #cbd5e1; border-radius: 16px; color: #64748b; }
+    @media print {
+      body { padding: 0; }
+      .sheet { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <h1 class="title">${escapeHtml(report?.detailTitle || 'Ürün Raporu')}</h1>
+    <div class="meta">Dönem: ${escapeHtml(rangeLabel || '-')}</div>
+    <div class="meta">Şube: ${escapeHtml(branchesLabel || '-')}</div>
+    <div class="meta">Oluşturma: ${escapeHtml(new Date().toLocaleString('tr-TR'))}</div>
+    <div class="divider"></div>
+    ${rows.length === 0 ? `<div class="empty">Bu rapor için sistemde uygun veri bulunamadı.</div>` : `
+      <table>
+        <thead>
+          <tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `<tr>${columns.map((column) => `<td>${escapeHtml(getRowValueByColumn(row, column) ?? '-')}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    `}
+  </div>
+</body>
+</html>`
+}
+
+export const printProductReportDocument = ({ report, detailData, rangeLabel, branchesLabel, autoPrint = true }) => {
+  const html = buildProductReportPrintHtml({ report, detailData, rangeLabel, branchesLabel })
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank', 'noopener,noreferrer,width=1100,height=900')
+  if (!win) {
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    throw new Error('Yazdırma penceresi açılamadı')
+  }
+
+  const cleanup = () => window.setTimeout(() => URL.revokeObjectURL(url), 15000)
+  if (autoPrint) {
+    window.setTimeout(() => {
+      try {
+        win.focus()
+        win.print()
+      } catch {}
+      cleanup()
+    }, 350)
+  } else {
+    cleanup()
+  }
+  return win
+}
+
+export const buildPaymentBreakdownRows = (sales, options = {}) => {
+  const preferCollected = options.preferCollected !== false
+  const dynamic = safeArray(preferCollected ? (sales?.collectedPaymentBreakdown || sales?.paymentBreakdown) : (sales?.paymentBreakdown || sales?.collectedPaymentBreakdown))
+  if (dynamic.length > 0) {
+    return dynamic.map((row) => ({
+      label: String(row?.methodName || 'Diğer'),
+      amount: toMoney(row?.totalAmount || 0),
+      count: Number(row?.count || 0),
+    }))
+  }
+  return [
+    { label: 'Nakit', amount: toMoney(sales?.collectedByMethod?.cash ?? sales?.byMethod?.cash ?? 0), count: 0 },
+    { label: 'Kart / POS', amount: toMoney(sales?.collectedByMethod?.pos ?? sales?.byMethod?.pos ?? 0), count: 0 },
+    { label: 'Banka', amount: toMoney(sales?.collectedByMethod?.bank ?? sales?.byMethod?.bank ?? 0), count: 0 },
+    { label: 'Açık Hesap', amount: toMoney(sales?.accountChargedTotal ?? sales?.byMethod?.account ?? 0), count: 0 },
+  ]
+}
 
 const filterOrdersByDashboardRange = (datasets, orders) => {
   const start = String(datasets?.dashboard?.range?.start || '').trim()
@@ -215,11 +328,11 @@ function KpiCard({ title, value, note, trend, tone = 'blue' }) {
   return (
     <div style={{ ...CARD_STYLE, padding: 20, display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>{title}</div>
+        <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 600 }}>{title}</div>
         <span style={{ background: colors.bg, color: colors.fg, borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 900 }}>{trend}</span>
       </div>
       <div style={{ fontSize: 28, fontWeight: 900 }}>{value}</div>
-      <div style={{ color: '#94a3b8', fontSize: 12 }}>{note}</div>
+      <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: 12 }}>{note}</div>
     </div>
   )
 }
@@ -250,7 +363,7 @@ function ReportFilter({
           {tabs.map((tab) => {
             const active = period === tab.key
             return (
-              <button key={tab.key} type="button" className="btn" onClick={() => setPeriod(tab.key)} style={{ background: active ? '#e2e8f0' : '#f8fafc', borderColor: active ? '#cbd5e1' : '#e2e8f0', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
+              <button key={tab.key} type="button" className="btn" onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--theme-accent, #111827)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--theme-accent, #111827)' : 'var(--app-border, var(--border))', color: active ? '#ffffff' : 'var(--app-text, var(--text))', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
                 {tab.label}
               </button>
             )
@@ -259,22 +372,22 @@ function ReportFilter({
             branchOptions={branchOptions}
             selectedBranches={selectedBranches}
             setSelectedBranches={setSelectedBranches}
-            title="Sube Sec"
+            title="Şube Seç"
             compact
           />
         </div>
-        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>{rangeLabel}</div>
+        <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 600 }}>{rangeLabel}</div>
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         {period === 'range' && (
           <>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Baslangic</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Baslangic</span>
               <input type="date" className="input" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Bitis</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bitis</span>
               <input type="date" className="input" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
             </label>
           </>
@@ -287,10 +400,10 @@ function ReportFilter({
 function ReportSummary({ summary, isMobilePortrait }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-      <KpiCard title="Toplam Ciro" value={fmtTl(summary.totalRevenue)} note="Secili tarih" trend="+0%" tone="green" />
-      <KpiCard title="Toplam Siparis" value={String(summary.orderCount)} note="Adet" trend="+0%" tone="blue" />
-      <KpiCard title="Ortalama Siparis" value={fmtTl(summary.averageOrder, 0)} note="Sepet" trend="+0%" tone="orange" />
-      <KpiCard title="Iptal Orani" value={fmtPct(summary.cancelRate)} note="Gercek veri" trend="+0%" tone="red" />
+      <KpiCard title="Toplam Ciro" value={fmtTl(summary.totalRevenue)} note="Seçili tarih" trend="+0%" tone="green" />
+      <KpiCard title="Toplam Sipariş" value={String(summary.orderCount)} note="Adet" trend="+0%" tone="blue" />
+      <KpiCard title="Ortalama Sipariş" value={fmtTl(summary.averageOrder, 0)} note="Sepet" trend="+0%" tone="orange" />
+      <KpiCard title="İptal Oranı" value={fmtPct(summary.cancelRate)} note="Gercek veri" trend="+0%" tone="red" />
     </div>
   )
 }
@@ -304,14 +417,14 @@ function ReportHero() {
             Rapor Merkezi
           </div>
           <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.1, fontWeight: 900 }}>
-            Isletmenin tum performansini tek ekranda analiz et.
+            Isletmenin tüm performansini tek ekranda analiz et.
           </h1>
-          <p style={{ margin: '10px 0 0', maxWidth: 720, fontSize: 14, color: 'rgba(255,255,255,0.64)', lineHeight: 1.6 }}>
-            Satis, odeme, urun, garson, masa, stok ve mutfak performansini ayri raporlar halinde inceleyebilirsin.
+          <p style={{ margin: '10px 0 0', maxWidth: 720, fontSize: 14, color: '#ffffff', lineHeight: 1.6 }}>
+            Satis, ödeme, ürün, garson, masa, stok ve mutfak performansini ayri raporlar halinde inceleyebilirsin.
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, minWidth: 260 }}>
-          <button type="button" className="btn" style={{ borderRadius: 18, background: '#ffffff', color: '#020617', padding: '14px 18px', fontWeight: 900 }}>
+          <button type="button" className="btn" style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '14px 18px', fontWeight: 900 }}>
             Excel Aktar
           </button>
           <button type="button" className="btn" style={{ borderRadius: 18, background: 'rgba(255,255,255,0.08)', color: '#ffffff', padding: '14px 18px', fontWeight: 900, borderColor: 'rgba(255,255,255,0.14)' }}>
@@ -328,10 +441,10 @@ function ReportSummaryCards({ summary, datasets, isMobilePortrait }) {
   const netSales = Math.max(0, summary.totalRevenue - toMoney(datasets.dashboard?.cancelled?.totalRevenue || 0))
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-      <KpiCard title="Net Satis" value={fmtTl(netSales, 0)} note="Secili donem" trend="+0%" tone="green" />
-      <KpiCard title="Siparis" value={String(summary.orderCount)} note="Toplam adet" trend="+0" tone="blue" />
-      <KpiCard title="Ortalama Sepet" value={fmtTl(summary.averageOrder, 0)} note="Siparis basi" trend="+0%" tone="orange" />
-      <KpiCard title="Fire Orani" value={fmtPct(fireRate)} note="Gercek veri" trend="+0%" tone="red" />
+      <KpiCard title="Net Satis" value={fmtTl(netSales, 0)} note="Seçili dönem" trend="+0%" tone="green" />
+      <KpiCard title="Sipariş" value={String(summary.orderCount)} note="Toplam adet" trend="+0" tone="blue" />
+      <KpiCard title="Ortalama Sepet" value={fmtTl(summary.averageOrder, 0)} note="Sipariş başı" trend="+0%" tone="orange" />
+      <KpiCard title="Fire Oranı" value={fmtPct(fireRate)} note="Gercek veri" trend="+0%" tone="red" />
     </div>
   )
 }
@@ -362,7 +475,7 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
   const totalTables = hourlyRows.reduce((sum, item) => sum + Number(item.tableCount || 0), 0)
   const totalDelivery = hourlyRows.reduce((sum, item) => sum + Number(item.deliveryCount || 0), 0)
   const statCards = [
-    { label: 'Toplam Musteri', value: String(totalCustomers) },
+    { label: 'Toplam Müşteri', value: String(totalCustomers) },
     { label: 'Yogun Saat', value: peakRow?.label || '-' },
     { label: 'Masa Siparisi', value: String(totalTables) },
     { label: 'Paket Siparisi', value: String(totalDelivery) }
@@ -373,9 +486,9 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Saatlik Musteri Analizi</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
-            {chartMode === 'week' ? 'Hafta icinde musteri hareketi ve yogunluk.' : 'Gun icinde musteri hareketi ve yogunluk.'}
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Saatlik Müşteri Analizi</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
+            {chartMode === 'week' ? 'Hafta icinde müşteri hareketi ve yoğunluk.' : 'Gün icinde müşteri hareketi ve yoğunluk.'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -396,7 +509,7 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
                   fontWeight: 900
                 }}
               >
-                Gunluk
+                Günlük
               </button>
               <button
                 type="button"
@@ -430,14 +543,14 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
 
       <div style={{ marginTop: 24, paddingTop: 10, borderTop: `1px solid ${theme.border}`, overflowX: 'auto', overflowY: 'hidden' }}>
         {bars.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>Musteri verisi bulunamadi.</div>
+          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Müşteri verisi bulunamadı.</div>
         ) : (
           <div style={{ display: 'flex', width: `${chartInnerWidth}px`, minWidth: '100%', height: 230, alignItems: 'stretch', gap: 8 }}>
             {bars.map((bar) => (
               <div key={bar.label} style={{ display: 'flex', flex: 1, minWidth: 28, flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                 <div style={{ display: 'flex', width: '100%', flex: 1, alignItems: 'flex-end' }}>
                   <div
-                    title={`${bar.label}: ${bar.value} musteri`}
+                    title={`${bar.label}: ${bar.value} müşteri`}
                     style={{
                       width: '100%',
                       height: `${Math.max(18, Math.round((bar.value / max) * 100))}%`,
@@ -459,7 +572,7 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap' }}>{bar.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--app-text)', whiteSpace: 'nowrap' }}>{bar.label}</span>
               </div>
             ))}
           </div>
@@ -471,24 +584,27 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
 
 export function PaymentOverviewPanel({ datasets, summary, headerAction = null }) {
   const { theme } = useTheme()
+  const paymentRows = buildPaymentBreakdownRows(datasets.dashboard?.sales, { preferCollected: true })
+    .filter((row) => row.amount > 0)
+    .map((row) => [row.label, row.amount])
   const rows = [
     ['Nakit', toMoney(datasets.dashboard?.sales?.collectedByMethod?.cash ?? datasets.dashboard?.sales?.byMethod?.cash ?? 0)],
     ['Kart / POS', toMoney(datasets.dashboard?.sales?.collectedByMethod?.pos ?? datasets.dashboard?.sales?.byMethod?.pos ?? 0)],
     ['Banka', toMoney(datasets.dashboard?.sales?.collectedByMethod?.bank ?? datasets.dashboard?.sales?.byMethod?.bank ?? 0)],
-    ['Acik Hesap', toMoney(datasets.dashboard?.sales?.accountChargedTotal ?? datasets.dashboard?.sales?.byMethod?.account ?? 0)]
+    ['Açık Hesap', toMoney(datasets.dashboard?.sales?.accountChargedTotal ?? datasets.dashboard?.sales?.byMethod?.account ?? 0)]
   ]
   return (
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Odeme Ozeti</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Tahsilat kanallarina gore dagilim.</p>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Ödeme Ozeti</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Tahsilat kanallarina göre dagilim.</p>
         </div>
         {headerAction}
       </div>
 
       <div style={{ marginTop: 24, display: 'grid', gap: 18 }}>
-        {rows.map(([label, amount]) => {
+        {(paymentRows.length > 0 ? paymentRows : rows).map(([label, amount]) => {
           const ratio = summary.totalRevenue > 0 ? Math.min(100, Math.round((amount / summary.totalRevenue) * 100)) : 0
           return (
             <div key={label}>
@@ -518,7 +634,7 @@ export function TopSellersPanel({ datasets, headerAction = null }) {
       </div>
       <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
         {rows.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>Satis verisi bulunamadi.</div>
+          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Satis verisi bulunamadı.</div>
         ) : rows.map((item, index) => (
           <div key={`${item.menuItemId || item.name}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 18, background: theme.accentSoft, padding: '14px 16px', minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: theme.text, minWidth: 0, overflowWrap: 'anywhere' }}>{`${index + 1}. ${String(item.name || '-').toUpperCase('tr-TR')}`}</div>
@@ -542,7 +658,7 @@ export function CategoryRevenuePanel({ datasets, summary, headerAction = null })
       </div>
       <div style={{ marginTop: 22, display: 'grid', gap: 18 }}>
         {rows.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: 13 }}>Kategori bazli veri bulunamadi.</div>
+          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Kategori bazli veri bulunamadı.</div>
         ) : rows.map((item) => (
           <div key={item.name}>
             <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14, minWidth: 0 }}>
@@ -567,11 +683,11 @@ function ReportCard({ report, onClick }) {
       style={{ ...CARD_STYLE, padding: 20, textAlign: 'left', cursor: 'pointer', transition: 'transform 160ms ease, box-shadow 160ms ease', minHeight: 250 }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'grid', height: 48, width: 48, placeItems: 'center', borderRadius: 18, background: '#f1f5f9', fontSize: 22 }}>
+        <div style={{ display: 'grid', height: 48, width: 48, placeItems: 'center', borderRadius: 18, background: 'var(--app-surface-soft, var(--panelElevated))', fontSize: 22 }}>
           {report.icon}
         </div>
 
-        <span style={{ borderRadius: 999, background: '#f1f5f9', padding: '6px 12px', fontSize: 11, fontWeight: 900, color: '#64748b' }}>
+        <span style={{ borderRadius: 999, background: 'var(--app-surface-soft, var(--panelElevated))', padding: '6px 12px', fontSize: 11, fontWeight: 900, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
           Rapor
         </span>
       </div>
@@ -580,12 +696,12 @@ function ReportCard({ report, onClick }) {
         {report.title}
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: '#64748b' }}>
+      <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
         {report.description}
       </div>
 
       <div style={{ marginTop: 20, borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8' }}>
+        <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--app-text)' }}>
           Icerdigi metrikler
         </div>
 
@@ -593,7 +709,7 @@ function ReportCard({ report, onClick }) {
           {report.metrics.slice(0, 4).map((metric) => (
             <span
               key={metric}
-              style={{ borderRadius: 999, background: '#f1f5f9', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#475569' }}
+              style={{ borderRadius: 999, background: 'var(--app-surface-soft, var(--panelElevated))', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}
             >
               {metric}
             </span>
@@ -602,8 +718,8 @@ function ReportCard({ report, onClick }) {
       </div>
 
       <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>
-          Detay icin ac
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--app-text)' }}>
+          Detay için ac
         </span>
 
         <span style={{ borderRadius: 12, background: '#020617', padding: '10px 14px', fontSize: 11, fontWeight: 900, color: '#ffffff' }}>
@@ -619,8 +735,8 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
     <section style={{ display: 'grid', gap: 14 }}>
       <div>
         <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Rapor Kutuphanesi</h2>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
-          Ozet panellerin altindan detay raporlara gecis yap.
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
+          Özet panellerin altindan detay raporlara gecis yap.
         </p>
       </div>
 
@@ -637,9 +753,13 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
   )
 }
 
-function ReportDetail({ report, onClose, detailData, isMobilePortrait }) {
+function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabel, branchesLabel }) {
   const metricGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
+  const metricEntries = Array.isArray(detailData?.metricEntries) && detailData.metricEntries.length > 0
+    ? detailData.metricEntries
+    : report.metrics.map((metric) => ({ label: metric, value: detailData?.metricValues?.[metric] ?? 'Veri yok' }))
   const [bounds, setBounds] = useState({ top: 24, left: 24, width: null, height: null })
+  const canPrint = report?.key === 'productPerformance'
 
   useEffect(() => {
     const updateBounds = () => {
@@ -663,13 +783,12 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait }) {
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed',
         top: bounds.top,
         left: bounds.left,
         width: bounds.width || 'calc(100vw - 48px)',
-        height: bounds.height || 'calc(100vh - 48px)',
+        minHeight: bounds.height || 'calc(100vh - 48px)',
         zIndex: 80,
         background: 'rgba(15, 23, 42, 0.22)',
         backdropFilter: 'blur(6px)',
@@ -683,27 +802,43 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait }) {
       <div
         onClick={(event) => event.stopPropagation()}
         style={{
-          height: '100%',
-          overflow: 'auto',
+          maxHeight: '100%',
+          overflow: 'hidden',
           borderRadius: 32,
-          background: '#ffffff',
+          background: 'var(--app-surface, var(--panel))',
           padding: 24,
-          boxShadow: '0 25px 50px rgba(15, 23, 42, 0.18)'
+          boxShadow: '0 25px 50px rgba(15, 23, 42, 0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 30, fontWeight: 900 }}>{report.detailTitle}</h2>
-            <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>{report.description}</p>
+            <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--app-text-secondary, var(--text-secondary))' }}>{report.description}</p>
           </div>
-          <button type="button" className="btn" onClick={onClose} style={{ background: '#f1f5f9', fontWeight: 900 }}>Kapat</button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {canPrint && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => printProductReportDocument({ report, detailData, rangeLabel, branchesLabel })}
+                style={{ fontWeight: 900 }}
+              >
+                Yazdır
+              </button>
+            )}
+            <button type="button" className="btn" onClick={onClose} style={{ background: 'var(--app-surface-soft, var(--panelElevated))', fontWeight: 900 }}>Kapat</button>
+          </div>
         </div>
 
-        <div style={{ marginTop: 24, display: 'grid', gridTemplateColumns: metricGrid, gap: 12 }}>
-          {report.metrics.map((metric) => (
-            <div key={metric} style={{ borderRadius: 18, background: '#f8fafc', padding: 16 }}>
-              <div style={{ fontSize: 12, color: '#64748b' }}>{metric}</div>
-              <div style={{ marginTop: 10, fontSize: 24, fontWeight: 900 }}>{detailData.metricValues[metric] ?? 'Veri yok'}</div>
+        <div className="scrollbar-hidden" style={{ marginTop: 24, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: metricGrid, gap: 12 }}>
+          {metricEntries.map((metric) => (
+            <div key={metric.label} style={{ borderRadius: 18, background: 'var(--app-surface-soft, var(--panelElevated))', padding: 16 }}>
+              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))' }}>{metric.label}</div>
+              <div style={{ marginTop: 10, fontSize: 24, fontWeight: 900 }}>{metric.value}</div>
             </div>
           ))}
         </div>
@@ -711,22 +846,23 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait }) {
         <div style={{ marginTop: 24, border: '1px solid #e2e8f0', borderRadius: 24, overflowX: 'auto', overflowY: 'hidden' }}>
           <table className="table" style={{ width: '100%' }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
+              <tr style={{ background: 'var(--app-surface-soft, var(--panelElevated))' }}>
                 {report.tableColumns.map((col) => <th key={col} style={{ padding: '14px 16px', fontWeight: 900, textAlign: 'left' }}>{col}</th>)}
               </tr>
             </thead>
             <tbody>
               {detailData.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={report.tableColumns.length} style={{ padding: '18px 16px', color: '#64748b' }}>Bu rapor icin sistemde uygun veri bulunamadi.</td>
+                  <td colSpan={report.tableColumns.length} style={{ padding: '18px 16px', color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bu rapor için sistemde uygun veri bulunamadı.</td>
                 </tr>
               ) : detailData.rows.map((row, rowIndex) => (
                 <tr key={`${report.key}-${rowIndex}`}>
-                  {report.tableColumns.map((col) => <td key={col} style={{ padding: '14px 16px', color: '#475569' }}>{row[col] ?? '-'}</td>)}
+                  {report.tableColumns.map((col) => <td key={col} style={{ padding: '14px 16px', color: '#475569' }}>{getRowValueByColumn(row, col) ?? '-'}</td>)}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       </div>
     </div>
@@ -783,10 +919,12 @@ export const buildReportDetailData = (report, datasets, summary) => {
   const productWithMeta = products.map((item) => {
     const meta = menuById.get(String(item.menuItemId || '')) || {}
     const categoryId = String(meta.categoryId || '')
+    const revenue = toMoney(item.revenue ?? item.total ?? 0)
     return {
       ...item,
+      revenue,
       categoryName: categoryNameById.get(categoryId) || '-',
-      price: Number(item.qty || 0) > 0 ? toMoney(item.revenue || 0) / Number(item.qty || 1) : 0,
+      price: Number(item.qty || 0) > 0 ? revenue / Number(item.qty || 1) : 0,
       vatRate: Number(meta.vatRate || 0),
       stockQty: Number(meta.stockQty || 0),
       stockTrackingEnabled: meta.stockTrackingEnabled === true
@@ -824,6 +962,19 @@ export const buildReportDetailData = (report, datasets, summary) => {
     return sum + Math.round((e - s) / 60000)
   }, 0)
   const avgTableMinutes = activeTables > 0 ? totalTableMinutes / activeTables : 0
+  const paymentDistributionRows = buildPaymentBreakdownRows(sales, { preferCollected: true })
+    .filter((row) => row.amount > 0)
+  const paymentMetricEntries = paymentDistributionRows.length > 0
+    ? paymentDistributionRows.slice(0, 4).map((row) => ({ label: row.label, value: fmtTl(row.amount) }))
+    : [
+        { label: 'Nakit', value: fmtTl(0) },
+        { label: 'Kart / POS', value: fmtTl(0) },
+        { label: 'Banka', value: fmtTl(0) },
+        { label: 'Açık Hesap', value: fmtTl(0) }
+      ]
+
+  const courierRows = safeArray(datasets.courierReportRows)
+  const courierTop = courierRows[0] || null
 
   const metricValuesByKey = {
     salesSummary: {
@@ -834,25 +985,25 @@ export const buildReportDetailData = (report, datasets, summary) => {
     },
     paymentDistribution: {
       Nakit: fmtTl(sales.byMethod?.cash || 0),
-      'Kredi Karti': fmtTl(sales.byMethod?.pos || 0),
+      'Kredi Kartı': fmtTl(sales.byMethod?.pos || 0),
       Online: fmtTl((sales.byMethod?.bank || 0) + 0),
-      'Acik Hesap': fmtTl(sales.byMethod?.account || 0)
+      'Açık Hesap': fmtTl(sales.byMethod?.account || 0)
     },
     productPerformance: {
-      'Satilan Urun': String(productWithMeta.length),
+      'Satilan Ürün': String(productWithMeta.length),
       'Toplam Adet': String(productWithMeta.reduce((sum, item) => sum + Number(item.qty || 0), 0)),
-      'Urun Cirosu': fmtTl(productWithMeta.reduce((sum, item) => sum + toMoney(item.revenue || 0), 0)),
-      'Kar Orani': 'Veri yok'
+      'Ürün Cirosu': fmtTl(productWithMeta.reduce((sum, item) => sum + toMoney(item.revenue || 0), 0)),
+      'Kar Oranı': 'Veri yok'
     },
     categoryRevenue: {
       'Kategori Sayisi': String(categoryRows.length),
       'En Yuksek Kategori': categoryRows[0]?.category || 'Veri yok',
       'Toplam Ciro': fmtTl(summary.totalRevenue),
-      'Pay Orani': categoryRows[0] ? fmtPct((categoryRows[0].revenue / Math.max(1, summary.totalRevenue)) * 100) : 'Veri yok'
+      'Pay Oranı': categoryRows[0] ? fmtPct((categoryRows[0].revenue / Math.max(1, summary.totalRevenue)) * 100) : 'Veri yok'
     },
     hourlyDensity: {
       'Yogun Saat': String(hourlyPeak?.label || 'Veri yok'),
-      'Siparis Adedi': String(hourlyPeak?.count || 0),
+      'Sipariş Adedi': String(hourlyPeak?.count || 0),
       'Saatlik Ciro': fmtTl(hourlyPeak?.revenue || 0),
       'Ortalama Sepet': fmtTl(summary.averageOrder, 0)
     },
@@ -860,35 +1011,35 @@ export const buildReportDetailData = (report, datasets, summary) => {
       Garson: 'Sistem verisi yok',
       'Masa Sayisi': String(activeTables),
       Satis: fmtTl(summary.totalRevenue),
-      'Servis Suresi': 'Sistem verisi yok'
+      'Servis Süresi': 'Sistem verisi yok'
     },
     tableTurnover: {
       'Aktif Masa': String(activeTables),
-      'Ortalama Sure': avgTableMinutes > 0 ? `${Math.round(avgTableMinutes)} dk` : 'Veri yok',
+      'Ortalama Süre': avgTableMinutes > 0 ? `${Math.round(avgTableMinutes)} dk` : 'Veri yok',
       'Kapanan Masa': String(activeTables),
-      'Doluluk Orani': activeTables > 0 ? fmtPct(100) : 'Veri yok'
+      'Doluluk Oranı': activeTables > 0 ? fmtPct(100) : 'Veri yok'
     },
     openAccount: {
-      'Acik Bakiye': fmtTl(accounts.reduce((sum, item) => sum + toMoney(item.balance || 0), 0)),
+      'Açık Bakiye': fmtTl(accounts.reduce((sum, item) => sum + toMoney(item.balance || 0), 0)),
       'Cari Sayisi': String(accounts.length),
       'Tahsil Edilen': fmtTl(summary.totalPaid),
       Geciken: String(accounts.filter((item) => toMoney(item.balance || 0) > 0).length)
     },
     cancelWaste: {
-      'Iptal Tutari': fmtTl(cancelled.totalRevenue || 0),
+      'İptal Tutari': fmtTl(cancelled.totalRevenue || 0),
       'Fire Tutari': fmtTl(cancelled.totalRevenue || 0),
-      'Iptal Adedi': String(cancelled.totalQty || 0),
-      'Kayip Orani': fmtPct(summary.cancelRate)
+      'İptal Adedi': String(cancelled.totalQty || 0),
+      'Kayıp Oranı': fmtPct(summary.cancelRate)
     },
     discounts: {
-      'Indirim Tutari': fmtTl(discountOrders.reduce((sum, order) => sum + toMoney(order.discountValue || 0), 0)),
-      'Indirim Adedi': String(discountOrders.length),
-      'Ortalama Indirim': fmtTl(discountOrders.length > 0 ? discountOrders.reduce((sum, order) => sum + toMoney(order.discountValue || 0), 0) / discountOrders.length : 0),
+      'İndirim Tutari': fmtTl(discountOrders.reduce((sum, order) => sum + toMoney(order.discountValue || 0), 0)),
+      'İndirim Adedi': String(discountOrders.length),
+      'Ortalama İndirim': fmtTl(discountOrders.length > 0 ? discountOrders.reduce((sum, order) => sum + toMoney(order.discountValue || 0), 0) / discountOrders.length : 0),
       Yetkili: 'Sistem verisi yok'
     },
     kitchenPrepTime: {
-      'Ortalama Sure': 'Sistem verisi yok',
-      'Geciken Siparis': String(kitchenOrders.filter((item) => safeArray(item.items).length > 5).length),
+      'Ortalama Süre': 'Sistem verisi yok',
+      'Geciken Sipariş': String(kitchenOrders.filter((item) => safeArray(item.items).length > 5).length),
       Hazirlanan: String(kitchenOrders.filter((item) => String(item.status || '') === 'completed').length),
       Bekleyen: String(kitchenOrders.filter((item) => String(item.status || '') !== 'completed').length)
     },
@@ -897,6 +1048,12 @@ export const buildReportDetailData = (report, datasets, summary) => {
       Yolda: String(deliveryOrders.filter((item) => String(item.deliveryStatus || '').includes('yolda')).length),
       Teslim: String(deliveryOrders.filter((item) => String(item.deliveryStatus || item.status || '').includes('delivered')).length),
       'Ortalama Teslimat': 'Sistem verisi yok'
+    },
+    courierReport: {
+      'Atanan Sipariş': String(courierRows.reduce((sum, item) => sum + Number(item.assignedOrderCount || 0), 0)),
+      'Teslim Edilen': String(courierRows.reduce((sum, item) => sum + Number(item.deliveredOrderCount || 0), 0)),
+      'Tahsil Edilen': fmtTl(courierRows.reduce((sum, item) => sum + Number(item.collectedCashAmount || 0) + Number(item.collectedCardAmount || 0), 0)),
+      'Ortalama Teslim': courierTop ? `${Number(courierTop.averageDeliveryMinutes || 0)} dk` : 'Veri yok'
     },
     taxVat: {
       Matrah: fmtTl(productWithMeta.reduce((sum, item) => sum + (toMoney(item.revenue || 0) / (1 + (Number(item.vatRate || 0) / 100))), 0)),
@@ -918,35 +1075,36 @@ export const buildReportDetailData = (report, datasets, summary) => {
     stockConsumption: {
       Tuketilen: String(productWithMeta.reduce((sum, item) => sum + Number(item.qty || 0), 0)),
       'Kritik Stok': String(productWithMeta.filter((item) => item.stockTrackingEnabled && Number(item.stockQty || 0) <= 10).length),
-      'Stok Degeri': fmtTl(productWithMeta.reduce((sum, item) => sum + (Number(item.stockQty || 0) * toMoney(item.price || 0)), 0)),
-      'Eksik Urun': String(productWithMeta.filter((item) => item.stockTrackingEnabled && Number(item.stockQty || 0) <= 0).length)
+      'Stok Değeri': fmtTl(productWithMeta.reduce((sum, item) => sum + (Number(item.stockQty || 0) * toMoney(item.price || 0)), 0)),
+      'Eksik Ürün': String(productWithMeta.filter((item) => item.stockTrackingEnabled && Number(item.stockQty || 0) <= 0).length)
     },
     customerBehavior: {
       Musteri: topCustomer?.name || 'Veri yok',
-      'Tekrar Orani': customerRows.length > 0 ? fmtPct((customerRows.filter((item) => item.count > 1).length / customerRows.length) * 100) : 'Veri yok',
+      'Tekrar Oranı': customerRows.length > 0 ? fmtPct((customerRows.filter((item) => item.count > 1).length / customerRows.length) * 100) : 'Veri yok',
       'Ortalama Harcama': fmtTl(topCustomer?.spend && topCustomer?.count ? topCustomer.spend / topCustomer.count : 0),
-      'Favori Urun': productWithMeta[0]?.name || 'Veri yok'
+      'Favori Ürün': productWithMeta[0]?.name || 'Veri yok'
     }
   }
 
   const rowsByKey = {
-    salesSummary: orders.slice(0, 12).map((order) => ({ Tarih: fmtDate(order.closedAt), Siparis: order.orderNo ? `Siparis ${order.orderNo}` : `#${String(order.id || '').slice(-6)}`, 'Brut Satis': fmtTl(order.totals?.grandTotal || order.netTotal || 0), Iptal: fmtTl(Math.max(0, toMoney(order.totals?.grandTotal || order.netTotal || 0) - toMoney(order.netTotal || 0))), 'Net Satis': fmtTl(order.netTotal || 0), Tahsilat: fmtTl(order.paidTotal || 0) })),
+    salesSummary: orders.slice(0, 12).map((order) => ({ Tarih: fmtDate(order.closedAt), Siparis: order.orderNo ? `Sipariş ${order.orderNo}` : `#${String(order.id || '').slice(-6)}`, 'Brut Satis': fmtTl(order.totals?.grandTotal || order.netTotal || 0), Iptal: fmtTl(Math.max(0, toMoney(order.totals?.grandTotal || order.netTotal || 0) - toMoney(order.netTotal || 0))), 'Net Satis': fmtTl(order.netTotal || 0), Tahsilat: fmtTl(order.paidTotal || 0) })),
     paymentDistribution: [
-      { Saat: 'Donem', 'Odeme Tipi': 'Nakit', 'Islem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.cash || 0), Oran: fmtPct((toMoney(sales.byMethod?.cash || 0) / Math.max(1, summary.totalRevenue)) * 100) },
-      { Saat: 'Donem', 'Odeme Tipi': 'Kredi Karti', 'Islem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.pos || 0), Oran: fmtPct((toMoney(sales.byMethod?.pos || 0) / Math.max(1, summary.totalRevenue)) * 100) },
-      { Saat: 'Donem', 'Odeme Tipi': 'Online', 'Islem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.bank || 0), Oran: fmtPct((toMoney(sales.byMethod?.bank || 0) / Math.max(1, summary.totalRevenue)) * 100) },
-      { Saat: 'Donem', 'Odeme Tipi': 'Acik Hesap', 'Islem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.account || 0), Oran: fmtPct((toMoney(sales.byMethod?.account || 0) / Math.max(1, summary.totalRevenue)) * 100) }
+      { Saat: 'Dönem', 'Ödeme Tipi': 'Nakit', 'İşlem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.cash || 0), Oran: fmtPct((toMoney(sales.byMethod?.cash || 0) / Math.max(1, summary.totalRevenue)) * 100) },
+      { Saat: 'Dönem', 'Ödeme Tipi': 'Kredi Kartı', 'İşlem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.pos || 0), Oran: fmtPct((toMoney(sales.byMethod?.pos || 0) / Math.max(1, summary.totalRevenue)) * 100) },
+      { Saat: 'Dönem', 'Ödeme Tipi': 'Online', 'İşlem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.bank || 0), Oran: fmtPct((toMoney(sales.byMethod?.bank || 0) / Math.max(1, summary.totalRevenue)) * 100) },
+      { Saat: 'Dönem', 'Ödeme Tipi': 'Açık Hesap', 'İşlem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.account || 0), Oran: fmtPct((toMoney(sales.byMethod?.account || 0) / Math.max(1, summary.totalRevenue)) * 100) }
     ].filter((row) => toMoney(String(row.Tutar).replace(/[^\d,.-]/g, '').replace(',', '.')) >= 0),
     productPerformance: productWithMeta.slice(0, 20).map((item) => ({ Urun: item.name || '-', Kategori: item.categoryName || '-', Adet: String(item.qty || 0), 'Birim Fiyat': fmtTl(item.price || 0), Ciro: fmtTl(item.revenue || 0), Kar: '-' })),
-    categoryRevenue: categoryRows.slice(0, 20).map((item) => ({ Kategori: item.category, 'Urun Adedi': String(item.itemCount), 'Satis Adedi': String(item.qty), Ciro: fmtTl(item.revenue), Oran: fmtPct((item.revenue / Math.max(1, summary.totalRevenue)) * 100) })),
+    categoryRevenue: categoryRows.slice(0, 20).map((item) => ({ Kategori: item.category, 'Ürün Adedi': String(item.itemCount), 'Satis Adedi': String(item.qty), Ciro: fmtTl(item.revenue), Oran: fmtPct((item.revenue / Math.max(1, summary.totalRevenue)) * 100) })),
     hourlyDensity: hourly.map((item) => ({ Saat: item.label, Siparis: String(item.count || 0), Masa: String(item.tableCount || 0), Paket: String(item.deliveryCount || 0), Ciro: fmtTl(item.revenue || 0) })),
     waiterPerformance: [],
     tableTurnover: orders.filter((order) => String(order.tableName || '').trim()).slice(0, 20).map((order) => ({ Masa: order.tableName || '-', Acilis: fmtTime(order.createdAt), Kapanis: fmtTime(order.closedAt), Sure: formatDurationMinutes(order.createdAt, order.closedAt), Tutar: fmtTl(order.netTotal || 0) })),
-    openAccount: accounts.slice(0, 20).map((account) => ({ Cari: account.name || '-', 'Son Islem': fmtDate(account.createdAt), Borc: fmtTl(account.balance || 0), Tahsilat: fmtTl(0), Kalan: fmtTl(account.balance || 0) })),
+    openAccount: accounts.slice(0, 20).map((account) => ({ Cari: account.name || '-', 'Son İşlem': fmtDate(account.createdAt), Borc: fmtTl(account.balance || 0), Tahsilat: fmtTl(0), Kalan: fmtTl(account.balance || 0) })),
     cancelWaste: cancelledProducts.slice(0, 20).map((item) => ({ Saat: '-', Urun: item.name || '-', Adet: String(item.qty || 0), Neden: '-', Tutar: fmtTl(item.revenue || 0), Personel: '-' })),
-    discounts: discountOrders.slice(0, 20).map((order) => ({ Saat: fmtTime(order.closedAt), 'Masa/Siparis': order.tableName || (order.orderNo ? `Siparis ${order.orderNo}` : '-'), Indirim: fmtTl(order.discountValue || 0), Sebep: '-', Yetkili: '-' })),
+    discounts: discountOrders.slice(0, 20).map((order) => ({ Saat: fmtTime(order.closedAt), 'Masa/Siparis': order.tableName || (order.orderNo ? `Sipariş ${order.orderNo}` : '-'), Indirim: fmtTl(order.discountValue || 0), Sebep: '-', Yetkili: '-' })),
     kitchenPrepTime: kitchenOrders.slice(0, 20).map((order) => ({ Siparis: order.tableName || order.customerName || order.id || '-', Urun: String(safeArray(order.items).length), Baslangic: fmtTime(order.createdAt), Hazir: order.completedAt ? fmtTime(order.completedAt) : '-', Sure: order.completedAt ? formatDurationMinutes(order.createdAt, order.completedAt) : '-' })),
-    deliveryPerformance: deliveryOrders.slice(0, 20).map((order) => ({ Siparis: order.orderNo ? `Siparis ${order.orderNo}` : order.id || '-', Musteri: order.customerName || '-', Kurye: order.courierName || '-', Durum: order.deliveryStatus || order.status || '-', Sure: '-', Tutar: fmtTl(order.netTotal || order.total || 0) })),
+    deliveryPerformance: deliveryOrders.slice(0, 20).map((order) => ({ Siparis: order.orderNo ? `Sipariş ${order.orderNo}` : order.id || '-', Musteri: order.customerName || '-', Kurye: order.courierName || '-', Durum: order.deliveryStatus || order.status || '-', Sure: '-', Tutar: fmtTl(order.netTotal || order.total || 0) })),
+    courierReport: courierRows.map((row) => ({ Kurye: row.courierName || '-', 'Atanan Sipariş': String(row.assignedOrderCount || 0), 'Teslim Edilen': String(row.deliveredOrderCount || 0), 'Geri Dönen': String(row.returnedOrderCount || 0), İptal: String(row.cancelledOrderCount || 0), 'Toplam Tutar': fmtTl(row.totalPackageAmount || 0), 'Tahsil Edilen': fmtTl((row.collectedCashAmount || 0) + (row.collectedCardAmount || 0)), Veresiye: fmtTl(row.receivableAmount || 0), 'Ortalama Teslim Süresi': `${Number(row.averageDeliveryMinutes || 0)} dk` })),
     taxVat: Array.from(productWithMeta.reduce((map, item) => {
       const key = String(Number(item.vatRate || 0))
       const revenue = toMoney(item.revenue || 0)
@@ -958,13 +1116,33 @@ export const buildReportDetailData = (report, datasets, summary) => {
       prev.count += 1
       map.set(key, prev)
       return map
-    }, new Map()).values()).map((item) => ({ Tarih: 'Donem', 'KDV Orani': `%${item.vatRate}`, Matrah: fmtTl(item.base), KDV: fmtTl(item.tax), Toplam: fmtTl(item.total) })),
+    }, new Map()).values()).map((item) => ({ Tarih: 'Dönem', 'KDV Oranı': `%${item.vatRate}`, Matrah: fmtTl(item.base), KDV: fmtTl(item.tax), Toplam: fmtTl(item.total) })),
     cashierShift: [],
     stockConsumption: productWithMeta.filter((item) => item.stockTrackingEnabled).slice(0, 20).map((item) => ({ Urun: item.name || '-', Baslangic: String(item.stockQty || 0), Tuketim: String(item.qty || 0), Kalan: String(Math.max(0, Number(item.stockQty || 0) - Number(item.qty || 0))), Durum: Number(item.stockQty || 0) <= 10 ? 'Kritik' : 'Normal' })),
-    customerBehavior: customerRows.slice(0, 20).map((item) => ({ Musteri: item.name, Ziyaret: String(item.count), Harcama: fmtTl(item.spend), 'Favori Urun': '-', 'Son Islem': fmtDate(item.last) }))
+    customerBehavior: customerRows.slice(0, 20).map((item) => ({ Musteri: item.name, Ziyaret: String(item.count), Harcama: fmtTl(item.spend), 'Favori Ürün': '-', 'Son İşlem': fmtDate(item.last) }))
+  }
+
+  metricValuesByKey.paymentDistribution = Object.fromEntries(paymentMetricEntries.map((item) => [item.label, item.value]))
+  rowsByKey.paymentDistribution = paymentDistributionRows.map((row) => ({
+    Saat: 'Dönem',
+    'Ödeme Tipi': row.label,
+    'İşlem Sayisi': String(row.count || summary.orderCount || 0),
+    Tutar: fmtTl(row.amount),
+    Oran: fmtPct((row.amount / Math.max(1, summary.totalPaid || summary.totalRevenue)) * 100)
+  }))
+
+  if (report.key === 'paymentDistribution' && Array.isArray(report.tableColumns) && report.tableColumns.length >= 5) {
+    rowsByKey.paymentDistribution = paymentDistributionRows.map((row) => ({
+      [report.tableColumns[0]]: 'Dönem',
+      [report.tableColumns[1]]: row.label,
+      [report.tableColumns[2]]: String(row.count || summary.orderCount || 0),
+      [report.tableColumns[3]]: fmtTl(row.amount),
+      [report.tableColumns[4]]: fmtPct((row.amount / Math.max(1, summary.totalPaid || summary.totalRevenue)) * 100)
+    }))
   }
 
   return {
+    metricEntries: report.key === 'paymentDistribution' ? paymentMetricEntries : null,
     metricValues: metricValuesByKey[report.key] || {},
     rows: rowsByKey[report.key] || []
   }
@@ -989,6 +1167,13 @@ export default function ReportsPage() {
 
   const selectedKey = selectedBranches.join(',')
   const detailData = useMemo(() => selectedReport ? buildReportDetailData(selectedReport, datasets, summary) : null, [selectedReport, datasets, summary])
+  const branchesLabel = useMemo(() => {
+    if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) return '-'
+    const names = selectedBranches
+      .map((id) => branchOptions.find((branch) => branch.id === id)?.name || 'Aktif Şube')
+      .filter(Boolean)
+    return names.length > 0 ? names.join(', ') : '-'
+  }, [branchOptions, selectedBranches])
   const hourlyReport = useMemo(() => reportDefinitions.find((report) => report.key === 'hourlyDensity') || null, [])
   const paymentReport = useMemo(() => reportDefinitions.find((report) => report.key === 'paymentDistribution') || null, [])
   const topSellersReport = useMemo(() => reportDefinitions.find((report) => report.key === 'productPerformance') || null, [])
@@ -1003,7 +1188,7 @@ export default function ReportsPage() {
   useEffect(() => {
     const loadBranches = async () => {
       if (allowedIds.length <= 1) {
-        setBranchOptions(allowedIds.map((id) => ({ id, name: 'Aktif Sube' })))
+        setBranchOptions(allowedIds.map((id) => ({ id, name: 'Aktif Şube' })))
         return
       }
       const res = await api('/api/branches', { silent: true })
@@ -1020,7 +1205,7 @@ export default function ReportsPage() {
   useEffect(() => {
     const load = async () => {
       if (!Array.isArray(selectedBranches) || selectedBranches.length === 0) {
-        setError('Sube seciniz')
+        setError('Şube seciniz')
         setSummary(EMPTY_SUMMARY)
         setDatasets(EMPTY_DATASETS)
         return
@@ -1028,7 +1213,7 @@ export default function ReportsPage() {
 
       const { params } = buildBranchQueryParams(selectedBranches)
       if (!params) {
-        setError('Sube seciniz')
+        setError('Şube seciniz')
         return
       }
 
@@ -1051,6 +1236,10 @@ export default function ReportsPage() {
       deliveryParams.set('limit', '50')
       deliveryParams.set('page', '1')
 
+      const courierReportParams = new URLSearchParams(params)
+      if (range.start) courierReportParams.set('startDate', range.start)
+      if (range.end) courierReportParams.set('endDate', range.end)
+
       setLoading(true)
       setError('')
 
@@ -1061,6 +1250,7 @@ export default function ReportsPage() {
           api(`/api/reports/orders?${reportParams.toString()}&status=closed`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api('/api/accounts?limit=50', { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api(`/api/pos/delivery/orders?${deliveryParams.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
+          api(`/api/pos/courier-report?${courierReportParams.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api(`/api/kitchen/orders?${params.toString()}`, { silent: true, skipBranchHeader: true, suppressBranchModal: true }),
           api('/api/tenant/menu-items?active=true', { silent: true }),
           api('/api/tenant/categories?active=true', { silent: true })
@@ -1071,9 +1261,10 @@ export default function ReportsPage() {
         const ordersRes = results[2].status === 'fulfilled' ? results[2].value : null
         const accountsRes = results[3].status === 'fulfilled' ? results[3].value : null
         const deliveryRes = results[4].status === 'fulfilled' ? results[4].value : null
-        const kitchenRes = results[5].status === 'fulfilled' ? results[5].value : null
-        const menuItemsRes = results[6].status === 'fulfilled' ? results[6].value : null
-        const categoriesRes = results[7].status === 'fulfilled' ? results[7].value : null
+        const courierReportRes = results[5].status === 'fulfilled' ? results[5].value : null
+        const kitchenRes = results[6].status === 'fulfilled' ? results[6].value : null
+        const menuItemsRes = results[7].status === 'fulfilled' ? results[7].value : null
+        const categoriesRes = results[8].status === 'fulfilled' ? results[8].value : null
 
         if (!dashboardRes?.ok) {
           setError(String(dashboardRes?.message || 'Raporlar yuklenemedi'))
@@ -1090,6 +1281,7 @@ export default function ReportsPage() {
           orders: safeArray(ordersRes?.orders),
           accounts: safeArray(accountsRes?.accounts),
           deliveryOrders: safeArray(deliveryRes?.orders),
+          courierReportRows: safeArray(courierReportRes?.rows),
           kitchenOrders: safeArray(kitchenRes?.orders),
           menuItems: safeArray(menuItemsRes?.items),
           categories: safeArray(categoriesRes?.categories)
@@ -1186,8 +1378,8 @@ export default function ReportsPage() {
         />
       </div>
       <ReportCatalog onSelect={setSelectedReport} isMobilePortrait={isMobilePortrait} />
-      {(loading || exporting) && <div style={{ color: '#64748b', fontSize: 13 }}>{exporting ? 'Rapor dosyasi hazirlaniyor...' : 'Rapor verileri sistemden yukleniyor...'}</div>}
-      {selectedReport && <ReportDetail report={selectedReport} onClose={() => setSelectedReport(null)} detailData={detailData} isMobilePortrait={isMobilePortrait} />}
+      {(loading || exporting) && <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>{exporting ? 'Rapor dosyasi hazırlanıyor...' : 'Rapor verileri sistemden yükleniyor...'}</div>}
+      {selectedReport && <ReportDetail report={selectedReport} onClose={() => setSelectedReport(null)} detailData={detailData} isMobilePortrait={isMobilePortrait} rangeLabel={rangeLabel} branchesLabel={branchesLabel} />}
     </div>
   )
 }

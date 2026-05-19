@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
 type Category = {
   id: string
@@ -31,12 +32,12 @@ const products: Product[] = [
   {
     id: 1,
     category: 'popular',
-    name: 'Sef Burger Menu',
+    name: 'Sef Burger Menü',
     desc: 'Dana burger, cheddar, karamelize sogan, ozel sos ve citir patates.',
     price: 285,
     badge: 'Cok Satan',
     image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=900&auto=format&fit=crop',
-    info: ['Dana eti', 'Cheddar', 'Gluten icerir', 'Patates dahil']
+    info: ['Dana eti', 'Cheddar', 'Gluten içerir', 'Patates dahil']
   },
   {
     id: 2,
@@ -52,11 +53,11 @@ const products: Product[] = [
     id: 3,
     category: 'breakfast',
     name: 'Serpme Kahvalti',
-    desc: 'Peynir cesitleri, zeytin, bal-kaymak, menemen ve sinirsiz cay.',
+    desc: 'Peynir cesitleri, zeytin, bal-kaymak, menemen ve sınırsız cay.',
     price: 420,
-    badge: '2 Kisilik',
+    badge: '2 Kişilik',
     image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?q=80&w=900&auto=format&fit=crop',
-    info: ['2 kisilik', 'Sinirsiz cay', 'Yumurta icerir', 'Sut urunu icerir']
+    info: ['2 kişilik', 'Sınırsız cay', 'Yumurta içerir', 'Süt urunu içerir']
   },
   {
     id: 4,
@@ -76,7 +77,7 @@ const products: Product[] = [
     price: 310,
     badge: 'Yeni',
     image: 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?q=80&w=900&auto=format&fit=crop',
-    info: ['Mozzarella', 'Gluten icerir', 'Domates sos', 'Vejetaryen']
+    info: ['Mozzarella', 'Gluten içerir', 'Domates sos', 'Vejetaryen']
   },
   {
     id: 6,
@@ -96,7 +97,7 @@ const products: Product[] = [
     price: 175,
     badge: 'Favori',
     image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?q=80&w=900&auto=format&fit=crop',
-    info: ['Sut urunu icerir', 'Yumurta icerir', 'Cikolata sos', 'Gunluk hazirlanir']
+    info: ['Süt urunu içerir', 'Yumurta içerir', 'Cikolata sos', 'Günlük hazirlanir']
   }
 ]
 
@@ -109,8 +110,10 @@ export default function DigitalMenuPage() {
   const [query, setQuery] = useState<string>('')
   const [selected, setSelected] = useState<Product | null>(null)
 
+  useBodyLayoutMode('public-site-layout')
+
   useEffect(() => {
-    document.title = 'PenPOS | Dijital Menu'
+    document.title = 'PenPOS | Dijital Menü'
   }, [])
 
   useEffect(() => {
@@ -131,46 +134,46 @@ export default function DigitalMenuPage() {
     })
   }, [active, query])
 
-  const activeLabel = categories.find((category) => category.id === active)?.label || 'Menu'
+  const activeLabel = categories.find((category) => category.id === active)?.label || 'Menü'
 
   return (
-    <div className="digital-menu-page">
-      <div className="digital-menu-shell">
-        <header className="digital-menu-header">
-          <div className="digital-menu-brand-row">
+    <div className="digital-menü-page">
+      <div className="digital-menü-shell">
+        <header className="digital-menü-header">
+          <div className="digital-menü-brand-row">
             <div>
-              <div className="digital-menu-kicker">QR Dijital Menu</div>
-              <h1 className="digital-menu-title">PenPOS Restaurant</h1>
-              <p className="digital-menu-subtitle">QR kodu okutarak menuyu inceleyin.</p>
+              <div className="digital-menü-kicker">QR Dijital Menü</div>
+              <h1 className="digital-menü-title">PenPOS Restaurant</h1>
+              <p className="digital-menü-subtitle">QR kodu okutarak menuyu inceleyin.</p>
             </div>
-            <div className="digital-menu-qr-badge">
+            <div className="digital-menü-qr-badge">
               <span>ORTAK</span>
               <strong>QR</strong>
             </div>
           </div>
 
-          <section className="digital-menu-hero">
-            <div className="digital-menu-hero-copy">
-              <span className="digital-menu-hero-pill">Bugunun onerisi</span>
-              <h2>Sef Burger Menu</h2>
-              <p>Detaylari gormek icin urune dokunun.</p>
+          <section className="digital-menü-hero">
+            <div className="digital-menü-hero-copy">
+              <span className="digital-menü-hero-pill">Bugunun onerisi</span>
+              <h2>Sef Burger Menü</h2>
+              <p>Detaylari görmek için urune dokunun.</p>
             </div>
-            <div className="digital-menu-hero-image-wrap">
-              <img src={products[0].image} alt="Sef Burger Menu" className="digital-menu-hero-image" />
+            <div className="digital-menü-hero-image-wrap">
+              <img src={products[0].image} alt="Sef Burger Menü" className="digital-menü-hero-image" />
             </div>
           </section>
 
-          <label className="digital-menu-search">
-            <span className="digital-menu-search-icon" aria-hidden="true">🔍</span>
+          <label className="digital-menü-search">
+            <span className="digital-menü-search-icon" aria-hidden="true">🔍</span>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Urun, kategori veya aciklama ara..."
-              className="digital-menu-search-input"
+              placeholder="Ürün, kategori veya aciklama ara..."
+              className="digital-menü-search-input"
             />
           </label>
 
-          <div className="digital-menu-categories" aria-label="Menu kategorileri">
+          <div className="digital-menü-categories" aria-label="Menü kategorileri">
             {categories.map((category) => {
               const isActive = active === category.id
               return (
@@ -178,7 +181,7 @@ export default function DigitalMenuPage() {
                   key={category.id}
                   type="button"
                   onClick={() => setActive(category.id)}
-                  className={`digital-menu-category-pill${isActive ? ' is-active' : ''}`}
+                  className={`digital-menü-category-pill${isActive ? ' is-active' : ''}`}
                 >
                   <span aria-hidden="true">{category.icon}</span>
                   <span>{category.label}</span>
@@ -188,37 +191,37 @@ export default function DigitalMenuPage() {
           </div>
         </header>
 
-        <main className="digital-menu-content">
-          <div className="digital-menu-content-head">
+        <main className="digital-menü-content">
+          <div className="digital-menü-content-head">
             <div>
               <h3>{activeLabel}</h3>
               <p>{visibleProducts.length} urun listeleniyor</p>
             </div>
-            <div className="digital-menu-mode-pill">Menu modu</div>
+            <div className="digital-menü-mode-pill">Menü modu</div>
           </div>
 
-          <div className="digital-menu-grid">
+          <div className="digital-menü-grid">
             {visibleProducts.map((product, index) => (
               <button
                 key={product.id}
                 type="button"
                 onClick={() => setSelected(product)}
-                className="digital-menu-card"
+                className="digital-menü-card"
                 style={{ animationDelay: `${index * 45}ms` }}
               >
-                <div className="digital-menu-card-image-wrap">
-                  <img src={product.image} alt={product.name} className="digital-menu-card-image" />
-                  <span className="digital-menu-card-badge">{product.badge}</span>
+                <div className="digital-menü-card-image-wrap">
+                  <img src={product.image} alt={product.name} className="digital-menü-card-image" />
+                  <span className="digital-menü-card-badge">{product.badge}</span>
                 </div>
-                <div className="digital-menu-card-body">
-                  <div className="digital-menu-card-top">
+                <div className="digital-menü-card-body">
+                  <div className="digital-menü-card-top">
                     <h4>{product.name}</h4>
-                    <span className="digital-menu-price">{money(product.price)}</span>
+                    <span className="digital-menü-price">{money(product.price)}</span>
                   </div>
-                  <p className="digital-menu-card-desc">{product.desc}</p>
-                  <div className="digital-menu-card-foot">
+                  <p className="digital-menü-card-desc">{product.desc}</p>
+                  <div className="digital-menü-card-foot">
                     <span>Detaylari gor</span>
-                    <span className="digital-menu-card-arrow" aria-hidden="true">›</span>
+                    <span className="digital-menü-card-arrow" aria-hidden="true">›</span>
                   </div>
                 </div>
               </button>
@@ -226,8 +229,8 @@ export default function DigitalMenuPage() {
           </div>
 
           {visibleProducts.length === 0 && (
-            <div className="digital-menu-empty">
-              <h4>Sonuc bulunamadi</h4>
+            <div className="digital-menü-empty">
+              <h4>Sonuç bulunamadı</h4>
               <p>Arama kelimesini veya kategori secimini degistirerek menuyu tekrar inceleyin.</p>
             </div>
           )}
@@ -236,41 +239,40 @@ export default function DigitalMenuPage() {
 
       {selected && (
         <div
-          className="digital-menu-modal-backdrop"
+          className="digital-menü-modal-backdrop"
           role="dialog"
           aria-modal="true"
-          onClick={() => setSelected(null)}
         >
-          <div className="digital-menu-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="digital-menu-modal-image-wrap">
-              <img src={selected.image} alt={selected.name} className="digital-menu-modal-image" />
-              <button type="button" onClick={() => setSelected(null)} className="digital-menu-modal-close">
+          <div className="digital-menü-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="digital-menü-modal-image-wrap">
+              <img src={selected.image} alt={selected.name} className="digital-menü-modal-image" />
+              <button type="button" onClick={() => setSelected(null)} className="digital-menü-modal-close">
                 ×
               </button>
-              <div className="digital-menu-modal-badge">{selected.badge}</div>
+              <div className="digital-menü-modal-badge">{selected.badge}</div>
             </div>
 
-            <div className="digital-menu-modal-body">
-              <div className="digital-menu-modal-head">
+            <div className="digital-menü-modal-body">
+              <div className="digital-menü-modal-head">
                 <div>
                   <h3>{selected.name}</h3>
                   <p>{selected.desc}</p>
                 </div>
-                <div className="digital-menu-modal-price">{money(selected.price)}</div>
+                <div className="digital-menü-modal-price">{money(selected.price)}</div>
               </div>
 
-              <section className="digital-menu-modal-info">
-                <h4>Urun Bilgisi</h4>
-                <div className="digital-menu-modal-tags">
+              <section className="digital-menü-modal-info">
+                <h4>Ürün Bilgisi</h4>
+                <div className="digital-menü-modal-tags">
                   {selected.info.map((item) => (
-                    <span key={item} className="digital-menu-modal-tag">
+                    <span key={item} className="digital-menü-modal-tag">
                       {item}
                     </span>
                   ))}
                 </div>
               </section>
 
-              <button type="button" onClick={() => setSelected(null)} className="digital-menu-modal-action">
+              <button type="button" onClick={() => setSelected(null)} className="digital-menü-modal-action">
                 Menuyu Incelemeye Devam Et
               </button>
             </div>

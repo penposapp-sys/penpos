@@ -13,5 +13,6 @@ router.get('/dashboard', requireAuth, tenantGuard, branchListGuard, requireRole(
 router.get('/products', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['reports_dashboard_view']), ctrl.products)
 router.get('/orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['closed_tables_view']), ctrl.orders)
 router.get('/export', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['reports_dashboard_view']), ctrl.exportXlsx)
+router.get('/z-report', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['reports_dashboard_view']), ctrl.zReport)
 
 export default router

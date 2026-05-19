@@ -8,6 +8,8 @@ import { branchListGuard } from '../middlewares/branchListGuard.js'
 import { resolveBranchFromTable, resolveBranchFromOrder } from '../middlewares/branchResolvers.js'
 import { validateObjectIdParam } from '../middlewares/validateObjectIdParam.js'
 import * as ctrl from '../controllers/posController.js'
+import * as deliveryCustomersCtrl from '../controllers/deliveryCustomersController.js'
+import * as packageCourierCtrl from '../controllers/packageCourierController.js'
 
 const router = Router()
 
@@ -52,7 +54,17 @@ router.get('/walkin/orders', requireAuth, tenantGuard, branchListGuard, requireR
 
 router.post('/delivery/orders', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'manage_delivery']), ctrl.createDeliveryOrder)
 router.get('/delivery/orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'view_delivery']), ctrl.listDeliveryOrders)
+router.get('/delivery/customers/search', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'view_delivery']), deliveryCustomersCtrl.searchDeliveryCustomers)
 router.put('/delivery/orders/:id/status', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'manage_delivery']), ctrl.updateDeliveryStatus)
 router.put('/delivery/orders/:id/customer', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'manage_delivery']), ctrl.updateDeliveryCustomer)
+
+router.get('/package-orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['package_courier_page_view', 'package_orders_view', 'view_delivery', 'manage_delivery']), packageCourierCtrl.listPackageOrders)
+router.get('/package-orders/:id', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['package_courier_page_view', 'package_orders_view', 'view_delivery', 'manage_delivery']), packageCourierCtrl.getPackageOrderDetail)
+router.post('/package-orders/:id/assign-courier', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['package_assign_courier', 'manage_delivery']), packageCourierCtrl.assignCourier)
+router.post('/package-orders/:id/status', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['package_status_update', 'manage_delivery']), packageCourierCtrl.updatePackageStatus)
+router.post('/package-orders/:id/payment-status', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['package_payment_status_update', 'manage_delivery']), packageCourierCtrl.updatePackagePaymentStatus)
+router.post('/package-orders/:id/collect-payment', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['take_payment', 'manage_delivery']), packageCourierCtrl.collectPackageOrderPayment)
+router.get('/couriers', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['package_assign_courier', 'package_courier_page_view', 'courier_reports_view', 'manage_delivery']), packageCourierCtrl.listCouriers)
+router.get('/courier-report', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['courier_reports_view', 'manage_delivery', 'reports_dashboard_view']), packageCourierCtrl.courierReport)
 
 export default router

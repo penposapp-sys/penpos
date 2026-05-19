@@ -53,7 +53,7 @@ export default function CanteenStockPage() {
   if (!canStock) return <div className="card">403 – Bu sayfaya yetkin yok</div>
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="canteen-stock-page" style={{ display: 'grid', gap: 12 }}>
       <div className="stickyTop" style={{ display: 'grid', gap: 10, paddingBottom: 12 }}>
         <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>

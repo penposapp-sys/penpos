@@ -40,7 +40,7 @@ export default function CanteenBranchSettingsPanel() {
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 700 }}>Kantin Ayarları</div>
+        <div style={{ fontWeight: 700 }}>Mağaza Ayarları</div>
         <button className="btn" type="button" onClick={load} disabled={loading} style={{ padding: '0 10px', height: 34 }}>{loading ? '...' : 'Yenile'}</button>
       </div>
 

@@ -5,8 +5,12 @@ import MobileTopSheetNav from '../../components/MobileTopSheetNav.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { normalizePermissions } from '../../constants/permissions.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
+import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
+import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionAllowedPath, isSubscriptionExpired } from '../../lib/subscription.js'
+import WebsiteLoadingScreen from '../../components/WebsiteLoadingScreen.jsx'
 
 const tokenKey = 'token_canteen'
+const qrSeenAtKey = 'canteen_qr_orders_seen_at'
 
 const todayLabel = () => {
   return new Date().toLocaleDateString('tr-TR', {
@@ -16,23 +20,48 @@ const todayLabel = () => {
   })
 }
 
+const getQrSeenAt = () => {
+  try {
+    const value = Number(localStorage.getItem(qrSeenAtKey) || 0)
+    return Number.isFinite(value) ? value : 0
+  } catch {
+    return 0
+  }
+}
+
+const setQrSeenAt = (value) => {
+  const numeric = Number(value || Date.now())
+  try { localStorage.setItem(qrSeenAtKey, String(Number.isFinite(numeric) ? numeric : Date.now())) } catch {}
+}
+
 export default function CanteenLayout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const [me, setMe] = useState(null)
   const [session, setSession] = useState(null)
+  const [tenantCtx, setTenantCtx] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [qrAlertCount, setQrAlertCount] = useState(0)
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { theme, themeKey } = useTheme()
+
+  useBodyLayoutMode('pos-app-layout')
+
+  useEffect(() => {
+    try { document.body.classList.add('app-shell-active') } catch {}
+    return () => {
+      try { document.body.classList.remove('app-shell-active') } catch {}
+    }
+  }, [])
 
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [pathname])
 
   useEffect(() => {
-    document.title = 'PenPOS - Kantin'
+    document.title = 'PenPOS - Mağaza'
   }, [pathname])
 
   useEffect(() => {
@@ -85,6 +114,8 @@ export default function CanteenLayout() {
 
       const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
       setSession(sess?.ok ? sess : null)
+      const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
+      setTenantCtx(ctx?.ok ? ctx : null)
       setLoading(false)
     }
     run()
@@ -95,6 +126,8 @@ export default function CanteenLayout() {
     const run = async () => {
       const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
       setSession(sess?.ok ? sess : null)
+      const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
+      setTenantCtx(ctx?.ok ? ctx : null)
     }
     run()
   }, [pathname, me?.id])
@@ -104,10 +137,14 @@ export default function CanteenLayout() {
     const handler = async () => {
       const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
       setSession(sess?.ok ? sess : null)
+      const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
+      setTenantCtx(ctx?.ok ? ctx : null)
     }
     window.addEventListener('canteen:session-updated', handler)
     return () => window.removeEventListener('canteen:session-updated', handler)
   }, [me?.id])
+
+  const isExpired = isSubscriptionExpired(tenantCtx)
 
   const IconCart = ({ size = 18 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9H7.5L6 6z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M6 6l-2-2H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="9" cy="20" r="1" stroke="currentColor" strokeWidth="2"/><circle cx="18" cy="20" r="1" stroke="currentColor" strokeWidth="2"/></svg>
@@ -124,26 +161,81 @@ export default function CanteenLayout() {
   const IconBoxes = ({ size = 18 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 0 0-1.2-1.8l-7-3.1a2 2 0 0 0-1.6 0l-7 3.1A2 2 0 0 0 3 8v8a2 2 0 0 0 1.2 1.8l7 3.1a2 2 0 0 0 1.6 0l7-3.1A2 2 0 0 0 21 16Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M3.3 7.3 12 11l8.7-3.7" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M12 22V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
   )
+  const IconQrOrders = ({ size = 18 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M3 5h2v2H3zM3 11h2v2H3zM3 17h2v2H3z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
+  )
   const IconLogout = ({ size = 16 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M10 17l5-5-5-5M3 12h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   )
 
+  const perms = Array.isArray(me?.permissions) ? me.permissions : []
+  const isAdmin = me?.role === 'tenant_admin'
+  const canPos = isAdmin || perms.includes('canteen_pos_access')
+  const canCustomers = isAdmin || perms.includes('canteen_customers_view') || perms.includes('canteen_customers_manage')
+  const canReports = isAdmin || perms.includes('canteen_reports_view')
+  const canStock = isAdmin || perms.includes('canteen_stock_manage') || perms.includes('canteen_stock_count')
+  const canSettings = isAdmin || perms.includes('manage_settings')
+  const canQrOrders = canPos || canCustomers
+
+  useEffect(() => {
+    if (!canQrOrders) return
+    if (!pathname.startsWith('/canteen/qr-siparisleri')) return
+    setQrSeenAt(Date.now())
+    setQrAlertCount(0)
+  }, [canQrOrders, pathname])
+
+  useEffect(() => {
+    if (!me || !canQrOrders || isExpired) {
+      setQrAlertCount(0)
+      return
+    }
+
+    let cancelled = false
+    let timerId = null
+
+    const loadQrAlerts = async () => {
+      const response = await api('/api/canteen/qr-orders?status=new', { silent: true, suppressAuthRedirect: true })
+      if (cancelled) return
+      if (!response?.ok || !Array.isArray(response?.items)) {
+        setQrAlertCount(0)
+        return
+      }
+
+      const seenAt = getQrSeenAt()
+      const unseenCount = response.items.filter((item) => {
+        const createdAt = new Date(item?.createdAt || 0).getTime()
+        return Number.isFinite(createdAt) && createdAt > seenAt
+      }).length
+
+      setQrAlertCount(unseenCount)
+    }
+
+    loadQrAlerts()
+    timerId = window.setInterval(loadQrAlerts, 15000)
+
+    return () => {
+      cancelled = true
+      if (timerId) window.clearInterval(timerId)
+    }
+  }, [canQrOrders, isExpired, me?.id])
+
   const itemsBase = useMemo(() => {
-    const perms = Array.isArray(me?.permissions) ? me.permissions : []
-    const isAdmin = me?.role === 'tenant_admin'
-    const canPos = isAdmin || perms.includes('canteen_pos_access')
-    const canCustomers = isAdmin || perms.includes('canteen_customers_view') || perms.includes('canteen_customers_manage')
-    const canReports = isAdmin || perms.includes('canteen_reports_view')
-    const canStock = isAdmin || perms.includes('canteen_stock_manage') || perms.includes('canteen_stock_count')
-    const canSettings = isAdmin || perms.includes('manage_settings')
+    if (isExpired) {
+      return [
+        { to: getSubscriptionUpgradePath('canteen'), label: 'Paket', icon: IconBarChart },
+        { to: getSubscriptionProfilePath('canteen'), label: 'Hesabım', icon: IconUsers }
+      ]
+    }
+
     const base = []
     if (canPos) base.push({ to: '/canteen/kasa', label: 'Kasa', icon: IconCart })
+    if (canQrOrders) base.push({ to: '/canteen/qr-siparisleri', label: 'QR Siparişleri', icon: IconQrOrders })
     if (canCustomers) base.push({ to: '/canteen/cariler', label: 'Cariler', icon: IconUsers })
     if (canReports) base.push({ to: '/canteen/raporlar', label: 'Raporlar', icon: IconBarChart })
     if (canStock) base.push({ to: '/canteen/stok', label: 'Stok', icon: IconBoxes })
     if (canSettings) base.push({ to: '/canteen/ayarlar', label: 'Ayarlar', icon: IconSettings })
     return base
-  }, [me])
+  }, [canCustomers, canPos, canQrOrders, canReports, canSettings, canStock, isExpired])
 
   const items = useMemo(() => {
     return (itemsBase || []).map((i) => {
@@ -157,25 +249,37 @@ export default function CanteenLayout() {
     .filter((i) => pathname === i.to || pathname.startsWith(String(i.to || '') + '/'))
     .sort((a, b) => String(b.to || '').length - String(a.to || '').length)[0]
 
-  const pageTitle = current?.label || 'Kantin'
+  const pageTitle = current?.label || 'Mağaza'
   const gridCols = isMobilePortrait ? '1fr' : `${desktopCollapsed ? (isTablet ? 92 : 94) : 228}px 1fr`
   const isMono = themeKey === 'mono'
-  const shellBg = '#f5f7fb'
+  const shellBg = theme.appBg || '#f5f7fb'
   const sidebarText = isMono ? '#1f2937' : '#ffffff'
   const sidebarMuted = isMono ? 'rgba(31,41,55,0.74)' : 'rgba(255,255,255,0.74)'
   const sidebarIconBg = isMono ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.08)'
   const sidebarHoverBg = isMono ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.14)'
+  const sidebarActiveText = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
+  const sidebarLogoutText = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
+  const sidebarLogoBg = theme.darkMode ? 'var(--surface-elevated, #1b1a18)' : theme.card
   const sidebarActiveShadow = theme.activeGlow || '0 18px 45px rgba(15, 23, 42, 0.22)'
   const shellShadow = isMono ? '0 14px 34px rgba(24, 24, 27, 0.08)' : '0 18px 42px rgba(15, 23, 42, 0.08)'
   const sidebarShadow = isMono ? '0 14px 32px rgba(24, 24, 27, 0.12)' : '0 24px 48px rgba(15, 23, 42, 0.22)'
   const topbarBorder = isMono ? 'rgba(24,24,27,0.08)' : theme.border
-  const accountLabel = String(me?.name || me?.fullName || me?.username || me?.email || 'Kullanici').trim()
-  const accountInitial = String(accountLabel || 'K').trim().charAt(0).toUpperCase()
+  const accountLabel = String(me?.name || me?.fullName || me?.username || me?.email || 'Kullanıcı').trim()
   const navButtonWidth = desktopCollapsed ? 58 : 188
   const navItemHeight = desktopCollapsed ? 44 : 46
   const navItemGap = 8
   const navStep = navItemHeight + navItemGap
   const activeIndex = items.findIndex((item) => item.to === current?.to)
+
+  if (loading) {
+    return (
+      <WebsiteLoadingScreen
+        badge="Mağaza paneli"
+        title="Mağaza ekranı hazırlanıyor"
+        message="Oturum, şube ve yetki bilgileri alınırken ekran aynı web sitesi diliyle kuruluyor."
+      />
+    )
+  }
 
   if (!localStorage.getItem(tokenKey) && !loading) {
     return <Navigate to="/canteen/login" replace />
@@ -183,8 +287,10 @@ export default function CanteenLayout() {
 
   if (loading) {
     return (
-      <div className="main" style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
-        <div className="card">Yukleniyor...</div>
+      <div className="public-auth-page">
+        <div className="main" style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+          <div className="card">Yükleniyor...</div>
+        </div>
       </div>
     )
   }
@@ -193,16 +299,26 @@ export default function CanteenLayout() {
     return <Navigate to="/canteen/login" replace />
   }
 
+  if (isExpired && !isSubscriptionAllowedPath(pathname, 'canteen')) {
+    return <Navigate to={getSubscriptionUpgradePath('canteen')} replace state={{ subscriptionExpired: true }} />
+  }
+
   const logout = () => {
     try { localStorage.removeItem(tokenKey) } catch {}
     nav('/canteen/login', { replace: true })
   }
 
+  const handleSidebarNavigate = (to) => {
+    if (!to) return
+    nav(to)
+    if (!desktopCollapsed) setDesktopCollapsed(true)
+  }
+
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', background: shellBg, color: '#0f172a' }}>
+    <div className="pos-app-shell" style={{ background: shellBg, color: theme.text }}>
       <MobileTopSheetNav
         open={isMobilePortrait && mobileMenuOpen}
-        title="Menu"
+        title="Menü"
         items={items}
         onClose={() => setMobileMenuOpen(false)}
         onSelect={(i) => {
@@ -217,15 +333,20 @@ export default function CanteenLayout() {
           gridTemplateColumns: gridCols,
           gap: 14,
           height: '100%',
+          minHeight: 0,
           padding: isMobilePortrait ? 12 : 16,
-          overflow: 'hidden'
+          alignItems: isMobilePortrait ? 'stretch' : 'start',
         }}
       >
         {!isMobilePortrait && (
           <aside
+            className="pos-sidebar"
             style={{
-              position: 'relative',
+              position: 'sticky',
+              top: 16,
               zIndex: 20,
+              alignSelf: 'start',
+              height: 'calc(100dvh - 32px)',
               minHeight: 0,
               borderRadius: 34,
               background: theme.sidebar,
@@ -246,7 +367,7 @@ export default function CanteenLayout() {
                   height: 64,
                   borderRadius: 24,
                   border: 'none',
-                  background: '#ffffff',
+                  background: sidebarLogoBg,
                   boxShadow: '0 18px 40px rgba(15, 23, 42, 0.16)',
                   display: 'grid',
                   placeItems: 'center',
@@ -256,7 +377,7 @@ export default function CanteenLayout() {
                 aria-label="Sidebar ac kapat"
               >
                 <img
-                  src={desktopCollapsed ? '/logo-1.png' : '/logo-2.png'}
+                  src={desktopCollapsed ? '/logo-1.png' : (theme.darkMode ? '/logo-3.png' : '/logo-2.png')}
                   alt="PenPOS"
                   style={{
                     width: desktopCollapsed ? 36 : 112,
@@ -292,7 +413,7 @@ export default function CanteenLayout() {
                         width: navButtonWidth,
                         height: navItemHeight,
                         borderRadius: 22,
-                        background: '#ffffff',
+                        background: theme.card,
                         border: '1px solid rgba(255,255,255,0.72)',
                         boxShadow: sidebarActiveShadow,
                         transform: `translateY(${activeIndex * navStep}px)`,
@@ -309,9 +430,9 @@ export default function CanteenLayout() {
                       <button
                         key={item.to}
                         type="button"
-                        className="sidebar-menu-button"
+                        className="sidebar-menü-button"
                         title={item.label}
-                        onClick={() => nav(item.to)}
+                        onClick={() => handleSidebarNavigate(item.to)}
                         style={{
                           position: 'relative',
                           zIndex: 1,
@@ -325,7 +446,7 @@ export default function CanteenLayout() {
                           border: 'none',
                           borderRadius: 22,
                           background: 'transparent',
-                          color: active ? '#0f172a' : sidebarMuted,
+                          color: active ? sidebarActiveText : sidebarMuted,
                           cursor: 'pointer',
                           fontWeight: 900,
                           textAlign: 'left'
@@ -333,7 +454,7 @@ export default function CanteenLayout() {
                       >
                         {!active && (
                           <span
-                            className="sidebar-menu-hover"
+                            className="sidebar-menü-hover"
                             style={{
                               position: 'absolute',
                               inset: 0,
@@ -357,7 +478,32 @@ export default function CanteenLayout() {
                               transition: 'all 260ms ease'
                             }}
                           >
-                            <Icon size={15} />
+                            <span style={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
+                              <Icon size={15} />
+                              {item.to === '/canteen/qr-siparisleri' && qrAlertCount > 0 && (
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    top: -6,
+                                    right: -7,
+                                    minWidth: 16,
+                                    height: 16,
+                                    paddingInline: qrAlertCount > 9 ? 4 : 0,
+                                    borderRadius: 999,
+                                    background: '#ef4444',
+                                    color: '#ffffff',
+                                    display: 'grid',
+                                    placeItems: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 900,
+                                    lineHeight: 1,
+                                    boxShadow: '0 0 0 2px rgba(18,18,17,0.92)'
+                                  }}
+                                >
+                                  {qrAlertCount > 9 ? '9+' : qrAlertCount}
+                                </span>
+                              )}
+                            </span>
                           </span>
                           {!desktopCollapsed && (
                             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13 }}>
@@ -390,9 +536,9 @@ export default function CanteenLayout() {
                 )}
                 <button
                   type="button"
-                  className="sidebar-menu-button"
+                  className="sidebar-menü-button"
                   onClick={logout}
-                  title="Cikis"
+                  title="Çıkış"
                   style={{
                     width: navButtonWidth,
                     height: navItemHeight,
@@ -403,8 +549,8 @@ export default function CanteenLayout() {
                     padding: desktopCollapsed ? 0 : '0 12px',
                     borderRadius: 22,
                     border: 'none',
-                    background: desktopCollapsed ? 'rgba(255,255,255,0.1)' : '#ffffff',
-                    color: desktopCollapsed ? sidebarText : '#0f172a',
+                    background: desktopCollapsed ? 'rgba(255,255,255,0.1)' : theme.card,
+                    color: desktopCollapsed ? sidebarText : sidebarLogoutText,
                     cursor: 'pointer',
                     fontWeight: 900,
                     boxShadow: desktopCollapsed ? 'none' : '0 16px 32px rgba(15, 23, 42, 0.14)'
@@ -413,7 +559,7 @@ export default function CanteenLayout() {
                   <span style={{ display: 'grid', width: desktopCollapsed ? 34 : 36, height: desktopCollapsed ? 34 : 36, placeItems: 'center', borderRadius: 15, background: desktopCollapsed ? 'rgba(255,255,255,0.08)' : theme.accent, color: '#ffffff' }}>
                     <IconLogout size={15} />
                   </span>
-                  {!desktopCollapsed && <span>Cikis</span>}
+                  {!desktopCollapsed && <span>Çıkış</span>}
                 </button>
               </div>
             </div>
@@ -421,6 +567,7 @@ export default function CanteenLayout() {
         )}
 
         <main
+          className="pos-main"
           style={{
             minWidth: 0,
             minHeight: 0,
@@ -428,7 +575,7 @@ export default function CanteenLayout() {
             flexDirection: 'column',
             overflow: 'hidden',
             borderRadius: 34,
-            background: '#ffffff',
+            background: theme.card,
             padding: isMobilePortrait ? 14 : 18,
             boxShadow: shellShadow
           }}
@@ -463,56 +610,17 @@ export default function CanteenLayout() {
                       borderColor: topbarBorder,
                       color: theme.accentText
                     }}
-                    aria-label="Menu"
+                    aria-label="Menü"
                     onClick={() => setMobileMenuOpen((value) => !value)}
                   >
                     &#8801;
                   </button>
                 )}
-                <div style={{ display: 'grid', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 20 : 28 }}>{pageTitle}</span>
-                    <span className="page-pill">{session?.branchName || 'Kantin Paneli'}</span>
-                  </div>
-                  <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-                    Siparis, cariler, stok ve ayar akisini tema ile ayni dilde yonet.
-                  </div>
-                </div>
+                <div style={{ fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 18 : 22, lineHeight: 1.1 }}>{pageTitle}</div>
               </div>
 
               <div className="topbar-meta" style={{ gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <span className="page-pill">{todayLabel()}</span>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '6px 10px 6px 6px',
-                    borderRadius: 18,
-                    border: `1px solid ${topbarBorder}`,
-                    background: '#ffffff',
-                    color: theme.text
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 14,
-                      display: 'grid',
-                      placeItems: 'center',
-                      background: theme.accent,
-                      color: '#ffffff',
-                      fontWeight: 900
-                    }}
-                  >
-                    {accountInitial}
-                  </span>
-                  <div style={{ display: 'grid', gap: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.1 }}>{accountLabel}</span>
-                    <span style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.1 }}>{me?.role === 'tenant_admin' ? 'Yonetici' : 'Personel'}</span>
-                  </div>
-                </div>
                 {isMobilePortrait && (
                   <button
                     className="btn"
@@ -520,17 +628,17 @@ export default function CanteenLayout() {
                     onClick={logout}
                     style={{ borderRadius: 16, fontWeight: 900 }}
                   >
-                    Cikis
+                    Çıkış
                   </button>
                 )}
               </div>
             </div>
           </header>
 
-          <section style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: isMobilePortrait ? 0 : 2 }}>
-            <div style={{ minWidth: 0, minHeight: '100%' }}>
-              <div className="main" style={{ minHeight: '100%', padding: 0 }}>
-                <Outlet context={{ me, session }} />
+          <section className="page-scroll page-scroll-area scrollbar-hidden" style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingRight: isMobilePortrait ? 0 : 2 }}>
+            <div className="page-content" key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>
+              <div className="main" style={{ padding: 0 }}>
+                <Outlet context={{ me, session, tenantCtx }} />
               </div>
             </div>
           </section>

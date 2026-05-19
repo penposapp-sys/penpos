@@ -24,6 +24,22 @@ const toPositiveNumberOrNull = (value, fallback = null) => {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
+const normalizeReceiptUsage = (entry = {}) => {
+  const rawCashier = entry?.useForCashierReceipt
+  const rawKitchen = entry?.useForKitchenReceipt
+  if (typeof rawCashier === 'boolean' || typeof rawKitchen === 'boolean') {
+    return {
+      useForCashierReceipt: rawCashier === true,
+      useForKitchenReceipt: rawKitchen === true
+    }
+  }
+  const receiptRole = String(entry?.receiptRole || '').trim().toLowerCase()
+  if (receiptRole === 'kitchen') {
+    return { useForCashierReceipt: false, useForKitchenReceipt: true }
+  }
+  return { useForCashierReceipt: true, useForKitchenReceipt: false }
+}
+
 const normalizeStationPrinters = (value) => {
   const src = Array.isArray(value) ? value : []
   const out = []
@@ -39,6 +55,13 @@ const normalizeStationPrinters = (value) => {
       .map(String)
       .filter(mongoose.isValidObjectId)
       .map((id) => new mongoose.Types.ObjectId(id))
+    const rawReceiptCategoryIds = Array.isArray(entry.categoryIds) ? entry.categoryIds : []
+    const categoryIds = rawReceiptCategoryIds
+      .map(String)
+      .filter(mongoose.isValidObjectId)
+      .map((id) => new mongoose.Types.ObjectId(id))
+    const receiptRole = String(entry.receiptRole || '').trim().toLowerCase() === 'kitchen' ? 'kitchen' : 'cashier'
+    const { useForCashierReceipt, useForKitchenReceipt } = normalizeReceiptUsage(entry)
     out.push({
       _id: entry._id && mongoose.isValidObjectId(String(entry._id)) ? new mongoose.Types.ObjectId(String(entry._id)) : new mongoose.Types.ObjectId(),
       name,
@@ -46,6 +69,10 @@ const normalizeStationPrinters = (value) => {
       windowsPrinterName,
       isActive: entry.isActive !== false,
       labelCategoryIds,
+      categoryIds,
+      receiptRole,
+      useForCashierReceipt,
+      useForKitchenReceipt,
       autoPrintOnOrder: entry.autoPrintOnOrder === true,
       printOnReady: entry.printOnReady === true,
       widthMm: printerType === 'label' ? toPositiveNumberOrNull(entry.widthMm) : null,
@@ -64,6 +91,10 @@ const mapStationPrinter = (entry) => ({
   windowsPrinterName: String(entry?.windowsPrinterName || ''),
   isActive: entry?.isActive !== false,
   labelCategoryIds: Array.isArray(entry?.labelCategoryIds) ? entry.labelCategoryIds.map(String) : [],
+  categoryIds: Array.isArray(entry?.categoryIds) ? entry.categoryIds.map(String) : [],
+  receiptRole: String(entry?.receiptRole || '').trim().toLowerCase() === 'kitchen' ? 'kitchen' : 'cashier',
+  useForCashierReceipt: normalizeReceiptUsage(entry).useForCashierReceipt,
+  useForKitchenReceipt: normalizeReceiptUsage(entry).useForKitchenReceipt,
   autoPrintOnOrder: entry?.autoPrintOnOrder === true,
   printOnReady: entry?.printOnReady === true,
   widthMm: toPositiveNumberOrNull(entry?.widthMm),
@@ -76,9 +107,40 @@ export const resolveStationPrinterConfig = ({ station, jobType, jobMeta, trigger
   const printers = Array.isArray(station?.printers) ? station.printers : []
   const activePrinters = printers.filter((entry) => entry && entry.isActive !== false)
   if (activePrinters.length === 0) return null
+  const explicitStationPrinterId = String(jobMeta?.stationPrinterId || '').trim()
+  if (explicitStationPrinterId) {
+    const exact = activePrinters.find((entry) => String(entry?._id || entry?.id || '') === explicitStationPrinterId)
+    if (exact) return exact
+  }
 
   if (jobType === 'receipt') {
-    return activePrinters.find((entry) => entry.printerType === 'receipt') || null
+    const receiptRole = String(jobMeta?.receiptRole || '').trim().toLowerCase() === 'kitchen' ? 'kitchen' : 'cashier'
+    const receiptPrinters = activePrinters.filter((entry) => entry.printerType === 'receipt')
+    if (receiptPrinters.length === 0) return null
+
+    const roleMatched = receiptPrinters.filter((entry) => {
+      const usage = normalizeReceiptUsage(entry)
+      return receiptRole === 'kitchen' ? usage.useForKitchenReceipt === true : usage.useForCashierReceipt === true
+    })
+    if (receiptRole !== 'kitchen') {
+      return roleMatched[0] || null
+    }
+
+    const categoryIds = Array.isArray(jobMeta?.categoryIds)
+      ? jobMeta.categoryIds.map(String).filter(Boolean)
+      : (jobMeta?.categoryId ? [String(jobMeta.categoryId)] : [])
+
+    const specificMatch = roleMatched.find((entry) => {
+      const printerCategories = Array.isArray(entry?.categoryIds) ? entry.categoryIds.map(String).filter(Boolean) : []
+      if (printerCategories.length === 0) return false
+      if (categoryIds.length === 0) return false
+      return categoryIds.some((id) => printerCategories.includes(id))
+    })
+    if (specificMatch) return specificMatch
+    return roleMatched.find((entry) => {
+      const printerCategories = Array.isArray(entry?.categoryIds) ? entry.categoryIds.map(String).filter(Boolean) : []
+      return printerCategories.length === 0
+    }) || roleMatched[0] || null
   }
 
   if (jobType !== 'label') return null

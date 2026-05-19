@@ -214,7 +214,7 @@ export default function ProductReportPage() {
                 </table>
               </div>
 
-              <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10, maxHeight: '65vh', overflowY: 'auto', paddingRight: 6 }}>
+              <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10 }}>
                 {items.map((r) => (
                   <div key={`${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff', display: 'grid', gap: 6 }}>
                     <div style={{ fontWeight: 800 }}>{r.name}</div>
@@ -235,24 +235,24 @@ export default function ProductReportPage() {
       </div>
 
       <div className="card">
-        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 10 }}>Iptal Olan Urunler Raporu</div>
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 10 }}>İptal Olan Urunler Raporu</div>
         <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 10 }}>
           Hazir/onay sonrasi iptal edilen urunler. Tarih filtresi iptal zamanina gore uygulanir.
         </div>
         {error && <div style={{ color: '#b91c1c', marginBottom: 10 }}>{error}</div>}
-        {loading && <div style={{ color: 'var(--muted)' }}>Yukleniyor...</div>}
+        {loading && <div style={{ color: 'var(--muted)' }}>Yükleniyor...</div>}
         {!loading && !error && (
           cancelledItems.length === 0 ? (
-            <div style={{ color: 'var(--muted)' }}>Bu aralikta hazir olduktan sonra iptal edilen urun yok.</div>
+            <div style={{ color: 'var(--muted)' }}>Bu aralikta hazır olduktan sonra iptal edilen ürün yok.</div>
           ) : (
             <>
               <div className="onlyDesktop desktop-only reportsTableWrap">
                 <table className="table" style={{ minWidth: 720 }}>
                   <thead>
                     <tr>
-                      <th>Urun</th>
-                      <th style={{ textAlign: 'right' }}>Iptal Adedi</th>
-                      <th style={{ textAlign: 'right' }}>Iptal Tutari</th>
+                      <th>Ürün</th>
+                      <th style={{ textAlign: 'right' }}>İptal Adedi</th>
+                      <th style={{ textAlign: 'right' }}>İptal Tutari</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -267,16 +267,16 @@ export default function ProductReportPage() {
                 </table>
               </div>
 
-              <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10, maxHeight: '65vh', overflowY: 'auto', paddingRight: 6 }}>
+              <div className="onlyMobile mobile-only" style={{ display: 'grid', gap: 10 }}>
                 {cancelledItems.map((r) => (
                   <div key={`cancelled-${r.productId || r.menuItemId}-${r.name}`} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: '#ffffff', display: 'grid', gap: 6 }}>
                     <div style={{ fontWeight: 800 }}>{r.name}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                      <div style={{ color: 'var(--muted)', fontSize: 12 }}>Iptal Adedi</div>
+                      <div style={{ color: 'var(--muted)', fontSize: 12 }}>İptal Adedi</div>
                       <div style={{ fontWeight: 800 }}>{Number(r.qty || 0)}</div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                      <div style={{ color: 'var(--muted)', fontSize: 12 }}>Iptal Tutari</div>
+                      <div style={{ color: 'var(--muted)', fontSize: 12 }}>İptal Tutari</div>
                       <div style={{ fontWeight: 900, color: '#b91c1c' }}>{fmtTl(r.revenue || 0)}</div>
                     </div>
                   </div>

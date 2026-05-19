@@ -41,8 +41,9 @@ export default function SettingsBranchCards({
                 padding: 12,
                 textAlign: 'left',
                 cursor: 'pointer',
-                background: '#ffffff',
-                borderColor: isSelected ? 'rgba(37, 99, 235, 0.18)' : 'var(--border)',
+                background: isSelected ? 'var(--app-surface-2, var(--app-surface-soft))' : 'var(--app-surface)',
+                color: 'var(--app-text)',
+                borderColor: isSelected ? 'var(--theme-accent, #2563eb)' : 'var(--app-border, var(--border))',
                 boxShadow: isSelected ? '0 18px 40px rgba(37, 99, 235, 0.12)' : '0 10px 26px rgba(15, 23, 42, 0.04)'
               }}
             >

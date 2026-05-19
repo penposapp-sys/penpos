@@ -45,7 +45,11 @@ const run = (file, args, { timeoutMs = 30000 } = {}) => {
 }
 
 const listPrintersWindows = async () => {
-  const cmd = 'Get-Printer | Select-Object -ExpandProperty Name'
+  const cmd = [
+    '$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()',
+    '[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()',
+    'Get-Printer | Select-Object -ExpandProperty Name'
+  ].join('; ')
   try {
     const { out } = await run('powershell.exe', ['-NoProfile', '-Command', cmd], { timeoutMs: 8000 })
     return String(out || '')
@@ -420,19 +424,62 @@ const printPdf = async ({ sumatraPath, printerName, pdfPath, orientation = 'port
 
 const psQuote = (value) => `'${String(value || '').replace(/'/g, "''")}'`
 
-const printRawText = async ({ printerName, content, txtPath }) => {
+const selectThermalReceiptContent = (job) => {
+  const rawContent = String(job?.rawContent || '').trim()
+  const variants = job?.meta?.thermalVariants && typeof job.meta.thermalVariants === 'object'
+    ? job.meta.thermalVariants
+    : null
+  const receiptWidthMm = Number(job?.printSettings?.options?.receiptWidthMm || 80)
+  const use32 = Number.isFinite(receiptWidthMm) && receiptWidthMm <= 58
+  const selected = use32 ? variants?.chars32 : variants?.chars48
+  const candidateRaw = String(selected?.raw || '').trim()
+  const candidateText = String(selected?.text || '').trim()
+  return candidateRaw || candidateText || rawContent
+}
+
+const printRawText = async ({ printerName, content, txtPath, encoding = 'cp857' }) => {
   const prn = String(printerName || '').trim()
   if (!prn) throw new Error('printerName missing')
-  const contentBase64 = Buffer.from(String(content || ''), 'latin1').toString('base64')
+  const normalizedEncoding = String(encoding || 'cp857').trim().toLowerCase()
+  const codePage = normalizedEncoding === 'cp1254' ? 1254 : 857
+  const contentBase64 = Buffer.from(String(content || ''), 'utf8').toString('base64')
   const script = [
     '$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()',
+    '[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()',
     '$printerName = ' + psQuote(prn),
     '$contentBase64 = ' + psQuote(contentBase64),
     '$txtPath = ' + psQuote(txtPath),
-    'Get-Printer -Name $printerName -ErrorAction Stop | Out-Null',
+    `$codePage = ${String(codePage)}`,
+    '$normalizeName = {',
+    '  param([string]$value)',
+    '  if ([string]::IsNullOrWhiteSpace($value)) { return "" }',
+    '  $normalized = $value.Normalize([Text.NormalizationForm]::FormD)',
+    '  $chars = New-Object System.Collections.Generic.List[char]',
+    '  foreach ($ch in $normalized.ToCharArray()) {',
+    '    if ([Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne [Globalization.UnicodeCategory]::NonSpacingMark) { [void]$chars.Add($ch) }',
+    '  }',
+    '  $plain = -join $chars.ToArray()',
+    "  $plain = $plain -replace [char]0xFFFD, ''",
+    "  $plain = $plain -replace '[^a-zA-Z0-9]', ''",
+    '  return $plain.ToLowerInvariant()',
+    '}',
+    '$availablePrinters = @(Get-Printer | Select-Object -ExpandProperty Name)',
+    '$matchedPrinterName = $availablePrinters | Where-Object { $_ -eq $printerName } | Select-Object -First 1',
+    'if (-not $matchedPrinterName) {',
+    '  $targetNormalized = & $normalizeName $printerName',
+    '  $matchedPrinterName = $availablePrinters | Where-Object { (& $normalizeName $_) -eq $targetNormalized } | Select-Object -First 1',
+    '}',
+    'if (-not $matchedPrinterName) {',
+    '  $targetNormalized = & $normalizeName $printerName',
+    '  $matchedPrinterName = $availablePrinters | Where-Object { (& $normalizeName $_).Contains($targetNormalized) -or $targetNormalized.Contains((& $normalizeName $_)) } | Select-Object -First 1',
+    '}',
+    'if (-not $matchedPrinterName) { throw "Printer not found: $printerName" }',
+    '$printerName = [string]$matchedPrinterName',
     '$printed = $false',
     'try {',
-    '  $bytes = [System.Convert]::FromBase64String($contentBase64)',
+    '  $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($contentBase64))',
+    '  $encoding = [System.Text.Encoding]::GetEncoding($codePage)',
+    '  $bytes = $encoding.GetBytes($content)',
     '  $rawPrinterType = \'using System; using System.Runtime.InteropServices; public static class RawPrinterHelper { [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public class DOCINFO { [MarshalAs(UnmanagedType.LPWStr)] public string pDocName; [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile; [MarshalAs(UnmanagedType.LPWStr)] public string pDataType; } [DllImport("winspool.drv", EntryPoint = "OpenPrinterW", SetLastError = true, CharSet = CharSet.Unicode)] public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault); [DllImport("winspool.drv", SetLastError = true)] public static extern bool ClosePrinter(IntPtr hPrinter); [DllImport("winspool.drv", EntryPoint = "StartDocPrinterW", SetLastError = true, CharSet = CharSet.Unicode)] public static extern int StartDocPrinter(IntPtr hPrinter, int level, DOCINFO di); [DllImport("winspool.drv", SetLastError = true)] public static extern bool EndDocPrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool StartPagePrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool EndPagePrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten); public static bool SendBytes(string printerName, byte[] bytes) { IntPtr hPrinter; if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false; try { var doc = new DOCINFO(); doc.pDocName = "PenPOS Raw Receipt"; doc.pDataType = "RAW"; if (StartDocPrinter(hPrinter, 1, doc) == 0) return false; try { if (!StartPagePrinter(hPrinter)) return false; IntPtr pUnmanaged = Marshal.AllocCoTaskMem(bytes.Length); try { Marshal.Copy(bytes, 0, pUnmanaged, bytes.Length); int written = 0; return WritePrinter(hPrinter, pUnmanaged, bytes.Length, out written) && written == bytes.Length; } finally { Marshal.FreeCoTaskMem(pUnmanaged); EndPagePrinter(hPrinter); } } finally { EndDocPrinter(hPrinter); } } finally { ClosePrinter(hPrinter); } } }\'',
     '  Add-Type -TypeDefinition $rawPrinterType -Language CSharp -ErrorAction Stop',
     '  [System.IO.File]::WriteAllBytes($txtPath, $bytes)',
@@ -440,8 +487,8 @@ const printRawText = async ({ printerName, content, txtPath }) => {
     '} catch {',
     '}',
     'if (-not $printed) {',
-    '  $content = [System.Text.Encoding]::GetEncoding(28591).GetString($bytes)',
-    '  [System.IO.File]::WriteAllText($txtPath, $content, [System.Text.UTF8Encoding]::new($false))',
+    '  $plainText = ($content -replace "[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "")',
+    '  [System.IO.File]::WriteAllText($txtPath, $plainText, [System.Text.UTF8Encoding]::new($false))',
     '  $text = [System.IO.File]::ReadAllText($txtPath, [System.Text.UTF8Encoding]::new($false))',
     '  $lines = $text -split "\\r?\\n"',
     '  Add-Type -AssemblyName System.Drawing -ErrorAction SilentlyContinue',
@@ -765,9 +812,11 @@ const main = async () => {
 
       if (String(job?.type || '').trim().toLowerCase() === 'receipt' && payloadType === 'raw' && rawContent) {
         const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
+        const thermalContent = selectThermalReceiptContent(job)
+        const thermalEncoding = String(job?.meta?.rawEncoding || 'cp857').trim() || 'cp857'
         try {
           for (let i = 0; i < copies; i++) {
-            await printRawText({ printerName, content: rawContent, txtPath: txtTmp })
+            await printRawText({ printerName, content: thermalContent, txtPath: txtTmp, encoding: thermalEncoding })
           }
           await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
         } finally {

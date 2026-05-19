@@ -8,6 +8,8 @@ const schema = new mongoose.Schema({
   phone: { type: String, default: '' },
   address: { type: String, default: '' },
   note: { type: String, default: '' },
+  passwordHash: { type: String, default: '' },
+  favoriteProductIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'CanteenProduct', default: [] },
   isActive: { type: Boolean, default: true, index: true },
   createdAt: { type: Date, default: Date.now },
   actorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }

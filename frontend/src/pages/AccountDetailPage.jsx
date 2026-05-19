@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { trStatusLabel } from '../i18n/tr.js'
 import Modal from '../components/Modal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import { pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
 const toNumberInput = (value) => {
@@ -46,7 +47,7 @@ export default function AccountDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   const [collectOpen, setCollectOpen] = useState(false)
-  const [collectForm, setCollectForm] = useState({ amount: '', method: 'cash', note: '' })
+  const [collectForm, setCollectForm] = useState({ amount: '', method: '', note: '' })
   const [collectMethods, setCollectMethods] = useState([])
   const [collectDiscountDraft, setCollectDiscountDraft] = useState('0')
   const [manualOpen, setManualOpen] = useState(false)
@@ -147,10 +148,7 @@ export default function AccountDetailPage() {
         }
         const methods = Array.isArray(res?.methods) ? res.methods.filter((m) => m.isEnabled) : []
         setCollectMethods(methods)
-        const def = methods.find((m) => m.isDefault && m.isEnabled)
-        if (def?.key) {
-          setCollectForm((prev) => ({ ...prev, method: def.key }))
-        }
+        setCollectForm((prev) => ({ ...prev, method: pickInitialPaymentMethod(methods, prev.method) }))
       } catch {}
     }
     run()
@@ -230,6 +228,10 @@ export default function AccountDetailPage() {
   const collect = async () => {
     const accountId = String(account?.id || '').trim()
     if (!accountId) return
+    if (!String(collectForm.method || '').trim()) {
+      toast.error('Odeme yontemi secin')
+      return
+    }
     const amt = toNumberInput(collectForm.amount)
     if (!Number.isFinite(amt) || amt < 0 || (amt + collectDiscountAmount) <= 0) {
       toast.error('Tutar geçersiz')
@@ -521,9 +523,9 @@ export default function AccountDetailPage() {
                 }}
               >
                 <div className="txRow">
-                  <div className="txLeft breakAny">{txTitle} • {money(amount)}</div>
-                  <div className="txRight" style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end' }}>
-                    <div>{new Date(t?.createdAt || Date.now()).toLocaleString()}</div>
+                  <div className="txLeft">{txTitle} • {money(amount)}</div>
+                  <div className="txRight">
+                    <div className="txDate">{new Date(t?.createdAt || Date.now()).toLocaleString()}</div>
                     {canDeleteThis && (
                       <button
                         className="btn btn--danger"
@@ -761,7 +763,7 @@ export default function AccountDetailPage() {
 
   const catalogGridStyle = isMobilePortrait || !canManageAccount
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start', width: '100%' }
-    : { display: 'grid', gridTemplateColumns: 'minmax(200px, 0.72fr) minmax(220px, 0.82fr) minmax(0, 1.8fr) minmax(300px, 0.9fr)', gap: 18, alignItems: 'start', width: '100%' }
+    : { display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(220px, 0.82fr) minmax(0, 1.8fr) minmax(300px, 0.9fr)', gap: 18, alignItems: 'start', width: '100%' }
 
   const mobileCatalogTopStyle = {
     display: 'grid',
@@ -879,13 +881,10 @@ export default function AccountDetailPage() {
               <div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yöntem</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {(collectMethods.length > 0 ? collectMethods : [
-                    { key: 'cash', label: 'Nakit' },
-                    { key: 'card', label: 'Kart' },
-                    { key: 'transfer', label: 'Havale' },
+                  {collectMethods.map((m) => { /*
                     { key: 'other', label: 'Diğer' }
-                  ]).map((m) => {
-                    const active = collectForm.method === m.key
+                  
+                    */ const active = collectForm.method === m.key
                     return (
                       <button
                         key={m.key}

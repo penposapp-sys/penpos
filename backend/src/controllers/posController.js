@@ -608,6 +608,9 @@ export const receipt = async (req, res) => {
       customerName: String(o.customerName || ''),
       customerPhone: String(o.customerPhone || ''),
       customerAddress: String(o.customerAddress || ''),
+      deliveryPaymentStatus: String(o.deliveryPaymentStatus || ''),
+      deliveryPaymentMethod: String(o.deliveryPaymentMethod || ''),
+      deliveryPaymentMethodLabel: String(o.deliveryPaymentMethodLabel || ''),
       createdByName: String(o.createdByName || ''),
       businessName: String(tenant?.name || 'PENPOS'),
       items: o.items,
@@ -707,16 +710,28 @@ export const createDeliveryOrder = async (req, res) => {
       return res.status(403).json({ status: 403, code: 'missing_branch', message: 'Branch required' })
     }
 
+    const customerId = String(req.body?.customerId || '').trim()
     const customerName = String(req.body?.customerName || '').trim()
     const phone = String(req.body?.phone ?? req.body?.customerPhone ?? '').trim()
     const address = String(req.body?.address ?? req.body?.customerAddress ?? '').trim()
     const note = String(req.body?.note ?? req.body?.deliveryNote ?? '').trim()
+    const deliveryPaymentStatus = String(req.body?.deliveryPaymentStatus || '').trim()
+    const deliveryPaymentMethod = String(req.body?.deliveryPaymentMethod || req.body?.paymentMethod || '').trim()
 
     if (!customerName) {
       return res.status(400).json({ success: false, code: 'customer_name_required', error: 'customer_name_required', message: 'Customer name required' })
     }
 
-    const order = await createDeliveryOrderService(tenantId, req.user.id, branchId, { customerName, phone, address, note, createdByName: req.user?.name })
+    const order = await createDeliveryOrderService(tenantId, req.user.id, branchId, {
+      customerId,
+      customerName,
+      phone,
+      address,
+      note,
+      createdByName: req.user?.name,
+      deliveryPaymentStatus,
+      deliveryPaymentMethod
+    })
     res.json({ success: true, order })
   } catch (err) {
     if (err?.name === 'ValidationError') {
@@ -751,7 +766,17 @@ export const updateDeliveryCustomer = async (req, res) => {
     const customerName = String(req.body?.customerName ?? '').trim()
     const phone = String(req.body?.phone ?? req.body?.customerPhone ?? '').trim()
     const address = String(req.body?.address ?? req.body?.customerAddress ?? '').trim()
-    const { order } = await updateDeliveryCustomerService(req.user.tenantId, req.params.id, { customerName, phone, address })
+    const deliveryPaymentStatus = String(req.body?.deliveryPaymentStatus || '').trim()
+    const deliveryPaymentMethod = String(req.body?.deliveryPaymentMethod || req.body?.paymentMethod || '').trim()
+    const customerId = String(req.body?.customerId || '').trim()
+    const { order } = await updateDeliveryCustomerService(req.user.tenantId, req.params.id, {
+      customerId,
+      customerName,
+      phone,
+      address,
+      deliveryPaymentStatus,
+      deliveryPaymentMethod
+    })
     res.json({ success: true, order })
   } catch (err) {
     sendError(res, err)

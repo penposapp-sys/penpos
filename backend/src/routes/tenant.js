@@ -7,6 +7,7 @@ import { listActivePlans } from '../services/planService.js'
 import { requireRole } from '../middlewares/requireRole.js'
 import { requireAnyPermission } from '../middlewares/requirePermission.js'
 import * as selfAccount from '../services/selfAccountService.js'
+import * as tenantBilling from '../controllers/tenantBillingController.js'
 import Category from '../models/Category.js'
 import MenuItem from '../models/MenuItem.js'
 import User from '../models/User.js'
@@ -52,12 +53,17 @@ router.put('/settings', requireAuth, tenantGuard, requireRole(['tenant_admin']),
 router.get('/plans', requireAuth, tenantGuard, requireRole(['tenant_admin']), async (req, res) => {
   try {
     const tenant = await (await import('../repositories/tenantRepository.js')).findTenantById(req.user.tenantId)
-    const plans = await listActivePlans(tenant?.systemType || 'kermes')
+    const plans = await listActivePlans(tenant?.vertical || tenant?.businessType || tenant?.systemType || 'kermes')
     res.json({ plans })
   } catch (err) {
     sendError(res, err)
   }
 })
+
+router.get('/billing/requests', requireAuth, tenantGuard, requireRole(['tenant_admin']), tenantBilling.listRequests)
+router.get('/billing/plans', requireAuth, tenantGuard, requireRole(['tenant_admin']), tenantBilling.listPlans)
+router.post('/billing/requests', requireAuth, tenantGuard, requireRole(['tenant_admin']), tenantBilling.createRequest)
+router.post('/billing/requests/:id/cancel', requireAuth, tenantGuard, requireRole(['tenant_admin']), tenantBilling.cancelRequest)
 
 router.get('/setup-status', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['pos_access', 'manage_settings']), async (req, res) => {
   try {

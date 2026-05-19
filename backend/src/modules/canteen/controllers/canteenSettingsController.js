@@ -36,3 +36,12 @@ export const updatePaymentSettings = async (req, res) => {
     sendError(res, err)
   }
 }
+
+export const updateQrSettings = async (req, res) => {
+  try {
+    const settings = await service.updateQrSettings(req.user.tenantId, req.canteenBranchId, req.body || {})
+    res.json({ success: true, settings })
+  } catch (err) {
+    sendError(res, err)
+  }
+}

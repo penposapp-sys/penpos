@@ -13,6 +13,15 @@ import Tenant from '../models/Tenant.js'
 import PrintProfile from '../models/PrintProfile.js'
 import { renderLabelPdfBase64, renderReceiptPdfBase64, renderTextPdfBase64 } from '../services/pdfRenderService.js'
 
+const getDeliveryPaymentLine = (order) => {
+  if (String(order?.paymentStatus || '') === 'paid') return 'Ödemesi alındı'
+  const plannedStatus = String(order?.deliveryPaymentStatus || '').trim()
+  if (plannedStatus === 'already_paid') return 'Ödemesi alındı'
+  const plannedLabel = String(order?.deliveryPaymentMethodLabel || order?.deliveryPaymentMethod || '').trim()
+  if (plannedStatus === 'pay_on_delivery' && plannedLabel) return plannedLabel
+  return ''
+}
+
 const normalizePrinters = (value) => {
   const arr = Array.isArray(value) ? value : []
   const out = []
@@ -100,6 +109,10 @@ const getJobPdfBase64 = async ({ job, tenantId, system, station }) => {
 
   if (type === 'receipt') {
     const orderId = String(job?.meta?.orderId || '').trim()
+    if (job?.meta?.kitchenReceipt === true) {
+      const payloadText = String(job?.payload?.content || '')
+      return await renderTextPdfBase64({ text: payloadText, widthMm: receiptWidthMm, heightMm: 300, fontSize: 10, marginMm: 4 })
+    }
     if (mongoose.isValidObjectId(orderId)) {
       const [tenant, order] = await Promise.all([
         Tenant.findById(tenantId).select('name').lean(),
@@ -122,7 +135,9 @@ const getJobPdfBase64 = async ({ job, tenantId, system, station }) => {
         isPackage,
         customerName: order?.customerName,
         customerPhone: order?.customerPhone,
-        customerAddress: order?.customerAddress
+        customerAddress: order?.customerAddress,
+        deliveryNote: order?.deliveryNote || order?.note || '',
+        deliveryPaymentLine: getDeliveryPaymentLine(order)
       })
     }
     const payloadText = String(job?.payload?.content || '')

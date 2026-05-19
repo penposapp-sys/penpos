@@ -19,13 +19,16 @@ export const paymentMethodLabel = (method) => {
     case 'cash':
       return 'Nakit'
     case 'pos':
+    case 'card':
       return 'POS'
     case 'bank':
       return 'Banka'
+    case 'discount':
+      return 'İndirim'
     case 'account':
+    case 'credit':
       return 'Cari'
     default:
       return ''
   }
 }
-

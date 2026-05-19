@@ -4,6 +4,252 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>POS SaaS</title>
+    <style>
+      html, body, #root {
+        min-height: 100%;
+      }
+
+      html {
+        background: var(--app-bg, #f8fafc);
+        color: var(--app-text, #0f172a);
+      }
+
+      body {
+        margin: 0;
+        background: var(--app-bg, #f8fafc);
+        color: var(--app-text, #0f172a);
+      }
+    </style>
+    <script>
+      (function () {
+        var THEME_KEY = 'penpos-theme-key';
+        var DARK_MODE_KEY = 'penpos-dark-mode';
+        function resolveThemeScope(pathname) {
+          var path = String(pathname || '').toLowerCase();
+          if (path.indexOf('/platform') === 0 || path.indexOf('/platform-login') === 0 || path.indexOf('/login/platform') === 0) return 'platform';
+          if (path.indexOf('/canteen') === 0 || path.indexOf('/login/kantin') === 0) return 'canteen';
+          if (path.indexOf('/kermes') === 0 || path.indexOf('/login/restoran') === 0) return 'kermes';
+          return 'public';
+        }
+        function getScopedThemeKey(scope) {
+          return THEME_KEY + ':' + String(scope || 'public');
+        }
+        function getScopedDarkModeKey(scope) {
+          return DARK_MODE_KEY + ':' + String(scope || 'public');
+        }
+        var themes = {
+          default: {
+            accent: '#111827',
+            accentHover: '#1f2937',
+            accentSoft: '#eef0f3',
+            accentText: '#111827',
+            sidebar: 'linear-gradient(180deg, #111827 0%, #1f2937 52%, #0f172a 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #f8fafc 45%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(15, 23, 42, 0.22)',
+            gradient: 'linear-gradient(90deg, #111827 0%, #374151 100%)',
+            chart: '#111827',
+            card: '#ffffff',
+            border: '#e2e8f0',
+            text: '#0f172a'
+          },
+          ocean: {
+            accent: '#2563eb',
+            accentHover: '#1d4ed8',
+            accentSoft: '#dbeafe',
+            accentText: '#1d4ed8',
+            sidebar: 'linear-gradient(180deg, #020617 0%, #172554 48%, #0f172a 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #eff6ff 50%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(37, 99, 235, 0.24)',
+            gradient: 'linear-gradient(90deg, #2563eb 0%, #06b6d4 100%)',
+            chart: '#2563eb',
+            card: '#ffffff',
+            border: '#dbeafe',
+            text: '#0f172a'
+          },
+          slate: {
+            accent: '#0f172a',
+            accentHover: '#1e293b',
+            accentSoft: '#e2e8f0',
+            accentText: '#0f172a',
+            sidebar: 'linear-gradient(180deg, #020617 0%, #0f172a 52%, #1e293b 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #f1f5f9 50%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(15, 23, 42, 0.24)',
+            gradient: 'linear-gradient(90deg, #020617 0%, #334155 100%)',
+            chart: '#0f172a',
+            card: '#ffffff',
+            border: '#cbd5e1',
+            text: '#0f172a'
+          },
+          emerald: {
+            accent: '#059669',
+            accentHover: '#047857',
+            accentSoft: '#d1fae5',
+            accentText: '#047857',
+            sidebar: 'linear-gradient(180deg, #022c22 0%, #064e3b 46%, #0f172a 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #ecfdf5 52%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(5, 150, 105, 0.24)',
+            gradient: 'linear-gradient(90deg, #059669 0%, #14b8a6 100%)',
+            chart: '#059669',
+            card: '#ffffff',
+            border: '#d1fae5',
+            text: '#0f172a'
+          },
+          amber: {
+            accent: '#d97706',
+            accentHover: '#b45309',
+            accentSoft: '#fef3c7',
+            accentText: '#b45309',
+            sidebar: 'linear-gradient(180deg, #292524 0%, #78350f 48%, #18181b 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #fffbeb 50%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(217, 119, 6, 0.24)',
+            gradient: 'linear-gradient(90deg, #f59e0b 0%, #f97316 100%)',
+            chart: '#d97706',
+            card: '#ffffff',
+            border: '#fde68a',
+            text: '#0f172a'
+          },
+          ruby: {
+            accent: '#e11d48',
+            accentHover: '#be123c',
+            accentSoft: '#ffe4e6',
+            accentText: '#be123c',
+            sidebar: 'linear-gradient(180deg, #09090b 0%, #4c0519 46%, #111827 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #fff1f2 50%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(225, 29, 72, 0.24)',
+            gradient: 'linear-gradient(90deg, #e11d48 0%, #ef4444 100%)',
+            chart: '#e11d48',
+            card: '#ffffff',
+            border: '#fecdd3',
+            text: '#0f172a'
+          },
+          coffee: {
+            accent: '#57534e',
+            accentHover: '#44403c',
+            accentSoft: '#e7e5e4',
+            accentText: '#44403c',
+            sidebar: 'linear-gradient(180deg, #1c1917 0%, #44403c 48%, #0f172a 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #f5f5f4 52%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(87, 83, 78, 0.24)',
+            gradient: 'linear-gradient(90deg, #57534e 0%, #a16207 100%)',
+            chart: '#57534e',
+            card: '#ffffff',
+            border: '#d6d3d1',
+            text: '#0f172a'
+          },
+          indigo: {
+            accent: '#4f46e5',
+            accentHover: '#4338ca',
+            accentSoft: '#e0e7ff',
+            accentText: '#4338ca',
+            sidebar: 'linear-gradient(180deg, #0f172a 0%, #312e81 48%, #111827 100%)',
+            topbar: 'linear-gradient(90deg, #ffffff 0%, #eef2ff 50%, #ffffff 100%)',
+            activeGlow: '0 18px 45px rgba(79, 70, 229, 0.24)',
+            gradient: 'linear-gradient(90deg, #4f46e5 0%, #0ea5e9 100%)',
+            chart: '#4f46e5',
+            card: '#ffffff',
+            border: '#c7d2fe',
+            text: '#0f172a'
+          },
+          mono: {
+            accent: '#18181b',
+            accentHover: '#27272a',
+            accentSoft: '#f4f4f5',
+            accentText: '#18181b',
+            sidebar: 'linear-gradient(180deg, #fafafa 0%, #ffffff 50%, #f4f4f5 100%)',
+            topbar: 'linear-gradient(90deg, #fafafa 0%, #ffffff 50%, #fafafa 100%)',
+            activeGlow: '0 18px 45px rgba(24, 24, 27, 0.16)',
+            gradient: 'linear-gradient(90deg, #18181b 0%, #71717a 100%)',
+            chart: '#18181b',
+            card: '#ffffff',
+            border: '#e4e4e7',
+            text: '#18181b'
+          }
+        };
+
+        function buildRuntimeTheme(themeKey, darkMode) {
+          var baseTheme = themes[themeKey] || themes.default;
+          if (!darkMode) {
+            return Object.assign({}, baseTheme, {
+              darkMode: false,
+              appBg: '#f8fafc',
+              appSurface: '#ffffff',
+              appSurfaceSoft: themeKey === 'default' ? '#f3f4f6' : '#f8fafc',
+              textPrimary: '#0f172a',
+              textSecondary: '#334155',
+              mutedText: '#64748b',
+              inputBg: '#ffffff',
+              buttonBg: '#e5e7eb',
+              buttonBorder: '#d1d5db',
+              surfaceElevated: themeKey === 'default' ? '#f3f4f6' : '#f8fafc',
+              cardShadow: '0 12px 28px rgba(15, 23, 42, 0.06)'
+            });
+          }
+
+          return Object.assign({}, baseTheme, {
+            darkMode: true,
+            appBg: '#0b1220',
+            appSurface: '#111827',
+            appSurfaceSoft: '#172033',
+            accentText: '#ffffff',
+            accentSoft: 'rgba(255,255,255,0.08)',
+            accentHover: baseTheme.accentHover || baseTheme.accent,
+            topbar: 'linear-gradient(90deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.98) 50%, rgba(15,23,42,0.96) 100%)',
+            card: '#111827',
+            border: 'rgba(148,163,184,0.22)',
+            text: '#ffffff',
+            textPrimary: '#ffffff',
+            textSecondary: '#ffffff',
+            mutedText: '#ffffff',
+            surfaceElevated: '#172033',
+            inputBg: '#0f172a',
+            buttonBg: '#1e293b',
+            buttonBorder: 'rgba(148,163,184,0.25)',
+            cardShadow: '0 18px 36px rgba(2, 6, 23, 0.45)'
+          });
+        }
+
+        try {
+          var scope = resolveThemeScope(window.location && window.location.pathname);
+          var themeKey = localStorage.getItem(getScopedThemeKey(scope)) || localStorage.getItem(THEME_KEY) || 'default';
+          var darkMode = localStorage.getItem(getScopedDarkModeKey(scope)) === 'true' || localStorage.getItem(DARK_MODE_KEY) === 'true';
+          var theme = buildRuntimeTheme(themeKey, darkMode);
+          var root = document.documentElement;
+          root.dataset.theme = theme.darkMode ? 'dark' : 'light';
+          root.classList.toggle('tenant-dark-mode', darkMode);
+          root.style.setProperty('--theme-accent', theme.accent);
+          root.style.setProperty('--theme-accent-hover', theme.accentHover);
+          root.style.setProperty('--theme-accent-soft', theme.accentSoft);
+          root.style.setProperty('--theme-accent-text', theme.accentText);
+          root.style.setProperty('--theme-card-bg', theme.card);
+          root.style.setProperty('--theme-border', theme.border);
+          root.style.setProperty('--theme-text', theme.text);
+          root.style.setProperty('--theme-muted', theme.mutedText);
+          root.style.setProperty('--app-bg', theme.appBg || theme.card);
+          root.style.setProperty('--app-surface', theme.appSurface || theme.card);
+          root.style.setProperty('--app-surface-soft', theme.appSurfaceSoft || theme.surfaceElevated);
+          root.style.setProperty('--app-border', theme.border);
+          root.style.setProperty('--app-text', theme.textPrimary || theme.text);
+          root.style.setProperty('--app-text-secondary', theme.textSecondary || theme.mutedText);
+          root.style.setProperty('--app-text-muted', theme.mutedText);
+          root.style.setProperty('--app-input', theme.inputBg);
+          root.style.setProperty('--app-button-bg', theme.buttonBg);
+          root.style.setProperty('--panel', theme.card);
+          root.style.setProperty('--panelElevated', theme.surfaceElevated);
+          root.style.setProperty('--border', theme.border);
+          root.style.setProperty('--text', theme.text);
+          root.style.setProperty('--text-primary', theme.textPrimary || theme.text);
+          root.style.setProperty('--text-secondary', theme.textSecondary || theme.mutedText);
+          root.style.setProperty('--muted', theme.mutedText);
+          root.style.setProperty('--input-bg', theme.inputBg);
+          root.style.setProperty('--button-bg', theme.buttonBg);
+          root.style.setProperty('--button-border', theme.buttonBorder);
+          root.style.setProperty('--card-shadow', theme.cardShadow);
+          document.addEventListener('DOMContentLoaded', function () {
+            document.body.classList.toggle('tenant-dark-mode', darkMode);
+          });
+        } catch (error) {}
+      }());
+    </script>
   </head>
   <body>
     <div id="root"></div>

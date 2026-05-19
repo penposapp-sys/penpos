@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../../lib/apiClient.js'
+import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 
 export default function CanteenBranchesPage() {
   const [items, setItems] = useState([])
@@ -7,14 +8,16 @@ export default function CanteenBranchesPage() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setLoading(true)
     const res = await api('/api/canteen/branches', { silent: true, skipBranchHeader: true })
     setItems(Array.isArray(res?.branches) ? res.branches : [])
-    setLoading(false)
+    if (!background) setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: true })
 
   const create = async (e) => {
     e.preventDefault()

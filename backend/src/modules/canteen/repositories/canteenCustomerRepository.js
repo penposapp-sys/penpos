@@ -46,3 +46,6 @@ export const updateByIdAndTenant = (id, tenantId, update) =>
 
 export const deleteByIdAndTenant = (id, tenantId) =>
   CanteenCustomer.findOneAndDelete({ _id: id, tenantId })
+
+export const listByIdsAndTenant = (tenantId, ids) =>
+  CanteenCustomer.find({ tenantId, _id: { $in: ids }, isActive: true })

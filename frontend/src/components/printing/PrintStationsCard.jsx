@@ -3,6 +3,7 @@ import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
 import ConfirmModal from '../ConfirmModal.jsx'
 import Modal from '../Modal.jsx'
+import { SettingsToggle, SettingsUiStyles } from '../settings/SettingsUi.jsx'
 
 const calcStatus = (lastHeartbeatAt) => {
   if (!lastHeartbeatAt) return { status: 'no_heartbeat', ageSec: null }
@@ -27,7 +28,7 @@ const copyText = async (label, text) => {
   if (!v) return
   try {
     await navigator.clipboard.writeText(v)
-    toast.success('Kopyalandi')
+    toast.success('Kopyalandı')
   } catch {
     try { window.prompt(label, v) } catch {}
   }
@@ -35,11 +36,15 @@ const copyText = async (label, text) => {
 
 const makeDraftPrinter = (type = 'label') => ({
   id: `tmp_${Math.random().toString(36).slice(2, 10)}`,
-  name: type === 'receipt' ? 'Yeni Fis Yazicisi' : 'Yeni Etiket Yazicisi',
+  name: type === 'receipt' ? 'Yeni Fiş Yazıcısı' : 'Yeni Etiket Yazıcısı',
   printerType: type === 'receipt' ? 'receipt' : 'label',
   windowsPrinterName: '',
   isActive: true,
   labelCategoryIds: [],
+  categoryIds: [],
+  receiptRole: 'cashier',
+  useForCashierReceipt: true,
+  useForKitchenReceipt: false,
   autoPrintOnOrder: type === 'label',
   printOnReady: type === 'label',
   widthMm: 50,
@@ -55,6 +60,14 @@ const normalizeDrafts = (list) => (Array.isArray(list) ? list : []).map((entry) 
   windowsPrinterName: String(entry?.windowsPrinterName || ''),
   isActive: entry?.isActive !== false,
   labelCategoryIds: Array.isArray(entry?.labelCategoryIds) ? entry.labelCategoryIds.map(String) : [],
+  categoryIds: Array.isArray(entry?.categoryIds) ? entry.categoryIds.map(String) : [],
+  receiptRole: String(entry?.receiptRole || '').trim().toLowerCase() === 'kitchen' ? 'kitchen' : 'cashier',
+  useForCashierReceipt: typeof entry?.useForCashierReceipt === 'boolean'
+    ? entry.useForCashierReceipt === true
+    : (String(entry?.receiptRole || '').trim().toLowerCase() === 'kitchen' ? false : true),
+  useForKitchenReceipt: typeof entry?.useForKitchenReceipt === 'boolean'
+    ? entry.useForKitchenReceipt === true
+    : (String(entry?.receiptRole || '').trim().toLowerCase() === 'kitchen'),
   autoPrintOnOrder: entry?.autoPrintOnOrder === true,
   printOnReady: entry?.printOnReady === true,
   widthMm: Number(entry?.widthMm || 50) || 50,
@@ -98,13 +111,13 @@ export default function PrintStationsCard({
     try {
       const res = await api(`/api/printing/stations/${encodeURIComponent(id)}/rotate-secret`, { method: 'POST', data: { system }, silent: true })
       const secret = String(res?.secret || '').trim()
-      if (!secret) throw new Error(res?.message || 'Secret uretilemedi')
+      if (!secret) throw new Error(res?.message || 'Secret üretilemedi')
       setRotatedSecret(secret)
       setSecretModalOpen(true)
       toast.success('Secret yenilendi')
       if (typeof onReload === 'function') await onReload()
     } catch (e) {
-      toast.error(e?.message || 'Secret yenileme basarisiz')
+      toast.error(e?.message || 'Secret yenileme başarısız')
     } finally {
       setSubmitting(false)
       setRotateStationId('')
@@ -118,10 +131,10 @@ export default function PrintStationsCard({
     try {
       const qs = `?system=${encodeURIComponent(system)}`
       await api(`/api/printing/stations/${encodeURIComponent(id)}${qs}`, { method: 'DELETE', silent: true })
-      toast.success('Istasyon silindi')
+      toast.success('İstasyon silindi')
       if (typeof onReload === 'function') await onReload()
     } catch (e) {
-      toast.error(e?.message || 'Silme basarisiz')
+      toast.error(e?.message || 'Silme başarısız')
     } finally {
       setSubmitting(false)
       setDeleteStationId('')
@@ -163,22 +176,29 @@ export default function PrintStationsCard({
           next.autoPrintOnOrder = false
           next.printOnReady = false
           next.labelCategoryIds = []
+          next.categoryIds = []
+          next.receiptRole = 'cashier'
+          next.useForCashierReceipt = true
+          next.useForKitchenReceipt = false
         } else {
           next.autoPrintOnOrder = true
           next.printOnReady = true
         }
       }
+      if (field === 'useForKitchenReceipt' && value !== true) {
+        next.categoryIds = []
+      }
       return next
     }))
   }
 
-  const toggleCategory = (stationId, id, categoryId) => {
+  const toggleCategory = (stationId, id, categoryId, field = 'labelCategoryIds') => {
     updateDrafts(stationId, (prev) => prev.map((entry) => {
       if (String(entry.id) !== String(id)) return entry
-      const set = new Set(entry.labelCategoryIds || [])
+      const set = new Set(entry[field] || [])
       if (set.has(categoryId)) set.delete(categoryId)
       else set.add(categoryId)
-      return { ...entry, labelCategoryIds: Array.from(set) }
+      return { ...entry, [field]: Array.from(set) }
     }))
   }
 
@@ -188,6 +208,16 @@ export default function PrintStationsCard({
 
   const addDraft = (stationId, type) => {
     updateDrafts(stationId, (prev) => [...prev, makeDraftPrinter(type)])
+  }
+
+  const setAllCategories = (stationId, id, enabled, field = 'labelCategoryIds') => {
+    updateDrafts(stationId, (prev) => prev.map((entry) => {
+      if (String(entry.id) !== String(id)) return entry
+      return {
+        ...entry,
+        [field]: enabled ? (categories || []).map((category) => String(category.id)) : []
+      }
+    }))
   }
 
   const savePrinters = async (stationId) => {
@@ -200,6 +230,10 @@ export default function PrintStationsCard({
       windowsPrinterName: entry.windowsPrinterName,
       isActive: entry.isActive === true,
       labelCategoryIds: entry.printerType === 'label' ? entry.labelCategoryIds : [],
+      categoryIds: entry.printerType === 'receipt' && entry.useForKitchenReceipt === true ? entry.categoryIds : [],
+      receiptRole: entry.printerType === 'receipt' ? entry.receiptRole : 'cashier',
+      useForCashierReceipt: entry.printerType === 'receipt' ? entry.useForCashierReceipt === true : false,
+      useForKitchenReceipt: entry.printerType === 'receipt' ? entry.useForKitchenReceipt === true : false,
       autoPrintOnOrder: entry.printerType === 'label' ? entry.autoPrintOnOrder === true : false,
       printOnReady: entry.printerType === 'label' ? entry.printOnReady === true : false,
       widthMm: entry.printerType === 'label' ? Number(entry.widthMm || 50) : null,
@@ -212,12 +246,13 @@ export default function PrintStationsCard({
 
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
+      <SettingsUiStyles />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <div>
           <div style={{ fontWeight: 800 }}>Print Station</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Istasyon bilgisayar demektir. Birden fazla istasyon ayni anda aktif olabilir ve her istasyonun altina birden fazla fis ve etiket yazicisi ekleyebilirsin.</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>İstasyon bilgisayar demektir. Birden fazla istasyon aynı anda aktif olabilir ve her istasyonun altına birden fazla fiş ve etiket yazıcısı ekleyebilirsin.</div>
         </div>
-        <button className="btn" onClick={handleCreate} disabled={blocked}>Yeni Istasyon Ekle</button>
+        <button className="btn" onClick={handleCreate} disabled={blocked}>Yeni İstasyon Ekle</button>
       </div>
 
       <div style={{ display: 'grid', gap: 8 }}>
@@ -245,7 +280,7 @@ export default function PrintStationsCard({
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)', display: 'grid', gap: 2 }}>
                     <div>{s.isActive ? 'Aktif' : 'Pasif'} · {label}{age}</div>
-                    <div>PC: {host || '-'} · v{ver || '-'} · Agent Yazicilari: {printersCount} · Tanimli Kurallar: {configuredPrinters.length}</div>
+                    <div>PC: {host || '-'} · v{ver || '-'} · Agent Yazıcıları: {printersCount} · Tanımlı Kurallar: {configuredPrinters.length}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -256,48 +291,47 @@ export default function PrintStationsCard({
               </div>
 
               {s.isActive === true && (
-                <div style={{ display: 'grid', gap: 10, padding: 12, border: '1px dashed var(--border)', borderRadius: 12, background: 'rgba(15,23,42,0.02)' }}>
+                <div style={{ display: 'grid', gap: 10, padding: 12, border: '1px dashed var(--app-border, var(--border))', borderRadius: 12, background: 'var(--app-surface-2, var(--app-surface-soft))' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <div>
-                      <div style={{ fontWeight: 800 }}>Istasyon Yazicilari</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Etiket yazicilarinda kategori filtresi bossa tum kategoriler basilir.</div>
+                      <div style={{ fontWeight: 800 }}>İstasyon Yazıcıları</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Etiket yazıcılarında kategori filtresi boşsa tüm kategoriler basılır.</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'label')} disabled={blocked}>Etiket Yazicisi Ekle</button>
-                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'receipt')} disabled={blocked}>Fis Yazicisi Ekle</button>
+                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'label')} disabled={blocked}>Etiket Yazıcısı Ekle</button>
+                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'receipt')} disabled={blocked}>Fiş Yazıcısı Ekle</button>
                       <button className="btn" type="button" onClick={() => savePrinters(s.id)} disabled={blocked}>Kaydet</button>
                     </div>
                   </div>
 
                   {draftPrinters.length === 0 && (
-                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Bu istasyonda henuz yazici kurali yok.</div>
+                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Bu istasyonda henüz yazıcı kuralı yok.</div>
                   )}
 
                   {draftPrinters.map((entry) => (
-                    <div key={entry.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 10, background: '#fff' }}>
+                    <div key={entry.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--app-border, var(--border))', borderRadius: 10, background: 'var(--app-surface)' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px,1fr) 150px minmax(220px,1fr) auto auto', gap: 10, alignItems: 'end' }}>
                         <label>
-                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kural Adi</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kural Adı</div>
                           <input className="input" value={entry.name} onChange={(e) => updateDraft(s.id, entry.id, 'name', e.target.value)} disabled={blocked} />
                         </label>
                         <label>
                           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tip</div>
                           <select className="input" value={entry.printerType} onChange={(e) => updateDraft(s.id, entry.id, 'printerType', e.target.value)} disabled={blocked}>
                             <option value="label">Etiket</option>
-                            <option value="receipt">Fis</option>
+                            <option value="receipt">Fiş</option>
                           </select>
                         </label>
                         <label>
-                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Windows Yazicisi</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Windows Yazıcısı</div>
                           <select className="input" value={entry.windowsPrinterName} onChange={(e) => updateDraft(s.id, entry.id, 'windowsPrinterName', e.target.value)} disabled={blocked}>
-                            <option value="">Seciniz</option>
+                            <option value="">Seçiniz</option>
                             {(availablePrinters || []).map((printer) => <option key={printer} value={printer}>{printer}</option>)}
                           </select>
                         </label>
-                        <label style={{ display: 'flex', gap: 8, alignItems: 'center', height: 42 }}>
-                          <input type="checkbox" checked={entry.isActive} onChange={(e) => updateDraft(s.id, entry.id, 'isActive', e.target.checked)} disabled={blocked} />
-                          <span>Aktif</span>
-                        </label>
+                        <div style={{ minWidth: 140 }}>
+                          <SettingsToggle label="Aktif" checked={entry.isActive} onChange={(e) => updateDraft(s.id, entry.id, 'isActive', e.target.checked)} disabled={blocked} />
+                        </div>
                         <button className="btn btn--danger" type="button" onClick={() => removeDraft(s.id, entry.id)} disabled={blocked}>Sil</button>
                       </div>
 
@@ -305,11 +339,11 @@ export default function PrintStationsCard({
                         <div style={{ display: 'grid', gap: 10 }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '120px 120px 120px', gap: 10 }}>
                             <label>
-                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Genislik</div>
+                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Genişlik</div>
                               <input className="input" value={entry.widthMm} onChange={(e) => updateDraft(s.id, entry.id, 'widthMm', e.target.value)} disabled={blocked} />
                             </label>
                             <label>
-                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yukseklik</div>
+                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yükseklik</div>
                               <input className="input" value={entry.heightMm} onChange={(e) => updateDraft(s.id, entry.id, 'heightMm', e.target.value)} disabled={blocked} />
                             </label>
                             <label>
@@ -318,43 +352,143 @@ export default function PrintStationsCard({
                             </label>
                           </div>
 
-                          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <input type="checkbox" checked={entry.autoPrintOnOrder} onChange={(e) => updateDraft(s.id, entry.id, 'autoPrintOnOrder', e.target.checked)} disabled={blocked} />
-                              <span>Sipariste otomatik bas</span>
-                            </label>
-                            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <input type="checkbox" checked={entry.printOnReady} onChange={(e) => updateDraft(s.id, entry.id, 'printOnReady', e.target.checked)} disabled={blocked} />
-                              <span>Hazirda etiket bas</span>
-                            </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                            <SettingsToggle label="Siparişte otomatik bas" checked={entry.autoPrintOnOrder} onChange={(e) => updateDraft(s.id, entry.id, 'autoPrintOnOrder', e.target.checked)} disabled={blocked} />
+                            <SettingsToggle label="Hazırda etiket bas" checked={entry.printOnReady} onChange={(e) => updateDraft(s.id, entry.id, 'printOnReady', e.target.checked)} disabled={blocked} />
                           </div>
 
                           <div style={{ display: 'grid', gap: 6 }}>
-                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori Filtresi</div>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori Filtresi</div>
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                <button type="button" className="btn btn--compact" onClick={() => setAllCategories(s.id, entry.id, true)} disabled={blocked || (categories || []).length === 0}>Hepsini Seç</button>
+                                <button type="button" className="btn btn--compact" onClick={() => setAllCategories(s.id, entry.id, false)} disabled={blocked || (entry.labelCategoryIds || []).length === 0}>Temizle</button>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                               {(categories || []).map((category) => {
                                 const checked = (entry.labelCategoryIds || []).includes(String(category.id))
                                 return (
-                                  <label key={category.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 999 }}>
-                                    <input type="checkbox" checked={checked} onChange={() => toggleCategory(s.id, entry.id, String(category.id))} disabled={blocked} />
+                                  <button
+                                    key={category.id}
+                                    type="button"
+                                    onClick={() => toggleCategory(s.id, entry.id, String(category.id))}
+                                    disabled={blocked}
+                                    style={{
+                                      border: `1px solid ${checked ? 'var(--theme-accent)' : 'var(--app-border)'}`,
+                                      borderRadius: 999,
+                                      background: checked ? 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 18%, var(--app-surface-2, var(--app-surface-soft))), var(--app-surface))' : 'var(--app-surface-2, var(--app-surface-soft))',
+                                      color: 'var(--app-text)',
+                                      padding: '10px 14px',
+                                      fontWeight: 900,
+                                      boxShadow: checked ? 'var(--theme-active-glow)' : 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 8,
+                                      cursor: blocked ? 'not-allowed' : 'pointer',
+                                      opacity: blocked ? 0.7 : 1,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: 18,
+                                        height: 18,
+                                        borderRadius: 999,
+                                        border: `2px solid ${checked ? 'var(--theme-accent)' : 'var(--app-text-muted)'}`,
+                                        background: checked ? 'var(--theme-accent)' : 'var(--app-surface)',
+                                        boxShadow: checked ? 'inset 0 0 0 3px var(--app-surface)' : 'none',
+                                      }}
+                                    />
                                     <span>{category.name}</span>
-                                  </label>
+                                  </button>
                                 )
                               })}
-                              {(categories || []).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori listesi bos.</div>}
+                              {(categories || []).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori listesi boş.</div>}
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: '120px 120px', gap: 10 }}>
-                          <label>
-                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fis Genisligi</div>
-                            <input className="input" value={entry.receiptWidthMm} onChange={(e) => updateDraft(s.id, entry.id, 'receiptWidthMm', e.target.value)} disabled={blocked} />
-                          </label>
-                          <label>
-                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kopya</div>
-                            <input className="input" value={entry.copies} onChange={(e) => updateDraft(s.id, entry.id, 'copies', e.target.value)} disabled={blocked} />
-                          </label>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '120px 120px', gap: 10 }}>
+                            <label>
+                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş Genişliği</div>
+                              <input className="input" value={entry.receiptWidthMm} onChange={(e) => updateDraft(s.id, entry.id, 'receiptWidthMm', e.target.value)} disabled={blocked} />
+                            </label>
+                            <label>
+                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kopya</div>
+                              <input className="input" value={entry.copies} onChange={(e) => updateDraft(s.id, entry.id, 'copies', e.target.value)} disabled={blocked} />
+                            </label>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) minmax(220px, 1fr)', gap: 12 }}>
+                            <SettingsToggle
+                              label="Kasa fişinde kullan"
+                              checked={entry.useForCashierReceipt === true}
+                              onChange={(e) => updateDraft(s.id, entry.id, 'useForCashierReceipt', e.target.checked)}
+                              disabled={blocked}
+                            />
+                            <SettingsToggle
+                              label="Mutfak fişinde kullan"
+                              checked={entry.useForKitchenReceipt === true}
+                              onChange={(e) => updateDraft(s.id, entry.id, 'useForKitchenReceipt', e.target.checked)}
+                              disabled={blocked}
+                            />
+                          </div>
+
+                          {entry.useForKitchenReceipt === true && (
+                            <div style={{ display: 'grid', gap: 6 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div>
+                                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mutfak kategorileri</div>
+                                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori filtresi boşsa tüm kategoriler basılır.</div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <button type="button" className="btn btn--compact" onClick={() => setAllCategories(s.id, entry.id, true, 'categoryIds')} disabled={blocked || (categories || []).length === 0}>Hepsini Seç</button>
+                                  <button type="button" className="btn btn--compact" onClick={() => setAllCategories(s.id, entry.id, false, 'categoryIds')} disabled={blocked || (entry.categoryIds || []).length === 0}>Temizle</button>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                {(categories || []).map((category) => {
+                                  const checked = (entry.categoryIds || []).includes(String(category.id))
+                                  return (
+                                    <button
+                                      key={category.id}
+                                      type="button"
+                                      onClick={() => toggleCategory(s.id, entry.id, String(category.id), 'categoryIds')}
+                                      disabled={blocked}
+                                      style={{
+                                        border: `1px solid ${checked ? 'var(--theme-accent)' : 'var(--app-border)'}`,
+                                        borderRadius: 999,
+                                        background: checked ? 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 18%, var(--app-surface-2, var(--app-surface-soft))), var(--app-surface))' : 'var(--app-surface-2, var(--app-surface-soft))',
+                                        color: 'var(--app-text)',
+                                        padding: '10px 14px',
+                                        fontWeight: 900,
+                                        boxShadow: checked ? 'var(--theme-active-glow)' : 'none',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        cursor: blocked ? 'not-allowed' : 'pointer',
+                                        opacity: blocked ? 0.7 : 1,
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: 999,
+                                          border: `2px solid ${checked ? 'var(--theme-accent)' : 'var(--app-text-muted)'}`,
+                                          background: checked ? 'var(--theme-accent)' : 'var(--app-surface)',
+                                          boxShadow: checked ? 'inset 0 0 0 3px var(--app-surface)' : 'none',
+                                        }}
+                                      />
+                                      <span>{category.name}</span>
+                                    </button>
+                                  )
+                                })}
+                                {(categories || []).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori listesi boş.</div>}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -372,9 +506,9 @@ export default function PrintStationsCard({
         open={!!rotateStationId}
         onClose={() => setRotateStationId('')}
         title="Secret yenilensin mi?"
-        description="Secret yenilenirse bu istasyona bagli agent yeniden ayarlanmalidir. Devam edilsin mi?"
+        description="Secret yenilenirse bu istasyona bağlı agent yeniden ayarlanmalıdır. Devam edilsin mi?"
         confirmText="Yenile"
-        cancelText="Vazgec"
+        cancelText="Vazgeç"
         onConfirm={doRotate}
         confirmDisabled={blocked}
         cancelDisabled={blocked}
@@ -383,10 +517,10 @@ export default function PrintStationsCard({
       <ConfirmModal
         open={!!deleteStationId}
         onClose={() => setDeleteStationId('')}
-        title="Istasyon silinsin mi?"
-        description="Bu istasyon silinecek. Istasyonun kilitledigi joblar failed olacaktir."
+        title="İstasyon silinsin mi?"
+        description="Bu istasyon silinecek. İstasyonun kilitlediği joblar failed olacaktır."
         confirmText="Sil"
-        cancelText="Vazgec"
+        cancelText="Vazgeç"
         danger
         onConfirm={doDelete}
         confirmDisabled={blocked}
@@ -395,7 +529,7 @@ export default function PrintStationsCard({
 
       <Modal open={secretModalOpen} onClose={closeSecretModal} title="Yeni secret">
         <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bu secret tek sefer gosterilir. Kaybedersen Secret Yenile'ye bas.</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bu secret tek sefer gösterilir. Kaybedersen Secret Yenile'ye bas.</div>
           <div className="input" style={{ fontFamily: 'monospace', userSelect: 'all' }}>{rotatedSecret}</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             <button className="btn" onClick={() => copyText('Station Secret', rotatedSecret)} disabled={!rotatedSecret}>Kopyala</button>

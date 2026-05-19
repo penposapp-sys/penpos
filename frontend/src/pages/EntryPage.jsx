@@ -21,7 +21,7 @@ export default function EntryPage() {
           </Link>
           <Link to="/login/kantin" className="card" style={{ textDecoration: 'none', color: 'inherit', padding: 30, display: 'grid', placeItems: 'center', gap: 15 }}>
             <div style={{ fontSize: 40 }}>🛒</div>
-            <div style={{ fontWeight: 700 }}>Kantin</div>
+            <div style={{ fontWeight: 700 }}>Mağaza</div>
           </Link>
         </div>
       </div>

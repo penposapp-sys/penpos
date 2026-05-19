@@ -1,4 +1,5 @@
 import { toast } from './toast.js'
+import { getSubscriptionUpgradePath, isSubscriptionAllowedPath } from './subscription.js'
 
 const inflight = new Map()
 const cache = new Map()
@@ -47,7 +48,7 @@ const normalizeApiPath = (path) => {
 const inferPortalFromPathname = (pathname) => {
   const p = String(pathname || '')
   if (p.startsWith('/canteen')) return 'canteen'
-  if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/superadmin') || p.startsWith('/login/platform')) return 'platform'
+  if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/superadmin') || p.startsWith('/login/platform') || p.startsWith('/platform-login')) return 'platform'
   return 'restaurant'
 }
 
@@ -258,7 +259,7 @@ export const api = async (path, options = {}) => {
           localStorage.removeItem(tokenKey)
         } catch {}
         try {
-          window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/login/platform' : '/login/restoran')
+          window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')
         } catch {}
       }
 
@@ -269,6 +270,16 @@ export const api = async (path, options = {}) => {
             window.dispatchEvent(new CustomEvent('missing_branch', { detail: { path: normalizedPath } }))
           } catch {}
         }
+      }
+
+      if (res.status === 402 && code === 'SUBSCRIPTION_EXPIRED') {
+        try {
+          const redirectTo = getSubscriptionUpgradePath(pathname)
+          window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
+          if (!isSubscriptionAllowedPath(pathname, pathname)) {
+            window.location.replace(redirectTo)
+          }
+        } catch {}
       }
 
         if (!silent) {
@@ -379,7 +390,17 @@ export const apiDownload = async (path, options = {}) => {
         localStorage.removeItem(tokenKey)
       } catch {}
       try {
-        window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/login/platform' : '/login/restoran')
+        window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')
+      } catch {}
+    }
+
+    if (res.status === 402 && code === 'SUBSCRIPTION_EXPIRED') {
+      try {
+        const redirectTo = getSubscriptionUpgradePath(pathname)
+        window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
+        if (!isSubscriptionAllowedPath(pathname, pathname)) {
+          window.location.replace(redirectTo)
+        }
       } catch {}
     }
 

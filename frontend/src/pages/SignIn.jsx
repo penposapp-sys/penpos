@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import PublicSystemLogin from '../components/PublicSystemLogin.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
 export default function SignIn({ portal }) {
   const { login } = useAuth()
@@ -9,26 +11,26 @@ export default function SignIn({ portal }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
-  const portalName = portal === 'kermes' ? 'Restoran' : 'Giriş'
 
-  useEffect(() => { document.title = `PenPOS – ${portalName} Giriş` }, [portalName])
+  useBodyLayoutMode('public-site-layout')
 
-  const onSubmit = async (e) => {
-    e.preventDefault()
+  const isRestaurant = portal === 'kermes'
+  const portalName = isRestaurant ? 'Restoran' : 'Giriş'
+
+  useEffect(() => {
+    document.title = `PenPOS - ${portalName} Girişi`
+  }, [portalName])
+
+  const onSubmit = async (event) => {
+    event.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const user = await login({ identifier, password, portal })
-
-      if (portal === 'kermes') {
-        nav('/kermes', { replace: true })
-      } else {
-        nav('/', { replace: true })
-      }
+      await login({ identifier, password, portal })
+      nav(isRestaurant ? '/kermes' : '/', { replace: true })
     } catch (err) {
       const code = err?.code || null
-      if (code === 'invalid_credentials') setError('E-posta/şifre hatalı')
+      if (code === 'invalid_credentials') setError('E-posta / şifre hatalı')
       else if (code === 'account_disabled') setError('Hesap devre dışı')
       else if (code === 'wrong_portal') setError('Yanlış giriş ekranı')
       else setError(err.message || 'Giriş başarısız')
@@ -38,26 +40,41 @@ export default function SignIn({ portal }) {
   }
 
   return (
-    <div className="main" style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
-      <form className="card" style={{ width: 360 }} onSubmit={onSubmit}>
-        <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <Link to="/" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>← Geri Dön</Link>
-            <h3 style={{ marginTop: 10, marginBottom: 4 }}>{portalName} Girişi</h3>
-        </div>
-        
-        <div style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta / Kullanıcı adı</div>
-            <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} type="text" placeholder="e-posta veya kullanıcı adı" className="input" autoFocus />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şifre</div>
-            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="şifre" className="input" />
-          </label>
-          {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
-          <button className="btn" disabled={loading}>{loading ? 'Gönderiliyor...' : 'Giriş Yap'}</button>
-        </div>
-      </form>
-    </div>
+    <PublicSystemLogin
+      backTo="/login"
+      backLabel="Sistem seçimine dön"
+      brand="PenPOS"
+      systemLabel="RESTORAN / CAFE YÖNETİMİ"
+      welcomeTitle="Adisyon, mutfak ve satış akışını tek panelden yönetin."
+      welcomeText="Masa yönetimi, paket servis, raporlar ve personel süreçlerini düzenli şekilde yönetin."
+      formTitle="Restoran Girişi"
+      formSubtitle="Üye bilgilerinizle panelinize giriş yapın."
+      identifierLabel="E-posta / Kullanıcı Adı"
+      identifierPlaceholder="eposta veya kullanıcı adı"
+      passwordLabel="Şifre"
+      passwordPlaceholder="şifrenizi girin"
+      identifier={identifier}
+      password={password}
+      onIdentifierChange={setIdentifier}
+      onPasswordChange={setPassword}
+      onSubmit={onSubmit}
+      error={error}
+      loading={loading}
+      forgotTo="/forgot-password?portal=kermes"
+      submitLabel="Giriş Yap"
+      loadingLabel="Giriş yapılıyor..."
+      registerTo="/register?type=restaurant"
+      registerLabel="Şimdi Kaydolun"
+      registerText="Yeni restoran hesabınızı oluşturun, şubenizi ve menünüzü hızlıca yayına alın."
+      supportTitle="Restoran desteği"
+      supportItems={[
+        { label: 'Masa + Paket', value: 'Canlı operasyon' },
+        { label: 'QR Menü', value: 'Hazır altyapı' },
+      ]}
+      theme="restaurant"
+      highlights={['Masa Takibi', 'Mutfak Akışı', 'Paket Servis', 'QR Menü']}
+      panelQuote="Çok şubeli yapılarda hızlı operasyon, net raporlama ve düzenli sipariş akışı için tek ekrandan kontrol sağlayın."
+      panelCaption="Restoran paneli"
+    />
   )
 }

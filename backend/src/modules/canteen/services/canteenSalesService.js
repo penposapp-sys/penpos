@@ -5,6 +5,7 @@ import * as saleRepo from '../repositories/canteenSaleRepository.js'
 import * as movementRepo from '../repositories/canteenStockMovementRepository.js'
 import { findTenantPaymentSettings } from '../repositories/canteenSettingsRepository.js'
 import { findByIdAndTenant as findCustomerById } from '../repositories/canteenCustomerRepository.js'
+import { resolvePaymentMethodSelection } from '../../../services/paymentSettingsService.js'
 
 const toNumber = (v) => {
   const n = Number(v)
@@ -16,6 +17,8 @@ const toInt = (v) => {
   if (!Number.isFinite(n)) return 0
   return Math.floor(n)
 }
+
+const roundMoney = (value) => Number(toNumber(value).toFixed(2))
 
 export const createSale = async (tenantId, branchId, actorUserId, input) => {
   const items = Array.isArray(input?.items) ? input.items : []
@@ -51,24 +54,46 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
     if (!p) throw error('product_not_found', 'Ürün bulunamadı', 404)
     const unitPrice = toNumber(p.price)
     const lineTotal = unitPrice * qty
-    lines.push({ productId: p.id, name: p.name, qty, unitPrice, lineTotal })
+    lines.push({
+      productId: p.id,
+      name: p.name,
+      qty,
+      unitPrice,
+      lineTotal,
+      vatRate: toNumber(p.vatRate)
+    })
   }
   if (lines.length === 0) throw error('invalid_request', 'Items required', 400)
 
   const subTotal = lines.reduce((sum, l) => sum + toNumber(l.lineTotal), 0)
-  const total = subTotal
+  const discountPercentRaw = toNumber(input?.discountPercent)
+  if (!Number.isFinite(discountPercentRaw) || discountPercentRaw < 0 || discountPercentRaw > 100) {
+    throw error('invalid_discount', 'Geçersiz indirim oranı', 400)
+  }
+  const discountPercent = roundMoney(discountPercentRaw)
+  const discountTotal = roundMoney((subTotal * discountPercent) / 100)
+  const total = roundMoney(Math.max(0, subTotal - discountTotal))
 
-  const method = String(input?.payment?.method || '').trim()
+  const requestedMethod = String(input?.payment?.method || '').trim()
   const note = String(input?.payment?.note || '').trim()
   const paymentAmount = toNumber(input?.payment?.amount)
   const saleNote = String(input?.note || '').trim()
   const customerId = input?.payment?.customerId ? String(input.payment.customerId) : null
 
-  if (method !== 'cash' && method !== 'pos' && method !== 'bank' && method !== 'account') {
+  if (!requestedMethod) {
     throw error('invalid_request', 'Invalid payment method', 400)
   }
   if (!Number.isFinite(paymentAmount) || Math.abs(paymentAmount - total) > 0.009) {
     throw error('invalid_request', 'Invalid payment amount', 400)
+  }
+
+  const resolvedPayment = await resolvePaymentMethodSelection(tenantId, branchId, requestedMethod)
+  const method = String(resolvedPayment.methodId || '').trim()
+  const methodName = String(resolvedPayment.methodName || '').trim()
+  const rawMethodType = String(resolvedPayment.methodType || '').trim()
+  const methodType = rawMethodType === 'credit' ? 'account' : rawMethodType
+  if (!method || !methodName || !methodType) {
+    throw error('invalid_request', 'Invalid payment method', 400)
   }
 
   const paySettings = await findTenantPaymentSettings(tenantId)
@@ -77,13 +102,13 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
   const bankEnabled = paySettings ? (paySettings.bankEnabled === undefined ? !!paySettings.ibanEnabled : !!paySettings.bankEnabled) : false
   const accountEnabled = paySettings ? (paySettings.accountEnabled === undefined ? true : !!paySettings.accountEnabled) : true
 
-  if (method === 'cash' && !cashEnabled) throw error('payment_disabled', 'Cash disabled', 400)
-  if (method === 'pos' && !posEnabled) throw error('payment_disabled', 'POS disabled', 400)
-  if (method === 'bank' && !bankEnabled) throw error('payment_disabled', 'Bank disabled', 400)
-  if (method === 'account' && !accountEnabled) throw error('payment_disabled', 'Account disabled', 400)
+  if (methodType === 'cash' && !cashEnabled) throw error('payment_disabled', 'Cash disabled', 400)
+  if (methodType === 'card' && !posEnabled) throw error('payment_disabled', 'POS disabled', 400)
+  if (methodType === 'bank' && !bankEnabled) throw error('payment_disabled', 'Bank disabled', 400)
+  if (methodType === 'account' && !accountEnabled) throw error('payment_disabled', 'Account disabled', 400)
 
   let resolvedCustomerId = null
-  if (method === 'account') {
+  if (methodType === 'account') {
     if (!customerId || !mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Customer required', 400)
     const c = await findCustomerById(customerId, tenantId)
     if (!c) throw error('not_found', 'Cari bulunamadı', 404)
@@ -125,6 +150,7 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
   }
 
   const saleId = new mongoose.Types.ObjectId()
+  const channel = String(input?.channel || '').trim().toLowerCase() === 'qr' ? 'qr' : 'cashier'
   let created
   try {
     created = await saleRepo.create({
@@ -134,8 +160,11 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
       customerId: resolvedCustomerId,
       items: lines,
       subTotal,
+      discountPercent,
+      discountTotal,
       total,
-      payment: { method, amount: total, note },
+      channel,
+      payment: { method, methodName, methodType, amount: total, note },
       note: saleNote,
       isActive: true,
       createdAt: new Date(),
@@ -158,6 +187,9 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
 
   return {
     id: created.id,
+    subTotal: Number(created.subTotal || 0),
+    discountPercent: Number(created.discountPercent || 0),
+    discountTotal: Number(created.discountTotal || 0),
     total: Number(created.total || 0),
     createdAt: created.createdAt,
     payment: created.payment,
@@ -182,6 +214,8 @@ export const getSale = async (tenantId, branchId, saleId) => {
     branchId: s.branchId ? String(s.branchId) : null,
     customerId: s.customerId ? String(s.customerId) : null,
     subTotal: Number(s.subTotal || 0),
+    discountPercent: Number(s.discountPercent || 0),
+    discountTotal: Number(s.discountTotal || 0),
     total: Number(s.total || 0),
     payment: s.payment,
     note: String(s.note || ''),
@@ -193,6 +227,7 @@ export const getSale = async (tenantId, branchId, saleId) => {
         qty: Number(it.qty || 0),
         unitPrice: Number(it.unitPrice || 0),
         lineTotal: Number(it.lineTotal || 0),
+        vatRate: Number(it.vatRate || 0),
         note: String(it.note || '')
       }))
       : []

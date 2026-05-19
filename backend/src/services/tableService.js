@@ -4,6 +4,7 @@ import { createOrder } from '../repositories/orderRepository.js'
 import Table from '../models/Table.js'
 import Order from '../models/Order.js'
 import User from '../models/User.js'
+import Branch from '../models/Branch.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { getTenantPlan, ensureNotExpired } from './planService.js'
 import mongoose from 'mongoose'
@@ -98,12 +99,16 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
     e.payload = { code: 'table_in_use', message: 'Table already occupied', details: { orderId: existing.id } }
     throw e
   }
+  const branchDoc = effectiveBranchId ? await Branch.findOne({ _id: effectiveBranchId, tenantId }).select('name').lean() : null
+  const safeCreatedByName = String(createdByName || '').trim()
   const order = await createOrder({
     tenantId,
     branchId: effectiveBranchId,
+    branchName: String(branchDoc?.name || ''),
     createdBy: userId,
     createdByUserId: userId,
-    createdByName: String(createdByName || '').trim(),
+    createdByUserName: safeCreatedByName,
+    createdByName: safeCreatedByName,
     tableId,
     status: 'open',
     items: [],

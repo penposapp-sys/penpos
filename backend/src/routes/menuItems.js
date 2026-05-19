@@ -9,6 +9,7 @@ import * as ctrl from '../controllers/menuItemController.js'
 const router = Router()
 
 router.get('/', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.list)
+router.get('/:id', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), ctrl.getOne)
 router.post('/', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), ctrl.create)
 router.put('/:id', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), ctrl.update)
 router.delete('/:id', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), ctrl.remove)

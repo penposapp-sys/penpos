@@ -6,17 +6,19 @@ export default function MobileTopSheetNav({ open, title, items, onClose, onSelec
   useEffect(() => {
     if (!open) return
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose?.()
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [open, onClose])
 
   if (!open) return null
 
   return (
     <>
-      <div className="topSheetBackdrop" onClick={() => onClose?.()} />
+      <div className="topSheetBackdrop" />
       <div className="topSheetPanel" role="dialog" aria-modal="true">
         <div className="topSheetInner">
           <div className="topSheetHeader">

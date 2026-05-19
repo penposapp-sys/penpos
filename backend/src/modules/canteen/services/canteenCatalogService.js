@@ -5,6 +5,20 @@ import * as prodRepo from '../repositories/canteenProductRepository.js'
 const normalizeName = (name) => String(name || '').trim()
 const normalizeKey = (name) => normalizeName(name).toLowerCase()
 const normalizeBarcode = (barcode) => String(barcode || '').trim()
+const normalizeText = (value) => String(value || '').trim()
+const normalizeSortOrder = (value) => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+const mapCategoryDto = (category) => ({
+  id: category.id,
+  name: category.name,
+  description: String(category.description || ''),
+  imageUrl: String(category.imageUrl || ''),
+  sortOrder: Number(category.sortOrder || 0),
+  isActive: category.isActive !== false
+})
 
 const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -27,48 +41,67 @@ const isDuplicateProductNameError = (err) => {
   )
 }
 
+const ensureCategoryInScope = async (tenantId, branchId, categoryId) => {
+  if (!categoryId) return null
+  const category = await catRepo.findByIdAndScope(categoryId, tenantId, branchId)
+  if (!category) throw error('category_not_found', 'Kategori bulunamadi', 404)
+  return category
+}
+
 export const listCategories = async (tenantId, branchId) => {
   const items = await catRepo.listByTenantAndBranch(tenantId, branchId)
-  return items.map(c => ({ id: c.id, name: c.name }))
+  return items.map(mapCategoryDto)
 }
 
 export const createCategory = async (tenantId, branchId, input) => {
   const name = normalizeName(input?.name)
-  if (!name) throw error('name_required', 'Kategori adı zorunludur', 400)
+  if (!name) throw error('name_required', 'Kategori adi zorunludur', 400)
   const created = await catRepo.create({
     tenantId,
     branchId,
     name,
     nameNormalized: normalizeKey(name),
+    description: normalizeText(input?.description),
+    imageUrl: normalizeText(input?.imageUrl),
+    sortOrder: normalizeSortOrder(input?.sortOrder),
     isActive: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    updatedAt: new Date()
   })
-  return { id: created.id, name: created.name }
+  return mapCategoryDto(created)
 }
 
 export const updateCategory = async (tenantId, branchId, id, input) => {
   const update = {}
   if (input?.name !== undefined) {
     const name = normalizeName(input?.name)
-    if (!name) throw error('name_required', 'Kategori adı zorunludur', 400)
+    if (!name) throw error('name_required', 'Kategori adi zorunludur', 400)
     update.name = name
     update.nameNormalized = normalizeKey(name)
   }
+  if (input?.description !== undefined) update.description = normalizeText(input?.description)
+  if (input?.imageUrl !== undefined) update.imageUrl = normalizeText(input?.imageUrl)
+  if (input?.sortOrder !== undefined) update.sortOrder = normalizeSortOrder(input?.sortOrder)
+  if (input?.isActive !== undefined) update.isActive = input?.isActive === true
+  update.updatedAt = new Date()
+
   const updated = await catRepo.updateByIdAndScope(id, tenantId, branchId, update)
-  if (!updated) throw error('not_found', 'Kategori bulunamadı', 404)
-  return { id: updated.id, name: updated.name }
+  if (!updated) throw error('not_found', 'Kategori bulunamadi', 404)
+  return mapCategoryDto(updated)
 }
 
 export const removeCategory = async (tenantId, branchId, id) => {
   const deleted = await catRepo.softDeleteByIdAndScope(id, tenantId, branchId)
-  if (!deleted) throw error('not_found', 'Kategori bulunamadı', 404)
+  if (!deleted) throw error('not_found', 'Kategori bulunamadi', 404)
   return { success: true }
 }
 
 export const listProducts = async (tenantId, branchIds) => {
   const ids = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
   const items = await prodRepo.listByTenantAndBranches(tenantId, ids)
-  return items.map(p => ({
+  const categories = ids.length > 0 ? await catRepo.listByTenantAndBranches(tenantId, ids) : []
+  const categoryById = new Map((categories || []).map((item) => [String(item.id || item._id), item]))
+  return items.map((p) => ({
     id: p.id,
     name: p.name,
     branchId: p.branchId ? String(p.branchId) : null,
@@ -78,27 +111,32 @@ export const listProducts = async (tenantId, branchIds) => {
     price: Number(p.price || 0),
     costPrice: Number(p.costPrice || 0),
     vatRate: Number(p.vatRate || 0),
-    categoryId: p.categoryId ? String(p.categoryId) : null
+    categoryId: p.categoryId ? String(p.categoryId) : null,
+    categoryName: p.categoryId ? String(categoryById.get(String(p.categoryId))?.name || '') : '',
+    categoryImageUrl: p.categoryId ? String(categoryById.get(String(p.categoryId))?.imageUrl || '') : '',
+    imageUrl: String(p.imageUrl || '')
   }))
 }
 
 export const createProduct = async (tenantId, branchId, input) => {
   const name = normalizeName(input?.name)
-  if (!name) throw error('name_required', 'Ürün adı zorunludur', 400)
+  if (!name) throw error('name_required', 'Urun adi zorunludur', 400)
   const barcode = normalizeBarcode(input?.barcode)
   if (!barcode) throw error('validation_error', 'Barkod zorunludur', 400)
   const rawPrice = input?.price
   if (rawPrice === undefined || rawPrice === null || String(rawPrice).trim() === '') {
-    throw error('price_required', 'Satış fiyatı zorunludur', 400)
+    throw error('price_required', 'Satis fiyati zorunludur', 400)
   }
   const price = Number(input?.price || 0)
-  if (!Number.isFinite(price) || price < 0) throw error('validation_error', 'Satış fiyatı geçersiz', 400)
+  if (!Number.isFinite(price) || price < 0) throw error('validation_error', 'Satis fiyati gecersiz', 400)
   const costPrice = Number(input?.costPrice || 0)
   const vatRate = Number(input?.vatRate || 0)
   const categoryId = input?.categoryId ? String(input.categoryId) : null
+  if (categoryId) await ensureCategoryInScope(tenantId, branchId, categoryId)
   const stockTrackingEnabled = input?.stockTrackingEnabled === true
   const stockQtyRaw = input?.stockQty
   const stockQty = Number(stockQtyRaw || 0)
+  const imageUrl = String(input?.imageUrl || '').trim()
   try {
     const created = await prodRepo.create({
       tenantId,
@@ -112,6 +150,7 @@ export const createProduct = async (tenantId, branchId, input) => {
       price: Number.isFinite(price) ? price : 0,
       costPrice: Number.isFinite(costPrice) ? costPrice : 0,
       vatRate: Number.isFinite(vatRate) ? vatRate : 0,
+      imageUrl,
       isActive: true,
       createdAt: new Date()
     })
@@ -124,11 +163,12 @@ export const createProduct = async (tenantId, branchId, input) => {
       price: Number(created.price || 0),
       costPrice: Number(created.costPrice || 0),
       vatRate: Number(created.vatRate || 0),
-      categoryId: created.categoryId ? String(created.categoryId) : null
+      categoryId: created.categoryId ? String(created.categoryId) : null,
+      imageUrl: String(created.imageUrl || '')
     }
   } catch (err) {
-    if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayıtlı', 409)
-    if (isDuplicateProductNameError(err)) throw error('duplicate_product_name', 'Bu şubede aynı isimde ürün zaten kayıtlı', 409)
+    if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayitli', 409)
+    if (isDuplicateProductNameError(err)) throw error('duplicate_product_name', 'Bu subede ayni isimde urun zaten kayitli', 409)
     throw err
   }
 }
@@ -137,7 +177,7 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
   const update = {}
   if (input?.name !== undefined) {
     const name = normalizeName(input?.name)
-    if (!name) throw error('name_required', 'Ürün adı zorunludur', 400)
+    if (!name) throw error('name_required', 'Urun adi zorunludur', 400)
     update.name = name
     update.nameNormalized = normalizeKey(name)
   }
@@ -163,10 +203,14 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
     const vatRate = Number(input?.vatRate || 0)
     update.vatRate = Number.isFinite(vatRate) ? vatRate : 0
   }
-  if (input?.categoryId !== undefined) update.categoryId = input?.categoryId ? String(input.categoryId) : null
+  if (input?.categoryId !== undefined) {
+    update.categoryId = input?.categoryId ? String(input.categoryId) : null
+    if (update.categoryId) await ensureCategoryInScope(tenantId, branchId, update.categoryId)
+  }
+  if (input?.imageUrl !== undefined) update.imageUrl = String(input?.imageUrl || '').trim()
   try {
     const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, update)
-    if (!updated) throw error('not_found', 'Ürün bulunamadı', 404)
+    if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
     return {
       id: updated.id,
       name: updated.name,
@@ -176,11 +220,12 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
       price: Number(updated.price || 0),
       costPrice: Number(updated.costPrice || 0),
       vatRate: Number(updated.vatRate || 0),
-      categoryId: updated.categoryId ? String(updated.categoryId) : null
+      categoryId: updated.categoryId ? String(updated.categoryId) : null,
+      imageUrl: String(updated.imageUrl || '')
     }
   } catch (err) {
-    if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayıtlı', 409)
-    if (isDuplicateProductNameError(err)) throw error('duplicate_product_name', 'Bu şubede aynı isimde ürün zaten kayıtlı', 409)
+    if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayitli', 409)
+    if (isDuplicateProductNameError(err)) throw error('duplicate_product_name', 'Bu subede ayni isimde urun zaten kayitli', 409)
     throw err
   }
 }
@@ -189,7 +234,7 @@ export const getProductByBarcode = async (tenantId, branchId, barcodeRaw) => {
   const barcode = normalizeBarcode(barcodeRaw)
   if (!barcode) throw error('validation_error', 'Barkod zorunludur', 400)
   const p = await prodRepo.findByBarcodeAndScope(barcode, tenantId, branchId)
-  if (!p) throw error('not_found', 'Barkod bulunamadı', 404)
+  if (!p) throw error('not_found', 'Barkod bulunamadi', 404)
   return {
     id: p.id,
     name: p.name,
@@ -206,7 +251,7 @@ export const searchProducts = async (tenantId, branchId, input) => {
   const limit = Number(input?.limit || 20)
   if (q.length < 2) throw error('validation_error', 'En az 2 karakter yaz', 400)
   const items = await prodRepo.searchByNameAndScope(tenantId, branchId, escapeRegex(q), limit)
-  return items.map(p => ({
+  return items.map((p) => ({
     id: p.id,
     name: p.name,
     barcode: p.barcode || '',
@@ -217,6 +262,6 @@ export const searchProducts = async (tenantId, branchId, input) => {
 
 export const removeProduct = async (tenantId, branchId, id) => {
   const deleted = await prodRepo.softDeleteByIdAndScope(id, tenantId, branchId)
-  if (!deleted) throw error('not_found', 'Ürün bulunamadı', 404)
+  if (!deleted) throw error('not_found', 'Urun bulunamadi', 404)
   return { success: true }
 }

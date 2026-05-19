@@ -3,10 +3,11 @@ import { error } from '../utils/errors.js'
 import { findAllByTenant, findAllByTenantAny, createBranch, confirmNameAvailable, updateById, findByIdAndTenant } from '../repositories/branchRepository.js'
 import { log as auditLog } from './auditService.js'
 import User from '../models/User.js'
+import { buildSoftDeleteUpdate } from '../utils/softDelete.js'
 
 export const listBranches = async (tenantId, { includeInactive = false } = {}) => {
   const list = includeInactive ? await findAllByTenantAny(tenantId) : await findAllByTenant(tenantId)
-  return list.map(b => ({ id: b.id, name: b.name, description: b.description || '', address: b.address, isActive: b.isActive }))
+  return list.map(b => ({ id: b.id, name: b.name, description: b.description || '', address: b.address || '', isActive: b.isActive, active: b.active !== false, isDeleted: b.isDeleted === true, status: b.status || (b.isActive ? 'active' : 'inactive') }))
 }
 
 export const createBranchService = async (tenantId, actorUserId, dto) => {
@@ -14,7 +15,7 @@ export const createBranchService = async (tenantId, actorUserId, dto) => {
   if (!ok) throw error('name_in_use', 'Name already in use', 400)
   const b = await createBranch({ tenantId, name: dto.name, description: dto.description ?? '', address: dto.address ?? '' })
   await auditLog(tenantId, actorUserId, 'branch_create', 'Branch', b.id, { name: b.name })
-  return { id: b.id, name: b.name, description: b.description || '', address: b.address, isActive: b.isActive }
+  return { id: b.id, name: b.name, description: b.description || '', address: b.address || '', isActive: b.isActive, active: b.active !== false, isDeleted: b.isDeleted === true, status: b.status || 'active' }
 }
 
 export const updateBranchService = async (tenantId, actorUserId, id, dto) => {
@@ -28,26 +29,31 @@ export const updateBranchService = async (tenantId, actorUserId, id, dto) => {
     name: dto.name ?? b.name,
     description: dto.description ?? b.description,
     address: dto.address ?? b.address,
-    isActive: dto.isActive ?? b.isActive
+    active: dto.isActive ?? dto.active ?? b.active ?? b.isActive,
+    isActive: dto.isActive ?? b.isActive,
+    isDeleted: b.isDeleted === true ? true : false,
+    deletedAt: b.isDeleted === true ? (b.deletedAt || new Date()) : null,
+    status: b.isDeleted === true ? 'deleted' : ((dto.isActive ?? b.isActive) ? 'active' : 'inactive')
   })
   await auditLog(tenantId, actorUserId, 'branch_update', 'Branch', updated.id, { name: updated.name })
-  return { id: updated.id, name: updated.name, description: updated.description || '', address: updated.address, isActive: updated.isActive }
+  return { id: updated.id, name: updated.name, description: updated.description || '', address: updated.address || '', isActive: updated.isActive, active: updated.active !== false, isDeleted: updated.isDeleted === true, status: updated.status || (updated.isActive ? 'active' : 'inactive') }
 }
 
 export const toggleBranchActiveService = async (tenantId, actorUserId, id) => {
   const b = await findByIdAndTenant(id, tenantId)
   if (!b) throw error('branch_not_found', 'Branch not found', 404)
-  const updated = await updateById(id, { isActive: !b.isActive })
+  const nextIsActive = !b.isActive
+  const updated = await updateById(id, { active: nextIsActive, isActive: nextIsActive, status: nextIsActive ? 'active' : 'inactive', isDeleted: false, deletedAt: null })
   await auditLog(tenantId, actorUserId, 'branch_toggle', 'Branch', updated.id, { isActive: updated.isActive })
-  return { id: updated.id, name: updated.name, description: updated.description || '', address: updated.address, isActive: updated.isActive }
+  return { id: updated.id, name: updated.name, description: updated.description || '', address: updated.address || '', isActive: updated.isActive, active: updated.active !== false, isDeleted: updated.isDeleted === true, status: updated.status || (updated.isActive ? 'active' : 'inactive') }
 }
 
 export const deleteBranchService = async (tenantId, actorUserId, id) => {
   const b = await findByIdAndTenant(id, tenantId)
   if (!b) throw error('branch_not_found', 'Branch not found', 404)
-  const updated = await updateById(id, { isActive: false })
-  await auditLog(tenantId, actorUserId, 'branch_delete', 'Branch', updated.id, {})
-  return { id: updated.id, isActive: updated.isActive }
+  const updated = await updateById(id, buildSoftDeleteUpdate())
+  await auditLog(tenantId, actorUserId, 'branch_delete_soft', 'Branch', updated.id, {})
+  return { id: updated.id, isActive: updated.isActive, active: updated.active !== false, isDeleted: updated.isDeleted === true, status: updated.status || 'deleted' }
 }
 
 export const setBranchStaffService = async (tenantId, actorUserId, branchId, staffIds = []) => {
@@ -59,7 +65,7 @@ export const setBranchStaffService = async (tenantId, actorUserId, branchId, sta
     ? staffIds.map(String).filter(Boolean)
     : []
 
-  const allStaff = await User.find({ tenantId, role: 'staff' })
+  const allStaff = await User.find({ tenantId, role: 'staff', isDeleted: { $ne: true }, status: { $ne: 'deleted' } })
   const selected = new Set(safeStaffIds)
 
   for (const u of allStaff) {
@@ -86,5 +92,5 @@ export const setBranchStaffService = async (tenantId, actorUserId, branchId, sta
   }
 
   await auditLog(tenantId, actorUserId, 'branch_staff_set', 'Branch', branchId, { staffCount: safeStaffIds.length })
-  return { success: true, branch: { id: b.id, name: b.name, description: b.description || '', address: b.address, isActive: b.isActive } }
+  return { success: true, branch: { id: b.id, name: b.name, description: b.description || '', address: b.address || '', isActive: b.isActive, active: b.active !== false, isDeleted: b.isDeleted === true, status: b.status || (b.isActive ? 'active' : 'inactive') } }
 }

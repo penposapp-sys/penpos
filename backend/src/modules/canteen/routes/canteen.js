@@ -23,8 +23,10 @@ import * as billingCtrl from '../controllers/canteenBillingController.js'
 import * as stockCtrl from '../controllers/canteenStockController.js'
 import * as meCtrl from '../controllers/canteenMeController.js'
 import * as bulkProductsCtrl from '../controllers/canteenProductsBulkController.js'
+import * as qrOrdersCtrl from '../controllers/canteenQrOrdersController.js'
 import multer from 'multer'
 import { error } from '../../../utils/errors.js'
+import { requireActiveSubscription } from '../../../middlewares/requireActiveSubscription.js'
 
 const router = Router()
 
@@ -64,8 +66,9 @@ router.post('/staff', requireRole(['tenant_admin']), requirePermission([PERMISSI
 router.put('/staff/:id', requireRole(['tenant_admin']), requirePermission([PERMISSIONS.CANTEEN_STAFF_MANAGE]), staffCtrl.update)
 router.delete('/staff/:id', requireRole(['tenant_admin']), requirePermission([PERMISSIONS.CANTEEN_STAFF_MANAGE]), staffCtrl.remove)
 
-router.get('/settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.getSettings)
+router.get('/settings', requireRole(['tenant_admin', 'staff']), settingsCtrl.getSettings)
 router.put('/settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updateSettings)
+router.put('/settings/qr', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updateQrSettings)
 
 router.get('/payment-settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.getPaymentSettings)
 router.put('/payment-settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updatePaymentSettings)
@@ -79,7 +82,13 @@ router.get('/billing/plans', requireRole(['tenant_admin']), requireAnyPermission
 router.post('/billing/requests', requireRole(['tenant_admin']), requireAnyPermission([PERMISSIONS.CANTEEN_BILLING_MANAGE, PERMISSIONS.MANAGE_SETTINGS]), billingCtrl.createRequest)
 router.post('/billing/requests/:id/cancel', requireRole(['tenant_admin']), requireAnyPermission([PERMISSIONS.CANTEEN_BILLING_MANAGE, PERMISSIONS.MANAGE_SETTINGS]), billingCtrl.cancelRequest)
 
+router.use(requireActiveSubscription)
+
 // Catalog - Branch dependent
+router.get('/catalog/categories', canteenBranchHeaderGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.MANAGE_MENU, PERMISSIONS.CANTEEN_POS_ACCESS]), catalogCtrl.listCategories)
+router.post('/catalog/categories', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createCategory)
+router.put('/catalog/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateCategory)
+router.delete('/catalog/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeCategory)
 router.get('/catalog/products', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.MANAGE_MENU, PERMISSIONS.CANTEEN_POS_ACCESS]), catalogCtrl.listProducts)
 // Alias: products list should be accessible from POS / product view / settings
 router.post('/catalog/products', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createProduct)
@@ -87,6 +96,22 @@ router.put('/catalog/products/:id', canteenBranchQueryGuard, requireRole(['tenan
 router.delete('/catalog/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProduct)
 
 // Products (alias) - Branch dependent
+router.get(
+  '/categories',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([
+    PERMISSIONS.CANTEEN_POS_ACCESS,
+    PERMISSIONS.CANTEEN_PRODUCTS_VIEW,
+    PERMISSIONS.MANAGE_MENU,
+    PERMISSIONS.MANAGE_SETTINGS
+  ]),
+  catalogCtrl.listCategories
+)
+router.post('/categories', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createCategory)
+router.put('/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateCategory)
+router.delete('/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeCategory)
+
 router.get(
   '/products',
   canteenBranchListGuard,
@@ -154,7 +179,44 @@ router.delete('/customers/:customerId/payments/:paymentId', requireRole(['tenant
 router.get('/reports/summary', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.summary)
 router.get('/reports/products', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.products)
 router.get('/reports/customers', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.customers)
+router.get('/reports/z-report', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.zReport)
 router.get('/reports/export', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_REPORTS_EXPORT, PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.exportAll)
+
+router.get(
+  '/qr-orders',
+  canteenBranchListGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]),
+  qrOrdersCtrl.list
+)
+router.patch(
+  '/qr-orders/:id/status',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]),
+  qrOrdersCtrl.updateStatus
+)
+router.patch(
+  '/qr-orders/:id/payment',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]),
+  qrOrdersCtrl.updatePayment
+)
+router.post(
+  '/qr-orders/:id/transfer-to-cari',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]),
+  qrOrdersCtrl.transferToCari
+)
+router.delete(
+  '/qr-orders/:id',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]),
+  qrOrdersCtrl.remove
+)
 
 router.post(
   '/stock/movements',

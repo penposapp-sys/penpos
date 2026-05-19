@@ -3,10 +3,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 const WRAPPER_STYLE = {}
 
 const CARD_STYLE = {
-  border: '1px solid #e2e8f0',
+  border: '1px solid var(--app-border, var(--border))',
   borderRadius: 24,
-  background: 'rgba(255,255,255,0.96)',
-  boxShadow: '0 14px 32px rgba(15, 23, 42, 0.08)',
+  background: 'linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 96%, transparent), var(--app-surface-soft, var(--panelElevated)))',
+  color: 'var(--app-text, var(--text))',
+  boxShadow: 'var(--card-shadow)',
   backdropFilter: 'blur(12px)',
   padding: 16
 }
@@ -17,19 +18,55 @@ function BranchPill({ label, active, onClick }) {
       type="button"
       onClick={onClick}
       style={{
-        border: `1px solid ${active ? '#0f172a' : '#e2e8f0'}`,
-        borderRadius: 18,
-        background: active ? '#0f172a' : '#f8fafc',
-        color: active ? '#ffffff' : '#334155',
+        border: `1px solid ${active ? 'color-mix(in srgb, var(--theme-accent, #3b82f6) 55%, white 10%)' : 'var(--app-border, var(--border))'}`,
+        borderRadius: 20,
+        background: active
+          ? 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent, #2563eb) 24%, var(--app-surface)), color-mix(in srgb, #0ea5e9 14%, var(--app-surface-soft, var(--panelElevated))))'
+          : 'linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 94%, transparent), color-mix(in srgb, var(--app-surface-soft, var(--panelElevated)) 96%, transparent))',
+        color: 'var(--app-text, var(--text))',
         padding: '12px 14px',
         textAlign: 'left',
         fontWeight: 800,
         fontSize: 13,
         transition: 'transform 160ms ease, box-shadow 160ms ease, background 160ms ease',
-        boxShadow: active ? '0 12px 24px rgba(15, 23, 42, 0.18)' : 'none'
+        boxShadow: active ? '0 14px 28px color-mix(in srgb, var(--theme-accent, #2563eb) 22%, transparent)' : '0 8px 18px rgba(0, 0, 0, 0.12)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12
       }}
     >
-      {label}
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <span
+        aria-hidden="true"
+        style={{
+          width: 42,
+          height: 24,
+          borderRadius: 999,
+          background: active
+            ? 'linear-gradient(135deg, var(--theme-accent, #2563eb), color-mix(in srgb, #0ea5e9 82%, var(--theme-accent, #2563eb)))'
+            : 'color-mix(in srgb, var(--app-text-secondary, var(--muted)) 35%, transparent)',
+          position: 'relative',
+          flexShrink: 0,
+          boxShadow: active
+            ? 'inset 0 0 0 1px rgba(255,255,255,0.18)'
+            : 'inset 0 0 0 1px color-mix(in srgb, var(--app-border, var(--border)) 80%, transparent)'
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: 3,
+            left: active ? 21 : 3,
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            background: 'var(--app-text, #ffffff)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.22)',
+            transition: 'left 160ms ease'
+          }}
+        />
+      </span>
     </button>
   )
 }
@@ -38,9 +75,10 @@ export default function BranchFilterCard({
   branchOptions,
   selectedBranches,
   setSelectedBranches,
-  title = 'Sube Sec',
+  title = 'Şube Seç',
   compact = false,
-  iconOnly = false
+  iconOnly = false,
+  hideSummary = false
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -59,7 +97,7 @@ export default function BranchFilterCard({
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [])
 
-  if (visibleOptions.length <= 1) return null
+  if (visibleOptions.length === 0) return null
 
   const toggleBranch = (branchId) => {
     if (selectedBranches.includes(branchId)) {
@@ -82,8 +120,8 @@ export default function BranchFilterCard({
                 onClick={() => setOpen((current) => !current)}
                 style={{
                   borderRadius: iconOnly ? 16 : (compact ? 14 : 18),
-                  background: '#0f172a',
-                  borderColor: '#0f172a',
+                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent, #111827) 78%, black 8%), color-mix(in srgb, var(--theme-accent, #111827) 52%, var(--app-surface)))',
+                  borderColor: 'color-mix(in srgb, var(--theme-accent, #111827) 45%, var(--app-border, var(--border)))',
                   color: '#ffffff',
                   padding: iconOnly ? '10px 12px' : (compact ? '10px 14px' : '12px 16px'),
                   fontWeight: 900,
@@ -103,9 +141,9 @@ export default function BranchFilterCard({
                   </span>
                 ) : title}
               </button>
-              {!iconOnly && (
-                <span style={{ color: '#475569', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  {selectedNames.length > 0 ? `${selectedNames.length} sube secili` : 'Tum subeler secili degil'}
+              {!iconOnly && !hideSummary && (
+                <span style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  {selectedNames.length > 0 ? `${selectedNames.length} şube seçili` : 'Tüm subeler seçili degil'}
                 </span>
               )}
             </div>
@@ -119,7 +157,7 @@ export default function BranchFilterCard({
                 onClick={() => setSelectedBranches(visibleOptions.map((branch) => branch.id))}
                 style={{ borderRadius: 16, padding: '10px 14px', fontWeight: 800 }}
               >
-                Tumunu Sec
+                Tumunu Seç
               </button>
               <button
                 type="button"
@@ -127,7 +165,7 @@ export default function BranchFilterCard({
                 onClick={() => setSelectedBranches(visibleOptions.slice(0, 1).map((branch) => branch.id))}
                 style={{ borderRadius: 16, padding: '10px 14px', fontWeight: 800 }}
               >
-                Tek Sube
+                Tek Şube
               </button>
             </div>
           )}
@@ -140,8 +178,8 @@ export default function BranchFilterCard({
                 key={name}
                 style={{
                   borderRadius: 999,
-                  background: '#f1f5f9',
-                  color: '#475569',
+                  background: 'color-mix(in srgb, var(--app-surface-soft, var(--panelElevated)) 92%, transparent)',
+                  color: 'var(--app-text-secondary, var(--muted))',
                   padding: '8px 12px',
                   fontSize: 12,
                   fontWeight: 800
@@ -169,8 +207,8 @@ export default function BranchFilterCard({
             } : { marginTop: 16, display: 'grid', gap: 12 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b' }}>
-                Gosterilecek subeleri sec
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--app-text-secondary, var(--muted))' }}>
+                Gosterilecek subeleri seç
               </div>
               {compact && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -180,7 +218,7 @@ export default function BranchFilterCard({
                     onClick={() => setSelectedBranches(visibleOptions.map((branch) => branch.id))}
                     style={{ borderRadius: 12, padding: '8px 10px', fontWeight: 800, fontSize: 12 }}
                   >
-                    Tumunu Sec
+                    Tumunu Seç
                   </button>
                   <button
                     type="button"
@@ -188,7 +226,7 @@ export default function BranchFilterCard({
                     onClick={() => setSelectedBranches(visibleOptions.slice(0, 1).map((branch) => branch.id))}
                     style={{ borderRadius: 12, padding: '8px 10px', fontWeight: 800, fontSize: 12 }}
                   >
-                    Tek Sube
+                    Tek Şube
                   </button>
                 </div>
               )}

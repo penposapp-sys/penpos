@@ -35,7 +35,7 @@ export default function CategoryFilterDrawer({
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
       <div
         className="card"
         style={{

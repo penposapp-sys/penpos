@@ -12,16 +12,16 @@ const shouldEmit = (type, message, ttlMs = 5000) => {
 }
 
 export const toast = {
-  success: (message) => {
+  success: (message, options = {}) => {
     if (!shouldEmit('success', message)) return
-    window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'success', message } }))
+    window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'success', message, ...options } }))
   },
-  error: (message) => {
+  error: (message, options = {}) => {
     if (!shouldEmit('error', message)) return
-    window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'error', message } }))
+    window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'error', message, ...options } }))
   },
-  info: (message) => {
+  info: (message, options = {}) => {
     if (!shouldEmit('info', message)) return
-    window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'info', message } }))
+    window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'info', message, ...options } }))
   }
 }

@@ -121,7 +121,9 @@ const measureReceiptHeightPt = ({
   isPackage,
   customerName,
   customerPhone,
-  customerAddress
+  customerAddress,
+  deliveryNote,
+  deliveryPaymentLine
 }) => {
   const tmp = new PDFDocument({ size: [widthPt, 2000], margins })
   applyTrFont(tmp)
@@ -180,7 +182,7 @@ const measureReceiptHeightPt = ({
   h += 2
 
   if (isPackage) {
-    h += hText('PAKET SERVİS', { font: 'trBold', size: 13, align: 'center' })
+    h += hText('*** PAKET SERVIS ***', { font: 'trBold', size: 13, align: 'center' })
     h += 2
     if (customerName) h += hText(`Müşteri: ${customerName}`, { font: 'tr', size: 11 }) + 1
     if (customerPhone) h += hText(`Telefon: ${customerPhone}`, { font: 'tr', size: 11 }) + 1
@@ -188,6 +190,8 @@ const measureReceiptHeightPt = ({
       h += hText('Adres:', { font: 'tr', size: 11 }) + 1
       h += hText(customerAddress, { font: 'tr', size: 10 }) + 2
     }
+    if (deliveryNote) h += hText(`Not: ${deliveryNote}`, { font: 'tr', size: 10 }) + 2
+    if (deliveryPaymentLine) h += hText(`Ödeme: ${deliveryPaymentLine}`, { font: 'tr', size: 10 }) + 2
     h += 6
   }
 
@@ -258,7 +262,9 @@ export const renderReceiptPdfBase64 = async ({
   isPackage,
   customerName,
   customerPhone,
-  customerAddress
+  customerAddress,
+  deliveryNote,
+  deliveryPaymentLine
 } = {}) => {
   const tName = safeText(tenantName) || 'PENPOS'
   const dt = createdAt ? new Date(createdAt) : new Date()
@@ -273,6 +279,8 @@ export const renderReceiptPdfBase64 = async ({
   const pkgCustomer = safeText(customerName)
   const pkgPhone = safeText(customerPhone)
   const pkgAddress = safeText(customerAddress)
+  const pkgNote = safeText(deliveryNote)
+  const pkgPaymentLine = safeText(deliveryPaymentLine)
 
   const marginPt = mmToPt(2)
   const margins = { top: marginPt, left: marginPt, right: marginPt, bottom: marginPt }
@@ -289,7 +297,9 @@ export const renderReceiptPdfBase64 = async ({
     isPackage: pkg,
     customerName: pkgCustomer,
     customerPhone: pkgPhone,
-    customerAddress: pkgAddress
+    customerAddress: pkgAddress,
+    deliveryNote: pkgNote,
+    deliveryPaymentLine: pkgPaymentLine
   })
 
   const headerH = pkg ? 150 : 110
@@ -327,7 +337,7 @@ export const renderReceiptPdfBase64 = async ({
 
   if (pkg) {
     useFont(doc, 'trBold')
-    doc.fontSize(13).text('PAKET SERVİS', { align: 'center' })
+    doc.fontSize(13).text('*** PAKET SERVIS ***', { align: 'center' })
     useFont(doc, 'tr')
     doc.y += 2
 
@@ -340,6 +350,8 @@ export const renderReceiptPdfBase64 = async ({
       textMediumFlow(doc, pkgAddress, { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'left' })
       doc.fontSize(11)
     }
+    if (pkgNote) textMediumFlow(doc, `Not: ${pkgNote}`)
+    if (pkgPaymentLine) textMediumFlow(doc, `Ödeme: ${pkgPaymentLine}`)
 
     doc.y += 3
     doc.moveTo(doc.page.margins.left, doc.y)

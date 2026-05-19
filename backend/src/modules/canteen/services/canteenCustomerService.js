@@ -1,8 +1,10 @@
 import mongoose from 'mongoose'
+import bcrypt from 'bcryptjs'
 import { error } from '../../../utils/errors.js'
 import * as customerRepo from '../repositories/canteenCustomerRepository.js'
 import * as saleRepo from '../repositories/canteenSaleRepository.js'
 import * as collectionRepo from '../repositories/canteenCustomerCollectionRepository.js'
+import CanteenQrOrder from '../models/CanteenQrOrder.js'
 
 const normalizeName = (name) => String(name || '').trim()
 const normalizeKey = (name) => normalizeName(name).toLowerCase()
@@ -11,10 +13,91 @@ const normalizePhone = (phone) => {
   if (!raw) return ''
   return raw.replace(/\s+/g, '').replace(/[^0-9+]/g, '')
 }
+const MIN_PASSWORD_LENGTH = 6
+
+const extractQrOrderNumberFromCollectionNote = (note) => {
+  const text = String(note || '').trim()
+  if (!text) return ''
+  const match = /^QR siparisi\s+(.+?)(?:\s+tahsil edildi|\s+icin indirim mahsup edildi)$/i.exec(text)
+  return String(match?.[1] || '').trim()
+}
+
+const syncQrOrderAfterCollectionChange = async (tenantId, customerId, note = '') => {
+  const orderNumber = extractQrOrderNumberFromCollectionNote(note)
+  if (!orderNumber) return
+
+  const qrOrder = await CanteenQrOrder.findOne({
+    tenantId,
+    orderNumber,
+    isDeleted: false,
+    $or: [
+      { customerId },
+      { cariId: customerId }
+    ]
+  })
+  if (!qrOrder) return
+
+  const collections = await collectionRepo.listByCustomerAllBranches(tenantId, customerId, { limit: 500 })
+  const linked = (Array.isArray(collections) ? collections : []).filter((item) => extractQrOrderNumberFromCollectionNote(item?.note) === orderNumber)
+  const paidCollection = linked.find((item) => String(item?.method || '').trim().toLowerCase() !== 'discount')
+
+  if (paidCollection) {
+    const method = String(paidCollection?.method || '').trim().toLowerCase()
+    qrOrder.paymentStatus = 'paid'
+    qrOrder.paymentMethod = 'already_paid'
+    if (method === 'cash') {
+      qrOrder.paymentMethodLabel = 'Nakit'
+      qrOrder.paymentMethodName = 'Nakit'
+      qrOrder.paymentMethodBucket = 'cash'
+      qrOrder.paymentMethodType = 'cash'
+    } else if (method === 'pos') {
+      qrOrder.paymentMethodLabel = 'POS'
+      qrOrder.paymentMethodName = 'POS'
+      qrOrder.paymentMethodBucket = 'card'
+      qrOrder.paymentMethodType = 'card'
+    } else if (method === 'bank') {
+      qrOrder.paymentMethodLabel = 'Banka'
+      qrOrder.paymentMethodName = 'Banka'
+      qrOrder.paymentMethodBucket = 'bank'
+      qrOrder.paymentMethodType = 'bank'
+    }
+    qrOrder.updatedAt = new Date()
+    await qrOrder.save()
+    return
+  }
+
+  if (qrOrder.isTransferredToCari === true || qrOrder.relatedSaleId) {
+    qrOrder.paymentStatus = 'cari'
+    qrOrder.paymentMethod = 'cari'
+    qrOrder.paymentMethodLabel = 'Cari / Veresiye'
+    qrOrder.paymentMethodName = 'Cari / Veresiye'
+    qrOrder.paymentMethodBucket = 'account'
+    qrOrder.paymentMethodType = 'credit'
+  } else {
+    qrOrder.paymentStatus = 'pending'
+    qrOrder.paymentMethod = 'none'
+    qrOrder.paymentMethodLabel = ''
+    qrOrder.paymentMethodName = ''
+    qrOrder.paymentMethodBucket = 'other'
+    qrOrder.paymentMethodType = 'other'
+  }
+  qrOrder.updatedAt = new Date()
+  await qrOrder.save()
+}
+
+const mapCustomerDto = (customer, balance = 0) => ({
+  id: String(customer.id || customer._id),
+  name: String(customer.name || ''),
+  phone: String(customer.phone || ''),
+  address: String(customer.address || ''),
+  note: String(customer.note || ''),
+  favoriteProductIds: Array.isArray(customer.favoriteProductIds) ? customer.favoriteProductIds.map((id) => String(id)) : [],
+  balance: Number(balance || 0)
+})
 
 const computeBalanceForCustomer = async (tenantId, customerId) => {
   const sales = await saleRepo.listByTenantAndCustomer(tenantId, customerId, { limit: 10000 })
-  const debt = (sales || []).reduce((sum, s) => sum + (s.payment?.method === 'account' ? Number(s.total || 0) : 0), 0)
+  const debt = (sales || []).reduce((sum, s) => sum + ((s.payment?.methodType === 'account' || s.payment?.method === 'account' || s.payment?.method === 'credit') ? Number(s.total || 0) : 0), 0)
   const paid = await collectionRepo.sumByCustomerAllBranches(tenantId, customerId)
   return Number(debt - paid)
 }
@@ -29,7 +112,7 @@ export const listCustomerMovements = async (tenantId, customerId) => {
 
   const rows = []
   for (const s of (sales || [])) {
-    if (s.payment?.method !== 'account') continue
+    if (!(s.payment?.methodType === 'account' || s.payment?.method === 'account' || s.payment?.method === 'credit')) continue
     rows.push({
       id: String(s.id),
       kind: 'sale',
@@ -85,6 +168,8 @@ export const deleteCustomerPayment = async (tenantId, actorUserId, customerId, p
     actorUserId
   })
 
+  await syncQrOrderAfterCollectionChange(tenantId, customerId, p.note || '')
+
   const balance = await computeBalanceForCustomer(tenantId, customerId)
   return { success: true, id: String(paymentId), balance }
 }
@@ -109,13 +194,14 @@ export const listCustomers = async (tenantId) => {
 
 export const searchCustomers = async (tenantId, q, { limit = 50 } = {}) => {
   const items = await customerRepo.searchByTenant(tenantId, q, { limit })
-  return (items || []).map(c => ({ id: c.id, name: c.name, phone: c.phone || '' }))
+  return (items || []).map((c) => ({ id: c.id, name: c.name, phone: c.phone || '' }))
 }
 
 export const createCustomer = async (tenantId, actorUserId, input) => {
   const name = normalizeName(input?.name)
   const phone = normalizePhone(input?.phone)
   const note = String(input?.note || '').trim()
+  const address = String(input?.address || '').trim()
   if (!name || name.length < 2) throw error('name_required', 'İsim zorunludur', 400)
 
   if (phone) {
@@ -133,7 +219,9 @@ export const createCustomer = async (tenantId, actorUserId, input) => {
     name,
     nameNormalized: normalizeKey(name),
     phone,
+    address,
     note,
+    favoriteProductIds: [],
     isActive: true,
     createdAt: new Date(),
     actorUserId
@@ -146,7 +234,7 @@ export const getCustomer = async (tenantId, customerId) => {
   const c = await customerRepo.findByIdAndTenant(customerId, tenantId)
   if (!c) throw error('not_found', 'Cari bulunamadı', 404)
   const balance = await computeBalanceForCustomer(tenantId, c.id)
-  return { id: c.id, name: c.name, phone: c.phone || '', address: c.address || '', note: c.note || '', balance }
+  return mapCustomerDto(c, balance)
 }
 
 export const updateCustomer = async (tenantId, actorUserId, customerId, input) => {
@@ -167,11 +255,18 @@ export const updateCustomer = async (tenantId, actorUserId, customerId, input) =
     name,
     nameNormalized: normalizeKey(name),
     phone,
+    address: input?.address === undefined ? undefined : String(input.address || '').trim(),
+    note: input?.note === undefined ? undefined : String(input.note || '').trim(),
+    favoriteProductIds: input?.favoriteProductIds === undefined
+      ? undefined
+      : (Array.isArray(input.favoriteProductIds)
+        ? input.favoriteProductIds.filter((id) => mongoose.isValidObjectId(String(id))).map(String)
+        : []),
     actorUserId
   })
   if (!updated) throw error('not_found', 'Cari bulunamadı', 404)
   const balance = await computeBalanceForCustomer(tenantId, updated.id)
-  return { id: updated.id, name: updated.name, phone: updated.phone || '', address: updated.address || '', note: updated.note || '', balance }
+  return mapCustomerDto(updated, balance)
 }
 
 export const deleteCustomer = async (tenantId, actorUserId, customerId) => {
@@ -198,14 +293,14 @@ export const listCustomerSales = async (tenantId, customerId, branchIds) => {
   const sales = branchIds && Array.isArray(branchIds) && branchIds.length > 0
     ? await saleRepo.listByTenantAndCustomerAndBranches(tenantId, customerId, branchIds, { limit: 200 })
     : await saleRepo.listByTenantAndCustomer(tenantId, customerId, { limit: 200 })
-  return (sales || []).map(s => ({
+  return (sales || []).map((s) => ({
     orderId: String(s.id),
     total: Number(s.total || 0),
     createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : null,
     paymentMethod: s.payment?.method || null,
     branchId: s.branchId ? String(s.branchId) : null,
     items: Array.isArray(s.items)
-      ? s.items.map(it => ({
+      ? s.items.map((it) => ({
           name: String(it?.name || ''),
           qty: Number(it?.qty || 0),
           price: Number(it?.unitPrice || 0),
@@ -221,7 +316,7 @@ export const collect = async (tenantId, actorUserId, customerId, input) => {
   if (!c) throw error('not_found', 'Cari bulunamadı', 404)
   const method = String(input?.method || '').trim()
   const amount = Number(input?.amount || 0)
-  if (method !== 'cash' && method !== 'pos' && method !== 'bank') throw error('invalid_request', 'Invalid method', 400)
+  if (method !== 'cash' && method !== 'pos' && method !== 'bank' && method !== 'discount') throw error('invalid_request', 'Invalid method', 400)
   if (!Number.isFinite(amount) || amount <= 0) throw error('invalid_request', 'Invalid amount', 400)
   const note = String(input?.note || '').trim()
   const branchId = input?.branchId && mongoose.isValidObjectId(input.branchId) ? input.branchId : null
@@ -238,4 +333,142 @@ export const collect = async (tenantId, actorUserId, customerId, input) => {
   })
   const balance = await computeBalanceForCustomer(tenantId, customerId)
   return { id: created.id, success: true, balance }
+}
+
+export const upsertPublicCustomerAccount = async (tenantId, input) => {
+  const name = normalizeName(input?.name)
+  const phone = normalizePhone(input?.phone)
+  const address = String(input?.address || '').trim()
+  const location = String(input?.location || '').trim()
+
+  if (!name || name.length < 2) throw error('name_required', 'Ad soyad zorunludur', 400)
+  if (!phone) throw error('phone_required', 'Telefon zorunludur', 400)
+  const digits = phone.replace(/[^0-9]/g, '')
+  if (digits.length < 10) throw error('invalid_request', 'Telefon en az 10 karakter olmalı', 400)
+
+  const existing = await customerRepo.findByPhoneAndTenant(tenantId, phone)
+  if (existing) {
+    const updated = await customerRepo.updateByIdAndTenant(existing.id || existing._id, tenantId, {
+      name,
+      nameNormalized: normalizeKey(name),
+      phone,
+      address: address || existing.address || '',
+      note: location || existing.note || ''
+    })
+    const balance = await computeBalanceForCustomer(tenantId, updated.id)
+    return {
+      customer: {
+        ...mapCustomerDto(updated, balance),
+        location: String(updated.note || '')
+      },
+      isNew: false
+    }
+  }
+
+  const created = await customerRepo.create({
+    tenantId,
+    name,
+    nameNormalized: normalizeKey(name),
+    phone,
+    address,
+    note: location,
+    favoriteProductIds: [],
+    isActive: true,
+    createdAt: new Date(),
+    actorUserId: null
+  })
+
+  return {
+    customer: {
+      ...mapCustomerDto(created, 0),
+      location: String(created.note || '')
+    },
+    isNew: true
+  }
+}
+
+export const registerPublicCustomerAccount = async (tenantId, input) => {
+  const name = normalizeName(input?.name)
+  const phone = normalizePhone(input?.phone)
+  const password = String(input?.password || '')
+  const passwordRepeat = String(input?.passwordRepeat || '')
+  const address = String(input?.address || '').trim()
+  const location = String(input?.location || '').trim()
+
+  if (!name || name.length < 2) throw error('name_required', 'Ad soyad zorunludur', 400)
+  if (!phone) throw error('phone_required', 'Telefon zorunludur', 400)
+  const digits = phone.replace(/[^0-9]/g, '')
+  if (digits.length < 10) throw error('invalid_request', 'Telefon en az 10 karakter olmalı', 400)
+  if (!password) throw error('password_required', 'Şifre zorunludur', 400)
+  if (password.length < MIN_PASSWORD_LENGTH) throw error('password_too_short', `Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalıdır`, 400)
+  if (password !== passwordRepeat) throw error('password_mismatch', 'Şifreler aynı değil', 400)
+
+  const existing = await customerRepo.findByPhoneAndTenant(tenantId, phone)
+  if (existing) throw error('duplicate_phone', 'Bu telefon numarasıyla kayıtlı hesap var, mevcut hesaptan giriş yapın', 409)
+
+  const passwordHash = await bcrypt.hash(password, 10)
+  const created = await customerRepo.create({
+    tenantId,
+    name,
+    nameNormalized: normalizeKey(name),
+    phone,
+    address,
+    note: location,
+    passwordHash,
+    favoriteProductIds: [],
+    isActive: true,
+    createdAt: new Date(),
+    actorUserId: null
+  })
+
+  return {
+    customer: {
+      ...mapCustomerDto(created, 0),
+      location: String(created.note || '')
+    }
+  }
+}
+
+export const loginPublicCustomerAccount = async (tenantId, input) => {
+  const phone = normalizePhone(input?.phone)
+  const password = String(input?.password || '')
+
+  if (!phone) throw error('phone_required', 'Telefon zorunludur', 400)
+  if (!password) throw error('password_required', 'Şifre zorunludur', 400)
+
+  const customer = await customerRepo.findByPhoneAndTenant(tenantId, phone)
+  if (!customer) throw error('invalid_credentials', 'Telefon numarası veya şifre hatalı', 401)
+  if (!String(customer.passwordHash || '').trim()) {
+    throw error('password_not_set', 'Bu hesap için şifre bulunamadı. Lütfen yeni hesap oluşturun veya işletme ile iletişime geçin', 409)
+  }
+
+  const ok = await bcrypt.compare(password, String(customer.passwordHash || ''))
+  if (!ok) throw error('invalid_credentials', 'Telefon numarası veya şifre hatalı', 401)
+
+  const balance = await computeBalanceForCustomer(tenantId, customer.id || customer._id)
+  return {
+    customer: {
+      ...mapCustomerDto(customer, balance),
+      location: String(customer.note || '')
+    }
+  }
+}
+
+export const getCustomerFavoriteProductIds = async (tenantId, customerId) => {
+  if (!mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Invalid id', 400)
+  const customer = await customerRepo.findByIdAndTenant(customerId, tenantId)
+  if (!customer) throw error('not_found', 'Cari bulunamadı', 404)
+  return Array.isArray(customer.favoriteProductIds) ? customer.favoriteProductIds.map((id) => String(id)) : []
+}
+
+export const updateCustomerFavoriteProductIds = async (tenantId, customerId, favoriteProductIds) => {
+  if (!mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Invalid id', 400)
+  const normalizedIds = Array.isArray(favoriteProductIds)
+    ? favoriteProductIds.filter((id) => mongoose.isValidObjectId(String(id))).map(String)
+    : []
+  const updated = await customerRepo.updateByIdAndTenant(customerId, tenantId, {
+    favoriteProductIds: normalizedIds
+  })
+  if (!updated) throw error('not_found', 'Cari bulunamadı', 404)
+  return normalizedIds
 }

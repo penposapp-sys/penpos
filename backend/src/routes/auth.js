@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { login, me } from '../services/authService.js'
+import { forgotPassword, login, me, resetPassword } from '../services/authService.js'
 import { requireAuth } from '../middlewares/requireAuth.js'
 import { sendError } from '../utils/errors.js'
 import { error as logError } from '../utils/logger.js'
@@ -23,6 +23,26 @@ router.post('/login', async (req, res) => {
       }
     } catch {
     }
+    sendError(res, err)
+  }
+})
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email, portal } = req.body || {}
+    const result = await forgotPassword(email, portal)
+    res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body || {}
+    const result = await resetPassword(token, newPassword)
+    res.json(result)
+  } catch (err) {
     sendError(res, err)
   }
 })

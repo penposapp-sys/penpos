@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -9,26 +9,95 @@ import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import { useTheme } from '../theme/ThemeContext.jsx'
 import { themeKeys, themes } from '../theme/themeConfig.js'
+import { buildSafeBusinessSettings, defaultBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
+import { getSubscriptionStatus } from '../lib/subscription.js'
+import { toast } from '../lib/toast.js'
 
-function ThemeSelector() {
-  const { themeKey, setThemeKey } = useTheme()
+const BUSINESS_SETTINGS_SECTIONS = {
+  general: [
+    ['closeCustomerAccounts', 'Cari hesapları ödeme sonrası kapat'],
+    ['saveCancelledOrders', 'İptal siparişleri kayıtta tut'],
+    ['hideTodoList', 'Yapılacaklar listesini gizle'],
+    ['preventStaffOrderingForOthers', 'Personel başkası adına sipariş açamasın'],
+    ['requireCancelReason', 'İptalde neden zorunlu olsun'],
+    ['askGuestCountOnTableOpen', 'Masa açarken kişi sayısı sor'],
+    ['trackCashDrawer', 'Nakit çekmecesi takibi yap'],
+  ],
+  notifications: [
+    ['loopDeliverySound', 'Paket sesi tekrar etsin'],
+    ['voiceWarnings', 'Sesli uyarılar açık olsun'],
+  ],
+  appearance: [
+    ['darkMode', 'Koyu tema tercih et'],
+    ['colorfulProducts', 'Ürün kartlarını renkli göster'],
+    ['animations', 'Geçiş animasyonlarını kullan'],
+  ],
+  order: [
+    ['confirmBeforeAddToCart', 'Sepete eklemeden önce onay sor'],
+    ['returnToOpenTablesAfterConfirm', 'İşlem sonrası açık masalara dön'],
+    ['addWithoutAskingOptions', 'Ürünü seçenek sormadan ekle'],
+    ['askPersonCountOnQuickOrder', 'Hızlı siparişte kişi sayısı sor'],
+  ],
+  catalogView: [
+    ['manualCategorySort', 'Kategori sırasını manuel yönet'],
+    ['sortProductsInsideCategory', 'Ürünleri kategori içinde sırala'],
+    ['moveOutOfStockToEnd', 'Stokta olmayanları sona taşı'],
+    ['hidePassiveProducts', 'Pasif ürünleri gizle'],
+    ['showCategoryHeaders', 'Kategori başlıklarını göster'],
+    ['showProductImage', 'Ürün görseli göster'],
+    ['showProductDescription', 'Ürün açıklaması göster'],
+    ['showLargePrice', 'Fiyatı büyük göster'],
+  ],
+  qrMenu: [
+    ['enabled', 'QR menü aktif olsun'],
+    ['showLogo', 'Logo göster'],
+    ['showCoverImage', 'Kapak görseli göster'],
+    ['showPrices', 'Fiyatları göster'],
+    ['showDescriptions', 'Açıklamaları göster'],
+    ['multiLanguage', 'Çoklu dil desteği'],
+    ['waiterCall', 'Garson çağır özelliği'],
+    ['tableQrEnabled', 'Masa bazlı QR aktif olsun'],
+  ],
+}
+
+function SettingsSwitchGroup({ title, items, values, onToggle }) {
+  return (
+    <div className="card" style={{ borderColor: 'var(--border)' }}>
+      <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {items.map(([key, label]) => (
+          <label key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 14 }}>{label}</span>
+            <input type="checkbox" checked={!!values?.[key]} onChange={(e) => onToggle(key, e.target.checked)} />
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ThemeSelector({ selectedThemeName, onSelectThemeName }) {
+  const { setThemeKey } = useTheme()
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
       {themeKeys.map((key) => {
         const item = themes[key]
-        const selected = themeKey === key
+        const selected = selectedThemeName === key
 
         return (
           <button
             key={key}
             type="button"
-            onClick={() => setThemeKey(key)}
+            onClick={() => {
+              setThemeKey(key)
+              onSelectThemeName?.(key)
+            }}
             style={{
               borderRadius: 24,
-              border: `1px solid ${selected ? '#0f172a' : '#e2e8f0'}`,
-              background: selected ? '#0f172a' : '#f8fafc',
-              color: selected ? '#ffffff' : '#334155',
+              border: `1px solid ${selected ? 'var(--theme-accent, #0f172a)' : 'var(--app-border, var(--border))'}`,
+              background: selected ? 'var(--theme-accent, #0f172a)' : 'var(--app-surface-soft, var(--panelElevated))',
+              color: selected ? '#ffffff' : 'var(--app-text-secondary, var(--text-secondary))',
               padding: 16,
               textAlign: 'left',
               cursor: 'pointer',
@@ -40,13 +109,13 @@ function ThemeSelector() {
             <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ fontWeight: 900 }}>{item.name}</div>
               {selected && (
-                <span style={{ borderRadius: 999, background: '#ffffff', color: '#0f172a', padding: '4px 8px', fontSize: 11, fontWeight: 900 }}>
-                  Secili
+                <span style={{ borderRadius: 999, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '4px 8px', fontSize: 11, fontWeight: 900 }}>
+                  Seçili
                 </span>
               )}
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: selected ? 'rgba(255,255,255,0.72)' : '#94a3b8', lineHeight: 1.5 }}>
-              Yan bar, ust bar, aktif menu kapsulu ve aksiyon butonlari tema rengine gore guncellenir.
+            <div style={{ marginTop: 8, fontSize: 12, color: selected ? '#ffffff' : 'var(--app-text)', lineHeight: 1.5 }}>
+              Yan bar, üst bar, aktif menü kapsülü ve aksiyon butonları tema rengine göre güncellenir.
             </div>
           </button>
         )
@@ -55,42 +124,463 @@ function ThemeSelector() {
   )
 }
 
+function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onBack, rightSlot }) {
+  return (
+    <div
+      style={{
+        borderRadius: 22,
+        border: '1px solid var(--settings-border)',
+        background: 'linear-gradient(135deg, color-mix(in srgb, var(--app-surface) 98%, transparent), var(--settings-panel-soft))',
+        padding: '10px 14px',
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+        boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        {onToggleMenu ? (
+          <button
+            type="button"
+            onClick={onToggleMenu}
+            style={{
+              height: 40,
+              width: 40,
+              borderRadius: 14,
+              border: 'none',
+              background: 'var(--theme-accent, #0f172a)',
+              color: '#ffffff',
+              fontSize: 18,
+              fontWeight: 900,
+              cursor: 'pointer',
+              boxShadow: '0 10px 18px rgba(15, 23, 42, 0.16)',
+            }}
+            aria-label="Ayar menüsünü aç veya kapat"
+          >
+            ≡
+          </button>
+        ) : null}
+
+        <div
+          style={{
+            height: 40,
+            minWidth: 40,
+            padding: '0 10px',
+            borderRadius: 14,
+            display: 'grid',
+            placeItems: 'center',
+            border: '1px solid var(--settings-border)',
+            background: 'var(--app-surface)',
+            fontWeight: 900,
+            color: 'var(--app-text)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+            fontSize: 14,
+          }}
+        >
+          {icon}
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--app-text)', lineHeight: 1.05 }}>
+            {title}
+          </div>
+          {subtitle ? <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 700, marginTop: 3 }}>{subtitle}</div> : null}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {rightSlot}
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            style={{
+              minHeight: 40,
+              padding: '0 14px',
+              borderRadius: 14,
+              border: '1px solid var(--settings-border)',
+              background: 'var(--app-button-bg)',
+              color: 'var(--app-text)',
+              fontWeight: 900,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            ← Ayarlara Dön
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilterChange, searchValue, onSearchChange, openSettingsPage }) {
+  return (
+    <div className="settings-home">
+      <style>{`
+        .settings-home { width: 100%; }
+        .settings-center-panel {
+          border: 1px solid var(--settings-border);
+          border-radius: 24px;
+          padding: 14px;
+          background:
+            radial-gradient(circle at top left, var(--settings-accent-soft-glow), transparent 34%),
+            linear-gradient(135deg, var(--app-surface), var(--settings-panel-bg));
+          box-shadow: var(--card-shadow);
+        }
+        .settings-search-row {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin: 0 0 14px;
+          padding: 12px;
+          border-radius: 20px;
+          border: 1px solid var(--settings-border);
+          background: color-mix(in srgb, var(--app-surface) 82%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .settings-search-box {
+          flex: 1;
+          min-height: 56px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 0 18px;
+          border: 1px solid var(--settings-border);
+          border-radius: 20px;
+          background: var(--app-input);
+        }
+        .settings-search-box input {
+          border: 0;
+          outline: 0;
+          width: 100%;
+          font-weight: 700;
+          color: var(--app-text);
+          background: transparent;
+        }
+        .settings-filter-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .settings-filter-list button {
+          border: 1px solid var(--settings-border);
+          border-radius: 999px;
+          background: var(--app-button-bg);
+          padding: 10px 14px;
+          font-weight: 950;
+          font-size: 12px;
+          color: var(--app-text);
+          cursor: pointer;
+        }
+        .settings-filter-list button.active {
+          background: var(--settings-gradient);
+          color: #ffffff;
+          box-shadow: var(--settings-accent-shadow);
+        }
+        .settings-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .settings-module-card {
+          text-align: left;
+          border: 1px solid var(--settings-border);
+          border-radius: 22px;
+          padding: 16px;
+          background: linear-gradient(135deg, var(--app-surface), var(--app-surface-soft));
+          box-shadow: var(--card-shadow);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+          cursor: pointer;
+          color: var(--app-text);
+        }
+        .settings-module-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.13);
+          border-color: var(--settings-accent);
+        }
+        .settings-module-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+        .settings-module-icon {
+          width: 46px;
+          height: 46px;
+          border-radius: 16px;
+          display: grid;
+          place-items: center;
+          font-size: 22px;
+          background: linear-gradient(135deg, var(--settings-accent-soft), var(--app-surface));
+          border: 1px solid var(--settings-border);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+          flex-shrink: 0;
+        }
+        .settings-module-badge {
+          padding: 7px 11px;
+          border-radius: 999px;
+          background: var(--settings-accent-soft);
+          color: var(--settings-accent-text);
+          font-size: 12px;
+          font-weight: 950;
+        }
+        .settings-module-card h3 { margin: 0; font-size: 17px; font-weight: 950; color: var(--app-text); }
+        .settings-module-card p { min-height: 0; margin: 8px 0 0; color: var(--app-text-secondary); font-size: 13px; font-weight: 700; line-height: 1.4; }
+        .settings-module-link {
+          margin-top: 14px;
+          color: var(--settings-accent-text);
+          font-size: 13px;
+          font-weight: 950;
+          transition: transform 0.2s ease;
+        }
+        .settings-module-card:hover .settings-module-link { transform: translateX(4px); }
+        .settings-empty-state {
+          padding: 24px;
+          border-radius: 24px;
+          border: 1px solid var(--settings-border);
+          background: color-mix(in srgb, var(--app-surface) 88%, transparent);
+          color: var(--app-text-secondary);
+          font-weight: 700;
+        }
+        @media (max-width: 1280px) {
+          .settings-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .settings-search-row { flex-direction: column; align-items: stretch; }
+        }
+        @media (max-width: 768px) {
+          .settings-card-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <section className="settings-center-panel">
+        <div className="settings-search-row">
+          <div className="settings-search-box">
+            <span>🔍</span>
+            <input value={searchValue} onChange={(e) => onSearchChange(e.target.value)} placeholder="Ayar adı, açıklama veya kategori ara" />
+          </div>
+
+          <div className="settings-filter-list">
+            {filterOptions.map((option) => (
+              <button key={option} type="button" className={option === activeFilter ? 'active' : ''} onClick={() => onFilterChange(option)}>
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-card-grid">
+          {settingsCards.map((item) => (
+            <button key={item.key} type="button" className="settings-module-card" onClick={() => openSettingsPage(item.to)}>
+              <div className="settings-module-top">
+                <div className="settings-module-icon">{item.icon}</div>
+                <span className="settings-module-badge">{item.group}</span>
+              </div>
+
+              <h3>{item.title}</h3>
+              <p>{item.desc}</p>
+
+              <div className="settings-module-link">Ayar sayfasını aç →</div>
+            </button>
+          ))}
+        </div>
+
+        {settingsCards.length === 0 && (
+          <div className="settings-empty-state">Arama veya filtre sonucunda eşleşen ayar kartı bulunamadı.</div>
+        )}
+      </section>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
-  const { user } = useAuth()
+  const { user, tenantCtx } = useAuth()
   const { pathname } = useLocation()
   const nav = useNavigate()
   const { isMobilePortrait } = useResponsiveFlags()
+  const { theme } = useTheme()
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  const [settingsSearch, setSettingsSearch] = useState('')
+  const [activeFilter, setActiveFilter] = useState('Tümü')
+  const shellTheme = {
+    pageBg: `radial-gradient(circle at top left, ${theme.accentSoft} 0, transparent 32%), radial-gradient(circle at bottom right, ${theme.border} 0, transparent 28%), var(--app-bg)`,
+    cardBorder: theme.border,
+    shadow: theme.activeGlow,
+    accent: theme.accent,
+    accentSoft: theme.accentSoft,
+    accentText: theme.accentText,
+    gradient: theme.gradient,
+    panelSoft: theme.darkMode ? 'color-mix(in srgb, var(--app-surface-soft) 86%, transparent)' : 'rgba(255,255,255,0.88)'
+  }
+  const settingsCssVars = {
+    '--settings-border': shellTheme.cardBorder,
+    '--settings-accent': shellTheme.accent,
+    '--settings-accent-soft': shellTheme.accentSoft,
+    '--settings-accent-text': shellTheme.accentText,
+    '--settings-gradient': shellTheme.gradient,
+    '--settings-accent-shadow': theme.activeGlow,
+    '--settings-panel-bg': theme.darkMode ? 'var(--app-surface-soft)' : theme.accentSoft,
+    '--settings-panel-soft': theme.darkMode ? 'color-mix(in srgb, var(--app-surface-soft) 90%, transparent)' : `${theme.accentSoft}cc`,
+    '--settings-accent-soft-glow': `${theme.accentSoft}99`,
+  }
+  const todayLabel = useMemo(
+    () => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()),
+    []
+  )
   const isActive = (p) => pathname.startsWith(p)
   const perms = Array.isArray(user?.permissions) ? user.permissions : []
   const canManageSettings = user?.role === 'tenant_admin' || user?.role === 'superadmin' || perms.includes(PERMISSIONS.MANAGE_SETTINGS)
   const canManageMenu = user?.role === 'tenant_admin' || user?.role === 'superadmin' || perms.includes(PERMISSIONS.MANAGE_MENU)
   const canSee = !!(canManageSettings || canManageMenu)
+  const isExpired = getSubscriptionStatus(tenantCtx) === 'expired'
 
   const basePath = '/kermes/settings'
   const isRoot = pathname === basePath || pathname === basePath + '/'
 
-  const menu = useMemo(() => {
-    const items = [{ to: '/kermes/settings/me', label: 'Hesabım' }]
-    if (canManageSettings) {
-      items.push(
-        { to: '/kermes/settings/system', label: 'Sistem Ayarları' },
-        { to: '/kermes/settings/branches', label: 'Şube Ayarları' },
-        { to: '/kermes/settings/staff', label: 'Personel Ayarları' },
-        { to: '/kermes/settings/tables', label: 'Masa Ayarları' },
-        { to: '/kermes/settings/printers', label: 'Yazıcı Ayarları' },
-        { to: '/kermes/settings/payments', label: 'Ödeme Seçenekleri' },
-        { to: '/kermes/settings/delivery', label: 'Paket Servis' }
-      )
-      if (user?.role === 'tenant_admin') items.push({ to: '/kermes/settings/billing', label: 'Paket & Satın Alma' })
+  const settingsGroups = useMemo(() => {
+    const groups = [
+      {
+        title: 'Hesap',
+        items: [{
+          key: 'account',
+          to: '/kermes/settings/me',
+          label: 'Hesabım',
+          icon: '👤',
+          group: 'İşletme',
+          description: 'Giriş bilgileri, şifre ve kullanıcı hesabı'
+        }]
+      }
+    ]
+
+    if (canManageSettings && !isExpired) {
+      groups.push({
+        title: 'İşletme',
+        items: [
+          {
+            key: 'business',
+            to: '/kermes/settings/system',
+            label: 'İşletme Ayarları',
+            icon: '🏪',
+            group: 'İşletme',
+            description: 'Firma bilgileri, servis, kapanış saati'
+          },
+          {
+            key: 'branches',
+            to: '/kermes/settings/branches',
+            label: 'Şube Ayarları',
+            icon: '🏢',
+            group: 'İşletme',
+            description: 'Şube listesi, aktiflik ve şubeye bağlı personel'
+          },
+          {
+            key: 'staff',
+            to: '/kermes/settings/staff',
+            label: 'Personel Ayarları',
+            icon: '👥',
+            group: 'Personel',
+            description: 'Personel, şifre, yetki ve aktiflik yönetimi'
+          },
+          {
+            key: 'tables',
+            to: '/kermes/settings/tables',
+            label: 'Masa Ayarları',
+            icon: '🪑',
+            group: 'Satış',
+            description: 'Masa listesi ve oturma düzeni'
+          },
+          {
+            key: 'printers',
+            to: '/kermes/settings/printers',
+            label: 'Yazıcı Ayarları',
+            icon: '🖨️',
+            group: 'Cihaz',
+            description: 'Print Agent, fiş ve etiket yazıcıları'
+          },
+          {
+            key: 'payments',
+            to: '/kermes/settings/payments',
+            label: 'Ödeme Seçenekleri',
+            icon: '💳',
+            group: 'Satış',
+            description: 'Nakit, kart, banka ve veresiye seçenekleri'
+          },
+          {
+            key: 'delivery',
+            to: '/kermes/settings/delivery',
+            label: 'Paket Servis',
+            icon: '🛵',
+            group: 'Satış',
+            description: 'Paket sipariş davranışları ve otomasyonlar'
+          },
+          ...(user?.role === 'tenant_admin'
+            ? [{
+                key: 'billing',
+                to: '/kermes/settings/billing',
+                label: 'Paket & Satın Alma',
+                icon: '🧾',
+                group: 'Finans',
+                description: 'Abonelik, paket ve satın alma yönetimi'
+              }]
+            : []),
+        ]
+      })
     }
-    if (canManageMenu) {
-      items.push(
-        { to: '/kermes/settings/catalog', label: 'Ürün & Kategori' },
-        { to: '/kermes/settings/qr', label: 'QR Menü' }
-      )
+
+    if (canManageMenu && !isExpired) {
+      groups.push({
+        title: 'Menü',
+        items: [
+          {
+            key: 'catalog',
+            to: '/kermes/settings/catalog',
+            label: 'Ürün & Kategori',
+            icon: '📦',
+            group: 'Ürün',
+            description: 'Ürün, kategori, görünüm ve sıralama ayarları'
+          },
+          {
+            key: 'qr',
+            to: '/kermes/settings/qr',
+            label: 'QR Menü',
+            icon: '▦',
+            group: 'Dijital',
+            description: 'Public menü, QR indir, masa QR ve görünüm'
+          },
+        ]
+      })
     }
-    return items
-  }, [canManageMenu, canManageSettings, user?.role])
+
+    if (isExpired && user?.role === 'tenant_admin') {
+      groups.push({
+        title: 'Abonelik',
+        items: [{
+          key: 'billing',
+          to: '/kermes/settings/billing',
+          label: 'Paket & Satın Alma',
+          icon: '🧾',
+          group: 'Finans',
+          description: 'Plan yükseltme ve ödeme adımları'
+        }]
+      })
+    }
+
+    return groups
+  }, [canManageMenu, canManageSettings, isExpired, user?.role])
+
+  const menu = useMemo(() => settingsGroups.flatMap((group) => group.items), [settingsGroups])
+  const settingsCards = useMemo(() => menu.map((item) => ({
+    key: item.key,
+    to: item.to,
+    title: item.label,
+    desc: item.description,
+    icon: item.icon,
+    group: item.group,
+  })), [menu])
+  const filterOptions = useMemo(() => {
+    const options = ['Tümü', ...new Set(settingsCards.map((item) => item.group).filter(Boolean))]
+    return options
+  }, [settingsCards])
+  const filteredCards = useMemo(() => {
+    const needle = settingsSearch.trim().toLocaleLowerCase('tr')
+    return settingsCards.filter((item) => {
+      const matchesFilter = activeFilter === 'Tümü' || item.group === activeFilter
+      if (!matchesFilter) return false
+      if (!needle) return true
+      const haystack = [item.label, item.description, item.group]
+        .join(' ')
+        .toLocaleLowerCase('tr')
+      return haystack.includes(needle)
+    })
+  }, [activeFilter, settingsCards, settingsSearch])
 
   const current = useMemo(() => {
     return menu
@@ -98,57 +588,228 @@ export default function SettingsPage() {
       .sort((a, b) => b.to.length - a.to.length)[0]
   }, [menu, pathname])
 
+  useEffect(() => {
+    setSettingsMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    const root = document.querySelector('.page-scroll-area')
+    if (root) root.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [pathname])
+
+  const openSettingsPage = (pagePath) => {
+    nav(pagePath)
+    setSettingsMenuOpen(false)
+  }
+
+  const goSettingsHome = () => {
+    nav('/kermes/settings')
+    setSettingsMenuOpen(false)
+  }
+
   if (isMobilePortrait) {
     if (isRoot) {
       return (
-        <div className="main pageMobile settings-scope">
-          <div style={{ fontWeight: 900, fontSize: 18 }}>Ayarlar</div>
+        <div className="main pageMobile settings-scope" style={{ display: 'grid', gap: 16, ...settingsCssVars }}>
+          <SettingsPageHeader
+            title="Ayarlar"
+            subtitle="Ayar bölümlerini buradan yönetin"
+            icon="AY"
+            rightSlot={
+              <div style={{ minHeight: 40, padding: '0 14px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center' }}>
+                {todayLabel}
+              </div>
+            }
+          />
           {!canSee ? (
             <div className="card">Bu sayfaya yetkin yok</div>
           ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {menu.map((i) => (
-                <Link
-                  key={i.to}
-                  to={i.to}
-                  className="card"
-                  style={{ textDecoration: 'none', color: 'inherit', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
-                >
-                  <div style={{ fontWeight: 800 }}>{i.label}</div>
-                  <div style={{ color: 'var(--muted)', fontWeight: 900 }}>›</div>
-                </Link>
-              ))}
-            </div>
+            <SettingsHomePage
+              settingsCards={filteredCards}
+              filterOptions={filterOptions}
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              searchValue={settingsSearch}
+              onSearchChange={setSettingsSearch}
+              openSettingsPage={openSettingsPage}
+            />
           )}
         </div>
       )
     }
 
     return (
-      <div className="main pageMobile settings-scope">
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <button className="btn" type="button" onClick={() => nav('/kermes/settings')}>← Ayarlara Dön</button>
-          <div style={{ fontWeight: 900 }}>{current?.label || 'Ayarlar'}</div>
+      <div className="main pageMobile settings-scope" style={{ display: 'grid', gap: 12, position: 'relative', overflowX: 'hidden', ...settingsCssVars }}>
+        <SettingsPageHeader
+          title={current?.label || 'Ayarlar'}
+          subtitle={current?.description || ''}
+          icon={current?.icon || 'AY'}
+          onToggleMenu={() => setSettingsMenuOpen((value) => !value)}
+          onBack={goSettingsHome}
+        />
+        {settingsMenuOpen && (
+          <aside
+            style={{
+              borderRadius: 30,
+              border: `1px solid ${shellTheme.cardBorder}`,
+              background: 'color-mix(in srgb, var(--app-surface) 94%, transparent)',
+              padding: 16,
+              boxShadow: '0 30px 80px rgba(15, 23, 42, 0.16)',
+              display: 'grid',
+              gap: 16,
+            }}
+          >
+            {settingsGroups.map((group) => (
+              <div key={group.title} style={{ display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--app-text-muted, var(--muted))' }}>
+                  {group.title}
+                </div>
+                {group.items.map((item) => (
+                  <button
+                    key={item.to}
+                    type="button"
+                    onClick={() => openSettingsPage(item.to)}
+                    style={{
+                      width: '100%',
+                      minHeight: 56,
+                      borderRadius: 18,
+                      border: `1px solid ${pathname === item.to || pathname.startsWith(item.to + '/') ? shellTheme.accent : 'var(--settings-border)'}`,
+                      background: pathname === item.to || pathname.startsWith(item.to + '/')
+                        ? shellTheme.gradient
+                        : 'linear-gradient(135deg, var(--app-surface), var(--app-surface-soft))',
+                      color: pathname === item.to || pathname.startsWith(item.to + '/') ? '#ffffff' : 'var(--app-text)',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </span>
+                    <span>›</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </aside>
+        )}
+        <div style={{ borderRadius: 20, border: `1px solid ${shellTheme.cardBorder}`, background: 'color-mix(in srgb, var(--app-surface) 80%, transparent)', padding: 10, boxShadow: shellTheme.shadow, minWidth: 0, overflowX: 'hidden' }}>
+          <Outlet />
         </div>
-        <Outlet />
       </div>
     )
   }
 
   return (
-    <div className="settingsLayout" style={{ gridTemplateColumns: '220px 1fr' }}>
-      <div className="card" style={{ padding: 8 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Ayarlar</div>
-        {canSee && (
-          <div style={{ display: 'grid', gap: 6 }}>
-            {menu.map((i) => (
-              <Link key={i.to} to={i.to} className="btn btn--left btn--full" data-active={isActive(i.to) ? 'true' : 'false'}>{i.label}</Link>
-            ))}
+    <div className="settings-scope" style={{ padding: 8, background: shellTheme.pageBg, borderRadius: 24, border: `1px solid ${shellTheme.cardBorder}`, boxShadow: '0 18px 40px rgba(148, 163, 184, 0.12)', position: 'relative', minWidth: 0, maxWidth: '100%', overflowX: 'hidden', ...settingsCssVars }}>
+      <div style={{ borderRadius: 20, border: `1px solid ${shellTheme.cardBorder}`, background: 'color-mix(in srgb, var(--app-surface) 76%, transparent)', backdropFilter: 'blur(10px)', padding: 10, boxShadow: shellTheme.shadow, minHeight: 420, minWidth: 0, overflowX: 'hidden' }}>
+        {isRoot ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <SettingsPageHeader
+              title="Ayarlar"
+              subtitle="Ayar bölümlerini buradan yönetin"
+              icon="AY"
+              rightSlot={
+                <div style={{ minHeight: 40, padding: '0 14px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center' }}>
+                  {todayLabel}
+                </div>
+              }
+            />
+            <SettingsHomePage
+              settingsCards={filteredCards}
+              filterOptions={filterOptions}
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              searchValue={settingsSearch}
+              onSearchChange={setSettingsSearch}
+              openSettingsPage={openSettingsPage}
+            />
+          </div>
+        ) : (
+          <div style={{ position: 'relative', display: 'grid', gap: 12, minWidth: 0 }}>
+            <SettingsPageHeader
+              title={current?.label || 'Ayarlar'}
+              subtitle={current?.description || ''}
+              icon={current?.icon || 'AY'}
+              onToggleMenu={() => setSettingsMenuOpen((value) => !value)}
+              onBack={goSettingsHome}
+            />
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: settingsMenuOpen ? '300px minmax(0, 1fr)' : 'minmax(0, 1fr)',
+                gap: 12,
+                alignItems: 'start',
+                minWidth: 0,
+              }}
+            >
+              {settingsMenuOpen && (
+                <aside
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    borderRadius: 30,
+                    border: `1px solid ${shellTheme.cardBorder}`,
+                    background: 'color-mix(in srgb, var(--app-surface) 94%, transparent)',
+                    padding: 16,
+                    boxShadow: '0 30px 80px rgba(15, 23, 42, 0.16)',
+                    display: 'grid',
+                    gap: 16,
+                    minWidth: 0,
+                  }}
+                >
+                  {settingsGroups.map((group) => (
+                    <div key={group.title} style={{ display: 'grid', gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--app-text-muted, var(--muted))' }}>
+                        {group.title}
+                      </div>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.to}
+                          type="button"
+                          onClick={() => openSettingsPage(item.to)}
+                          style={{
+                            width: '100%',
+                            minHeight: 56,
+                            borderRadius: 18,
+                            border: `1px solid ${isActive(item.to) ? shellTheme.accent : 'var(--settings-border)'}`,
+                            background: isActive(item.to)
+                              ? shellTheme.gradient
+                              : 'linear-gradient(135deg, var(--app-surface), var(--app-surface-soft))',
+                            color: isActive(item.to) ? '#ffffff' : 'var(--app-text)',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 12,
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 18 }}>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </span>
+                          <span>›</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </aside>
+              )}
+
+              <div style={{ minWidth: 0 }}>
+                <Outlet />
+              </div>
+            </div>
           </div>
         )}
-      </div>
-      <div className="card settings-scope">
-        {isRoot ? <div style={{ color: 'var(--muted)' }}>Bir ayar seçiniz</div> : <Outlet />}
       </div>
     </div>
   )
@@ -311,7 +972,7 @@ export const SettingsSystemContent = () => {
         <div className="card" style={{ borderColor: 'var(--border)' }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Restoran Logosu</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ width: 64, height: 64, borderRadius: 12, border: '1px solid var(--border)', background: '#ffffff', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+            <div style={{ width: 64, height: 64, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--app-surface)', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
               {logoPreviewSrc ? (
                 <img src={logoPreviewSrc} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
               ) : (
@@ -423,7 +1084,7 @@ export const SettingsTablesContent = () => {
   const { user, tenantCtx } = useAuth()
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState('')
-  const isExpired = tenantCtx?.tenant?.plan?.status === 'expired'
+  const isExpired = getSubscriptionStatus(tenantCtx) === 'expired'
   const [createErrors, setCreateErrors] = useState([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
 
@@ -672,7 +1333,7 @@ export const SettingsTablesContent = () => {
       </div>
 
       {!selectedBranchId && (
-        <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', marginBottom: 12 }}>
+        <div className="card" style={{ borderColor: '#ef4444', background: 'color-mix(in srgb, #ef4444 14%, var(--app-surface))', marginBottom: 12 }}>
           <div style={{ fontWeight: 800, color: '#b91c1c' }}>Şube seçilmedi. Lütfen yukarıdan şube seçin.</div>
         </div>
       )}
@@ -789,116 +1450,222 @@ export const SettingsTablesContent = () => {
 }
 
 export const SettingsPaymentsContent = () => {
-  const [data, setData] = useState(null)
+  const [methods, setMethods] = useState([])
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [newMethod, setNewMethod] = useState({ label: '', bucket: 'other' })
-  const makeKey = (value) => String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
+  const [adding, setAdding] = useState(false)
+  const [addingName, setAddingName] = useState('')
+  const [editingId, setEditingId] = useState('')
+
+  const sortMethods = (list) => [...(Array.isArray(list) ? list : [])]
+    .sort((a, b) => (Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0)) || String(a?.name || '').localeCompare(String(b?.name || ''), 'tr'))
+
+  const normalizeMethods = (payload) => sortMethods(payload?.paymentMethods || [])
+
   const load = async () => {
+    setLoading(true)
     setError('')
     try {
-      const result = await api('/api/tenant/payment-settings', { silent: true })
-      setData(result && Array.isArray(result.methods) ? result : { methods: [] })
+      const result = await api('/api/settings/payment-methods', { silent: true, cacheMode: 'no-store' })
+      setMethods(normalizeMethods(result))
     } catch (err) {
       setError(err.message)
-      setData({ methods: [] })
+      setMethods([])
+    } finally {
+      setLoading(false)
     }
   }
   useEffect(() => { load() }, [])
-  const toggle = (key) => {
-    setData(prev => {
-      const methods = (prev?.methods || []).map(m => m.key === key ? { ...m, isEnabled: !m.isEnabled } : m)
-      return { ...(prev || {}), methods }
-    })
+
+  const setMethodValue = (id, updater) => {
+    setMethods((current) => sortMethods(current.map((method) => {
+      if (String(method?.id) !== String(id)) return method
+      return typeof updater === 'function' ? updater(method) : { ...method, ...updater }
+    })))
   }
-  const setDefault = (key) => {
-    setData(prev => {
-      const methods = (prev?.methods || []).map(m => ({ ...m, isDefault: m.key === key }))
-      return { ...(prev || {}), methods }
-    })
-  }
-  const updateLabel = (key, label) => {
-    setData(prev => {
-      const methods = (prev?.methods || []).map(m => m.key === key ? { ...m, label } : m)
-      return { ...(prev || {}), methods }
-    })
-  }
-  const updateBucket = (key, bucket) => {
-    setData(prev => {
-      const methods = (prev?.methods || []).map(m => m.key === key ? { ...m, bucket } : m)
-      return { ...(prev || {}), methods }
-    })
-  }
-  const removeMethod = (key) => {
-    setData(prev => {
-      const current = Array.isArray(prev?.methods) ? prev.methods : []
-      const filtered = current.filter(m => m.key !== key)
-      const hasDefault = filtered.some(m => m.isDefault)
-      const methods = hasDefault ? filtered : filtered.map((m, index) => ({ ...m, isDefault: index === 0 }))
-      return { ...(prev || {}), methods }
-    })
-  }
-  const addMethod = () => {
-    const label = String(newMethod.label || '').trim()
-    const key = makeKey(label)
-    if (!label || !key) {
-      setError('Yeni odeme secenegi icin isim girin')
-      return
-    }
-    if ((data?.methods || []).some(m => m.key === key)) {
-      setError('Ayni isimde bir odeme secenegi zaten var')
-      return
-    }
+
+  const toggleEnabled = (id) => {
     setError('')
-    setData(prev => ({
-      ...(prev || {}),
-      methods: [
-        ...(prev?.methods || []),
-        { key, label, bucket: newMethod.bucket || 'other', isEnabled: true, isDefault: !(prev?.methods || []).some(m => m.isDefault) }
-      ]
-    }))
-    setNewMethod({ label: '', bucket: 'other' })
+    setMethods((current) => {
+      const list = sortMethods(current)
+      const next = list.map((method) => ({ ...method }))
+      const index = next.findIndex((method) => String(method?.id) === String(id))
+      if (index === -1) return list
+      const target = next[index]
+      target.enabled = !target.enabled
+      return next
+    })
   }
-  const save = async () => {
+
+  const updateName = (id, name) => {
+    setError('')
+    setMethodValue(id, { name })
+  }
+
+  const addMethod = async () => {
+    const name = String(addingName || '').trim()
+    if (!name) {
+      setError('Yeni ödeme seçeneği için isim girin.')
+      return
+    }
+    if (methods.some((method) => method.isDeleted !== true && String(method.name || '').trim().toLocaleLowerCase('tr-TR') === name.toLocaleLowerCase('tr-TR'))) {
+      setError('Aynı isimde aktif ödeme yöntemi olamaz.')
+      return
+    }
     setSaving(true)
     setError('')
     try {
-      await api('/api/tenant/payment-settings', { method: 'PUT', body: JSON.stringify({ methods: data?.methods || [] }), silent: true })
-      await load()
+      const result = await api('/api/settings/payment-methods', { method: 'POST', data: { name }, silent: true })
+      setMethods(normalizeMethods(result))
+      setAdding(false)
+      setAddingName('')
+      toast.success('Ödeme seçeneği eklendi')
     } catch (err) {
       setError(err.message)
+      toast.error(err.message || 'Ödeme seçeneği eklenemedi')
     } finally {
       setSaving(false)
     }
   }
-  if (!data || !Array.isArray(data.methods)) {
+
+  const removeMethod = async (method) => {
+    if (!method) return
+    const confirmed = window.confirm('Bu ödeme seçeneği yeni işlemlerde gizlenecek. Eski raporlar korunacak.')
+    if (!confirmed) return
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api(`/api/settings/payment-methods/${method.id}`, { method: 'DELETE', silent: true })
+      setMethods(normalizeMethods(result))
+      toast.success('Ödeme seçeneği silindi')
+    } catch (err) {
+      setError(err.message)
+      toast.error(err.message || 'Ödeme seçeneği silinemedi')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = methods.map((method, index) => ({
+        id: method.id,
+        name: String(method.name || '').trim(),
+        type: method.type,
+        enabled: method.enabled === true,
+        isDefault: method.isDefault === true,
+        isSystem: method.isSystem === true,
+        isDeleted: method.isDeleted === true,
+        sortOrder: index + 1,
+      }))
+      const result = await api('/api/settings/payment-methods', { method: 'PUT', data: { paymentMethods: payload }, silent: true })
+      setMethods(normalizeMethods(result))
+      setEditingId('')
+      toast.success('Ödeme seçenekleri kaydedildi')
+    } catch (err) {
+      setError(err.message)
+      toast.error(err.message || 'Ödeme seçenekleri kaydedilemedi')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
     return <div>Yükleniyor...</div>
   }
+
   return (
     <div>
       <h3 style={{ marginTop: 0 }}>Ödeme Seçenekleri Ayarları</h3>
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
-        {(data.methods || []).map(m => (
-          <div key={m.key} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input type="checkbox" checked={!!m.isEnabled} onChange={() => toggle(m.key)} />
-              <div>{m.label}</div>
+      <div style={{ display: 'grid', gap: 10, maxWidth: 860 }}>
+        {(methods || []).map((method) => {
+          const isEditing = editingId === method.id
+          return (
+          <div key={method.id} className="card" style={{ display: 'grid', gap: 12, padding: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) auto', gap: 12, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <input type="checkbox" checked={!!method.enabled} onChange={() => toggleEnabled(method.id)} disabled={saving} />
+                {!isEditing ? (
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{method.name}</div>
+                    <div style={{ color: 'var(--app-text-muted)', fontSize: 12 }}>
+                      {method.enabled ? 'Aktif odeme yontemi' : 'Pasif odeme yontemi'}
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    className="input"
+                    value={method.name || ''}
+                    onChange={(event) => updateName(method.id, event.target.value)}
+                    placeholder="Ödeme adı"
+                    disabled={saving}
+                    style={{ minWidth: 0 }}
+                  />
+                )}
+              </label>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setEditingId(isEditing ? '' : method.id)}
+                  disabled={saving}
+                >
+                  {isEditing ? 'Tamam' : 'Duzenle'}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => removeMethod(method)}
+                  disabled={saving}
+                  style={{ borderColor: '#fecaca', color: '#b91c1c' }}
+                >
+                  Sil
+                </button>
+              </div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="radio" name="default" checked={!!m.isDefault} onChange={() => setDefault(m.key)} />
-              Varsayılan
-            </label>
           </div>
-        ))}
+        )})}
       </div>
+
+      <div className="card" style={{ marginTop: 12, maxWidth: 860, display: 'grid', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 800 }}>Yeni ödeme seçeneği</div>
+            <div style={{ color: 'var(--app-text-muted)', fontSize: 13 }}>Yemek Kartı, Ticket, Multinet, Havale, Online Ödeme gibi yeni yöntemler ekleyebilirsiniz.</div>
+          </div>
+          <button type="button" className="btn" onClick={() => setAdding((current) => !current)} disabled={saving}>
+            {adding ? 'Vazgeç' : '+ Ödeme Seçeneği Ekle'}
+          </button>
+        </div>
+        {adding && (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input
+              className="input"
+              value={addingName}
+              onChange={(event) => setAddingName(event.target.value)}
+              placeholder="Ödeme adı"
+              disabled={saving}
+              style={{ flex: '1 1 280px', minWidth: 220 }}
+            />
+            <button type="button" className="btn" onClick={addMethod} disabled={saving}>
+              {saving ? 'Kaydediliyor...' : 'Ekle'}
+            </button>
+          </div>
+        )}
+      </div>
+
       <div style={{ marginTop: 12 }}>
         <button className="btn" onClick={save} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
       </div>
     </div>
   )
 }
+
+
+
+
+

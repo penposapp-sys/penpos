@@ -6,11 +6,12 @@ import { requirePermission } from '../middlewares/requirePermission.js'
 import { PERMISSIONS } from '../constants/permissions.js'
 import * as ctrl from '../controllers/printingController.js'
 import * as agentCtrl from '../controllers/stationAgentController.js'
+import { requireActiveSubscription } from '../middlewares/requireActiveSubscription.js'
 
 const router = Router()
 
-const authSettings = [requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS])]
-const adminOnly = [requireAuth, tenantGuard, requireRole(['tenant_admin'])]
+const authSettings = [requireAuth, tenantGuard, requireActiveSubscription, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS])]
+const adminOnly = [requireAuth, tenantGuard, requireActiveSubscription, requireRole(['tenant_admin'])]
 
 router.post('/stations/pair', ctrl.pairStation)
 
@@ -29,7 +30,7 @@ router.post('/stations/:stationId/rotate-secret', ...adminOnly, ctrl.rotateStati
 router.delete('/stations/:stationId', ...adminOnly, ctrl.deleteStation)
 
 router.get('/jobs', ...authSettings, ctrl.listJobs)
-router.post('/jobs', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), ctrl.createJob)
+router.post('/jobs', requireAuth, tenantGuard, requireActiveSubscription, requireRole(['tenant_admin', 'staff']), ctrl.createJob)
 
 router.post('/stations/:stationId/auth', agentCtrl.stationAuth)
 router.post('/stations/:stationId/heartbeat', agentCtrl.heartbeat)

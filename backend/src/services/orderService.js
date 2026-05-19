@@ -8,16 +8,129 @@ import CustomerAccount from '../models/CustomerAccount.js'
 import AccountTransaction from '../models/AccountTransaction.js'
 import Table from '../models/Table.js'
 import OrderCounter from '../models/OrderCounter.js'
+import Branch from '../models/Branch.js'
+import Category from '../models/Category.js'
 import { isMongoTransactionsSupported } from '../config/db.js'
 import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
+import { findTenantById } from '../repositories/tenantRepository.js'
+import { mergeBusinessSettings } from '../utils/businessSettings.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
+import { isVisibleInBranch } from '../utils/branchVisibility.js'
+import { buildKitchenReceiptRaw } from '../utils/kitchenReceiptRaw.js'
+import { upsertDeliveryCustomerProfile } from './deliveryCustomerService.js'
 
 const toMoney = (v) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+const normalizeReceiptUsage = (entry = {}) => {
+  const rawCashier = entry?.useForCashierReceipt
+  const rawKitchen = entry?.useForKitchenReceipt
+  if (typeof rawCashier === 'boolean' || typeof rawKitchen === 'boolean') {
+    return {
+      useForCashierReceipt: rawCashier === true,
+      useForKitchenReceipt: rawKitchen === true
+    }
+  }
+  const receiptRole = String(entry?.receiptRole || '').trim().toLowerCase()
+  if (receiptRole === 'kitchen') return { useForCashierReceipt: false, useForKitchenReceipt: true }
+  return { useForCashierReceipt: true, useForKitchenReceipt: false }
+}
+
+const getDeliveryPaymentLine = (order) => {
+  const actualPaid = String(order?.paymentStatus || '') === 'paid'
+  if (actualPaid) return 'ODEMESI ALINDI'
+  const plannedStatus = String(order?.deliveryPaymentStatus || '').trim()
+  if (plannedStatus === 'already_paid') return 'ODEMESI ALINDI'
+  const plannedLabel = String(order?.deliveryPaymentMethodLabel || order?.deliveryPaymentMethod || '').trim()
+  if (plannedStatus === 'pay_on_delivery' && plannedLabel) return `${plannedLabel} - KAPI DA ODEME`
+  return ''
+}
+
+const computeCustomerAccountBalance = async (tenantId, accountId, session = null) => {
+  const cursor = AccountTransaction.aggregate([
+    {
+      $match: {
+        tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+        accountId: new mongoose.Types.ObjectId(String(accountId)),
+        isDeleted: { $ne: true }
+      }
+    },
+    {
+      $group: {
+        _id: '$type',
+        sum: { $sum: '$amount' }
+      }
+    }
+  ])
+  if (session) cursor.session(session)
+  const rows = await cursor
+  const debit = rows.find((row) => row._id === 'debit')?.sum || 0
+  const credit = rows.find((row) => row._id === 'credit')?.sum || 0
+  return toMoney(debit) - toMoney(credit)
+}
+
+const resolveVeresiyeTransactionFilter = (tenantId, orderId, removedEntry) => {
+  const accountId = removedEntry?.accountId ? String(removedEntry.accountId) : ''
+  const transactionId = removedEntry?.transactionId ? String(removedEntry.transactionId) : ''
+  if (transactionId && mongoose.Types.ObjectId.isValid(transactionId)) {
+    return {
+      _id: new mongoose.Types.ObjectId(transactionId),
+      tenantId,
+      source: 'order_veresiye',
+      type: 'debit',
+      isDeleted: { $ne: true }
+    }
+  }
+
+  const filter = {
+    tenantId,
+    orderId,
+    accountId,
+    source: 'order_veresiye',
+    type: 'debit',
+    isDeleted: { $ne: true }
+  }
+  const amount = Number(removedEntry?.amount || 0)
+  if (amount > 0) filter.amount = amount
+  const note = String(removedEntry?.note || '').trim()
+  if (note) filter.note = note
+  return filter
+}
+
+const getTenantBusinessSettings = async (tenantId) => {
+  const tenant = await findTenantById(tenantId)
+  return mergeBusinessSettings({
+    ...(tenant?.settings || {}),
+    logo: {
+      ...(tenant?.settings?.logo || {}),
+      url: tenant?.settings?.logo?.url || tenant?.logoUrl || '',
+    },
+  })
+}
+
+const maybeAutoClosePaidOrder = async (tenantId, order) => {
+  const settings = await getTenantBusinessSettings(tenantId)
+  const isPaid = String(order?.paymentStatus || '') === 'paid'
+  if (!isPaid) return
+
+  if (order?.saleType === 'delivery' && settings.automation.autoClosePackageOrdersAfterPayment === true) {
+    const updates = {
+      status: order.status === 'cancelled' ? 'closed' : 'completed',
+      closedAt: order.closedAt || new Date(),
+      deliveryStatus: order.deliveryStatus === 'cancelled' ? 'cancelled' : (order.deliveryStatus === 'delivered' ? 'delivered' : 'ready'),
+    }
+    await updateById(order.id || order._id, updates)
+  }
+
+  if (order?.tableId && settings.automation.autoClosePaidTables === true) {
+    await updateById(order.id || order._id, { status: 'closed', closedAt: order.closedAt || new Date() })
+    await Table.updateOne({ _id: order.tableId, tenantId }, { $set: { status: 'empty', activeOrderId: null } })
+  }
 }
 
 const computeTotals = (items) => {
@@ -228,7 +341,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     const isWeightBased = it?.isWeightBased === true || weightGrams > 0
     const amountLine = isWeightBased && weightGrams > 0 ? `${weightGrams} GR` : `${qty} ADET`
     const noteLine = String(it?.note || '').trim()
-    const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}\n` : ''}`
+    const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}` : ''}\n`
 
     await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
       type: 'label',
@@ -244,6 +357,142 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
         qty,
         triggerMode: mode
       }
+    })
+  }
+}
+
+const normalizePrinterCategoryIds = (value) => Array.isArray(value)
+  ? value.map(String).filter(Boolean)
+  : []
+
+const enqueueKitchenReceiptJobs = async ({ tenantId, order, items, batchId }) => {
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
+  if (!order || safeItems.length === 0) return
+
+  try {
+    const { listActiveByTenantAndSystem } = await import('../repositories/printStationRepository.js')
+    const { createJob } = await import('./printingService.js')
+    const stations = await listActiveByTenantAndSystem(tenantId, 'kermes')
+    const kitchenPrinters = []
+
+    for (const station of (stations || [])) {
+      const stationPrinters = Array.isArray(station?.printers) ? station.printers : []
+      for (const printer of stationPrinters) {
+        if (!printer || printer.isActive === false) continue
+        if (String(printer.printerType || '') !== 'receipt') continue
+        const receiptUsage = normalizeReceiptUsage(printer)
+        if (receiptUsage.useForKitchenReceipt !== true) continue
+        kitchenPrinters.push({
+          stationId: String(station.id || station._id || ''),
+          stationName: String(station.name || ''),
+          printerId: String(printer._id || printer.id || ''),
+          printerName: String(printer.name || ''),
+          copies: Math.max(1, Math.min(10, Number(printer.copies || 1) || 1)),
+          receiptWidthMm: Math.max(58, Number(printer.receiptWidthMm || 80) || 80),
+          categoryIds: normalizePrinterCategoryIds(printer.categoryIds)
+        })
+      }
+    }
+
+    if (kitchenPrinters.length === 0) return
+
+    const specificPrinters = kitchenPrinters.filter((printer) => printer.categoryIds.length > 0)
+    const wildcardPrinters = kitchenPrinters.filter((printer) => printer.categoryIds.length === 0)
+    const groupedByPrinterKey = new Map()
+    const specificallyAssignedItemIds = new Set()
+
+    const pushPrinterItems = (printer, selectedItems) => {
+      if (!printer?.printerId || !Array.isArray(selectedItems) || selectedItems.length === 0) return
+      const key = `${printer.stationId}:${printer.printerId}`
+      const prev = groupedByPrinterKey.get(key) || { printer, items: [] }
+      prev.items.push(...selectedItems)
+      groupedByPrinterKey.set(key, prev)
+    }
+
+    for (const item of safeItems) {
+      const categoryId = String(item?.categoryId || '').trim()
+      const matchingPrinter = specificPrinters.find((printer) => categoryId && printer.categoryIds.includes(categoryId))
+      if (!matchingPrinter) continue
+      specificallyAssignedItemIds.add(String(item?._id || ''))
+      pushPrinterItems(matchingPrinter, [item])
+    }
+
+    const wildcardItems = safeItems.filter((item) => !specificallyAssignedItemIds.has(String(item?._id || '')))
+    if (wildcardItems.length > 0) {
+      for (const printer of wildcardPrinters) {
+        pushPrinterItems(printer, wildcardItems)
+      }
+    }
+
+    if (groupedByPrinterKey.size === 0) return
+
+    const tableName = order?.tableId
+      ? String((await Table.findById(order.tableId).select('name').lean())?.name || '')
+      : ''
+    const printedItemIds = new Set()
+
+    for (const { printer, items: groupedItems } of groupedByPrinterKey.values()) {
+      if (!Array.isArray(groupedItems) || groupedItems.length === 0) continue
+      try {
+        const payload = buildKitchenReceiptRaw(order, groupedItems, {
+          tableName,
+          createdByName: order?.createdByName || order?.createdByUserName || '',
+          orderNote: order?.note || '',
+          createdAt: order?.updatedAt || order?.createdAt,
+          customerName: order?.customerName || '',
+          customerPhone: order?.customerPhone || '',
+          customerAddress: order?.customerAddress || '',
+          paymentLine: getDeliveryPaymentLine(order)
+        })
+        await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
+          type: 'receipt',
+          stationId: printer.stationId,
+          payload: { type: 'raw', content: payload.raw },
+          meta: {
+            orderId: String(order.id),
+            tableId: order.tableId ? String(order.tableId) : null,
+            kitchenBatchId: batchId ? String(batchId) : null,
+            receiptRole: 'kitchen',
+            stationPrinterId: printer.printerId,
+            categoryIds: printer.categoryIds,
+            itemIds: groupedItems.map((item) => String(item?._id || '')).filter(Boolean),
+            copies: printer.copies,
+            thermalVariants: payload.thermalVariants,
+            triggerMode: 'order_send',
+            kitchenReceipt: true
+          }
+        })
+        for (const item of groupedItems) {
+          const itemId = String(item?._id || '')
+          if (itemId) printedItemIds.add(itemId)
+        }
+      } catch (jobError) {
+        logger.error('[KITCHEN_RECEIPT_QUEUE_FAILED]', {
+          orderId: String(order.id || ''),
+          batchId: String(batchId || ''),
+          stationId: printer.stationId,
+          stationPrinterId: printer.printerId,
+          printerName: printer.printerName,
+          message: String(jobError?.message || jobError || '')
+        })
+      }
+    }
+
+    if (printedItemIds.size === 0) return
+    const now = new Date()
+    let changed = false
+    for (const item of order.items || []) {
+      const itemId = String(item?._id || '')
+      if (!itemId || !printedItemIds.has(itemId)) continue
+      item.kitchenPrintedAt = now
+      changed = true
+    }
+    if (changed) await order.save()
+  } catch (err) {
+    logger.error('[KITCHEN_RECEIPT_AUTO_PRINT_FAILED]', {
+      orderId: String(order?.id || ''),
+      batchId: String(batchId || ''),
+      message: String(err?.message || err || '')
     })
   }
 }
@@ -349,11 +598,14 @@ const decorateOrder = (order) => {
 
 export const createOrderService = async (tenantId, userId, branchId, { createdByName } = {}) => {
   const safeCreatedByName = String(createdByName || '').trim()
+  const branchDoc = branchId ? await Branch.findOne({ _id: branchId, tenantId }).select('name').lean() : null
   const order = await createOrder({
     tenantId,
     branchId: branchId || null,
+    branchName: String(branchDoc?.name || ''),
     createdBy: userId,
     createdByUserId: userId,
+    createdByUserName: safeCreatedByName,
     createdByName: safeCreatedByName,
     items: [],
     status: 'open',
@@ -375,11 +627,14 @@ export const createWalkInOrderService = async (tenantId, userId, branchId, { cus
   const safeCustomerName = (String(customerName || '').trim().slice(0, 40)) || 'Misafir'
   const safeNote = String(note || '').trim()
   const safeCreatedByName = String(createdByName || '').trim()
+  const branchDoc = branchId ? await Branch.findOne({ _id: branchId, tenantId }).select('name').lean() : null
   const order = await createOrder({
     tenantId,
     branchId,
+    branchName: String(branchDoc?.name || ''),
     createdBy: userId,
     createdByUserId: userId,
+    createdByUserName: safeCreatedByName,
     createdByName: safeCreatedByName,
     items: [],
     status: 'open',
@@ -458,27 +713,56 @@ export const getWalkInOrdersService = async (tenantId, branchFilter, { status = 
   return { orders: dto }
 }
 
-export const createDeliveryOrderService = async (tenantId, userId, branchId, { customerName, phone, address, note, createdByName } = {}) => {
+export const createDeliveryOrderService = async (tenantId, userId, branchId, { customerId, customerName, phone, address, note, createdByName, deliveryPaymentStatus, deliveryPaymentMethod } = {}) => {
   const safeCustomerName = String(customerName || '').trim()
   const safePhone = String(phone || '').trim()
   const safeAddress = String(address || '').trim()
   const safeNote = String(note || '').trim()
   const safeCreatedByName = String(createdByName || '').trim()
+  const safeDeliveryPaymentStatus = String(deliveryPaymentStatus || '').trim() === 'already_paid'
+    ? 'already_paid'
+    : (String(deliveryPaymentStatus || '').trim() === 'pay_on_delivery' ? 'pay_on_delivery' : 'unknown')
+  const resolvedPlannedMethod = safeDeliveryPaymentStatus === 'pay_on_delivery' && String(deliveryPaymentMethod || '').trim()
+    ? await resolvePaymentMethodSelection(tenantId, branchId, deliveryPaymentMethod)
+    : null
+  const deliveryCustomer = await upsertDeliveryCustomerProfile(tenantId, {
+    customerId,
+    branchId,
+    name: safeCustomerName,
+    phone: safePhone,
+    address: safeAddress,
+    note: safeNote,
+    lastOrderAt: new Date()
+  })
+  const branchDoc = branchId ? await Branch.findOne({ _id: branchId, tenantId }).select('name').lean() : null
   const order = await createOrder({
     tenantId,
     branchId,
+    branchName: String(branchDoc?.name || ''),
     createdBy: userId,
     createdByUserId: userId,
+    createdByUserName: safeCreatedByName,
     createdByName: safeCreatedByName,
     items: [],
     status: 'open',
     totals: { subtotal: 0, grandTotal: 0 },
     saleType: 'delivery',
+    deliveryType: 'package',
+    deliveryCustomerId: deliveryCustomer?._id || null,
     customerName: safeCustomerName,
     customerPhone: safePhone,
     customerAddress: safeAddress,
     deliveryNote: safeNote,
     note: safeNote,
+    deliveryAddress: {
+      fullName: safeCustomerName,
+      phone: safePhone,
+      addressText: safeAddress,
+      note: safeNote
+    },
+    deliveryPaymentStatus: safeDeliveryPaymentStatus,
+    deliveryPaymentMethod: resolvedPlannedMethod?.methodId || '',
+    deliveryPaymentMethodLabel: resolvedPlannedMethod?.methodLabel || '',
     deliveryStatus: 'pending',
     paymentStatus: 'unpaid'
   })
@@ -490,7 +774,14 @@ export const createDeliveryOrderService = async (tenantId, userId, branchId, { c
     totals: order.totals,
     note: order.note,
     saleType: order.saleType,
+    deliveryCustomerId: order.deliveryCustomerId ? String(order.deliveryCustomerId) : null,
     customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    customerAddress: order.customerAddress,
+    deliveryNote: order.deliveryNote,
+    deliveryPaymentStatus: order.deliveryPaymentStatus,
+    deliveryPaymentMethod: order.deliveryPaymentMethod,
+    deliveryPaymentMethodLabel: order.deliveryPaymentMethodLabel,
     deliveryStatus: order.deliveryStatus,
     orderNo: order.orderNo,
     orderDayKey: order.orderDayKey
@@ -531,7 +822,7 @@ export const updateDeliveryStatusService = async (tenantId, id, deliveryStatus) 
   return { order: dto }
 }
 
-export const updateDeliveryCustomerService = async (tenantId, id, { customerName, phone, address } = {}) => {
+export const updateDeliveryCustomerService = async (tenantId, id, { customerId, customerName, phone, address, deliveryPaymentStatus, deliveryPaymentMethod } = {}) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
   if (order.saleType !== 'delivery') throw error('invalid_request', 'Not a delivery order', 400)
@@ -544,6 +835,36 @@ export const updateDeliveryCustomerService = async (tenantId, id, { customerName
   order.customerName = safeCustomerName
   order.customerPhone = safePhone
   order.customerAddress = safeAddress
+  order.deliveryType = 'package'
+  order.deliveryAddress = {
+    ...(order.deliveryAddress && typeof order.deliveryAddress === 'object' ? order.deliveryAddress.toObject?.() || order.deliveryAddress : {}),
+    fullName: safeCustomerName,
+    phone: safePhone,
+    addressText: safeAddress,
+    note: order.deliveryNote || order.note || ''
+  }
+  const safeDeliveryPaymentStatus = String(deliveryPaymentStatus || '').trim()
+  if (safeDeliveryPaymentStatus === 'already_paid' || safeDeliveryPaymentStatus === 'pay_on_delivery' || safeDeliveryPaymentStatus === 'unknown') {
+    order.deliveryPaymentStatus = safeDeliveryPaymentStatus
+    if (safeDeliveryPaymentStatus === 'pay_on_delivery' && String(deliveryPaymentMethod || '').trim()) {
+      const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, deliveryPaymentMethod)
+      order.deliveryPaymentMethod = resolvedMethod.methodId
+      order.deliveryPaymentMethodLabel = resolvedMethod.methodLabel
+    } else if (safeDeliveryPaymentStatus !== 'pay_on_delivery') {
+      order.deliveryPaymentMethod = ''
+      order.deliveryPaymentMethodLabel = ''
+    }
+  }
+  const deliveryCustomer = await upsertDeliveryCustomerProfile(tenantId, {
+    customerId: customerId || order.deliveryCustomerId,
+    branchId: order.branchId,
+    name: safeCustomerName,
+    phone: safePhone,
+    address: safeAddress,
+    note: order.deliveryNote || order.note || '',
+    lastOrderAt: order.createdAt || new Date()
+  })
+  order.deliveryCustomerId = deliveryCustomer?._id || order.deliveryCustomerId || null
   await order.save()
 
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_delivery_customer_update', 'Order', order.id, { customerName: safeCustomerName })
@@ -570,12 +891,12 @@ export const getDeliveryOrdersService = async (tenantId, branchFilter, { status,
 
   const s = String(status || '').trim()
   if (!s || s === 'active') {
-    filter.deliveryStatus = { $in: ['pending', 'accepted', 'preparing', 'ready'] }
+    filter.deliveryStatus = { $in: ['pending', 'accepted', 'preparing', 'ready', 'yeni', 'hazirlaniyor', 'kuryeye_atandi', 'yola_cikti'] }
     filter.status = { $nin: ['cancelled', 'closed'] }
   } else if (s === 'delivered') {
-    filter.deliveryStatus = 'delivered'
+    filter.deliveryStatus = { $in: ['delivered', 'teslim_edildi'] }
   } else if (s === 'cancelled') {
-    filter.deliveryStatus = 'cancelled'
+    filter.deliveryStatus = { $in: ['cancelled', 'iptal_edildi', 'musteriyi_bulamadi', 'adreste_yok', 'geri_dondu'] }
   } else {
     filter.deliveryStatus = s
   }
@@ -662,12 +983,16 @@ export const getOrderService = async (tenantId, id) => {
     note: obj.note,
     mergeSourceOrderIds: obj.mergeSourceOrderIds || [],
     saleType: obj.saleType,
+    deliveryCustomerId: obj.deliveryCustomerId ? String(obj.deliveryCustomerId) : null,
     customerName: obj.customerName,
     kitchenEnabled: obj.kitchenEnabled,
     sendToKitchen: obj.sendToKitchen,
     customerPhone: obj.customerPhone,
     customerAddress: obj.customerAddress,
     deliveryNote: obj.deliveryNote,
+    deliveryPaymentStatus: obj.deliveryPaymentStatus || 'unknown',
+    deliveryPaymentMethod: obj.deliveryPaymentMethod || '',
+    deliveryPaymentMethodLabel: obj.deliveryPaymentMethodLabel || '',
     deliveryStatus: obj.deliveryStatus,
     deliveryAt: obj.deliveryAt,
     servingType: getEffectiveServingTypeForOrder(obj),
@@ -701,7 +1026,7 @@ const isNotEditableStatus = (status) => ['closed', 'cancelled'].includes(status)
 
 export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
   if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid order id', 400)
-  if (!mongoose.Types.ObjectId.isValid(menuItemId)) throw error('invalid_request', 'Invalid menu item', 400)
+  if (!mongoose.Types.ObjectId.isValid(menuItemId)) throw error('invalid_request', 'Invalid menü item', 400)
 
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
@@ -732,7 +1057,16 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
   const rawQuantity = typeof input === 'object' && input !== null ? input.quantity : input
   const qty = Math.max(1, Number(rawQuantity) || 1)
   const item = await findMenuItem(menuItemId, tenantId)
-  if (!item || !item.isActive) throw error('not_found', 'Menu item not found', 404)
+  if (!item || !item.isActive) throw error('not_found', 'Menü item not found', 404)
+  if (order.branchId && !isVisibleInBranch(item, order.branchId)) {
+    throw error('branch_not_allowed', 'Item is not available in this branch', 403)
+  }
+  const categoryDoc = item?.categoryId
+    ? await Category.findOne({ _id: item.categoryId, tenantId }).select('name branchIds').lean()
+    : null
+  if (order.branchId && categoryDoc && !isVisibleInBranch(categoryDoc, order.branchId)) {
+    throw error('branch_not_allowed', 'Category is not available in this branch', 403)
+  }
   const price = typeof item.price === 'number' ? item.price : 0
   const isWeightBased = !!item.isWeightBased
   const rawWeightGrams = typeof input === 'object' && input !== null ? input.weightGrams : null
@@ -766,6 +1100,11 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
     // const now = new Date() // Not needed for open item
     const newItem = {
       menuItemId: item.id,
+      productId: item.id,
+      productName: String(item.name || ''),
+      categoryId: item.categoryId || null,
+      categoryName: String(categoryDoc?.name || ''),
+      imageUrl: String(item.imageUrl || ''),
       nameSnapshot: item.name || 'Unknown',
       priceSnapshot: price,
       qty: isWeightBased ? 1 : qty,
@@ -965,6 +1304,11 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
 export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  const tenantSettings = await getTenantBusinessSettings(tenantId)
+  const cancelReason = String(reason || '').trim()
+  if (tenantSettings.general.requireCancelReasonForProduct === true && !cancelReason) {
+    throw error('cancel_reason_required', 'İptal açıklaması zorunlu', 400)
+  }
   if (isNotEditableStatus(order.status)) {
     const e = new Error('Order is not editable')
     e.status = 409
@@ -987,7 +1331,8 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
   }
   it.status = 'cancelled'
   it.cancelledAt = new Date()
-  it.note = reason ? String(reason) : it.note
+  it.note = cancelReason || it.note
+  it.cancelReason = cancelReason || it.cancelReason || ''
   const totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
   const fin = computePaymentSummary({ ...order.toObject?.() ?? order, items: order.items, totals })
@@ -1003,6 +1348,11 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
 export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user, unitIndex }) => {
     const order = await findByIdAndTenant(orderId, user.tenantId)
     if (!order) throw error('not_found', 'Order not found', 404)
+    const tenantSettings = await getTenantBusinessSettings(user.tenantId)
+    const cancelReason = String(reason || '').trim()
+    if (tenantSettings.general.requireCancelReasonForProduct === true && !cancelReason) {
+      throw error('cancel_reason_required', 'İptal açıklaması zorunlu', 400)
+    }
     if (isNotEditableStatus(order.status)) {
       const e = new Error('Order is not editable')
       e.status = 409
@@ -1032,13 +1382,15 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
         selectedOverrides: {
           status: 'cancelled',
           cancelledAt: cancelAt,
-          note: reason || item.note || ''
+          note: cancelReason || item.note || '',
+          cancelReason: cancelReason || item.cancelReason || ''
         }
       })
     } else {
       item.status = 'cancelled'
       item.cancelledAt = cancelAt
-      if (reason) item.note = reason
+      if (cancelReason) item.note = cancelReason
+      item.cancelReason = cancelReason || item.cancelReason || ''
     }
     if (order.tableId) {
       order.cancelAlertActive = true
@@ -1429,7 +1781,7 @@ export const splitOrderService = async (tenantId, id, itemsToMove = [], targetTa
       for (const m of itemsToMove) {
         const key = String(m.menuItemId)
         const src = sourceItemsMap.get(key)
-        if (!src) throw error('not_found', 'Menu item not in order', 404)
+        if (!src) throw error('not_found', 'Menü item not in order', 404)
         if (m.qty < 1 || m.qty > src.qty) throw error('invalid_qty', 'Invalid qty', 400)
         // reduce from source
         src.qty -= m.qty
@@ -1438,6 +1790,11 @@ export const splitOrderService = async (tenantId, id, itemsToMove = [], targetTa
         // add to new order
         newOrderItems.push({
           menuItemId: src.menuItemId,
+          productId: src.productId || src.menuItemId,
+          productName: src.productName || src.nameSnapshot,
+          categoryId: src.categoryId || null,
+          categoryName: src.categoryName || '',
+          imageUrl: String(src.imageUrl || ''),
           nameSnapshot: src.nameSnapshot,
           priceSnapshot: src.priceSnapshot,
           qty: m.qty,
@@ -1517,6 +1874,9 @@ export const cancelOrderService = async (tenantId, id) => {
     order.deliveryStatus = 'cancelled'
     order.closedAt = now
   }
+  order.totals = computeTotals(order.items)
+  order.paymentStatus = 'unpaid'
+  order.paidAt = null
   normalizeLegacyItemStatuses(order)
   await order.save()
   if (order.tableId) {
@@ -1534,6 +1894,7 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
   const batchId = new mongoose.Types.ObjectId().toString()
 
   const itemsToLabel = []
+  const itemsToKitchenReceipt = []
 
   if (kitchenEnabled !== undefined) {
     order.kitchenEnabled = Boolean(kitchenEnabled)
@@ -1584,11 +1945,25 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
         } catch {}
       }
       itemsToLabel.push({
+        _id: it._id,
         menuItemId: it.menuItemId,
+        categoryId: it.categoryId || null,
         nameSnapshot: it.nameSnapshot,
         qty: it.qty,
         isWeightBased: it.isWeightBased,
-        weightGrams: it.weightGrams
+        weightGrams: it.weightGrams,
+        note: it.note || ''
+      })
+      itemsToKitchenReceipt.push({
+        _id: it._id,
+        menuItemId: it.menuItemId,
+        categoryId: it.categoryId || null,
+        nameSnapshot: it.nameSnapshot,
+        qty: it.qty,
+        isWeightBased: it.isWeightBased,
+        weightGrams: it.weightGrams,
+        note: it.note || '',
+        servingType: it.servingType
       })
     }
   }
@@ -1602,6 +1977,8 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
     }
   } catch {
   }
+
+  await enqueueKitchenReceiptJobs({ tenantId, order, items: itemsToKitchenReceipt, batchId })
 
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_send', 'Order', order.id, {})
   const fresh = await Order.findById(order.id).lean()
@@ -1648,8 +2025,11 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
   const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, method)
   order.payments.push({
     method: resolvedMethod.method,
+    methodId: resolvedMethod.methodId,
     methodLabel: resolvedMethod.methodLabel,
+    methodName: resolvedMethod.methodName,
     methodBucket: resolvedMethod.methodBucket,
+    methodType: resolvedMethod.methodType,
     amount: payAmount,
     note: String(note || '')
   })
@@ -1662,6 +2042,7 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
     order.paidAt = null
   }
   await order.save()
+  await maybeAutoClosePaidOrder(tenantId, order)
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }
 }
@@ -1728,6 +2109,10 @@ export const setOrderDiscountService = async (tenantId, id, discountPercent) => 
 export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, id, { accountId, amount, note }) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  const tenantSettings = await getTenantBusinessSettings(tenantId)
+  if (tenantSettings.general.disableCreditAccounts === true) {
+    throw error('credit_accounts_disabled', 'Cari hesap kullanımı kapalı', 403)
+  }
   if (['closed', 'cancelled', 'merged'].includes(order.status)) {
     const e = new Error('Order closed')
     e.status = 409
@@ -1785,7 +2170,7 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
           { $inc: { balance: settleAmount } },
           { session }
         )
-        await AccountTransaction.create([
+        const createdTransactions = await AccountTransaction.create([
           {
             tenantId,
             branchId,
@@ -1798,6 +2183,7 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
             orderId: order.id
           }
         ], { session })
+        const createdTx = Array.isArray(createdTransactions) ? createdTransactions[0] : null
 
         const entries = Array.isArray(order.veresiyeEntries) ? order.veresiyeEntries : []
         if (entries.length === 0 && order.settlementType === 'veresiye' && Number(order.veresiyeAmount || 0) > 0) {
@@ -1811,7 +2197,15 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
             createdAt: order.veresiyeAt || now
           })
         }
-        entries.push({ accountId: acc.id, accountName: String(acc?.name || '').trim(), amount: settleAmount, note: verNote, createdBy: actorUserId, createdAt: now })
+        entries.push({
+          accountId: acc.id,
+          accountName: String(acc?.name || '').trim(),
+          transactionId: createdTx?._id || null,
+          amount: settleAmount,
+          note: verNote,
+          createdBy: actorUserId,
+          createdAt: now
+        })
         order.veresiyeEntries = entries
         order.veresiyeAmount = entries.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0)
         order.settlementType = order.veresiyeAmount > 0 ? 'veresiye' : 'none'
@@ -1861,7 +2255,15 @@ export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, i
           createdAt: order.veresiyeAt || now
         })
       }
-      entries.push({ accountId: acc.id, accountName: String(acc?.name || '').trim(), amount: settleAmount, note: verNote, createdBy: actorUserId, createdAt: now })
+      entries.push({
+        accountId: acc.id,
+        accountName: String(acc?.name || '').trim(),
+        transactionId: tx?._id || null,
+        amount: settleAmount,
+        note: verNote,
+        createdBy: actorUserId,
+        createdAt: now
+      })
       order.veresiyeEntries = entries
       order.veresiyeAmount = entries.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0)
       order.settlementType = order.veresiyeAmount > 0 ? 'veresiye' : 'none'
@@ -1928,6 +2330,7 @@ export const deleteOrderVeresiyeEntryService = async (tenantId, branchId, actorU
 
   const now = new Date()
   const txnSupported = isMongoTransactionsSupported()
+  const txFilter = resolveVeresiyeTransactionFilter(tenantId, order._id, removed)
   const applyOrderUpdate = async (session) => {
     const list = Array.isArray(order.veresiyeEntries) ? order.veresiyeEntries : []
     const i = list.findIndex(e => String(e?._id) === String(entryId))
@@ -1957,42 +2360,35 @@ export const deleteOrderVeresiyeEntryService = async (tenantId, branchId, actorU
     const session = await mongoose.startSession()
     try {
       await session.withTransaction(async () => {
+        const sourceTx = await AccountTransaction.findOne(txFilter).sort({ createdAt: -1 }).session(session)
+        if (!sourceTx) {
+          throw error('not_found', 'Veresiye hareketi bulunamadi', 404)
+        }
+        sourceTx.isDeleted = true
+        sourceTx.deletedAt = now
+        await sourceTx.save({ session })
+
+        const nextBalance = await computeCustomerAccountBalance(tenantId, acc.id, session)
         await CustomerAccount.updateOne(
           { _id: acc.id, tenantId },
-          { $inc: { balance: -amount } },
+          { $set: { balance: nextBalance } },
           { session }
         )
-        await AccountTransaction.create([
-          {
-            tenantId,
-            branchId,
-            accountId: acc.id,
-            type: 'credit',
-            amount,
-            method: 'other',
-            note: `Veresiye silindi${removed?.note ? `: ${String(removed.note).trim()}` : ''}`,
-            source: 'order_veresiye_delete',
-            orderId: order.id
-          }
-        ], { session })
         await applyOrderUpdate(session)
       })
     } finally {
       await session.endSession().catch(() => {})
     }
   } else {
-    await CustomerAccount.updateOne({ _id: acc.id, tenantId }, { $inc: { balance: -amount } })
-    await AccountTransaction.create({
-      tenantId,
-      branchId,
-      accountId: acc.id,
-      type: 'credit',
-      amount,
-      method: 'other',
-      note: `Veresiye silindi${removed?.note ? `: ${String(removed.note).trim()}` : ''}`,
-      source: 'order_veresiye_delete',
-      orderId: order.id
-    })
+    const sourceTx = await AccountTransaction.findOne(txFilter).sort({ createdAt: -1 })
+    if (!sourceTx) {
+      throw error('not_found', 'Veresiye hareketi bulunamadi', 404)
+    }
+    sourceTx.isDeleted = true
+    sourceTx.deletedAt = now
+    await sourceTx.save()
+    const nextBalance = await computeCustomerAccountBalance(tenantId, acc.id)
+    await CustomerAccount.updateOne({ _id: acc.id, tenantId }, { $set: { balance: nextBalance } })
     await applyOrderUpdate(undefined)
   }
 
@@ -2141,8 +2537,11 @@ export const payOrderService = async (tenantId, id, paymentMethod, amount) => {
   order.payments.push({
     amount: payAmount,
     method: resolvedMethod.method,
+    methodId: resolvedMethod.methodId,
     methodLabel: resolvedMethod.methodLabel,
+    methodName: resolvedMethod.methodName,
     methodBucket: resolvedMethod.methodBucket,
+    methodType: resolvedMethod.methodType,
     note: ''
   })
 
@@ -2156,6 +2555,7 @@ export const payOrderService = async (tenantId, id, paymentMethod, amount) => {
   }
 
   await order.save()
+  await maybeAutoClosePaidOrder(tenantId, order)
   
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_pay', 'Order', order.id, { paymentMethod, amount: payAmount })
   
@@ -2626,6 +3026,7 @@ const normalizeMergedItem = (item) => {
     ...item,
     qty,
     priceSnapshot: price,
+    imageUrl: String(item?.imageUrl || ''),
     subtotal
   }
 }

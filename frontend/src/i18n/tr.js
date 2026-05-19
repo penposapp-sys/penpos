@@ -1,4 +1,4 @@
-export const STATUS_LABELS_TR = {
+﻿export const STATUS_LABELS_TR = {
   open: 'Bekliyor',
   pending: 'Bekliyor',
   closed: 'Kapandı',

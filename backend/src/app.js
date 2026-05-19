@@ -28,6 +28,9 @@ import settingsLogoRouter from './routes/settingsLogo.js'
 import settingsMenuRouter from './routes/settingsMenu.js'
 import userPreferencesRouter from './routes/userPreferences.js'
 import printingRouter from './routes/printing.js'
+import { requireActiveSubscription } from './middlewares/requireActiveSubscription.js'
+import { requireAuth } from './middlewares/requireAuth.js'
+import { tenantGuard } from './middlewares/tenantGuard.js'
 import { sendError } from './utils/errors.js'
 import debugRouter from './routes/debug.js'
 import canteenRouter from './modules/canteen/routes/canteen.js'
@@ -117,12 +120,12 @@ export const createServer = () => {
   app.use('/api/superadmin', superadminRouter)
   app.use('/api/tenant', tenantRouter)
   app.use('/api/kermes', tenantRouter)
-  app.use('/api/tenant/staff', tenantStaffRouter)
-  app.use('/api/tenant/branches', tenantBranchesRouter)
-  app.use('/api/branches', branchesRouter)
-  app.use('/api/tenant/categories', categoriesRouter)
-  app.use('/api/tenant/menu-items', menuItemsRouter)
-  app.use('/api/pos', posRouter)
+  app.use('/api/tenant/staff', requireAuth, tenantGuard, requireActiveSubscription, tenantStaffRouter)
+  app.use('/api/tenant/branches', requireAuth, tenantGuard, requireActiveSubscription, tenantBranchesRouter)
+  app.use('/api/branches', requireAuth, tenantGuard, requireActiveSubscription, branchesRouter)
+  app.use('/api/tenant/categories', requireAuth, tenantGuard, requireActiveSubscription, categoriesRouter)
+  app.use('/api/tenant/menu-items', requireAuth, tenantGuard, requireActiveSubscription, menuItemsRouter)
+  app.use('/api/pos', requireAuth, tenantGuard, requireActiveSubscription, posRouter)
   app.use('/api/public', publicRouter)
   app.use('/api/debug', debugRouter)
   try { console.log('[DEBUG_STAMP]', 'branch_fix_v5', process.cwd()) } catch {}
@@ -144,9 +147,9 @@ export const createServer = () => {
       })
     console.log('BRANCHES ROUTES REGISTERED:', routes)
   } catch {}
-  app.use('/api/kitchen', kitchenRouter)
-  app.use('/api/accounts', accountsRouter)
-  app.use('/api/kermes/cari', accountsRouter)
+  app.use('/api/kitchen', requireAuth, tenantGuard, requireActiveSubscription, kitchenRouter)
+  app.use('/api/accounts', requireAuth, tenantGuard, requireActiveSubscription, accountsRouter)
+  app.use('/api/kermes/cari', requireAuth, tenantGuard, requireActiveSubscription, accountsRouter)
   app.use('/api/reports', (req, res, next) => {
     if (process.env.NODE_ENV !== 'production') {
       res.set('Cache-Control', 'no-store')
@@ -154,16 +157,16 @@ export const createServer = () => {
     }
     next()
   })
-  app.use('/api/reports', reportsRouter)
-  app.use('/api/tenant/tables', tablesRouter)
+  app.use('/api/reports', requireAuth, tenantGuard, requireActiveSubscription, reportsRouter)
+  app.use('/api/tenant/tables', requireAuth, tenantGuard, requireActiveSubscription, tablesRouter)
   app.use('/api/tenant/audit', tenantAuditRouter)
-  app.use('/api/tenant/payment-settings', paymentSettingsRouter)
+  app.use('/api/tenant/payment-settings', requireAuth, tenantGuard, requireActiveSubscription, paymentSettingsRouter)
   app.use('/api/platform', platformRouter)
   app.use('/api/payments', paymentsRouter)
   app.use('/api/printing', printingRouter)
-  app.use('/api/settings/products', settingsProductsRouter)
-  app.use('/api/settings/menu', settingsMenuRouter)
-  app.use('/api/settings', settingsLogoRouter)
+  app.use('/api/settings/products', requireAuth, tenantGuard, requireActiveSubscription, settingsProductsRouter)
+  app.use('/api/settings/menu', requireAuth, tenantGuard, requireActiveSubscription, settingsMenuRouter)
+  app.use('/api/settings', requireAuth, tenantGuard, requireActiveSubscription, settingsLogoRouter)
   app.use('/api/user/preferences', userPreferencesRouter)
   app.use('/api/canteen', canteenRouter)
   try {

@@ -4,6 +4,7 @@ import MenuItem from '../models/MenuItem.js'
 import Category from '../models/Category.js'
 import { error } from '../utils/errors.js'
 import { KERMES_PRODUCTS_EXPORT_KEYS, trHeadersFor, trRowFor } from '../utils/excelHeaders.js'
+import { notDeletedFilter } from '../utils/softDelete.js'
 
 const TEMPLATE_HEADERS = KERMES_PRODUCTS_EXPORT_KEYS
 
@@ -166,10 +167,10 @@ export const exportProducts = async (req, res, next) => {
   try {
     const format = String(req.query.format || 'xlsx').toLowerCase() === 'csv' ? 'csv' : 'xlsx'
     const tenantId = req.user.tenantId
-    const categories = await Category.find({ tenantId }).select('_id name').lean()
+    const categories = await Category.find(notDeletedFilter({ tenantId })).select('_id name').lean()
     const catNameById = new Map(categories.map((c) => [String(c._id), c.name]))
 
-    const items = await MenuItem.find({ tenantId }).sort({ updatedAt: -1 }).lean()
+    const items = await MenuItem.find(notDeletedFilter({ tenantId })).sort({ updatedAt: -1 }).lean()
     const canonicalRows = items.map((i) => {
       const categoryId = String(i.categoryId || '')
       return {
@@ -187,7 +188,7 @@ export const exportProducts = async (req, res, next) => {
     })
 
     const headersTr = trHeadersFor(TEMPLATE_HEADERS)
-    const rows = canonicalRows.map(r => trRowFor(r, TEMPLATE_HEADERS))
+    const rows = canonicalRows.map((r) => trRowFor(r, TEMPLATE_HEADERS))
 
     const baseName = `products_export_${filenameStamp()}`
     if (format === 'csv') {
@@ -240,7 +241,7 @@ export const downloadTemplate = async (req, res, next) => {
     ]
 
     const headersTr = trHeadersFor(TEMPLATE_HEADERS)
-    const rows = canonicalRows.map(r => trRowFor(r, TEMPLATE_HEADERS))
+    const rows = canonicalRows.map((r) => trRowFor(r, TEMPLATE_HEADERS))
 
     const baseName = 'products_template'
     if (format === 'csv') {
@@ -304,7 +305,7 @@ export const importProducts = async (req, res, next) => {
       return String(value || '').trim().replace(/\s+/g, ' ')
     }
 
-    const categories = await Category.find({ tenantId }).select('_id name').lean()
+    const categories = await Category.find(notDeletedFilter({ tenantId })).select('_id name').lean()
     const catById = new Map(categories.map((c) => [String(c._id), c]))
     const catByKey = new Map(categories.map((c) => [normalizeCategoryKey(c.name), c]))
 
@@ -322,13 +323,13 @@ export const importProducts = async (req, res, next) => {
       if (catByKey.has(key)) existingRequestedKeys.add(key)
     }
 
-    const missingKeys = Array.from(requestedKeyToDisplay.keys()).filter(k => !catByKey.has(k))
+    const missingKeys = Array.from(requestedKeyToDisplay.keys()).filter((k) => !catByKey.has(k))
     if (missingKeys.length > 0) {
       const docs = missingKeys.map((k) => ({ tenantId, createdBy: actorUserId, name: requestedKeyToDisplay.get(k) || k, isActive: true }))
       try {
         await Category.insertMany(docs, { ordered: false })
       } catch {}
-      const refreshed = await Category.find({ tenantId }).select('_id name').lean()
+      const refreshed = await Category.find(notDeletedFilter({ tenantId })).select('_id name').lean()
       catById.clear()
       catByKey.clear()
       for (const c of refreshed) {
@@ -337,7 +338,7 @@ export const importProducts = async (req, res, next) => {
       }
     }
 
-    const createdCategories = missingKeys.filter(k => catByKey.has(k)).length
+    const createdCategories = missingKeys.filter((k) => catByKey.has(k)).length
     const matchedCategories = existingRequestedKeys.size
 
     const errors = []
@@ -438,14 +439,14 @@ export const importProducts = async (req, res, next) => {
       if (categoryIdForUpdate !== undefined) set.categoryId = categoryIdForUpdate
 
       return {
-      updateOne: {
-        filter: { tenantId, sku: v.sku },
-        update: {
-          $setOnInsert: { tenantId, sku: v.sku },
-          $set: set
-        },
-        upsert: true
-      }
+        updateOne: {
+          filter: { tenantId, sku: v.sku },
+          update: {
+            $setOnInsert: { tenantId, sku: v.sku },
+            $set: set
+          },
+          upsert: true
+        }
       }
     })
 

@@ -7,6 +7,7 @@ import { error } from '../utils/errors.js'
 import { log as auditLog } from './auditService.js'
 import { isTxnSupported } from '../utils/mongoTxn.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
+import { notDeletedFilter } from '../utils/softDelete.js'
 
 const toMoney = (v) => {
   const raw = v === null || v === undefined ? '' : String(v).trim().replace(/\s/g, '').replace(',', '.')
@@ -207,7 +208,7 @@ export const getAccountService = async (tenantId, branchId, id) => {
 export const getAccountCatalogService = async (tenantId) => {
   const [categories, items] = await Promise.all([
     mongoose.model('Category').find({ tenantId }).sort({ sortOrder: 1, name: 1 }).lean(),
-    MenuItem.find({ tenantId }).sort({ sortOrder: 1, name: 1 }).lean()
+    MenuItem.find(notDeletedFilter({ tenantId })).sort({ sortOrder: 1, name: 1 }).lean()
   ])
 
   return {
@@ -344,8 +345,11 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
     type: 'credit',
     amount: totalEffect,
     method: paymentMethod.method,
+    methodId: paymentMethod.methodId,
     methodLabel: paymentMethod.methodLabel,
+    methodName: paymentMethod.methodName,
     methodBucket: paymentMethod.methodBucket,
+    methodType: paymentMethod.methodType,
     note,
     source: 'collection',
     orderId
@@ -355,7 +359,7 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
 
   return {
     account: { id: acc.id, name: acc.name, phone: acc.phone, note: acc.note, balance: toMoney(acc.balance), isActive: acc.isActive },
-    transaction: { id: tx.id, type: tx.type, amount: toMoney(tx.amount), method: tx.method, methodLabel: tx.methodLabel, methodBucket: tx.methodBucket, note: tx.note, source: tx.source, createdAt: tx.createdAt }
+    transaction: { id: tx.id, type: tx.type, amount: toMoney(tx.amount), method: tx.method, methodId: tx.methodId, methodLabel: tx.methodLabel, methodName: tx.methodName, methodBucket: tx.methodBucket, methodType: tx.methodType, note: tx.note, source: tx.source, createdAt: tx.createdAt }
   }
 }
 
@@ -471,7 +475,7 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
   if (normalizedItems.length === 0) throw error('invalid_request', 'Sepette ürün yok', 400)
 
   const uniqueIds = [...new Set(normalizedItems.map((entry) => entry.menuItemId))]
-  const menuItems = await MenuItem.find({ tenantId, _id: { $in: uniqueIds } })
+  const menuItems = await MenuItem.find(notDeletedFilter({ tenantId, _id: { $in: uniqueIds } }))
     .select('name price isActive')
     .lean()
   const menuItemMap = new Map(menuItems.map((item) => [String(item._id), item]))

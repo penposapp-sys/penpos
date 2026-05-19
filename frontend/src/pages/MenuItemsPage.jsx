@@ -1,43 +1,349 @@
-import React, { useEffect, useState } from 'react'
-import { api } from '../lib/apiClient.js'
+﻿import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import Modal from '../components/Modal.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import BranchAccessField from '../components/settings/BranchAccessField.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { api } from '../lib/apiClient.js'
+import { getSubscriptionStatus } from '../lib/subscription.js'
+import { normalizeBranchIdList } from '../lib/branchVisibility.js'
+import { toast } from '../lib/toast.js'
+import ProductCatalogStyles from './ProductCatalogStyles.jsx'
+import {
+  buildProductPayload,
+  createEmptyProductForm,
+  inflateProductForm,
+  mergeProductSettings
+} from './productCatalogShared.js'
 
-export default function MenuItemsPage() {
-  const { tenantCtx } = useAuth()
-  const [items, setItems] = useState([])
-  const [categories, setCategories] = useState([])
-  const [categoryId, setCategoryId] = useState('')
-  const [q, setQ] = useState('')
-  const [active, setActive] = useState('all')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [selected, setSelected] = useState(null)
-  const [createForm, setCreateForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false, printLabelEnabled: false })
-  const [editForm, setEditForm] = useState({ categoryId: '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isActive: true, isWeightBased: false, printLabelEnabled: false })
-  const [formError, setFormError] = useState('')
-  const [formLoading, setFormLoading] = useState(false)
-  const [inlineSaving, setInlineSaving] = useState({})
-  const [inlineDrafts, setInlineDrafts] = useState({})
-  const isExpired = tenantCtx?.tenant?.plan?.status === 'expired'
+function HorizontalScrollStrip({ className = '', children, style = {} }) {
+  const [dragging, setDragging] = useState(false)
+  const dragRef = useRef({ active: false, startX: 0, startLeft: 0, moved: false })
 
-  const loadCategories = async () => {
-    const { categories } = await api('/api/tenant/categories?active=true')
-    setCategories(categories)
+  return (
+    <div
+      className={className}
+      style={{ ...style, userSelect: dragging ? 'none' : undefined }}
+      onDragStart={(event) => event.preventDefault()}
+      onMouseDown={(event) => {
+        if (event.button !== 0) return
+        const node = event.currentTarget
+        dragRef.current = {
+          active: true,
+          startX: event.clientX,
+          startLeft: node.scrollLeft,
+          moved: false
+        }
+        setDragging(true)
+      }}
+      onMouseMove={(event) => {
+        const drag = dragRef.current
+        if (!drag.active) return
+        const node = event.currentTarget
+        const delta = event.clientX - drag.startX
+        if (Math.abs(delta) > 4) drag.moved = true
+        node.scrollLeft = drag.startLeft - delta
+      }}
+      onMouseUp={() => {
+        dragRef.current.active = false
+        setDragging(false)
+      }}
+      onMouseLeave={() => {
+        dragRef.current.active = false
+        setDragging(false)
+      }}
+      onClickCapture={(event) => {
+        if (!dragRef.current.moved) return
+        event.preventDefault()
+        event.stopPropagation()
+        dragRef.current.moved = false
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">
+      <path
+        d="M4 20l4.2-1 9.1-9.1a1.8 1.8 0 0 0 0-2.6l-.6-.6a1.8 1.8 0 0 0-2.6 0L5 15.8 4 20zm9.3-12.6 2.3 2.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function KebabMenu({ items = [] }) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef(null)
+  const menuRef = useRef(null)
+  const [style, setStyle] = useState({ top: 0, left: 0, minWidth: 180 })
+  const enabledItems = items.filter(Boolean)
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current || typeof window === 'undefined') return undefined
+
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const menuWidth = Math.max(180, menuRef.current?.offsetWidth || 180)
+      const estimatedHeight = Math.max(140, Math.min(320, menuRef.current?.offsetHeight || (enabledItems.length * 44) + 16))
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+      const spaceBelow = viewportHeight - rect.bottom - 12
+      const openUpward = spaceBelow < Math.min(estimatedHeight, 220) && rect.top > spaceBelow
+      const top = openUpward
+        ? Math.max(12, rect.top - estimatedHeight - 8)
+        : Math.min(viewportHeight - estimatedHeight - 12, rect.bottom + 8)
+      const left = Math.max(12, Math.min(rect.right - menuWidth, viewportWidth - menuWidth - 12))
+      const maxHeight = openUpward ? Math.max(120, rect.top - 20) : Math.max(120, viewportHeight - top - 12)
+      setStyle({ top, left, minWidth: menuWidth, maxHeight })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [enabledItems.length, open])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const handlePointerDown = (event) => {
+      const target = event.target
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div className="product-kebab-portal">
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`product-kebab-trigger${open ? ' is-open' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        ...
+      </button>
+      {open && typeof document !== 'undefined' ? createPortal(
+        <div ref={menuRef} className="product-kebab-menu" role="menu" style={style}>
+          {enabledItems.map((item) => (
+            <button
+              key={item.key || item.label}
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              onClick={() => {
+                setOpen(false)
+                if (!item.disabled && typeof item.onClick === 'function') item.onClick()
+              }}
+              style={item.danger ? { color: '#b42318' } : undefined}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      ) : null}
+    </div>
+  )
+}
+
+const parseFilenameFromDisposition = (value) => {
+  const v = String(value || '')
+  const match = v.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i)
+  const raw = match?.[1] || match?.[2] || ''
+  try {
+    const decoded = decodeURIComponent(raw)
+    return decoded || null
+  } catch {
+    return raw || null
+  }
+}
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+const fetchWithAuth = async (path, options = {}) => {
+  const token = localStorage.getItem('token_restaurant')
+  const selectedBranchId = localStorage.getItem('selectedBranchId')
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(selectedBranchId ? { 'x-branch-id': selectedBranchId } : {}),
+    ...(options.headers || {})
+  }
+  return fetch(path, { ...options, headers })
+}
+
+const createEmptyCategoryForm = (category = null) => {
+  const branchIds = Array.isArray(category?.branchIds) ? category.branchIds.map((branchId) => String(branchId)) : []
+  return {
+    id: String(category?.id || ''),
+    name: String(category?.name || ''),
+    sortOrder: Number(category?.sortOrder || 0),
+    isActive: category?.isActive !== false,
+    qrMenuVisible: category?.qrMenuVisible !== false,
+    branchIds,
+    allBranches: branchIds.length === 0
+  }
+}
+
+function Toggle({ checked = false, onChange, disabled = false }) {
+  return (
+    <button type="button" className={`product-toggle ${checked ? 'active' : ''}`} onClick={() => !disabled && onChange(!checked)} disabled={disabled}>
+      <i />
+    </button>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="product-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function ToggleCard({ title, description, checked, onChange }) {
+  return (
+    <div className="product-toggle-card">
+      <div>
+        <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>{title}</div>
+        <div style={{ color: 'var(--app-text-muted)', fontSize: 13, fontWeight: 700, marginTop: 4 }}>{description}</div>
+      </div>
+      <Toggle checked={checked} onChange={onChange} />
+    </div>
+  )
+}
+
+function CategorySortModal({ open, categories, draftCategories, setDraftCategories, saving, onClose, onSave }) {
+  if (!open) return null
+  const move = (index, direction) => {
+    const next = [...draftCategories]
+    const target = index + direction
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setDraftCategories(next)
   }
 
-  const loadItems = async () => {
+  return (
+    <Modal open={open} onClose={onClose} title="Kategori Sıralamasını Düzenle" dialogStyle={{ maxWidth: 720 }}>
+      <div className="app-modal-body scrollbar-hidden" style={{ display: 'grid', gap: 12, padding: 0 }}>
+        {(draftCategories.length > 0 ? draftCategories : categories).map((category, index) => (
+          <div key={category.id} className="product-inline-table-row" style={{ gridTemplateColumns: '46px 1fr 48px 48px' }}>
+            <div className="product-chip" style={{ background: 'var(--app-surface-2, var(--app-surface-soft))', color: 'var(--app-text)' }}>{index + 1}</div>
+            <div style={{ fontWeight: 900, paddingBottom: 10 }}>{category.name}</div>
+            <button type="button" className="product-secondary-btn" onClick={() => move(index, -1)}>↑</button>
+            <button type="button" className="product-secondary-btn" onClick={() => move(index, 1)}>↓</button>
+          </div>
+        ))}
+      </div>
+      <div className="product-modal-footer-row">
+        <button type="button" className="product-secondary-btn" onClick={onClose}>İptal</button>
+        <button type="button" className="product-dark-btn" onClick={onSave} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+      </div>
+    </Modal>
+  )
+}
+
+export default function MenuItemsPage() {
+  const navigate = useNavigate()
+  const { tenantCtx } = useAuth()
+  const isExpired = getSubscriptionStatus(tenantCtx) === 'expired'
+  const [items, setItems] = useState([])
+  const [categories, setCategories] = useState([])
+  const [branches, setBranches] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [savingRowId, setSavingRowId] = useState('')
+  const [error, setError] = useState('')
+  const [viewMode, setViewMode] = useState('list')
+  const [activeTab, setActiveTab] = useState('all')
+  const [searchText, setSearchText] = useState('')
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [branchFilter, setBranchFilter] = useState('')
+  const [selectedIds, setSelectedIds] = useState([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [categoryOpen, setCategoryOpen] = useState(false)
+  const [sortOpen, setSortOpen] = useState(false)
+  const [sortSaving, setSortSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [createForm, setCreateForm] = useState(createEmptyProductForm())
+  const [categoryName, setCategoryName] = useState('')
+  const [draftCategories, setDraftCategories] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [resultOpen, setResultOpen] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkFile, setBulkFile] = useState(null)
+  const [bulkResult, setBulkResult] = useState(null)
+  const [categoryEditorOpen, setCategoryEditorOpen] = useState(false)
+  const [categoryForm, setCategoryForm] = useState(createEmptyCategoryForm())
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState(null)
+  const [categoryDeleteLoading, setCategoryDeleteLoading] = useState(false)
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0) || String(a?.name || '').localeCompare(String(b?.name || ''), 'tr'))
+  }, [categories])
+
+  const categoryTabs = useMemo(() => ([
+    { key: 'all', label: 'Tümü', special: true, category: null },
+    { key: 'favorites', label: 'Favoriler', special: true, category: null },
+    ...sortedCategories.map((category) => ({
+      key: `category:${category.id}`,
+      label: category.name,
+      special: false,
+      category
+    }))
+  ]), [sortedCategories])
+
+  const importErrors = useMemo(() => (Array.isArray(bulkResult?.errors) ? bulkResult.errors : []), [bulkResult])
+
+  const loadData = async () => {
     setLoading(true)
     setError('')
     try {
-      const query = new URLSearchParams()
-      if (categoryId) query.set('categoryId', categoryId)
-      if (q) query.set('q', q)
-      if (active !== 'all') query.set('active', active)
-      const { items } = await api(`/api/tenant/menu-items?${query.toString()}`)
-      setItems(items)
+      const [itemRes, categoryRes, branchRes] = await Promise.all([
+        api('/api/tenant/menu-items', { skipBranchHeader: true }),
+        api('/api/tenant/categories', { skipBranchHeader: true }),
+        api('/api/branches', { skipBranchHeader: true })
+      ])
+      setItems((Array.isArray(itemRes?.items) ? itemRes.items : []).filter((item) => item?.isDeleted !== true))
+      setCategories((Array.isArray(categoryRes?.categories) ? categoryRes.categories : []).filter((item) => item?.isDeleted !== true))
+      setBranches((Array.isArray(branchRes?.branches) ? branchRes.branches : []).filter((item) => item?.isActive !== false))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -45,412 +351,671 @@ export default function MenuItemsPage() {
     }
   }
 
-  useEffect(() => { loadCategories(); loadItems() }, [])
+  useEffect(() => {
+    const root = document.querySelector('.page-scroll-area')
+    if (root) root.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [])
 
-  const onSearch = async (e) => {
-    e.preventDefault()
-    await loadItems()
-  }
+  useEffect(() => {
+    loadData()
+  }, [])
 
-  const openCreate = () => {
-    setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false, printLabelEnabled: false })
-    setFormError('')
-    setCreateOpen(true)
-  }
-  const onCreate = async (e) => {
-    e.preventDefault()
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const { item } = await api('/api/tenant/menu-items', { method: 'POST', body: JSON.stringify(createForm) })
-      setItems([item, ...items])
-      setCreateOpen(false)
-    } catch (err) {
-      setFormError(err.message)
-    } finally {
-      setFormLoading(false)
+  useEffect(() => {
+    const handleMenuItemUpdated = (event) => {
+      const nextItem = event?.detail?.item
+      if (!nextItem?.id) return
+      setItems((prev) => prev.map((item) => (String(item.id) === String(nextItem.id) ? nextItem : item)))
     }
-  }
-  const onCreateKeepOpen = async (e) => {
-    e.preventDefault()
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const { item } = await api('/api/tenant/menu-items', { method: 'POST', body: JSON.stringify(createForm) })
-      setItems([item, ...items])
-      setCreateForm({ categoryId: categories[0]?.id || '', name: '', price: 0, description: '', imageUrl: '', sortOrder: 0, isWeightBased: false, printLabelEnabled: false })
-    } catch (err) {
-      setFormError(err.message)
-    } finally {
-      setFormLoading(false)
-    }
+    window.addEventListener('menu_item_updated', handleMenuItemUpdated)
+    return () => window.removeEventListener('menu_item_updated', handleMenuItemUpdated)
+  }, [])
+
+  useEffect(() => {
+    const firstCategoryId = sortedCategories[0]?.id || ''
+    setCreateForm((prev) => (prev.categoryId ? prev : { ...prev, categoryId: firstCategoryId }))
+  }, [sortedCategories])
+
+  useEffect(() => {
+    if (!String(activeTab).startsWith('category:')) return
+    const activeCategoryId = String(activeTab).slice('category:'.length)
+    const exists = sortedCategories.some((category) => String(category.id) === activeCategoryId)
+    if (!exists) setActiveTab('all')
+  }, [activeTab, sortedCategories])
+
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      const settings = mergeProductSettings(item?.settings)
+      const category = sortedCategories.find((entry) => String(entry.id) === String(item.categoryId))
+      const activeCategoryId = String(activeTab).startsWith('category:') ? String(activeTab).slice('category:'.length) : ''
+      const matchesTab = activeTab === 'all'
+        ? true
+        : activeTab === 'favorites'
+          ? settings.isFavorite === true
+          : String(item.categoryId || '') === activeCategoryId
+      const matchesSearch = !searchText || `${item?.name || ''} ${category?.name || ''}`.toLocaleLowerCase('tr-TR').includes(searchText.toLocaleLowerCase('tr-TR'))
+      const matchesActive = activeFilter === 'all' ? true : activeFilter === 'true' ? item?.isActive !== false : item?.isActive === false
+      const branchIds = normalizeBranchIdList(item?.branchIds)
+      const matchesBranch = !branchFilter ? true : branchIds.length === 0 || branchIds.includes(String(branchFilter))
+      return matchesTab && matchesSearch && matchesActive && matchesBranch
+    })
+  }, [activeFilter, activeTab, branchFilter, items, searchText, sortedCategories])
+
+  const toggleSelected = (itemId) => {
+    setSelectedIds((prev) => prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId])
   }
 
-  const openEdit = (i) => {
-    setSelected(i)
-    setEditForm({ categoryId: i.categoryId, name: i.name, price: i.price, description: i.description || '', imageUrl: i.imageUrl || '', sortOrder: i.sortOrder, isActive: i.isActive, isWeightBased: !!i.isWeightBased, printLabelEnabled: i.printLabelEnabled === true })
-    setFormError('')
-    setEditOpen(true)
-  }
-  const onEdit = async (e) => {
-    e.preventDefault()
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const { item } = await api(`/api/tenant/menu-items/${selected.id}`, { method: 'PUT', body: JSON.stringify(editForm) })
-      setItems(items.map(it => it.id === item.id ? item : it))
-      setEditOpen(false)
-    } catch (err) {
-      setFormError(err.message)
-    } finally {
-      setFormLoading(false)
-    }
+  const buildUpdatedItem = (item, patch = {}, settingsPatch = {}) => {
+    const current = inflateProductForm({
+      ...item,
+      settings: {
+        ...mergeProductSettings(item?.settings),
+        ...settingsPatch
+      },
+      ...patch
+    })
+    return buildProductPayload(current)
   }
 
-  const onDelete = async (i) => {
-    try {
-      const result = await api(`/api/tenant/menu-items/${i.id}`, { method: 'DELETE' })
-      setItems(items.map(it => it.id === i.id ? { ...it, isActive: result.isActive } : it))
-    } catch (err) {
-      setError(err.message)
-    }
-  }
-
-  const catName = (id) => categories.find(c => c.id === id)?.name || ''
-
-  const getInlineDraft = (item) => {
-    const key = String(item?.id || '')
-    const draft = inlineDrafts[key] || {}
-    return {
-      price: draft.price ?? String(item?.price ?? ''),
-      isActive: draft.isActive ?? !!item?.isActive,
-      printLabelEnabled: draft.printLabelEnabled ?? (item?.printLabelEnabled === true)
-    }
-  }
-
-  const setInlineDraftValue = (itemId, patch) => {
-    const key = String(itemId || '')
-    setInlineDrafts(prev => ({
-      ...(prev || {}),
-      [key]: {
-        ...(prev?.[key] || {}),
-        ...patch
-      }
-    }))
-  }
-
-  const updateInlineItem = async (item, patch) => {
-    const itemId = String(item?.id || '')
-    if (!itemId) return
-    setInlineSaving(prev => ({ ...(prev || {}), [itemId]: true }))
+  const updateItem = async (item, patch = {}, settingsPatch = {}) => {
+    setSavingRowId(String(item.id))
     setError('')
     try {
-      const payload = {
-        categoryId: item.categoryId,
-        name: item.name,
-        price: patch.price ?? item.price,
-        isWeightBased: patch.isWeightBased ?? item.isWeightBased,
-        printLabelEnabled: patch.printLabelEnabled ?? item.printLabelEnabled,
-        description: item.description || '',
-        imageUrl: item.imageUrl || '',
-        sortOrder: item.sortOrder ?? 0,
-        isActive: patch.isActive ?? item.isActive
-      }
-      const { item: updated } = await api(`/api/tenant/menu-items/${itemId}`, {
+      const response = await api(`/api/tenant/menu-items/${item.id}`, {
         method: 'PUT',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(buildUpdatedItem(item, patch, settingsPatch)),
+        skipBranchHeader: true
       })
-      setItems(prev => prev.map(it => it.id === updated.id ? updated : it))
-      setInlineDrafts(prev => ({
-        ...(prev || {}),
-        [itemId]: {
-          price: String(updated.price ?? ''),
-          isActive: !!updated.isActive,
-          printLabelEnabled: updated.printLabelEnabled === true
-        }
-      }))
+      setItems((prev) => prev.map((row) => (String(row.id) === String(item.id) ? response.item : row)))
     } catch (err) {
       setError(err.message)
-      setInlineDrafts(prev => ({
-        ...(prev || {}),
-        [itemId]: {
-          price: String(item?.price ?? ''),
-          isActive: !!item?.isActive,
-          printLabelEnabled: item?.printLabelEnabled === true
-        }
-      }))
     } finally {
-      setInlineSaving(prev => ({ ...(prev || {}), [itemId]: false }))
+      setSavingRowId('')
     }
   }
 
-  const commitInlinePrice = async (item) => {
-    const draft = getInlineDraft(item)
-    const normalized = String(draft.price || '').replace(',', '.').trim()
-    const nextPrice = Number(normalized)
-    if (!Number.isFinite(nextPrice) || nextPrice < 0) {
-      setError('Fiyat 0 veya daha büyük bir sayı olmalı')
-      setInlineDraftValue(item.id, { price: String(item?.price ?? '') })
+  const createProduct = async (form) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      const response = await api('/api/tenant/menu-items', {
+        method: 'POST',
+        body: JSON.stringify(buildProductPayload(form)),
+        skipBranchHeader: true
+      })
+      const createdItem = response?.item || null
+      await loadData()
+      return createdItem
+    } catch (err) {
+      setError(err.message)
+      return null
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const createCategory = async () => {
+    if (!categoryName.trim()) {
+      setError('Kategori adı zorunlu.')
       return
     }
-    if (Number(nextPrice) === Number(item?.price ?? 0)) return
-    await updateInlineItem(item, { price: nextPrice })
+    setSubmitting(true)
+    setError('')
+    try {
+      await api('/api/tenant/categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: categoryName.trim(),
+          sortOrder: sortedCategories.length,
+          qrMenuVisible: true
+        }),
+        skipBranchHeader: true
+      })
+      setCategoryName('')
+      setCategoryOpen(false)
+      await loadData()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const toggleInlineStatus = async (item, nextIsActive) => {
-    setInlineDraftValue(item.id, { isActive: !!nextIsActive })
-    if (Boolean(item?.isActive) === Boolean(nextIsActive)) return
-    await updateInlineItem(item, { isActive: !!nextIsActive })
+  const saveCategoryOrder = async () => {
+    setSortSaving(true)
+    setError('')
+    try {
+      for (let index = 0; index < draftCategories.length; index += 1) {
+        const category = draftCategories[index]
+        await api(`/api/tenant/categories/${category.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: category.name,
+            sortOrder: index,
+            isActive: category.isActive !== false,
+            qrMenuVisible: category.qrMenuVisible !== false,
+            allBranches: Array.isArray(category.branchIds) ? category.branchIds.length === 0 : true,
+            branchIds: Array.isArray(category.branchIds) ? category.branchIds : []
+          }),
+          skipBranchHeader: true
+        })
+      }
+      setSortOpen(false)
+      await loadData()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSortSaving(false)
+    }
+  }
+
+  const saveCategoryDetail = async () => {
+    if (!categoryForm.id) return
+    if (!categoryForm.name.trim()) {
+      setError('Kategori adı zorunlu.')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      await api(`/api/tenant/categories/${categoryForm.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: categoryForm.name.trim(),
+          sortOrder: Number(categoryForm.sortOrder || 0),
+          isActive: categoryForm.isActive !== false,
+          qrMenuVisible: categoryForm.qrMenuVisible !== false,
+          allBranches: categoryForm.allBranches !== false,
+          branchIds: categoryForm.allBranches ? [] : (Array.isArray(categoryForm.branchIds) ? categoryForm.branchIds : [])
+        }),
+        skipBranchHeader: true
+      })
+      setCategoryEditorOpen(false)
+      setCategoryForm(createEmptyCategoryForm())
+      await loadData()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const deleteCategory = async () => {
+    if (!categoryDeleteTarget?.id) return
+    setCategoryDeleteLoading(true)
+    setError('')
+    try {
+      const result = await api(`/api/tenant/categories/${categoryDeleteTarget.id}`, { method: 'DELETE', skipBranchHeader: true })
+      setCategoryDeleteTarget(null)
+      setCategoryEditorOpen(false)
+      setCategoryForm(createEmptyCategoryForm())
+      if (activeTab === `category:${categoryDeleteTarget.id}`) setActiveTab('all')
+      toast.success(`Kategori silindi${Number(result?.deletedItemCount || 0) > 0 ? `, ${Number(result.deletedItemCount)} ürün de kaldırıldı` : ''}`)
+      await loadData()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCategoryDeleteLoading(false)
+    }
+  }
+
+  const onDownloadExcel = async (path, fallbackName) => {
+    setBulkBusy(true)
+    try {
+      const res = await fetchWithAuth(path)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.message || 'İndirme başarısız')
+      }
+      const filename = parseFilenameFromDisposition(res.headers.get('content-disposition')) || fallbackName
+      const blob = await res.blob()
+      downloadBlob(blob, filename)
+      toast.success('İndirme başladı')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const onUploadExcel = async (event) => {
+    event.preventDefault()
+    if (!bulkFile) {
+      toast.error('Lütfen bir dosya seçin')
+      return
+    }
+    setBulkBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', bulkFile)
+      const res = await fetchWithAuth('/api/settings/products/import', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.success === false) {
+        throw new Error(data.message || 'Yükleme başarısız')
+      }
+      setBulkResult(data)
+      setResultOpen(true)
+      setImportOpen(false)
+      setBulkFile(null)
+      await loadData()
+      toast.success('Excel içe aktarma tamamlandı')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const deleteItem = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    setError('')
+    try {
+      await api(`/api/tenant/menu-items/${deleteTarget.id}`, { method: 'DELETE', skipBranchHeader: true })
+      setDeleteTarget(null)
+      setItems((prev) => prev.filter((item) => String(item.id) !== String(deleteTarget.id)))
+      toast.success('Ürün kalıcı olarak silindi')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const openSortModal = () => {
+    setDraftCategories(sortedCategories.map((category) => ({ ...category })))
+    setSortOpen(true)
+  }
+
+  const openCategoryEditor = (category) => {
+    setCategoryForm(createEmptyCategoryForm(category))
+    setCategoryEditorOpen(true)
+  }
+
+  const deleteItemConfirmTitle = 'Ürünü Kalıcı Sil'
+  const deleteItemConfirmMessage = 'Bu ürün menüden tamamen silinecek. Geçmiş satış ve rapor kayıtlarındaki ürün adı korunur, ancak ürün kartının kendisi geri gelmez.'
+  const deleteItemConfirmText = 'Ürünü Sil'
+  const deleteCategoryConfirmTitle = 'Kategoriyi Kalıcı Sil'
+  const deleteCategoryConfirmMessage = `${categoryDeleteTarget?.name || 'Bu kategori'} kalıcı olarak silinecek.${Number(categoryDeleteTarget?.itemCount || 0) > 0 ? ` Altındaki ${Number(categoryDeleteTarget?.itemCount || 0)} ürün de birlikte silinecek.` : ''} Geçmiş sipariş ve raporlardaki isimler korunur. Emin misiniz?`
+
+  const renderProductCard = (item) => {
+    const settings = mergeProductSettings(item?.settings)
+    const isSaving = savingRowId === String(item.id)
+    const category = sortedCategories.find((entry) => String(entry.id) === String(item.categoryId))
+    const thumbText = String(item?.name || 'U').slice(0, 2).toUpperCase()
+    const actionItems = [
+      {
+        key: 'settings',
+        label: 'Ürün Ayarları',
+        onClick: () => navigate(`/kermes/settings/catalog/items/${item.id}`)
+      },
+      {
+        key: 'active',
+        label: item.isActive === false ? 'Aktif Yap' : 'Pasife Al',
+        onClick: () => updateItem(item, { isActive: item.isActive === false })
+      },
+      viewMode === 'list'
+        ? {
+            key: 'favorite',
+            label: settings.isFavorite ? 'Favoriden Çıkar' : 'Favori Yap',
+            onClick: () => updateItem(item, {}, { isFavorite: !settings.isFavorite })
+          }
+        : null,
+      viewMode === 'list'
+        ? {
+            key: 'qr',
+            label: settings.qrMenuVisible ? 'QR Menüyü Gizle' : 'QR Menüde Göster',
+            onClick: () => updateItem(item, {}, { qrMenuVisible: !settings.qrMenuVisible })
+          }
+        : null,
+      {
+        key: 'delete',
+        label: 'Sil',
+        danger: true,
+        onClick: () => setDeleteTarget(item)
+      }
+    ].filter(Boolean)
+
+    if (viewMode === 'card') {
+      return (
+        <article key={item.id} className="product-card product-card-grid">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+            <div className="product-card-meta-top">
+              {typeof category?.sortOrder === 'number' ? `#${category.sortOrder + 1}` : '#-'} Â· {category?.name || '-'}
+            </div>
+            <KebabMenu items={actionItems} />
+            <details className="product-kebab">
+              <summary>...</summary>
+              <div className="product-kebab-menu">
+                <button type="button" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+                <button type="button" onClick={() => updateItem(item, { isActive: item.isActive === false })}>{item.isActive === false ? 'Aktif Yap' : 'Pasife Al'}</button>
+                <button type="button" onClick={() => setDeleteTarget(item)} style={{ color: '#b42318' }}>Sil</button>
+              </div>
+            </details>
+          </div>
+          <div className="product-thumb product-thumb--card">
+            {item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : thumbText}
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div className="product-card-title">{item.name}</div>
+            <div className="product-card-meta">
+              {typeof category?.sortOrder === 'number' ? `Kategori ${category.sortOrder + 1}` : 'Kategori -'} Â· {category?.name || '-'}
+            </div>
+          </div>
+          <div className="product-card-stats">
+            <div className="product-chip product-money-chip" style={{ width: '100%' }}>{Number(item.price || 0).toFixed(2)} TL</div>
+            <div className="product-chip product-stock-chip" style={{ width: '100%' }}>Stok: {Number(settings.stockQty || 0)}</div>
+          </div>
+          <button className="product-dark-btn product-card-settings-btn" type="button" disabled={isSaving} onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+        </article>
+      )
+    }
+
+    return (
+      <article key={item.id} className="product-card">
+        <div className="product-list-row-wrap scrollbar-hidden">
+          <div className="product-card-list">
+            <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} />
+            <div className="product-thumb">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : thumbText}</div>
+            <div className="product-name-cell">
+              <div className="product-name-text">{item.name}</div>
+              <div className="product-name-subtext">{category?.name || '-'}</div>
+            </div>
+            <div className="product-chip">{category?.name || '-'}</div>
+            <div className="product-chip product-money-chip">{Number(item.price || 0).toFixed(2)} TL</div>
+            <div className="product-chip product-stock-chip">{Number(settings.stockQty || 0)}</div>
+            <div className="product-toggle-cell">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Toggle checked={item.isActive !== false} disabled={isExpired || isSaving} onChange={(checked) => updateItem(item, { isActive: checked })} />
+                <span className="product-toggle-label">Aktif</span>
+              </div>
+            </div>
+            <div className="product-toggle-cell">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Toggle checked={!!settings.qrMenuVisible} disabled={isExpired || isSaving} onChange={(checked) => updateItem(item, {}, { qrMenuVisible: checked })} />
+                <span className="product-toggle-label">QR Menü</span>
+              </div>
+            </div>
+            <div className="product-row-actions">
+              <button type="button" className="product-dark-btn" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+            </div>
+            <KebabMenu items={actionItems} />
+            <details className="product-kebab">
+              <summary>...</summary>
+              <div className="product-kebab-menu">
+                <button type="button" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+                <button type="button" onClick={() => updateItem(item, { isActive: item.isActive === false })}>{item.isActive === false ? 'Aktif Yap' : 'Pasife Al'}</button>
+                <button type="button" onClick={() => updateItem(item, {}, { isFavorite: !settings.isFavorite })}>{settings.isFavorite ? 'Favoriden Çıkar' : 'Favori Yap'}</button>
+                <button type="button" onClick={() => updateItem(item, {}, { qrMenuVisible: !settings.qrMenuVisible })}>{settings.qrMenuVisible ? 'QR Menüyü Gizle' : 'QR Menüde Göster'}</button>
+                <button type="button" onClick={() => setDeleteTarget(item)} style={{ color: '#b42318' }}>Sil</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </article>
+    )
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>Ürünler</h3>
-        <button className="btn" onClick={openCreate} disabled={isExpired} title={isExpired ? 'Paket süreniz doldu. Plan yükseltin.' : undefined}>Yeni Ürün</button>
+    <div className="page-scroll-area scrollbar-hidden">
+      <ProductCatalogStyles />
+      <div className="product-catalog-page">
+        <div className="product-shell">
+          <section className="product-panel">
+            <div className="product-header-stack">
+              <div className="product-page-heading">
+                <h1 className="product-page-title">Ürün & Kategori</h1>
+                <div className="product-page-subtitle">Ürün, kategori, görünüm ve sıralama ayarları</div>
+              </div>
+              <div className="product-header-controls">
+                <div className="product-toolbar-field product-toolbar-search">
+                  <input
+                    className="product-input"
+                    placeholder="Ürün veya kategori ara"
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                  />
+                </div>
+                <div className="product-toolbar-field product-toolbar-status">
+                  <select className="product-select" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value)}>
+                    <option value="all">Tümü</option>
+                    <option value="true">Aktif</option>
+                    <option value="false">Pasif</option>
+                  </select>
+                </div>
+                <div className="product-toolbar-field product-toolbar-branch">
+                  <select className="product-select" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)}>
+                    <option value="">Tüm Şubeler</option>
+                    {branches.map((branch) => <option key={branch._id || branch.id} value={branch._id || branch.id}>{branch.name}</option>)}
+                  </select>
+                </div>
+                <button type="button" className="product-dark-btn product-header-back-btn" onClick={() => navigate('/kermes/settings')}>← Ayarlara Dön</button>
+              </div>
+              <HorizontalScrollStrip className="product-toolbar product-toolbar-scroll scrollbar-hidden">
+                <button type="button" className="product-action-btn" disabled={isExpired} onClick={() => setCreateOpen(true)}>+ Yeni Ürün Ekle</button>
+                <button type="button" className="product-secondary-btn" onClick={() => setCategoryOpen(true)}>+ Yeni Kategori Ekle</button>
+                <button type="button" className="product-secondary-btn" disabled={bulkBusy} onClick={() => setImportOpen(true)}>Excel ile Ürün Yükle</button>
+                <button type="button" className="product-secondary-btn" disabled={bulkBusy} onClick={() => onDownloadExcel('/api/settings/products/template?format=xlsx', 'products_template.xlsx')}>Örnek Excel İndir</button>
+                <button type="button" className="product-secondary-btn" disabled={bulkBusy} onClick={() => onDownloadExcel('/api/settings/products/export?format=xlsx', 'products_export.xlsx')}>Mevcut Ürünleri İndir</button>
+                <button type="button" className={`product-pill-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}>Liste Görünümü</button>
+                <button type="button" className={`product-pill-btn ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')}>Kart Görünümü</button>
+                <button type="button" className="product-secondary-btn" onClick={openSortModal}>Sıralamayı Düzenle</button>
+                <div className="product-chip product-toolbar-badge">Seçili: {selectedIds.length}</div>
+              </HorizontalScrollStrip>
+            </div>
+          </section>
+
+          <section className="product-panel">
+            <HorizontalScrollStrip className="product-category-bar scrollbar-hidden">
+              {categoryTabs.map((tab) => (
+                <div key={tab.key} className={`product-category-pill ${activeTab === tab.key ? 'active' : ''}`}>
+                  <button type="button" className="product-category-pill-trigger" onClick={() => setActiveTab(tab.key)}>
+                    <span className="product-category-pill-name">{tab.label}</span>
+                  </button>
+                  {!tab.special ? (
+                    <button
+                      type="button"
+                      className="product-category-edit-btn"
+                      aria-label={`${tab.label} kategorisini düzenle`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        openCategoryEditor(tab.category)
+                      }}
+                    >
+                      <PencilIcon />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </HorizontalScrollStrip>
+          </section>
+
+          {error ? <div className="product-panel" style={{ color: '#b42318', fontWeight: 900 }}>{error}</div> : null}
+          {loading ? <div className="product-panel">Yükleniyor...</div> : null}
+          {!loading && visibleItems.length === 0 ? <div className="product-panel">Filtreye uygun ürün bulunamadı.</div> : null}
+          {!loading && visibleItems.length > 0 ? (
+            <section className={viewMode === 'list' ? 'product-list' : 'product-grid'}>
+              {visibleItems.map(renderProductCard)}
+            </section>
+          ) : null}
+        </div>
       </div>
-      <form onSubmit={onSearch} className="desktop-only" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <select className="input" style={{ width: 200 }} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">Tüm Kategoriler</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input className="input" placeholder="Ara" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input" style={{ width: 160 }} value={active} onChange={(e) => setActive(e.target.value)}>
-          <option value="all">Tümü</option>
-          <option value="true">Aktif</option>
-          <option value="false">Pasif</option>
-        </select>
-        <button className="btn">Ara</button>
-      </form>
 
-      <form onSubmit={onSearch} className="mobile-only mobile-filters" style={{ marginBottom: 12 }}>
-        <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">Tüm Kategoriler</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select className="input" value={active} onChange={(e) => setActive(e.target.value)}>
-          <option value="all">Tümü</option>
-          <option value="true">Aktif</option>
-          <option value="false">Pasif</option>
-        </select>
-        <input className="input" placeholder="Ara" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn">Ara</button>
-      </form>
-      {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      {loading ? 'Yükleniyor...' : (
-        items.length === 0 ? (
-          <div>Henüz ürün yok. “Yeni Ürün” ile ekleyin.</div>
-        ) : (
-          <>
-            <div className="desktop-only">
-              <table className="table">
-                <thead>
-                  <tr><th>Ürün</th><th>Kategori</th><th>Fiyat</th><th>Durum</th><th className="actions" style={{ width: 300 }}>Aksiyon</th></tr>
-                </thead>
-                <tbody>
-                  {items.map(i => {
-                    const categoryLabel = catName(i.categoryId)
-                    const draft = getInlineDraft(i)
-                    const isSaving = !!inlineSaving[String(i.id)]
-                    return (
-                      <tr key={i.id}>
-                        <td>{i.name}</td>
-                        <td>{categoryLabel}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <input
-                              className="input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              style={{ width: 120 }}
-                              value={draft.price}
-                              onChange={(e) => setInlineDraftValue(i.id, { price: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  commitInlinePrice(i)
-                                  e.currentTarget.blur()
-                                }
-                              }}
-                              onBlur={() => commitInlinePrice(i)}
-                              disabled={isExpired || isSaving}
-                            />
-                            <span>TL</span>
-                          </div>
-                        </td>
-                        <td>
-                          <select
-                            className="input"
-                            style={{ width: 120 }}
-                            value={draft.isActive ? 'true' : 'false'}
-                            onChange={(e) => toggleInlineStatus(i, e.target.value === 'true')}
-                            disabled={isExpired || isSaving}
-                          >
-                            <option value="true">Aktif</option>
-                            <option value="false">Pasif</option>
-                          </select>
-                        </td>
-                        <td className="actions">
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn" onClick={() => openEdit(i)}>Düzenle</button>
-                            <button className="btn" onClick={() => onDelete(i)}>Sil</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mobile-only settings-mobile">
-              {(items || []).map(i => {
-                const categoryLabel = catName(i.categoryId)
-                const draft = getInlineDraft(i)
-                const isSaving = !!inlineSaving[String(i.id)]
-                return (
-                  <div key={i.id} className="mobile-list-item">
-                    <div className="mobile-item-title breakAny">{i.name}</div>
-                    <div className="mobile-item-meta">
-                      <span className="breakAny">Kategori: {categoryLabel}</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        Fiyat:
-                        <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          style={{ width: 110 }}
-                          value={draft.price}
-                          onChange={(e) => setInlineDraftValue(i.id, { price: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              commitInlinePrice(i)
-                              e.currentTarget.blur()
-                            }
-                          }}
-                          onBlur={() => commitInlinePrice(i)}
-                          disabled={isExpired || isSaving}
-                        />
-                        TL
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        Durum:
-                        <select
-                          className="input"
-                          style={{ width: 110 }}
-                          value={draft.isActive ? 'true' : 'false'}
-                          onChange={(e) => toggleInlineStatus(i, e.target.value === 'true')}
-                          disabled={isExpired || isSaving}
-                        >
-                          <option value="true">Aktif</option>
-                          <option value="false">Pasif</option>
-                        </select>
-                      </span>
-                      {isSaving && <span>Kaydediliyor...</span>}
-                    </div>
-                    <div className="mobile-actions-row">
-                      <button className="btn" type="button" onClick={() => openEdit(i)}>Düzenle</button>
-                      <button className="btn" type="button" onClick={() => onDelete(i)}>Sil</button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )
-      )}
-
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Ürün">
-        <form onSubmit={onCreate} style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori</div>
-            <select className="input" value={createForm.categoryId} onChange={(e) => setCreateForm({ ...createForm, categoryId: e.target.value })}>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Ürün Ekle" dialogStyle={{ maxWidth: 900 }}>
+        <div className="product-form-grid cols-2">
+          <Field label="Ürün Adı"><input className="product-input" value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} /></Field>
+          <Field label="Kategori">
+            <select className="product-select" value={createForm.categoryId} onChange={(event) => setCreateForm({ ...createForm, categoryId: event.target.value })}>
+              <option value="">Kategori seçin</option>
+              {sortedCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
-            <input className="input" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiyat (TL)</div>
-            <input className="input" type="number" value={createForm.price} onChange={(e) => setCreateForm({ ...createForm, price: Number(e.target.value) })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
-            <textarea className="input" rows="3" value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel URL</div>
-            <input className="input" value={createForm.imageUrl} onChange={(e) => setCreateForm({ ...createForm, imageUrl: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sort</div>
-            <input className="input" type="number" value={createForm.sortOrder} onChange={(e) => setCreateForm({ ...createForm, sortOrder: Number(e.target.value) })} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={!!createForm.isWeightBased} onChange={(e) => setCreateForm({ ...createForm, isWeightBased: e.target.checked })} />
-            Kg ile satış
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={!!createForm.printLabelEnabled} onChange={(e) => setCreateForm({ ...createForm, printLabelEnabled: e.target.checked })} />
-            Etiket yazicisinda ciksin
-          </label>
-          {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="btn" onClick={onCreateKeepOpen} disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Ekle'}</button>
-            <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet & Kapat'}</button>
+          </Field>
+          <Field label="Ürün Fiyatı"><input className="product-input" type="number" min="0" step="0.01" value={createForm.price} onChange={(event) => setCreateForm({ ...createForm, price: event.target.value })} /></Field>
+          <Field label="Görsel URL"><input className="product-input" value={createForm.imageUrl} onChange={(event) => setCreateForm({ ...createForm, imageUrl: event.target.value })} /></Field>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Field label="Açıklama"><textarea className="product-textarea" value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} /></Field>
+          </div>
+          <ToggleCard title="Aktif" description="Satış ekranlarında görünsün." checked={!!createForm.isActive} onChange={(checked) => setCreateForm({ ...createForm, isActive: checked })} />
+          <ToggleCard title="Favori" description="Hızlı erişimde görünsün." checked={!!createForm.isFavorite} onChange={(checked) => setCreateForm({ ...createForm, isFavorite: checked })} />
+          <ToggleCard title="QR Menü" description="Dijital menüde görünsün." checked={!!createForm.qrMenuVisible} onChange={(checked) => setCreateForm({ ...createForm, qrMenuVisible: checked })} />
+          <div style={{ gridColumn: '1 / -1' }}>
+            <BranchAccessField
+              label="Şube Görünürlüğü"
+              hint="Şube seçmezseniz ürün tüm şubelerde kullanılır."
+              branches={branches}
+              value={createForm.visibility}
+              onChange={(visibility) => setCreateForm({ ...createForm, visibility })}
+              allLabel="Tüm Şubelerde Geçerli"
+            />
+          </div>
+        </div>
+        <div className="product-modal-footer-row">
+          <button type="button" className="product-secondary-btn" onClick={() => setCreateOpen(false)}>İptal</button>
+          <button type="button" className="product-dark-btn" disabled={submitting} onClick={async () => {
+            const createdItem = await createProduct(createForm)
+            if (!createdItem?.id) return
+            setCreateOpen(false)
+            setCreateForm(createEmptyProductForm(sortedCategories[0]?.id || ''))
+            navigate(`/kermes/settings/catalog/items/${createdItem.id}`)
+          }}>{submitting ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        </div>
+      </Modal>
+
+      <Modal open={categoryOpen} onClose={() => setCategoryOpen(false)} title="Yeni Kategori Ekle" dialogStyle={{ maxWidth: 520 }}>
+        <div className="product-form-grid">
+          <Field label="Kategori Adı"><input className="product-input" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} /></Field>
+        </div>
+        <div className="product-modal-footer-row">
+          <button type="button" className="product-secondary-btn" onClick={() => setCategoryOpen(false)}>İptal</button>
+          <button type="button" className="product-dark-btn" disabled={submitting} onClick={createCategory}>{submitting ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        </div>
+      </Modal>
+
+      <Modal open={categoryEditorOpen} onClose={() => setCategoryEditorOpen(false)} title="Kategori Düzenle" dialogStyle={{ maxWidth: 560 }}>
+        <div className="product-form-grid cols-2">
+          <Field label="Kategori Adı">
+            <input
+              className="product-input"
+              value={categoryForm.name}
+              onChange={(event) => setCategoryForm((prev) => ({ ...prev, name: event.target.value }))}
+            />
+          </Field>
+          <Field label="Sıra Numarası">
+            <input
+              className="product-input"
+              type="number"
+              min="0"
+              step="1"
+              value={categoryForm.sortOrder}
+              onChange={(event) => setCategoryForm((prev) => ({ ...prev, sortOrder: event.target.value }))}
+            />
+          </Field>
+          <ToggleCard
+            title="Aktif"
+            description="Kategori satış ekranında filtre olarak görünsün."
+            checked={!!categoryForm.isActive}
+            onChange={(checked) => setCategoryForm((prev) => ({ ...prev, isActive: checked }))}
+          />
+          <ToggleCard
+            title="QR Menüde Göster"
+            description="Kategori dijital menüde yayınlansın veya gizlensin."
+            checked={!!categoryForm.qrMenuVisible}
+            onChange={(checked) => setCategoryForm((prev) => ({ ...prev, qrMenuVisible: checked }))}
+          />
+        </div>
+        <div className="product-modal-footer-row">
+          <button
+            type="button"
+            className="product-secondary-btn"
+            style={{ marginRight: 'auto', color: '#b42318', borderColor: '#fecaca', background: '#fff5f5' }}
+            disabled={!categoryForm.id || submitting}
+            onClick={() => setCategoryDeleteTarget({
+              id: categoryForm.id,
+              name: categoryForm.name,
+              itemCount: items.filter((item) => String(item.categoryId || '') === String(categoryForm.id)).length
+            })}
+          >
+            Sil
+          </button>
+          <button type="button" className="product-secondary-btn" onClick={() => setCategoryEditorOpen(false)}>İptal</button>
+          <button type="button" className="product-dark-btn" disabled={submitting} onClick={saveCategoryDetail}>{submitting ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        </div>
+      </Modal>
+
+      <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Excel ile Ürün Yükle" dialogStyle={{ maxWidth: 620 }}>
+        <form onSubmit={onUploadExcel} className="product-form-grid">
+          <div style={{ fontSize: 13, color: 'var(--app-text)', fontWeight: 700 }}>
+            Desteklenen format: `.xlsx` veya `.csv`. Eski toplu ürün endpointi kullanılır.
+          </div>
+          <input
+            className="product-input"
+            type="file"
+            accept=".xlsx,.csv"
+            onChange={(event) => setBulkFile(event.target.files?.[0] || null)}
+          />
+          <div className="product-modal-footer-row">
+            <button type="button" className="product-secondary-btn" onClick={() => setImportOpen(false)}>İptal</button>
+            <button type="submit" className="product-dark-btn" disabled={bulkBusy}>{bulkBusy ? 'Yükleniyor...' : 'Yükle'}</button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Ürün Düzenle">
-        <form onSubmit={onEdit} style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori</div>
-            <select className="input" value={editForm.categoryId} onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value })}>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
-            <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiyat (TL)</div>
-            <input className="input" type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
-            <textarea className="input" rows="3" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel URL</div>
-            <input className="input" value={editForm.imageUrl} onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sort</div>
-            <input className="input" type="number" value={editForm.sortOrder} onChange={(e) => setEditForm({ ...editForm, sortOrder: Number(e.target.value) })} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={!!editForm.isWeightBased} onChange={(e) => setEditForm({ ...editForm, isWeightBased: e.target.checked })} />
-            Kg ile satış
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
-            Aktif
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={!!editForm.printLabelEnabled} onChange={(e) => setEditForm({ ...editForm, printLabelEnabled: e.target.checked })} />
-            Etiket yazicisinda ciksin
-          </label>
-          {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>
-        </form>
+      <Modal open={resultOpen} onClose={() => setResultOpen(false)} title="Excel İşlem Sonucu" dialogStyle={{ maxWidth: 880 }}>
+        <div className="product-form-grid">
+          <div className="product-inline-table-row" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+            <div><div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 900 }}>Toplam Satır</div><div style={{ marginTop: 6, fontWeight: 900 }}>{bulkResult?.totalRows ?? 0}</div></div>
+            <div><div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 900 }}>Eklenen</div><div style={{ marginTop: 6, fontWeight: 900, color: '#16a34a' }}>{bulkResult?.created ?? 0}</div></div>
+            <div><div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 900 }}>Güncellenen</div><div style={{ marginTop: 6, fontWeight: 900 }}>{bulkResult?.updated ?? 0}</div></div>
+            <div><div style={{ fontSize: 12, color: 'var(--app-text-muted)', fontWeight: 900 }}>Hatalı</div><div style={{ marginTop: 6, fontWeight: 900, color: importErrors.length ? '#dc2626' : 'var(--app-text)' }}>{bulkResult?.failed ?? importErrors.length}</div></div>
+          </div>
+          {importErrors.length > 0 ? (
+            <div className="product-inline-table">
+              {importErrors.slice(0, 100).map((entry, index) => (
+                <div key={`${entry.row}-${index}`} className="product-inline-table-row" style={{ gridTemplateColumns: '90px 140px 1fr' }}>
+                  <div><strong>Satır</strong><div>{entry.row}</div></div>
+                  <div><strong>Alan</strong><div>{entry.field}</div></div>
+                  <div><strong>Mesaj</strong><div>{entry.message}</div></div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </Modal>
+
+      <CategorySortModal
+        open={sortOpen}
+        categories={sortedCategories}
+        draftCategories={draftCategories}
+        setDraftCategories={setDraftCategories}
+        saving={sortSaving}
+        onClose={() => setSortOpen(false)}
+        onSave={saveCategoryOrder}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        loading={deleteLoading}
+        title={deleteItemConfirmTitle}
+        message={deleteItemConfirmMessage}
+        confirmText={deleteItemConfirmText}
+        onConfirm={deleteItem}
+        onClose={() => {
+          if (deleteLoading) return
+          setDeleteTarget(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!categoryDeleteTarget}
+        loading={categoryDeleteLoading}
+        title={deleteCategoryConfirmTitle}
+        message={deleteCategoryConfirmMessage}
+        onConfirm={deleteCategory}
+        onClose={() => {
+          if (categoryDeleteLoading) return
+          setCategoryDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }

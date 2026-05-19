@@ -195,7 +195,7 @@ export const downloadTemplate = async (req, res, next) => {
     ]
 
     const headersTr = trHeadersFor(TEMPLATE_HEADERS)
-    const rows = canonicalRows.map(r => trRowFor(r, TEMPLATE_HEADERS))
+    const rows = canonicalRows.map((r) => trRowFor(r, TEMPLATE_HEADERS))
 
     const baseName = 'canteen_products_template'
     if (format === 'csv') {
@@ -224,7 +224,7 @@ export const exportProducts = async (req, res, next) => {
     const branchId = req.canteenBranchId
 
     const categories = await CanteenCategory.find({ tenantId, branchId, isActive: true }).select('_id name').lean()
-    const catNameById = new Map((categories || []).map(c => [String(c._id), c.name]))
+    const catNameById = new Map((categories || []).map((c) => [String(c._id), c.name]))
 
     const items = await CanteenProduct.find({ tenantId, branchId, isActive: true }).sort({ createdAt: -1 }).lean()
     const canonicalRows = (items || []).map((p) => {
@@ -242,7 +242,7 @@ export const exportProducts = async (req, res, next) => {
     })
 
     const headersTr = trHeadersFor(TEMPLATE_HEADERS)
-    const rows = canonicalRows.map(r => trRowFor(r, TEMPLATE_HEADERS))
+    const rows = canonicalRows.map((r) => trRowFor(r, TEMPLATE_HEADERS))
 
     const baseName = `canteen_products_export_${filenameStamp()}`
     if (format === 'csv') {
@@ -289,7 +289,7 @@ export const importProducts = async (req, res, next) => {
     if (dataRows.length > maxRows) return next(error('too_many_rows', `Maksimum satır sayısı: ${maxRows}`, 400))
 
     const categories = await CanteenCategory.find({ tenantId, branchId, isActive: true }).select('_id name nameNormalized').lean()
-    const catById = new Map((categories || []).map(c => [String(c._id), c]))
+    const catById = new Map((categories || []).map((c) => [String(c._id), c]))
     const catByKey = new Map()
     for (const c of (categories || [])) {
       const k1 = normalizeCategoryKey(c.name)
@@ -312,7 +312,7 @@ export const importProducts = async (req, res, next) => {
       if (catByKey.has(key)) existingRequestedKeys.add(key)
     }
 
-    const missingKeys = Array.from(requestedKeyToDisplay.keys()).filter(k => !catByKey.has(k))
+    const missingKeys = Array.from(requestedKeyToDisplay.keys()).filter((k) => !catByKey.has(k))
     if (missingKeys.length > 0) {
       for (const key of missingKeys) {
         const name = requestedKeyToDisplay.get(key) || key
@@ -346,7 +346,7 @@ export const importProducts = async (req, res, next) => {
       }
     }
 
-    const createdCategories = missingKeys.filter(k => catByKey.has(k)).length
+    const createdCategories = missingKeys.filter((k) => catByKey.has(k)).length
     const matchedCategories = existingRequestedKeys.size
 
     const errors = []
@@ -426,7 +426,7 @@ export const importProducts = async (req, res, next) => {
         stockTrackingEnabled,
         stockQty: stockQty === null ? 0 : stockQty,
         categoryProvided,
-        categoryId: resolvedCategoryId,
+        categoryId: resolvedCategoryId
       })
     }
 
@@ -434,9 +434,9 @@ export const importProducts = async (req, res, next) => {
       return res.json({ success: true, totalRows: dataRows.length, created: 0, updated: 0, failed: errors.length, errors, createdCategories, matchedCategories, missingCategoryRows })
     }
 
-    const barcodes = valid.map(v => v.barcode)
+    const barcodes = valid.map((v) => v.barcode)
     const existing = await CanteenProduct.find({ tenantId, barcode: { $in: barcodes } }).select('barcode branchId').lean()
-    const existingByBarcode = new Map((existing || []).map(p => [String(p.barcode || ''), p]))
+    const existingByBarcode = new Map((existing || []).map((p) => [String(p.barcode || ''), p]))
 
     const filteredValid = []
     for (const v of valid) {
@@ -452,8 +452,8 @@ export const importProducts = async (req, res, next) => {
       return res.json({ success: true, totalRows: dataRows.length, created: 0, updated: 0, failed: errors.length, errors, createdCategories, matchedCategories, missingCategoryRows })
     }
 
-    const existingInBranch = new Set((existing || []).filter(p => String(p.branchId) === String(branchId)).map(p => String(p.barcode || '')))
-    const created = filteredValid.filter(v => !existingInBranch.has(v.barcode)).length
+    const existingInBranch = new Set((existing || []).filter((p) => String(p.branchId) === String(branchId)).map((p) => String(p.barcode || '')))
+    const created = filteredValid.filter((v) => !existingInBranch.has(v.barcode)).length
     const updated = filteredValid.length - created
 
     const ops = filteredValid.map((v) => {

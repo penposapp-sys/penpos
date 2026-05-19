@@ -1,4 +1,37 @@
 export const THEME_STORAGE_KEY = 'penpos-theme-key'
+export const DARK_MODE_STORAGE_KEY = 'penpos-dark-mode'
+
+export function resolveThemeScope(pathname = '') {
+  const path = String(pathname || '').toLowerCase()
+  if (
+    path.startsWith('/platform') ||
+    path.startsWith('/platform-login') ||
+    path.startsWith('/login/platform')
+  ) {
+    return 'platform'
+  }
+  if (
+    path.startsWith('/canteen') ||
+    path.startsWith('/login/kantin')
+  ) {
+    return 'canteen'
+  }
+  if (
+    path.startsWith('/kermes') ||
+    path.startsWith('/login/restoran')
+  ) {
+    return 'kermes'
+  }
+  return 'public'
+}
+
+export function getScopedThemeStorageKey(scope = 'public') {
+  return `${THEME_STORAGE_KEY}:${scope}`
+}
+
+export function getScopedDarkModeStorageKey(scope = 'public') {
+  return `${DARK_MODE_STORAGE_KEY}:${scope}`
+}
 
 export const themes = {
   default: {
@@ -108,17 +141,17 @@ export const themes = {
   },
   indigo: {
     name: 'Indigo Night',
-    accent: '#4f46e5',
-    accentHover: '#4338ca',
-    accentSoft: '#e0e7ff',
-    accentText: '#4338ca',
-    sidebar: 'linear-gradient(180deg, #0f172a 0%, #312e81 48%, #111827 100%)',
-    topbar: 'linear-gradient(90deg, #ffffff 0%, #eef2ff 50%, #ffffff 100%)',
-    activeGlow: '0 18px 45px rgba(79, 70, 229, 0.24)',
-    gradient: 'linear-gradient(90deg, #4f46e5 0%, #0ea5e9 100%)',
-    chart: '#4f46e5',
+    accent: '#6f6457',
+    accentHover: '#5c5248',
+    accentSoft: '#eee7dd',
+    accentText: '#5c5248',
+    sidebar: 'linear-gradient(180deg, #1c1a18 0%, #2a2622 48%, #151311 100%)',
+    topbar: 'linear-gradient(90deg, #ffffff 0%, #f4eee6 50%, #ffffff 100%)',
+    activeGlow: '0 18px 45px rgba(79, 65, 54, 0.2)',
+    gradient: 'linear-gradient(90deg, #6f6457 0%, #968878 100%)',
+    chart: '#6f6457',
     card: '#ffffff',
-    border: '#c7d2fe',
+    border: '#dfd5c9',
     text: '#0f172a'
   },
   mono: {

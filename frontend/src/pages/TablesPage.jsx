@@ -6,6 +6,8 @@ import { api } from '../lib/apiClient.js'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { toast } from '../lib/toast.js'
 
+const OPEN_TABLES_CATEGORY = 'Acik Masalar'
+
 const inferTableCategory = (table) => {
   const raw = String(table?.name || '').trim()
   if (!raw) return 'Diğer'
@@ -29,6 +31,15 @@ const getElapsedMinutes = (value, nowTs) => {
   const createdAtTs = date.getTime()
   if (!Number.isFinite(createdAtTs)) return null
   return Math.max(0, Math.floor((nowTs - createdAtTs) / 60000))
+}
+
+const getTableActivityTimestamp = (table, activeByTable, paidByTable) => {
+  const active = activeByTable?.[table?.id] || {}
+  const paid = paidByTable?.[table?.id] || {}
+  const raw = paid?.createdAt || active?.createdAt || table?.updatedAt || table?.createdAt || null
+  if (!raw) return 0
+  const ts = new Date(raw).getTime()
+  return Number.isFinite(ts) ? ts : 0
 }
 
 const getBorderColor = (active, paid, elapsedMinutes) => {
@@ -167,15 +178,35 @@ export function TablesManagementContent({ embedded = false }) {
   }, [])
 
   const groupedTables = useMemo(() => {
-    return tables.reduce((acc, table) => {
+    const baseGroups = tables.reduce((acc, table) => {
       const category = inferTableCategory(table)
       if (!acc[category]) acc[category] = []
       acc[category].push(table)
       return acc
     }, {})
-  }, [tables])
 
-  const categories = useMemo(() => Object.keys(groupedTables), [groupedTables])
+    const openTables = tables
+      .filter((table) => activeByTable?.[table?.id]?.hasActive)
+      .sort((a, b) => getTableActivityTimestamp(a, activeByTable, paidByTable) - getTableActivityTimestamp(b, activeByTable, paidByTable))
+
+    if (openTables.length > 0) {
+      return {
+        [OPEN_TABLES_CATEGORY]: openTables,
+        ...baseGroups
+      }
+    }
+
+    return baseGroups
+  }, [tables, activeByTable, paidByTable])
+
+  const categories = useMemo(() => {
+    const baseCategories = Object.keys(groupedTables)
+    if (!baseCategories.includes(OPEN_TABLES_CATEGORY)) return baseCategories
+    return [
+      OPEN_TABLES_CATEGORY,
+      ...baseCategories.filter((category) => category !== OPEN_TABLES_CATEGORY)
+    ]
+  }, [groupedTables])
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -183,7 +214,7 @@ export function TablesManagementContent({ embedded = false }) {
       return
     }
     if (!activeCategory || !categories.includes(activeCategory)) {
-      setActiveCategory(categories[0])
+      setActiveCategory(categories.includes(OPEN_TABLES_CATEGORY) ? OPEN_TABLES_CATEGORY : categories[0])
     }
   }, [activeCategory, categories])
 
@@ -300,10 +331,10 @@ export function TablesManagementContent({ embedded = false }) {
               onClick={() => setActiveCategory(category)}
               style={{
                 fontWeight: activeCategory === category ? 800 : 700,
-                borderColor: activeCategory === category ? '#111827' : '#d1d5db',
-                background: activeCategory === category ? '#eef2ff' : '#ffffff',
-                color: '#111827',
-                boxShadow: activeCategory === category ? '0 6px 16px rgba(15, 23, 42, 0.10)' : '0 2px 8px rgba(15, 23, 42, 0.06)',
+                borderColor: activeCategory === category ? 'var(--theme-accent, #111827)' : 'var(--app-border, var(--border))',
+                background: activeCategory === category ? 'var(--theme-accent, #111827)' : 'var(--app-surface, var(--panel))',
+                color: activeCategory === category ? '#ffffff' : 'var(--app-text, var(--text))',
+                boxShadow: activeCategory === category ? '0 6px 16px rgba(15, 23, 42, 0.22)' : 'var(--card-shadow)',
                 borderWidth: 1.5,
                 borderStyle: 'solid',
                 borderRadius: 14,
@@ -339,7 +370,7 @@ export function TablesManagementContent({ embedded = false }) {
                 borderWidth: 1.5,
                 boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
                 borderRadius: 18,
-                background: '#ffffff',
+                background: 'var(--app-surface, var(--panel))',
                 padding: 16,
                 minHeight: 118,
                 display: 'grid',

@@ -99,7 +99,7 @@ export default function BranchSelectorModal() {
           <div style={{ color: 'var(--muted)' }}>{user?.role === 'staff' ? 'Şube yetkiniz yok' : 'Şube bulunamadı. Önce şube oluşturun.'}</div>
         )}
 
-        <div style={{ display: 'grid', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+        <div style={{ display: 'grid', gap: 8 }}>
           {branches.map(b => (
             <button
               key={b._id || b.id}

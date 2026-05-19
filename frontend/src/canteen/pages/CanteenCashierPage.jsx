@@ -3,13 +3,28 @@ import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
 import { useTheme } from '../../theme/ThemeContext.jsx'
+import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
+import { Barcode, Search } from 'lucide-react'
+
+const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
+const CASHIER_CART_STORAGE_KEY = 'canteen_cashier_cart_v1'
 
 const money = (n) => {
   const v = Number(n || 0)
   return v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const roundMoney = (n) => Number(Number(n || 0).toFixed(2))
+
 const normalize = (s) => String(s || '').toLowerCase().trim()
+const normalizePaymentType = (method = {}) => {
+  const type = String(method?.type || method?.bucket || method?.methodType || '').trim().toLowerCase()
+  if (type === 'credit' || type === 'account') return 'account'
+  if (type === 'card' || type === 'pos') return 'pos'
+  if (type === 'bank') return 'bank'
+  if (type === 'cash') return 'cash'
+  return 'other'
+}
 
 export default function CanteenCashierPage() {
   const { me, session } = useOutletContext()
@@ -17,12 +32,16 @@ export default function CanteenCashierPage() {
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [q, setQ] = useState('')
+  const [activeCategoryId, setActiveCategoryId] = useState('')
   const [barcode, setBarcode] = useState('')
   const [cart, setCart] = useState([])
   const [payMethod, setPayMethod] = useState('cash')
+  const [paymentMethods, setPaymentMethods] = useState([])
   const [payNote, setPayNote] = useState('')
   const [saleNote, setSaleNote] = useState('')
   const [payAccordionOpen, setPayAccordionOpen] = useState(false)
+  const [discountOpen, setDiscountOpen] = useState(false)
+  const [discountDraft, setDiscountDraft] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState('')
   const [customers, setCustomers] = useState([])
@@ -37,6 +56,7 @@ export default function CanteenCashierPage() {
 
   const customerAbortRef = useRef(null)
   const lastCustomerKeyRef = useRef('')
+  const cartHydratedRef = useRef(false)
 
   const barcodeInputRef = useRef(null)
   const scanInFlightRef = useRef(new Set())
@@ -92,21 +112,62 @@ export default function CanteenCashierPage() {
 
   const allowedBranches = Array.isArray(session?.allowedBranches) ? session.allowedBranches : []
   const allowedIds = Array.isArray(session?.allowedBranchIds) ? session.allowedBranchIds.map(String).filter(Boolean) : []
+  const sessionDefaultBranchId = String(
+    session?.defaultBranchId ||
+    session?.activeBranch?.id ||
+    session?.branchId ||
+    ''
+  ).trim()
 
   const canPos = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('canteen_pos_access'))
 
-  const loadProducts = async () => {
-    setLoadingProducts(true)
-    setError('')
+  const loadProducts = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setLoadingProducts(true)
+    if (!background) setError('')
     const qs = allowedIds.length > 0 ? `?branchIds=${encodeURIComponent(allowedIds.join(','))}` : ''
     const res = await api(`/api/canteen/products${qs}`, { silent: true })
     setProducts(Array.isArray(res?.products) ? res.products : [])
-    setLoadingProducts(false)
+    if (!background) setLoadingProducts(false)
   }
 
   useEffect(() => {
     loadProducts()
   }, [session?.allowedBranchIds])
+
+  const loadPaymentMethods = async () => {
+    const res = await api('/api/settings/payment-methods', { silent: true })
+    const methods = Array.isArray(res?.paymentMethods) ? res.paymentMethods : []
+    const enabled = methods
+      .filter((method) => method?.enabled === true && method?.isDeleted !== true)
+      .map((method) => ({
+        id: String(method.id || method.key || ''),
+        name: String(method.name || method.label || ''),
+        type: normalizePaymentType(method),
+        isDefault: method?.isDefault === true,
+      }))
+      .filter((method) => method.id && method.name)
+    setPaymentMethods(enabled)
+    if (enabled.length === 0) return
+    const current = enabled.find((method) => method.id === payMethod)
+    if (current) return
+    const nextDefault = enabled.find((method) => method.isDefault) || enabled[0]
+    setPayMethod(nextDefault.id)
+  }
+
+  useEffect(() => {
+    loadPaymentMethods()
+  }, [])
+  useCanteenAutoRefresh(() => {
+    loadProducts({ background: true })
+    loadPaymentMethods()
+  }, [session?.allowedBranchIds], { enabled: canPos })
+
+  const selectedPayMethod = useMemo(() => {
+    return paymentMethods.find((method) => method.id === payMethod) || null
+  }, [paymentMethods, payMethod])
+
+  const selectedPayMethodType = selectedPayMethod?.type || 'cash'
 
   useEffect(() => {
     const handler = () => {
@@ -121,16 +182,19 @@ export default function CanteenCashierPage() {
   }, [])
 
   useEffect(() => {
-    if (selectedBranchId) return
-    if (allowedIds.length !== 1) return
-    const v = String(allowedIds[0] || '').trim()
+    const current = String(selectedBranchId || '').trim()
+    if (current && allowedIds.includes(current)) return
+    const preferred = sessionDefaultBranchId && allowedIds.includes(sessionDefaultBranchId)
+      ? sessionDefaultBranchId
+      : String(allowedIds[0] || '').trim()
+    const v = String(preferred || '').trim()
     if (!v) return
     try { localStorage.setItem('selectedBranchId_canteen', v) } catch {}
     setSelectedBranchId(v)
-  }, [allowedIds, selectedBranchId])
+  }, [allowedIds, selectedBranchId, sessionDefaultBranchId])
 
   useEffect(() => {
-    if (selectedBranchId) {
+    if (String(selectedBranchId || '').trim()) {
       setBranchModalOpen(false)
       return
     }
@@ -139,17 +203,129 @@ export default function CanteenCashierPage() {
     }
   }, [allowedIds.length, selectedBranchId])
 
+  const categories = useMemo(() => {
+    const groups = new Map()
+    products.forEach((product) => {
+      const id = String(product?.categoryId || '').trim()
+      const name = String(product?.categoryName || '').trim()
+      if (!id || !name) return
+      const current = groups.get(id)
+      if (current) {
+        current.count += 1
+        if (!current.imageUrl && product?.categoryImageUrl) current.imageUrl = String(product.categoryImageUrl)
+        return
+      }
+      groups.set(id, {
+        id,
+        name,
+        count: 1,
+        imageUrl: String(product?.categoryImageUrl || product?.imageUrl || '')
+      })
+    })
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+  }, [products])
 
+  const cartProductMap = useMemo(() => {
+    const map = new Map()
+    products.forEach((product) => {
+      const id = String(product?.id || product?._id || '').trim()
+      if (!id) return
+      map.set(id, product)
+    })
+    return map
+  }, [products])
 
+  useEffect(() => {
+    if (!categories.length) {
+      setActiveCategoryId('')
+      return
+    }
+    if (categories.some((category) => String(category.id) === String(activeCategoryId))) return
+    setActiveCategoryId(String(categories[0]?.id || ''))
+  }, [activeCategoryId, categories])
 
   const filteredProducts = useMemo(() => {
     const nq = normalize(q)
-    if (!nq) return products
-    return products.filter(p => normalize(p.name).includes(nq))
-  }, [products, q])
+    return products.filter((product) => {
+      const matchesCategory = !String(activeCategoryId || '').trim()
+        ? true
+        : activeCategoryId === 'uncategorized'
+          ? !String(product?.categoryId || '').trim()
+          : String(product?.categoryId || '') === String(activeCategoryId)
+      if (!matchesCategory) return false
+      if (!nq) return true
+      return [product?.name, product?.categoryName, product?.barcode].some((value) => normalize(value).includes(nq))
+    })
+  }, [activeCategoryId, products, q])
+
+  useEffect(() => {
+    cartHydratedRef.current = false
+    try {
+      const raw = localStorage.getItem(CASHIER_CART_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      const byBranch = parsed && typeof parsed === 'object' ? parsed : {}
+      const branchId = String(selectedBranchId || '').trim()
+      if (!branchId) return
+      const saved = Array.isArray(byBranch[branchId]) ? byBranch[branchId] : []
+      if (saved.length === 0) return
+      const restored = saved
+        .map((item) => {
+          const productId = String(item?.productId || '').trim()
+          const product = cartProductMap.get(productId)
+          if (!product) return null
+          const qty = Math.max(1, Number(item?.qty || 0))
+          return {
+            productId,
+            name: String(product?.name || item?.name || ''),
+            barcode: String(product?.barcode || item?.barcode || ''),
+            unitPrice: Number(product?.price ?? item?.unitPrice ?? 0),
+            qty,
+            productBranchId: String(product?.branchId || item?.productBranchId || branchId)
+          }
+        })
+        .filter(Boolean)
+      setCart(restored)
+    } catch {
+      setCart([])
+    } finally {
+      cartHydratedRef.current = true
+    }
+  }, [selectedBranchId, cartProductMap])
+
+  useEffect(() => {
+    const branchId = String(selectedBranchId || '').trim()
+    if (!branchId) return
+    if (!cartHydratedRef.current) return
+    try {
+      const raw = localStorage.getItem(CASHIER_CART_STORAGE_KEY)
+      const parsed = raw ? JSON.parse(raw) : {}
+      const next = parsed && typeof parsed === 'object' ? parsed : {}
+      next[branchId] = cart.map((item) => ({
+        productId: String(item?.productId || ''),
+        name: String(item?.name || ''),
+        barcode: String(item?.barcode || ''),
+        unitPrice: Number(item?.unitPrice || 0),
+        qty: Math.max(1, Number(item?.qty || 0)),
+        productBranchId: String(item?.productBranchId || branchId)
+      }))
+      localStorage.setItem(CASHIER_CART_STORAGE_KEY, JSON.stringify(next))
+    } catch {}
+  }, [cart, selectedBranchId])
 
   const total = useMemo(() => {
     return cart.reduce((sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0), 0)
+  }, [cart])
+  const discountInputValue = String(discountDraft ?? '').replace(',', '.').trim()
+  const parsedDiscountPercent = Number(discountInputValue === '' ? '0' : discountInputValue)
+  const discountPercent = Number.isFinite(parsedDiscountPercent)
+    ? Math.max(0, Math.min(100, parsedDiscountPercent))
+    : 0
+  const discountTotal = roundMoney((Number(total || 0) * discountPercent) / 100)
+  const netTotal = roundMoney(Math.max(0, Number(total || 0) - discountTotal))
+
+  const cartItemCount = useMemo(() => {
+    return cart.reduce((sum, it) => sum + Number(it.qty || 0), 0)
   }, [cart])
 
   const cartBranchIds = useMemo(() => {
@@ -410,7 +586,7 @@ export default function CanteenCashierPage() {
   }, [customerQuery])
 
   useEffect(() => {
-    if (payMethod !== 'account') return
+    if (selectedPayMethodType !== 'account') return
     const term = String(debouncedCustomerQuery || '').trim()
 
     if (term.length < 2) {
@@ -446,7 +622,7 @@ export default function CanteenCashierPage() {
     return () => {
       try { controller.abort() } catch {}
     }
-  }, [debouncedCustomerQuery, payMethod])
+  }, [debouncedCustomerQuery, selectedPayMethodType])
 
   const submitNewCustomer = async () => {
     const name = String(newCustomerName || '').trim()
@@ -469,7 +645,7 @@ export default function CanteenCashierPage() {
 
   const completeSale = async () => {
     if (cart.length === 0) return
-    if (payMethod === 'account' && !customerId) {
+    if (selectedPayMethodType === 'account' && !customerId) {
       setError('Cari seçmelisin')
       return
     }
@@ -503,7 +679,16 @@ export default function CanteenCashierPage() {
     const grand = totalsByBranch.reduce((sum, x) => sum + Number(x.subTotal || 0), 0)
     if (!Number.isFinite(grand) || grand <= 0) return
 
-    const allocations = totalsByBranch.map(x => ({ ...x, payAmount: Number(x.subTotal || 0) }))
+    let allocatedDiscount = 0
+    const allocations = totalsByBranch.map((x, index) => {
+      const branchSubTotal = roundMoney(Number(x.subTotal || 0))
+      const branchDiscount = index === totalsByBranch.length - 1
+        ? roundMoney(discountTotal - allocatedDiscount)
+        : roundMoney((branchSubTotal * discountPercent) / 100)
+      allocatedDiscount += branchDiscount
+      const payAmount = roundMoney(Math.max(0, branchSubTotal - branchDiscount))
+      return { ...x, discountPercent, discountTotal: branchDiscount, payAmount }
+    })
 
     setSaving(true)
     setError('')
@@ -516,13 +701,14 @@ export default function CanteenCashierPage() {
       const items = (groups.get(bid) || []).map(it => ({ productId: it.productId, qty: Number(it.qty || 0) }))
       const payload = {
         items,
+        discountPercent: row.discountPercent,
         payment: {
           method: payMethod,
           amount: row.payAmount,
           note: String(payNote || '').trim(),
-          customerId: payMethod === 'account' ? String(customerId) : undefined
+          customerId: selectedPayMethodType === 'account' ? String(customerId) : undefined
         },
-        note: String(saleNote || '').trim()
+        note: String(saleNote || payNote || '').trim()
       }
 
       const res = await api(`/api/canteen/sales?branchId=${encodeURIComponent(String(bid))}`, { method: 'POST', data: payload, silent: true })
@@ -557,12 +743,13 @@ export default function CanteenCashierPage() {
 
     const breakdown = created.map(x => {
       const bname = allowedBranches.find(b => String(b.id) === String(x.branchId))?.name || x.branchId
-      return { branchId: x.branchId, name: bname, total: Number(x.sale?.total || 0), id: x.sale?.id }
+      return { branchId: x.branchId, name: bname, subTotal: Number(x.sale?.subTotal || 0), discountTotal: Number(x.sale?.discountTotal || 0), total: Number(x.sale?.total || 0), id: x.sale?.id }
     })
-    setLastSale({ total: total, breakdown })
+    setLastSale({ subTotal: total, discountTotal, total: netTotal, breakdown })
     setCart([])
     setPayNote('')
     setSaleNote('')
+    setDiscountDraft('')
     setCustomerId('')
     setSaving(false)
 
@@ -581,24 +768,13 @@ export default function CanteenCashierPage() {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700 }}>Kasa</div>
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>{activeBranchName ? `Aktif Şube: ${activeBranchName}` : ''}</div>
-        </div>
-        <button className="btn btn--compact" type="button" onClick={loadProducts} disabled={loadingProducts}>{loadingProducts ? '...' : 'Yenile'}</button>
-      </div>
+      {!!error && <div className="card" style={{ borderColor: 'color-mix(in srgb, #ef4444 38%, var(--app-border, var(--border)))', background: 'color-mix(in srgb, #ef4444 10%, var(--app-surface, var(--panel)))', color: 'color-mix(in srgb, #ef4444 78%, var(--app-text, var(--text)))' }}>{error}</div>}
 
-      {!!error && <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>{error}</div>}
-
-      <div className="kasaLayout">
-        <div className="card" style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Barkod okut</div>
-            </div>
+      <div className="kasaLayout kasaShowcaseLayout">
+        <div className="card kasaShowcasePanel" style={{ display: 'grid', gap: 10 }}>
+          <label className="kasaSearchPrimary">
             <input
-              className="input"
+              className="input kasaSearchPrimaryInput"
               ref={barcodeInputRef}
               value={barcode}
               onChange={(e) => {
@@ -613,62 +789,110 @@ export default function CanteenCashierPage() {
                 setBarcode('')
                 scanBarcode(v, { source: 'manual', final: true })
               }}
-              placeholder="Barkod"
+              placeholder="Barkod okut"
               inputMode="numeric"
             />
           </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ürün ara</div>
+          <label className="kasaSearchSecondary">
+            <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Ürün ara</div>
             <input
-              className="input"
+              className="input kasaSearchSecondaryInput"
               value={q}
               onBlur={() => scheduleBarcodeFocus(250)}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Ürün adı"
             />
           </label>
-          <div className="kasaProductGrid kasaProductGridScroll">
+          <div className="kasaCatalogLayout">
+            <div className="kasaCategoryColumn kasaProductGridScroll kasaCategoryRail">
+              {categories.map((category) => {
+                const isActive = String(activeCategoryId) === String(category.id)
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className="kasaCategoryCard"
+                    data-active={isActive ? 'true' : 'false'}
+                    onClick={() => setActiveCategoryId(String(category.id))}
+                  >
+                    <img
+                      className="kasaCategoryCardImage"
+                      src={String(category.imageUrl || IMAGE_PLACEHOLDER)}
+                      alt={category.name}
+                      onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
+                    />
+                    <div className="kasaCategoryCardBody">
+                      <span>{category.name}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="kasaProductGrid kasaProductGridScroll">
             {filteredProducts.map(p => (
               <button
                 key={p.id || p._id}
                 type="button"
-                className="card"
+                className="card kasaProductCard"
+                data-has-image={String(p.imageUrl || '').trim() ? 'true' : 'false'}
                 onClick={() => addToCart(p)}
                 style={{ ...softProductCardStyle, cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6 }}
               >
-                <div style={{ fontWeight: 800, lineHeight: 1.2, color: theme.text }}>{p.name}</div>
+                {String(p.imageUrl || '').trim()
+                  ? (
+                    <img
+                      className="kasaProductCardImage"
+                      src={String(p.imageUrl)}
+                      alt={p.name}
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none'
+                        const placeholder = event.currentTarget.nextElementSibling
+                        if (placeholder) placeholder.style.display = 'grid'
+                      }}
+                    />
+                  )
+                  : null}
+                <div className="kasaProductCardBody">
+                  <div className="kasaProductCardTitle" style={{ color: theme.text }}>{p.name}</div>
+                {p.categoryName && (
+                  <div className="kasaProductCardMeta" style={{ color: theme.accentText }}>
+                    {p.categoryName}
+                  </div>
+                )}
                 {p.branchId && (
-                  <div style={{ fontSize: 12, color: theme.accentText }}>
+                  <div className="kasaProductCardMeta" style={{ color: theme.accentText }}>
                     {(allowedBranches.find(b => String(b.id) === String(p.branchId))?.name) || 'Şube'}
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <div className="kasaProductCardFooter">
                   <div style={{ color: theme.accentText, fontSize: 13, fontWeight: 700 }}>{money(p.price)} ₺</div>
-                  <div style={{ fontSize: 12, color: 'rgba(15,23,42,0.62)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>
                     {p.stockTrackingEnabled === true ? `Stok: ${Number(p.stockQty || 0)}` : 'Stok: —'}
                   </div>
                 </div>
+                </div>
               </button>
             ))}
-            {!loadingProducts && filteredProducts.length === 0 && <div style={{ color: 'var(--muted)' }}>Ürün yok</div>}
+            {!loadingProducts && filteredProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}
+          </div>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: 12 }}>
-          <div className="card" style={{ display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="kasaSidePanel" style={{ display: 'grid', gap: 12 }}>
+          <div className="card kasaCartPanel" style={{ display: 'grid', gap: 10 }}>
+            <div className="kasaCartPanelHead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontWeight: 700 }}>Sepet</div>
-              <div style={{ color: '#111827', fontSize: 18, fontWeight: 800 }}>Toplam: {money(total)} ₺</div>
+              <div style={{ color: 'var(--app-text, var(--text))', fontSize: 18, fontWeight: 800 }}>Toplam: {money(total)} ₺</div>
             </div>
 
-            <div className="kasaCartList">
+            <div className="kasaCartList order-cart-scroll scrollbar-hidden">
               {cart.map(it => (
-                <div key={it.productId} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: 10, border: '1px solid var(--border)', borderRadius: 10 }}>
-                  <div>
+                <div key={it.productId} className="kasaCartRow" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: 10, border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <div className="kasaCartRowBody">
                     <div style={{ fontWeight: 700 }}>{it.name}</div>
-                    <div style={{ color: 'var(--muted)', fontSize: 12 }}>{money(it.unitPrice)} ₺</div>
+                    <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>{money(it.unitPrice)} ₺</div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div className="kasaCartRowActions" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button className="btn btn--compact" type="button" onClick={() => dec(it.productId)}>-</button>
                     <input
                       className="input"
@@ -687,42 +911,74 @@ export default function CanteenCashierPage() {
                   </div>
                 </div>
               ))}
-              {cart.length === 0 && <div style={{ color: 'var(--muted)' }}>Sepet boş</div>}
+              {cart.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Sepet boş</div>}
             </div>
           </div>
 
-          <div className="card" style={{ display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div className="card kasaPaymentPanel" style={{ display: 'grid', gap: '2mm' }}>
+            <div className="kasaPaymentPanelHead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2mm', flexWrap: 'wrap' }}>
               <div style={{ fontWeight: 700 }}>Ödeme Al</div>
+              <button
+                className="btn btn--compact kasaDiscountToggle"
+                type="button"
+                onClick={() => setDiscountOpen(v => !v)}
+                aria-pressed={discountOpen}
+                style={{ minWidth: 0 }}
+              >
+                {discountOpen ? 'İndirimi Gizle' : `İndirim ${discountPercent > 0 ? `%${discountPercent}` : ''}`.trim()}
+              </button>
+              <input
+                className="input kasaPaymentHeadNote"
+                value={payNote}
+                onBlur={() => scheduleBarcodeFocus(250)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setPayNote(v)
+                  setSaleNote(v)
+                }}
+                placeholder="Not"
+              />
               <button className="btn btn--compact onlyMobile" type="button" onClick={() => setPayAccordionOpen(v => !v)} aria-pressed={payAccordionOpen}>
                 {payAccordionOpen ? 'Kapat' : 'Aç'}
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: 10 }} className={payAccordionOpen ? '' : 'onlyDesktop'}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[
-                { key: 'cash', label: 'Nakit' },
-                { key: 'pos', label: 'POS' },
-                { key: 'bank', label: 'Banka' },
-                { key: 'account', label: 'Cari' }
-              ].map(m => (
-                <button
-                  key={m.key}
-                  type="button"
-                  className="btn"
-                  onClick={() => setPayMethod(m.key)}
-                  aria-pressed={payMethod === m.key}
-                >
-                  {m.label}
-                </button>
-              ))}
+            <div style={{ display: 'grid', gap: '2mm' }} className={payAccordionOpen ? '' : 'onlyDesktop'}>
+            {discountOpen && (
+            <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 14, background: 'var(--app-surface-soft, var(--panel))' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Brüt</div>
+                <div style={{ fontWeight: 700 }}>{money(total)} ₺</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>İndirim (%)</div>
+                <input
+                  className="input"
+                  type="text"
+                  inputMode="decimal"
+                  data-allow-manual-numeric="true"
+                  value={discountDraft}
+                  placeholder="0"
+                  onBlur={() => scheduleBarcodeFocus(250)}
+                  onChange={(e) => setDiscountDraft(String(e.target.value ?? '').replace(',', '.'))}
+                  style={{ width: 120, height: 36, textAlign: 'right', fontWeight: 700, padding: '6px 10px' }}
+                  dir="ltr"
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>İndirim Tutarı</div>
+                <div style={{ fontWeight: 700 }}>{money(discountTotal)} ₺</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Net</div>
+                <div style={{ fontWeight: 800, color: 'var(--theme-accent, #f59e0b)' }}>{money(netTotal)} ₺</div>
+              </div>
             </div>
-
-            {payMethod === 'account' && (
+            )}
+            {selectedPayMethodType === 'account' && (
               <div style={{ display: 'grid', gap: 8 }}>
                 <label>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Cari seç</div>
+                  <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Cari seç</div>
                   <input
                     className="input"
                     value={customerQuery}
@@ -745,28 +1001,32 @@ export default function CanteenCashierPage() {
                       disabled={loadingCustomers}
                     >
                       <span>{c.name}</span>
-                      <span style={{ color: 'var(--muted)' }}>{c.phone || ''}</span>
+                      <span style={{ color: 'var(--app-text-secondary, var(--muted))' }}>{c.phone || ''}</span>
                     </button>
                   ))}
-                  {!loadingCustomers && String(debouncedCustomerQuery || '').trim().length < 2 && <div style={{ color: 'var(--muted)' }}>Aramak için en az 2 karakter yaz</div>}
-                  {!loadingCustomers && String(debouncedCustomerQuery || '').trim().length >= 2 && customers.length === 0 && <div style={{ color: 'var(--muted)' }}>Cari yok</div>}
+                  {!loadingCustomers && String(debouncedCustomerQuery || '').trim().length < 2 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Aramak için en az 2 karakter yaz</div>}
+                  {!loadingCustomers && String(debouncedCustomerQuery || '').trim().length >= 2 && customers.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Cari yok</div>}
                 </div>
                 <button className="btn btn--primary" type="button" onClick={() => setOpenNewCustomer(true)}>+ Yeni cari ekle</button>
               </div>
             )}
 
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
+              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Not</div>
               <input
                 className="input"
                 value={payNote}
                 onBlur={() => scheduleBarcodeFocus(250)}
-                onChange={(e) => setPayNote(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setPayNote(v)
+                  setSaleNote(v)
+                }}
                 placeholder="Ödeme notu"
               />
             </label>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Satış notu</div>
+              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Satış notu</div>
               <input
                 className="input"
                 value={saleNote}
@@ -776,14 +1036,30 @@ export default function CanteenCashierPage() {
               />
             </label>
 
-            <button className="btn btn--primary btn--large onlyDesktop" type="button" onClick={completeSale} disabled={saving || cart.length === 0}>
+            <div className="kasaPaymentMethodGrid" role="group" aria-label="Odeme yontemleri">
+              {paymentMethods.map((method) => {
+                return (
+                  <button
+                    key={method.id}
+                    type="button"
+                    className="btn kasaPaymentMethodButton"
+                    data-active={payMethod === method.id ? 'true' : 'false'}
+                    onClick={() => setPayMethod(method.id)}
+                  >
+                    <span>{method.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <button className="btn btn--primary btn--large onlyDesktop kasaCheckoutButton" type="button" onClick={completeSale} disabled={saving || cart.length === 0}>
               {saving ? 'Kaydediliyor...' : 'Satışı tamamla'}
             </button>
 
             {lastSale && (
               <div className="card" style={{ background: '#ecfdf5', borderColor: '#bbf7d0' }}>
                 <div style={{ fontWeight: 700, color: '#166534' }}>Satış tamamlandı</div>
-                <div style={{ color: '#166534', fontSize: 13 }}>Toplam: {money(lastSale.total)} ₺</div>
+                <div style={{ color: 'color-mix(in srgb, #22c55e 78%, var(--app-text, var(--text)))', fontSize: 13 }}>Toplam: {money(lastSale.total)} ₺</div>
                 <div style={{ color: '#166534', fontSize: 13 }}>
                   {Array.isArray(lastSale.breakdown)
                     ? `Satış ${lastSale.breakdown.length} şubeye bölündü: ${lastSale.breakdown.map(x => `${x.name} ${money(x.total)}₺`).join(', ')}`
@@ -811,7 +1087,7 @@ export default function CanteenCashierPage() {
       <Modal open={openNewCustomer} onClose={() => setOpenNewCustomer(false)} title="Yeni Cari">
         <div style={{ display: 'grid', gap: 10 }}>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
+            <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Ad</div>
             <input
               className="input"
               value={newCustomerName}
@@ -820,7 +1096,7 @@ export default function CanteenCashierPage() {
             />
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Telefon</div>
+            <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Telefon</div>
             <input
               className="input"
               value={newCustomerPhone}
@@ -828,7 +1104,7 @@ export default function CanteenCashierPage() {
               onChange={(e) => setNewCustomerPhone(e.target.value)}
             />
           </label>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className="app-modal-footer" style={{ justifyContent: 'flex-end' }}>
             <button className="btn" type="button" onClick={() => setOpenNewCustomer(false)}>Vazgeç</button>
             <button className="btn btn--primary" type="button" onClick={submitNewCustomer} disabled={!String(newCustomerName || '').trim()}>Kaydet</button>
           </div>
@@ -838,7 +1114,7 @@ export default function CanteenCashierPage() {
 
       <Modal open={branchModalOpen} onClose={() => {}} title="Şube Seç">
         <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Kasa için aktif şubeyi seç.</div>
+          <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13 }}>Kasa için aktif şubeyi seç.</div>
           <select
             className="input"
             value={selectedBranchId}

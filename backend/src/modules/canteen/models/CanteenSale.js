@@ -6,11 +6,14 @@ const itemSchema = new mongoose.Schema({
   qty: { type: Number, required: true },
   unitPrice: { type: Number, required: true },
   lineTotal: { type: Number, required: true },
+  vatRate: { type: Number, default: 0 },
   note: { type: String, default: '' }
 }, { _id: false })
 
 const paymentSchema = new mongoose.Schema({
-  method: { type: String, enum: ['cash', 'pos', 'bank', 'account'], required: true },
+  method: { type: String, required: true },
+  methodName: { type: String, default: '' },
+  methodType: { type: String, default: '' },
   amount: { type: Number, required: true },
   note: { type: String, default: '' }
 }, { _id: false })
@@ -21,7 +24,10 @@ const schema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'CanteenCustomer', default: null, index: true },
   items: { type: [itemSchema], default: [] },
   subTotal: { type: Number, required: true },
+  discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+  discountTotal: { type: Number, default: 0, min: 0 },
   total: { type: Number, required: true },
+  channel: { type: String, default: 'cashier', index: true },
   payment: { type: paymentSchema, required: true },
   note: { type: String, default: '' },
   isActive: { type: Boolean, default: true, index: true },

@@ -3,10 +3,13 @@ import { findById as findUserById } from '../repositories/userRepository.js'
 import { error } from '../utils/errors.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { findPlanById } from '../repositories/planRepository.js'
-import { getPlanStatus, getPlanDaysLeft } from './planService.js'
+import { getPlanStatus, getPlanDaysLeft, hasActiveSubscription } from './planService.js'
 import PaymentRequest from '../models/PaymentRequest.js'
+import MembershipRequest from '../models/MembershipRequest.js'
 import Branch from '../models/Branch.js'
 import mongoose from 'mongoose'
+import { buildIncomingBusinessSettings, mergeBusinessSettings } from '../utils/businessSettings.js'
+import { resolvePlanPackageType, resolveTenantPackageType } from '../utils/systemType.js'
 
 const normalizeBranchIds = (input) => {
   const list = Array.isArray(input) ? input : []
@@ -18,6 +21,30 @@ const normalizeBranchIds = (input) => {
   return ids
 }
 
+const buildPlanSummary = (tenant, planDoc, status) => {
+  if (!planDoc) return null
+  const tenantType = resolveTenantPackageType(tenant)
+  const planType = resolvePlanPackageType(planDoc)
+  if (!tenantType || !planType || tenantType !== planType) return null
+  const isTrial = planDoc.isTrial === true
+  const endsAt = isTrial ? (tenant?.trialEndsAt || tenant?.planEndsAt || null) : (tenant?.planEndsAt || null)
+  return {
+    id: planDoc.id,
+    _id: planDoc.id,
+    name: planDoc.name,
+    systemType: planType,
+    packageType: planDoc.packageType || planDoc.vertical || null,
+    limits: planDoc.limits,
+    features: planDoc.features,
+    trialDays: planDoc.trialDays,
+    isTrial,
+    startsAt: tenant?.planStartedAt || tenant?.trialStartsAt || null,
+    endsAt,
+    status,
+    daysLeft: getPlanDaysLeft(tenant)
+  }
+}
+
 export const getContext = async (user) => {
   const u = await findUserById(user.id)
   if (!u) throw error('unauthorized', 'Unauthorized', 401)
@@ -25,22 +52,16 @@ export const getContext = async (user) => {
   if (u.tenantId) {
     const t = await findTenantById(u.tenantId)
     if (t) {
-      let plan = null
+      const subscriptionStatus = getPlanStatus(t)
+      const isActiveSubscription = hasActiveSubscription(t)
+      let linkedPlan = null
       if (t.planId) {
         const p = await findPlanById(t.planId)
         if (p) {
-          plan = {
-            _id: p.id,
-            name: p.name,
-            limits: p.limits,
-            features: p.features,
-            trialDays: p.trialDays,
-            endsAt: t.planEndsAt || null,
-            status: getPlanStatus(t),
-            daysLeft: getPlanDaysLeft(t)
-          }
+          linkedPlan = buildPlanSummary(t, p, subscriptionStatus)
         }
       }
+
       tenant = {
         _id: t.id,
         name: t.name,
@@ -48,7 +69,13 @@ export const getContext = async (user) => {
         description: t.description,
         allowedBranchIds: (t.allowedBranchIds || []).map(String),
         systemType: t.systemType || 'kermes',
-        plan
+        vertical: t.vertical || null,
+        businessType: t.businessType || null,
+        subscriptionStatus,
+        currentPlan: isActiveSubscription ? linkedPlan : null,
+        expiredPlan: !isActiveSubscription ? linkedPlan : null,
+        plan: linkedPlan,
+        canUpgrade: !isActiveSubscription
       }
     }
   }
@@ -56,6 +83,9 @@ export const getContext = async (user) => {
   if (u.tenantId) {
     try {
       paymentPending = !!(await PaymentRequest.exists({ tenantId: u.tenantId, status: 'pending' }))
+      if (!paymentPending) {
+        paymentPending = !!(await MembershipRequest.exists({ tenantId: u.tenantId, status: 'pending' }))
+      }
     } catch {}
   }
   return {
@@ -67,17 +97,27 @@ export const getContext = async (user) => {
 export const getProfile = async (tenantId) => {
   const t = await findTenantById(tenantId)
   if (!t) throw error('not_found', 'Tenant not found', 404)
+  const activeBranches = await Branch.find({ tenantId, isDeleted: { $ne: true }, status: { $ne: 'deleted' }, isActive: true }).select('_id').lean()
+  const fallbackBranchIds = activeBranches.map((branch) => String(branch._id))
+  const mergedSettings = mergeBusinessSettings({
+    ...(t?.settings || {}),
+    logo: {
+      ...(t?.settings?.logo || {}),
+      url: t?.settings?.logo?.url || t?.logoUrl || '',
+    },
+  }, { activeBranchIds: fallbackBranchIds })
+  const allowedBranchIds = Array.isArray(mergedSettings?.authorizedBranches?.branchIds) && mergedSettings.authorizedBranches.branchIds.length > 0
+    ? mergedSettings.authorizedBranches.branchIds.map(String)
+    : (t.allowedBranchIds || []).map(String)
   const base = {
     _id: t.id,
     name: t.name,
     slug: t.slug,
     description: t.description,
     logoUrl: t.logoUrl || '',
-    allowedBranchIds: (t.allowedBranchIds || []).map(String),
+    allowedBranchIds,
     systemType: t.systemType || 'kermes',
-    settings: {
-      qrMenuEnabled: Boolean(t?.settings?.qrMenuEnabled)
-    }
+    settings: mergedSettings
   }
 
   if ((t.systemType || 'kermes') !== 'kantin') return base
@@ -85,7 +125,8 @@ export const getProfile = async (tenantId) => {
   try {
     const { listByTenant } = await import('../modules/canteen/repositories/canteenBranchRepository.js')
     const { findTenantSettings } = await import('../modules/canteen/repositories/canteenSettingsRepository.js')
-    const branches = await listByTenant(tenantId)
+    const { ensureBranchPublicSlugs } = await import('../modules/canteen/services/canteenBranchService.js')
+    const branches = await ensureBranchPublicSlugs(tenantId, t.name, await listByTenant(tenantId))
     const activeIds = new Set((branches || []).map(b => String(b.id || b._id)))
     const st = await findTenantSettings(tenantId)
     const canteenAllowedBranchIds = Array.isArray(st?.canteenAllowedBranchIds)
@@ -96,6 +137,7 @@ export const getProfile = async (tenantId) => {
       branches: (branches || []).map(b => ({
         id: String(b.id || b._id),
         name: b.name,
+        publicSlug: String(b.publicSlug || ''),
         description: b.description || '',
         isActive: b.isActive !== false
       })),
@@ -107,9 +149,24 @@ export const getProfile = async (tenantId) => {
 }
 
 export const updateSettings = async (tenantId, dto) => {
-  const update = {}
-  if (dto.qrMenuEnabled !== undefined) {
-    update['settings.qrMenuEnabled'] = !!dto.qrMenuEnabled
+  const currentTenant = await findTenantById(tenantId)
+  if (!currentTenant) throw error('not_found', 'Tenant not found', 404)
+  const incoming = buildIncomingBusinessSettings(dto)
+  const activeBranches = await Branch.find({ tenantId, isDeleted: { $ne: true }, status: { $ne: 'deleted' }, isActive: true }).select('_id').lean()
+  const fallbackBranchIds = activeBranches.map((branch) => String(branch._id))
+  const mergedSettings = mergeBusinessSettings({
+    ...(currentTenant?.settings || {}),
+    ...incoming,
+    logo: {
+      ...(currentTenant?.settings?.logo || {}),
+      url: currentTenant?.settings?.logo?.url || currentTenant?.logoUrl || '',
+    },
+  }, { activeBranchIds: fallbackBranchIds })
+  const update = {
+    settings: mergedSettings,
+    allowedBranchIds: Array.isArray(mergedSettings?.authorizedBranches?.branchIds)
+      ? mergedSettings.authorizedBranches.branchIds
+      : currentTenant.allowedBranchIds,
   }
   const t = await updateTenant(tenantId, update)
   if (!t) throw error('not_found', 'Tenant not found', 404)
@@ -121,9 +178,7 @@ export const updateSettings = async (tenantId, dto) => {
     description: t.description,
     logoUrl: t.logoUrl || '',
     allowedBranchIds: (t.allowedBranchIds || []).map(String),
-    settings: {
-      qrMenuEnabled: Boolean(t?.settings?.qrMenuEnabled)
-    }
+    settings: mergeBusinessSettings(t?.settings || {})
   }
 }
 
@@ -142,6 +197,7 @@ export const updateProfile = async (tenantId, dto) => {
       }
     }
     update.allowedBranchIds = ids
+    update['settings.authorizedBranches.branchIds'] = ids
   }
   const t = await updateTenant(tenantId, update)
   if (!t) throw error('not_found', 'Tenant not found', 404)

@@ -3,16 +3,36 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
-import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
-import { trStatusLabel } from '../i18n/tr.js'
+import {
+  AdminActionMenu,
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminFilterField,
+  AdminPageHeader,
+  AdminStatusBadge,
+  AdminTableCard,
+} from '../components/AdminListUi.jsx'
+import {
+  formatPlanBadge,
+  formatPlanDate,
+  getPlanDisplayName,
+  getPlanStatus,
+  getRemainingPlanMeta,
+  resolvePlanType,
+} from '../lib/planPresentation.js'
+
+function getTenantStateMeta(item) {
+  return item?.isActive
+    ? { label: 'Aktif', tone: 'success' }
+    : { label: 'Pasif', tone: 'neutral' }
+}
 
 export default function PlatformAdminTenants({ system = 'kermes' }) {
-  const { isMobilePortrait } = useResponsiveFlags()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
+  const [form, setForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPhone: '', ownerPassword: '' })
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [extendOpen, setExtendOpen] = useState(false)
@@ -24,76 +44,63 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
   const [assignForm, setAssignForm] = useState({ planId: '', startsAt: '' })
   const [assignError, setAssignError] = useState('')
   const [assignLoading, setAssignLoading] = useState(false)
+  const [assignPlansLoading, setAssignPlansLoading] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [editForm, setEditForm] = useState({ name: '', email: '' })
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '' })
   const [editError, setEditError] = useState('')
   const [editLoading, setEditLoading] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [toggleBusy, setToggleBusy] = useState(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailTarget, setDetailTarget] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [planStatusFilter, setPlanStatusFilter] = useState('all')
+
+  const pagePlanType = system === 'canteen' ? 'canteen' : 'restaurant'
+  const pageTitle = pagePlanType === 'canteen' ? 'Mağaza Üyeleri' : 'Restoran Üyeleri'
+  const pageSubtitle = pagePlanType === 'canteen'
+    ? 'Mağaza üye listesini paket süreleriyle birlikte yönetin.'
+    : 'Restoran üye listesini paket süreleriyle birlikte yönetin.'
 
   const load = async () => {
     setLoading(true)
     setError('')
     try {
       const res = await api(`/api/platform/tenants?system=${encodeURIComponent(system)}`, { portalOverride: 'platform' })
-      const list = Array.isArray(res?.data)
-        ? res.data
-        : Array.isArray(res?.items)
-          ? res.items
-          : []
-      setItems(list)
+      const rawList = Array.isArray(res?.data) ? res.data : Array.isArray(res?.items) ? res.items : []
+      setItems(rawList)
+      return rawList
     } catch (err) {
       setError(err.message)
+      setItems([])
+      return []
     } finally {
       setLoading(false)
     }
   }
-  useEffect(() => { load() }, [])
+
   useEffect(() => {
-    setItems([])
-    setLoading(false)
-    setError('')
-    setModalOpen(false)
-    setForm({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
-    setFormError('')
-    setFormLoading(false)
-    setExtendOpen(false)
-    setExtendForm({ days: 7 })
-    setExtendError('')
-    setAssignOpen(false)
-    setAssignTarget(null)
-    setPlans([])
-    setAssignForm({ planId: '', startsAt: '' })
-    setAssignError('')
-    setAssignLoading(false)
-    setEditOpen(false)
-    setEditTarget(null)
-    setEditForm({ name: '', email: '' })
-    setEditError('')
-    setEditLoading(false)
-    setDeleteConfirmOpen(false)
-    setDeleteTarget(null)
-    setToggleBusy(null)
     load()
   }, [system])
 
   const openCreate = () => {
-    setForm({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
+    setForm({ name: '', ownerName: '', ownerEmail: '', ownerPhone: '', ownerPassword: '' })
     setFormError('')
     setModalOpen(true)
   }
 
-  const onCreate = async (e) => {
-    e.preventDefault()
+  const onCreate = async (event) => {
+    event.preventDefault()
     setFormLoading(true)
     setFormError('')
     try {
-      const target = system === 'canteen' ? '/api/platform/tenants/canteen' : '/api/platform/tenants/kermes'
-      await api(target, { method: 'POST', body: JSON.stringify({ ...form }) })
+      const target = pagePlanType === 'canteen' ? '/api/platform/tenants/canteen' : '/api/platform/tenants/kermes'
+      await api(target, { method: 'POST', body: JSON.stringify({ ...form }), portalOverride: 'platform' })
       setModalOpen(false)
       await load()
+      toast.success('Uye olusturuldu')
     } catch (err) {
       setFormError(err.message)
     } finally {
@@ -101,29 +108,45 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
     }
   }
 
-  const toggleActive = async (t) => {
+  const toggleActive = async (tenant) => {
     try {
-      await api(`/api/platform/tenants/${t._id}/status`, { method: 'PUT', body: JSON.stringify({ isActive: !t.isActive }) })
+      await api(`/api/platform/tenants/${tenant._id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ isActive: !tenant.isActive }),
+        portalOverride: 'platform'
+      })
       await load()
+      toast.success(tenant.isActive ? 'Uye pasiflestirildi' : 'Uye aktiflestirildi')
     } catch (err) {
       setError(err.message)
     }
   }
 
-  const openAssign = async (t) => {
-    setAssignTarget(t)
-    const today = new Date()
-    const dd = String(today.getDate()).padStart(2, '0')
-    const mm = String(today.getMonth() + 1).padStart(2, '0')
-    const yyyy = String(today.getFullYear())
-    setAssignForm({ planId: '', startsAt: `${dd}/${mm}/${yyyy}` })
+  const openAssign = async (tenant) => {
+    setAssignTarget(tenant)
+    setAssignForm({
+      planId: '',
+      startsAt: new Date().toISOString().slice(0, 10)
+    })
     setAssignError('')
+    setAssignPlansLoading(true)
     setAssignOpen(true)
+
     try {
-      const { plans } = await api('/api/platform/plans')
-      setPlans(plans)
+      const res = await api(
+        `/api/platform/plans?tenantId=${encodeURIComponent(String(tenant._id || ''))}&systemType=${encodeURIComponent(pagePlanType)}`,
+        { portalOverride: 'platform' }
+      )
+      const safePlans = Array.isArray(res?.plans) ? res.plans : Array.isArray(res?.items) ? res.items : []
+      setPlans(safePlans.filter((plan) => resolvePlanType(plan) === pagePlanType))
+      if (safePlans.length === 0) {
+        setAssignError('Bu uye icin uygun plan bulunamadi.')
+      }
     } catch (err) {
       setAssignError(err.message)
+      setPlans([])
+    } finally {
+      setAssignPlansLoading(false)
     }
   }
 
@@ -134,22 +157,30 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
       const [dd, mm, yyyy] = value.split('/')
       return `${yyyy}-${mm}-${dd}`
     }
-    const d = new Date(value)
-    return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10)
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10)
   }
 
-  const onAssign = async (e) => {
-    e.preventDefault()
+  const onAssign = async (event) => {
+    event.preventDefault()
+    if (!assignTarget || !assignForm.planId) return
     setAssignLoading(true)
     setAssignError('')
     try {
       const safeStarts = normalizeDateForAPI(assignForm.startsAt)
-      const result = await api(`/api/platform/tenants/${assignTarget._id}/plan`, { method: 'PUT', body: JSON.stringify({ planId: assignForm.planId, startsAt: safeStarts }) })
-      setAssignOpen(false)
-      await load()
-      if (result?.success) {
-        toast.success('İşlem başarıyla tamamlandı')
+      const result = await api(`/api/platform/tenants/${assignTarget._id}/plan`, {
+        method: 'PUT',
+        body: JSON.stringify({ planId: assignForm.planId, startsAt: safeStarts, systemType: pagePlanType }),
+        portalOverride: 'platform'
+      })
+      const nextItems = await load()
+      if (detailTarget?._id) {
+        const refreshed = nextItems.find((item) => item._id === detailTarget._id)
+        if (refreshed) setDetailTarget(refreshed)
       }
+      setAssignOpen(false)
+      setAssignTarget(null)
+      if (result?.success) toast.success('Plan bilgisi guncellendi')
     } catch (err) {
       setAssignError(err.message)
     } finally {
@@ -157,230 +188,347 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
     }
   }
 
-  const openExtend = (t) => {
-    setAssignTarget(t)
+  const openExtend = (tenant) => {
+    setAssignTarget(tenant)
     setExtendForm({ days: 7 })
     setExtendError('')
     setExtendOpen(true)
   }
-  const onExtend = async (e) => {
-    e.preventDefault()
+
+  const onExtend = async (event) => {
+    event.preventDefault()
     setFormLoading(true)
     setExtendError('')
     try {
-      const result = await api(`/api/platform/tenants/${assignTarget._id}/trial-extend`, { method: 'PUT', body: JSON.stringify({ days: Number(extendForm.days || 0) }) })
-      setExtendOpen(false)
+      const result = await api(`/api/platform/tenants/${assignTarget._id}/trial-extend`, {
+        method: 'PUT',
+        body: JSON.stringify({ days: Number(extendForm.days || 0) }),
+        portalOverride: 'platform'
+      })
       await load()
-      if (result?.success) {
-        toast.success('İşlem başarıyla tamamlandı')
-      }
+      setExtendOpen(false)
+      if (result?.success) toast.success('Deneme suresi uzatildi')
     } catch (err) {
       setExtendError(err.message)
     } finally {
       setFormLoading(false)
     }
   }
-  const endTrial = async (t) => {
+
+  const endTrial = async (tenant) => {
     try {
-      const result = await api(`/api/platform/tenants/${t._id}/trial-end`, { method: 'PUT' })
+      const result = await api(`/api/platform/tenants/${tenant._id}/trial-end`, { method: 'PUT', portalOverride: 'platform' })
       await load()
-      if (result?.success) {
-        toast.success('İşlem başarıyla tamamlandı')
-      }
+      if (result?.success) toast.success('Deneme suresi sonlandirildi')
     } catch (err) {
       setError(err.message)
     }
   }
-  const openEdit = (t) => {
-    setEditTarget(t)
-    setEditForm({ name: t.name, email: t.ownerEmail || '' })
+
+  const openEdit = (tenant) => {
+    setEditTarget(tenant)
+    setEditForm({ name: tenant.name || '', email: tenant.ownerEmail || '', phone: tenant.ownerPhone || tenant.phone || '' })
     setEditError('')
     setEditOpen(true)
   }
-  const onEdit = async (e) => {
-    e.preventDefault()
+
+  const onEdit = async (event) => {
+    event.preventDefault()
     setEditLoading(true)
     setEditError('')
     try {
-      const result = await api(`/api/platform/tenants/${editTarget._id}`, { method: 'PUT', body: JSON.stringify({ name: editForm.name, email: editForm.email }) })
-      const tenant = result.tenant
-      setItems(items.map(i => i._id === tenant.id ? { ...i, name: tenant.name, ownerEmail: tenant.ownerEmail || i.ownerEmail } : i))
+      const result = await api(`/api/platform/tenants/${editTarget._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: editForm.name, email: editForm.email, phone: editForm.phone }),
+        portalOverride: 'platform'
+      })
+      const tenant = result?.tenant
+      setItems((prev) => prev.map((item) => (
+        item._id === tenant?.id
+          ? {
+              ...item,
+              name: tenant.name,
+              ownerEmail: tenant.ownerEmail || item.ownerEmail,
+              ownerPhone: tenant.ownerPhone || item.ownerPhone,
+              phone: tenant.phone || item.phone,
+            }
+          : item
+      )))
       setEditOpen(false)
+      toast.success('Uye bilgileri guncellendi')
     } catch (err) {
-      setEditError(err.code === 'email_taken' ? 'Bu e-posta zaten kullanılıyor' : err.message)
+      setEditError(err.code === 'email_taken' ? 'Bu e-posta zaten kullaniliyor' : err.message)
     } finally {
       setEditLoading(false)
     }
   }
-  
-  const openDelete = (t) => {
-    setDeleteTarget(t)
+
+  const openDelete = (tenant) => {
+    setDeleteTarget(tenant)
     setDeleteConfirmOpen(true)
   }
+
+  const openDetail = (tenant) => {
+    setDetailTarget(tenant)
+    setDetailOpen(true)
+  }
+
   const confirmDelete = async () => {
     if (!deleteTarget) return
     try {
-      await api(`/api/platform/tenants/${deleteTarget._id}`, { method: 'DELETE' })
+      await api(`/api/platform/tenants/${deleteTarget._id}`, { method: 'DELETE', portalOverride: 'platform' })
       await load()
-      toast.success('Üye tamamen silindi')
+      toast.success('Uye tamamen silindi')
       setDeleteConfirmOpen(false)
     } catch (err) {
       toast.error(err.message)
     }
   }
 
+  const filteredItems = items.filter((item) => {
+    const query = search.trim().toLocaleLowerCase('tr-TR')
+    const planName = getPlanDisplayName(item)
+    const matchesSearch = !query || [
+      item.name,
+      item.ownerEmail,
+      item.ownerPhone,
+      item.phone,
+      planName,
+    ].some((value) => String(value || '').toLocaleLowerCase('tr-TR').includes(query))
+
+    const tenantMeta = getTenantStateMeta(item)
+    const planMeta = formatPlanBadge(item)
+    const matchesStatus = statusFilter === 'all' || statusFilter === (tenantMeta.tone === 'success' ? 'active' : 'inactive')
+    const matchesPlanStatus = planStatusFilter === 'all' || planStatusFilter === planMeta.key
+
+    return matchesSearch && matchesStatus && matchesPlanStatus
+  })
+
   return (
     <div className="main">
-      <div className="actionWrap" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>{system === 'canteen' ? 'Kantin Üyeler' : 'Kermes Üyeler'}</h3>
-        <button className={isMobilePortrait ? 'btn btn--full' : 'btn'} onClick={openCreate}>Yeni Üye</button>
-      </div>
-      {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      <div className="card">
-        {loading ? 'Yükleniyor...' : (
-          items.length === 0 ? (
-            <div>Henüz üye yok.</div>
+      <div className="admin-page">
+        <AdminPageHeader
+          title={pageTitle}
+          subtitle={pageSubtitle}
+          action={<button className="btn btn--primary" onClick={openCreate}>Yeni Uye</button>}
+        />
+
+        <AdminFilterBar>
+          <AdminFilterField label="Arama">
+            <input
+              className="input admin-filter-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Isletme, e-posta, telefon veya paket ara"
+            />
+          </AdminFilterField>
+          <AdminFilterField label="Durum">
+            <select className="input admin-filter-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="all">Tumu</option>
+              <option value="active">Aktif</option>
+              <option value="inactive">Pasif</option>
+            </select>
+          </AdminFilterField>
+          <AdminFilterField label="Paket Durumu">
+            <select className="input admin-filter-input" value={planStatusFilter} onChange={(event) => setPlanStatusFilter(event.target.value)}>
+              <option value="all">Tumu</option>
+              <option value="trial">Trial aktif</option>
+              <option value="active">Aktif paket</option>
+              <option value="expired">Suresi doldu</option>
+              <option value="inactive">Plan atanmamis</option>
+            </select>
+          </AdminFilterField>
+        </AdminFilterBar>
+
+        {error ? <div style={{ color: '#dc2626', fontWeight: 700 }}>{error}</div> : null}
+
+        <AdminTableCard>
+          {loading ? (
+            <div style={{ padding: 22, fontWeight: 700, color: '#64748b' }}>Yukleniyor...</div>
+          ) : filteredItems.length === 0 ? (
+            <AdminEmptyState title="Gosterilecek uye bulunamadi" description="Filtreleri temizleyin veya yeni bir uye olusturun." />
           ) : (
-            isMobilePortrait ? (
-              <div className="cardList">
-                {items.map(t => (
-                  <div key={t._id} className="card" style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="breakAny" style={{ fontWeight: 800 }}>{t.name}</div>
-                        <div style={{ color: 'var(--muted)', fontSize: 13 }}>{t.ownerEmail || '-'}</div>
-                      </div>
-                      <span className="page-pill">{t.isActive ? 'Aktif' : 'Pasif'}</span>
-                    </div>
-                    <div style={{ marginTop: 10, display: 'grid', gap: 6, fontSize: 13 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ color: 'var(--muted)' }}>Plan</div>
-                        <div style={{ fontWeight: 700, textAlign: 'right' }}>{t.planName || '-'}</div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ color: 'var(--muted)' }}>Plan Durumu</div>
-                        <div style={{ fontWeight: 700, textAlign: 'right' }}>{trStatusLabel(t.planStatus) || '-'}</div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ color: 'var(--muted)' }}>Bitiş</div>
-                        <div style={{ fontWeight: 700, textAlign: 'right' }}>{t.planEndsAt ? new Date(t.planEndsAt).toLocaleDateString() : '-'}</div>
-                      </div>
-                    </div>
-                    <div className="actionWrap" style={{ marginTop: 10 }}>
-                      <button className="btn" onClick={() => openEdit(t)}>Düzenle</button>
-                      <button className="btn" onClick={() => openDelete(t)}>Sil</button>
-                      <button className="btn" onClick={() => toggleActive(t)}>{t.isActive ? 'Pasifleştir' : 'Aktifleştir'}</button>
-                      <button className="btn" onClick={() => openAssign(t)}>{t.planName ? 'Plan Değiştir' : 'Plan Ata'}</button>
-                      <button className="btn" onClick={() => openExtend(t)}>Deneme Uzat</button>
-                      <button className="btn" onClick={() => endTrial(t)}>Denemeyi Bitir</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <table className="table">
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <colgroup>
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: 140 }} />
+                </colgroup>
                 <thead>
-                  <tr><th>Ad</th><th>Durum</th><th>Plan</th><th>Plan Durumu</th><th>Bitiş</th><th style={{ width: 420 }}>Aksiyonlar</th></tr>
+                  <tr>
+                    <th>Isletme</th>
+                    <th>E-posta</th>
+                    <th>Telefon</th>
+                    <th>Durum</th>
+                    <th>Paket</th>
+                    <th>Paket Durumu</th>
+                    <th>Bitis</th>
+                    <th>Kalan Sure</th>
+                    <th className="admin-actions-cell">Islemler</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {items.map(t => (
-                    <tr key={t._id}>
-                      <td>{t.name}</td>
-                      <td>{t.isActive ? 'Aktif' : 'Pasif'}</td>
-                      <td>{t.planName || '-'}</td>
-                      <td>{trStatusLabel(t.planStatus) || '-'}</td>
-                      <td>{t.planEndsAt ? new Date(t.planEndsAt).toLocaleDateString() : '-'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn" onClick={() => openEdit(t)}>Düzenle</button>
-                          <button className="btn" onClick={() => openDelete(t)}>Sil</button>
-                          <button className="btn" onClick={() => toggleActive(t)}>{t.isActive ? 'Pasifleştir' : 'Aktifleştir'}</button>
-                          <button className="btn" onClick={() => openAssign(t)}>{t.planName ? 'Plan Değiştir' : 'Plan Ata'}</button>
-                          <button className="btn" onClick={() => openExtend(t)}>Deneme Uzat</button>
-                          <button className="btn" onClick={() => endTrial(t)}>Denemeyi Bitir</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredItems.map((tenant) => {
+                    const tenantMeta = getTenantStateMeta(tenant)
+                    const planMeta = formatPlanBadge(tenant)
+                    const remainingMeta = getRemainingPlanMeta(tenant)
+                    const planName = getPlanDisplayName(tenant)
+                    return (
+                      <tr key={tenant._id} className="admin-table-row">
+                        <td title={tenant.name || ''}>
+                          <span className="admin-cell-ellipsis">{tenant.name || 'Isimsiz isletme'}</span>
+                        </td>
+                        <td title={tenant.ownerEmail || ''}>
+                          <span className="admin-cell-ellipsis admin-cell-secondary">{tenant.ownerEmail || 'E-posta yok'}</span>
+                        </td>
+                        <td title={tenant.ownerPhone || tenant.phone || ''}>
+                          <span className="admin-cell-ellipsis">{tenant.ownerPhone || tenant.phone || 'Telefon yok'}</span>
+                        </td>
+                        <td>
+                          <AdminStatusBadge tone={tenantMeta.tone}>{tenantMeta.label}</AdminStatusBadge>
+                        </td>
+                        <td title={planName}>
+                          <span className="admin-cell-ellipsis">{planName || 'Plan bilgisi bulunamadi'}</span>
+                        </td>
+                        <td>
+                          <AdminStatusBadge tone={planMeta.tone}>{planMeta.label}</AdminStatusBadge>
+                        </td>
+                        <td>
+                          <span className="admin-cell-ellipsis">{formatPlanDate(tenant.planEndsAt) || '-'}</span>
+                        </td>
+                        <td>
+                          <AdminStatusBadge tone={remainingMeta.tone}>{remainingMeta.label}</AdminStatusBadge>
+                        </td>
+                        <td className="admin-actions-cell">
+                          <AdminActionMenu
+                            items={[
+                              { label: 'Detay', onClick: () => openDetail(tenant) },
+                              { label: 'Duzenle', onClick: () => openEdit(tenant) },
+                              { label: planName ? 'Plan Degistir' : 'Plan Ata', onClick: () => openAssign(tenant) },
+                              { label: 'Deneme Uzat', onClick: () => openExtend(tenant) },
+                              { label: 'Denemeyi Bitir', onClick: () => endTrial(tenant) },
+                              { label: tenant.isActive ? 'Pasiflestir' : 'Aktiflestir', onClick: () => toggleActive(tenant) },
+                              { label: 'Sil', onClick: () => openDelete(tenant), danger: true },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
-            )
-          )
-        )}
+            </div>
+          )}
+        </AdminTableCard>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Yeni Üye">
-        <form onSubmit={onCreate} style={{ display: 'grid', gap: 10 }}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Yeni Uye">
+        <form onSubmit={onCreate} style={{ display: 'grid', gap: 12 }}>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Restoran Adı</div>
-            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Isletme Adi</div>
+            <input className="input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sahip Adı</div>
-            <input className="input" value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sahip Adi</div>
+            <input className="input" value={form.ownerName} onChange={(event) => setForm({ ...form, ownerName: event.target.value })} />
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sahip E-posta</div>
-            <input className="input" value={form.ownerEmail} onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} />
+            <input className="input" value={form.ownerEmail} onChange={(event) => setForm({ ...form, ownerEmail: event.target.value })} />
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şifre</div>
-            <input type="password" className="input" value={form.ownerPassword} onChange={(e) => setForm({ ...form, ownerPassword: e.target.value })} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Telefon</div>
+            <input className="input" value={form.ownerPhone} onChange={(event) => setForm({ ...form, ownerPhone: event.target.value })} />
           </label>
-          {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Üye Oluştur'}</button>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sifre</div>
+            <input type="password" className="input" value={form.ownerPassword} onChange={(event) => setForm({ ...form, ownerPassword: event.target.value })} />
+          </label>
+          {formError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div> : null}
+          <button className="btn btn--primary" disabled={formLoading}>{formLoading ? 'Gonderiliyor...' : 'Uye Olustur'}</button>
         </form>
       </Modal>
 
-      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title={`Plan Atama${assignTarget ? ` – ${assignTarget.name}` : ''}`}>
-        <form onSubmit={onAssign} style={{ display: 'grid', gap: 10 }}>
+      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title={`Plan Atama${assignTarget ? ` • ${assignTarget.name}` : ''}`}>
+        <form onSubmit={onAssign} style={{ display: 'grid', gap: 12 }}>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Plan</div>
-            <select className="input" value={assignForm.planId} onChange={(e) => setAssignForm({ ...assignForm, planId: e.target.value })}>
-              <option value="">Seçiniz</option>
-              {plans.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+            <select className="input" value={assignForm.planId} onChange={(event) => setAssignForm({ ...assignForm, planId: event.target.value })} disabled={assignPlansLoading}>
+              <option value="">Seciniz</option>
+              {plans.map((plan) => <option key={plan._id || plan.id} value={plan._id || plan.id}>{plan.name}</option>)}
             </select>
           </label>
+          {assignPlansLoading ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>Uygun planlar yukleniyor...</div> : null}
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Başlangıç Tarihi</div>
-            <input type="text" className="input" placeholder="gg/aa/yyyy" value={assignForm.startsAt} onChange={(e) => setAssignForm({ ...assignForm, startsAt: e.target.value })} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Baslangic Tarihi</div>
+            <input type="date" className="input" value={assignForm.startsAt} onChange={(event) => setAssignForm({ ...assignForm, startsAt: event.target.value })} />
           </label>
-          {assignError && <div style={{ color: '#ef4444', fontSize: 13 }}>{assignError}</div>}
-          <button className="btn" disabled={assignLoading || !assignForm.planId}>{assignLoading ? 'Gönderiliyor...' : 'Ata'}</button>
+          {assignError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{assignError}</div> : null}
+          <button className="btn btn--primary" disabled={assignLoading || !assignForm.planId}>{assignLoading ? 'Gonderiliyor...' : 'Ata'}</button>
         </form>
       </Modal>
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Üye Düzenle${editTarget ? ` – ${editTarget.name}` : ''}`}>
-        <form onSubmit={onEdit} style={{ display: 'grid', gap: 10 }}>
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={`Uye Detayi${detailTarget ? ` • ${detailTarget.name}` : ''}`}>
+        {detailTarget ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div className="card" style={{ display: 'grid', gap: 10 }}>
+              <div style={{ fontWeight: 800 }}>{detailTarget.name}</div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div><strong>Paket adi:</strong> {getPlanDisplayName(detailTarget) || 'Plan bilgisi bulunamadi'}</div>
+                <div><strong>Paket baslangic tarihi:</strong> {formatPlanDate(detailTarget.planStartedAt) || '-'}</div>
+                <div><strong>Paket bitis tarihi:</strong> {formatPlanDate(detailTarget.planEndsAt) || '-'}</div>
+                <div><strong>Kalan sure:</strong> {getRemainingPlanMeta(detailTarget).label}</div>
+                <div><strong>Paket durumu:</strong> {formatPlanBadge(detailTarget).label}</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Uye Duzenle${editTarget ? ` • ${editTarget.name}` : ''}`}>
+        <form onSubmit={onEdit} style={{ display: 'grid', gap: 12 }}>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
-            <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Isletme Adi</div>
+            <input className="input" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta</div>
-            <input className="input" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+            <input className="input" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} />
           </label>
-          {editError && <div style={{ color: '#ef4444', fontSize: 13 }}>{editError}</div>}
-          <button className="btn" disabled={editLoading}>{editLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Telefon</div>
+            <input className="input" value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} />
+          </label>
+          {editError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{editError}</div> : null}
+          <button className="btn btn--primary" disabled={editLoading}>{editLoading ? 'Gonderiliyor...' : 'Kaydet'}</button>
         </form>
       </Modal>
 
-      <Modal open={extendOpen} onClose={() => setExtendOpen(false)} title={`Deneme Uzat${assignTarget ? ` – ${assignTarget.name}` : ''}`}>
-        <form onSubmit={onExtend} style={{ display: 'grid', gap: 10 }}>
+      <Modal open={extendOpen} onClose={() => setExtendOpen(false)} title={`Deneme Uzat${assignTarget ? ` • ${assignTarget.name}` : ''}`}>
+        <form onSubmit={onExtend} style={{ display: 'grid', gap: 12 }}>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Gün</div>
-            <input type="number" className="input" value={extendForm.days} onChange={(e) => setExtendForm({ days: Number(e.target.value || 0) })} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Gun</div>
+            <input type="number" className="input" value={extendForm.days} onChange={(event) => setExtendForm({ days: Number(event.target.value || 0) })} />
           </label>
-          {extendError && <div style={{ color: '#ef4444', fontSize: 13 }}>{extendError}</div>}
-          <button className="btn" disabled={formLoading || !extendForm.days}>{formLoading ? 'Gönderiliyor...' : 'Uzat'}</button>
+          {extendError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{extendError}</div> : null}
+          <button className="btn btn--primary" disabled={formLoading || !extendForm.days}>{formLoading ? 'Gonderiliyor...' : 'Uzat'}</button>
         </form>
       </Modal>
+
       <ConfirmModal
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
-        title="Üye Sil"
-        description="Bu işlem geri alınamaz. Üye ve tüm verileri silinecek. Emin misiniz?"
+        title="Uye Sil"
+        description="Bu islem geri alinamaz. Uye ve tum verileri kalici olarak silinecek. Emin misiniz?"
         confirmText="Evet, Sil"
+        cancelText="Vazgec"
         danger={true}
         onConfirm={confirmDelete}
       />

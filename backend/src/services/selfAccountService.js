@@ -38,7 +38,11 @@ export const updateEmail = async (userId, email, currentPassword) => {
   const normalized = normalizeEmail(email)
   if (!normalized) throw error('email_required', 'Email zorunludur', 400)
 
-  const exists = await User.exists({ email: normalized, _id: { $ne: user._id } })
+  const exists = await User.exists({
+    email: normalized,
+    systemType: user.systemType || null,
+    _id: { $ne: user._id }
+  })
   if (exists) throw error('duplicate_email', 'Bu e-posta zaten kayıtlı', 409)
 
   user.email = normalized
@@ -79,4 +83,3 @@ export const updateUsername = async (userId, username, currentPassword) => {
   await auditLog(user.tenantId || null, user.id, 'me_username_update', 'User', user.id, { username: normalized }).catch(() => {})
   return toUserDto(user)
 }
-

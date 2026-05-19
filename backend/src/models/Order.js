@@ -3,8 +3,11 @@ import mongoose from 'mongoose'
 const paymentSchema = new mongoose.Schema(
   {
     method: { type: String, default: 'cash' },
+    methodId: { type: String, default: 'cash' },
     methodLabel: { type: String, default: '' },
+    methodName: { type: String, default: '' },
     methodBucket: { type: String, enum: ['cash', 'card', 'bank', 'account', 'other'], default: 'other' },
+    methodType: { type: String, enum: ['cash', 'card', 'bank', 'credit', 'other'], default: 'other' },
     amount: { type: Number, required: true, min: 0 },
     note: { type: String, default: '' }
   },
@@ -13,6 +16,11 @@ const paymentSchema = new mongoose.Schema(
 
 const itemSchema = new mongoose.Schema({
   menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', default: null },
+  productName: { type: String, default: '' },
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
+  categoryName: { type: String, default: '' },
+  imageUrl: { type: String, default: '' },
   nameSnapshot: { type: String, required: true },
   priceSnapshot: { type: Number, required: true, min: 0 },
   qty: { type: Number, required: true, min: 1 },
@@ -24,8 +32,10 @@ const itemSchema = new mongoose.Schema({
   status: { type: String, enum: ['open', 'sent', 'cooking', 'completed', 'cancelled'], default: 'open' },
   sentAt: { type: Date, default: null },
   cancelledAt: { type: Date, default: null },
+  cancelReason: { type: String, default: '' },
   kitchenBatchId: { type: String, default: null },
-  kitchenSentAt: { type: Date, default: null }
+  kitchenSentAt: { type: Date, default: null },
+  kitchenPrintedAt: { type: Date, default: null }
 })
 
 const kitchenBatchSchema = new mongoose.Schema(
@@ -42,6 +52,7 @@ const veresiyeEntrySchema = new mongoose.Schema(
   {
     accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomerAccount', required: true },
     accountName: { type: String, default: '' },
+    transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'AccountTransaction', default: null },
     amount: { type: Number, required: true, min: 0 },
     note: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -50,12 +61,42 @@ const veresiyeEntrySchema = new mongoose.Schema(
   { timestamps: false }
 )
 
+const deliveryAddressSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    addressText: { type: String, default: '' },
+    district: { type: String, default: '' },
+    neighborhood: { type: String, default: '' },
+    note: { type: String, default: '' },
+    mapUrl: { type: String, default: '' },
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null }
+  },
+  { _id: false }
+)
+
+const deliveryEventSchema = new mongoose.Schema(
+  {
+    type: { type: String, default: '' },
+    oldStatus: { type: String, default: '' },
+    newStatus: { type: String, default: '' },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    userName: { type: String, default: '' },
+    note: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
+  },
+  { _id: false }
+)
+
 const orderSchema = new mongoose.Schema(
   {
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
+    branchName: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    createdByUserName: { type: String, default: '' },
     createdByName: { type: String, default: '' },
     orderNo: { type: Number, default: null },
     orderDayKey: { type: String, default: '' },
@@ -81,13 +122,24 @@ const orderSchema = new mongoose.Schema(
     mergedIntoOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     mergeSourceOrderIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
     saleType: { type: String, enum: ['table', 'walkin', 'delivery'], default: 'table' },
+    deliveryType: { type: String, enum: ['table', 'takeaway', 'package'], default: null },
+    deliveryCustomerId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryCustomer', default: null },
     customerName: { type: String, default: '' },
     customerPhone: { type: String, default: '' },
     customerAddress: { type: String, default: '' },
     deliveryNote: { type: String, default: '' },
-    deliveryStatus: { type: String, enum: ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled'], default: 'pending' },
+    deliveryPaymentStatus: { type: String, enum: ['unknown', 'pay_on_delivery', 'already_paid', 'odeme_bekliyor', 'odeme_alindi', 'veresiye', 'online_odendi', 'iade_edildi'], default: 'unknown' },
+    deliveryPaymentMethod: { type: String, default: '' },
+    deliveryPaymentMethodLabel: { type: String, default: '' },
+    deliveryStatus: { type: String, enum: ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled', 'yeni', 'hazirlaniyor', 'kuryeye_atandi', 'yola_cikti', 'teslim_edildi', 'iptal_edildi', 'musteriyi_bulamadi', 'adreste_yok', 'geri_dondu'], default: 'pending' },
+    courierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    courierName: { type: String, default: '' },
+    courierAssignedAt: { type: Date, default: null },
+    courierDepartedAt: { type: Date, default: null },
     deliveryAt: { type: Date, default: null },
     deliveredAt: { type: Date, default: null },
+    deliveryAddress: { type: deliveryAddressSchema, default: () => ({}) },
+    deliveryEvents: { type: [deliveryEventSchema], default: [] },
     closedAt: { type: Date, default: null },
     kitchenEnabled: { type: Boolean, default: true },
     sendToKitchen: { type: Boolean, default: true },

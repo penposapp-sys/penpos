@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import PublicSystemLogin from '../../components/PublicSystemLogin.jsx'
+import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
 import { api } from '../../lib/apiClient.js'
 
 export default function CanteenLogin() {
@@ -9,10 +11,14 @@ export default function CanteenLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { document.title = 'PenPOS – Kantin Girişi' }, [])
+  useBodyLayoutMode('public-site-layout')
 
-  const onSubmit = async (e) => {
-    e.preventDefault()
+  useEffect(() => {
+    document.title = 'PenPOS - Mağaza Girişi'
+  }, [])
+
+  const onSubmit = async (event) => {
+    event.preventDefault()
     setLoading(true)
     setError('')
     try {
@@ -21,7 +27,7 @@ export default function CanteenLogin() {
         data: { identifier, password, portal: 'canteen' },
         silent: true,
         suppressAuthRedirect: true,
-        portalOverride: 'canteen'
+        portalOverride: 'canteen',
       })
       if (!loginRes?.ok || !loginRes?.token) {
         throw new Error(loginRes?.message || 'Giriş başarısız')
@@ -36,26 +42,41 @@ export default function CanteenLogin() {
   }
 
   return (
-    <div className="main" style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
-      <form className="card" style={{ width: 360 }} onSubmit={onSubmit}>
-        <div style={{ marginBottom: 20, textAlign: 'center' }}>
-          <Link to="/" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>← Geri Dön</Link>
-          <h3 style={{ marginTop: 10, marginBottom: 4 }}>Kantin Girişi</h3>
-        </div>
-
-        <div style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta / Kullanıcı adı</div>
-            <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} type="text" placeholder="e-posta veya kullanıcı adı" className="input" autoFocus />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şifre</div>
-            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="şifre" className="input" />
-          </label>
-          {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
-          <button className="btn" disabled={loading}>{loading ? 'Gönderiliyor...' : 'Giriş Yap'}</button>
-        </div>
-      </form>
-    </div>
+    <PublicSystemLogin
+      backTo="/login"
+      backLabel="Sistem seçimine dön"
+      brand="PenPOS"
+      systemLabel="KANTİN / MARKET YÖNETİMİ"
+      welcomeTitle="Hızlı kasa, stok ve cari akışlarını tek ekranda toplayın."
+      welcomeText="Barkodlu satış, stok hareketleri, cari bakiyeler ve günlük raporlar ile operasyonu sade ve hızlı yönetin."
+      formTitle="Mağaza Girişi"
+      formSubtitle="Mağaza veya market panelinize giriş yapın."
+      identifierLabel="E-posta / Kullanıcı Adı"
+      identifierPlaceholder="eposta veya kullanıcı adı"
+      passwordLabel="Şifre"
+      passwordPlaceholder="şifrenizi girin"
+      identifier={identifier}
+      password={password}
+      onIdentifierChange={setIdentifier}
+      onPasswordChange={setPassword}
+      onSubmit={onSubmit}
+      error={error}
+      loading={loading}
+      forgotTo="/forgot-password?portal=canteen"
+      submitLabel="Giriş Yap"
+      loadingLabel="Giriş yapılıyor..."
+      registerTo="/register?type=market"
+      registerLabel="Yeni İşletme Kaydı"
+      registerText="Mağaza veya market hesabınızı açın, ürünlerinizi ve şubelerinizi kolayca yönetin."
+      supportTitle="Mağaza desteği"
+      supportItems={[
+        { label: 'Barkodlu Satış', value: 'Hızlı kasa' },
+        { label: 'Stok + Cari', value: 'Tek panel' },
+      ]}
+      theme="canteen"
+      highlights={['Hızlı Kasa', 'Stok Takibi', 'Cari Hesap', 'Şube Yönetimi']}
+      panelQuote="Yoğun satış saatlerinde kasayı yavaşlatmadan ürün, stok ve cari akışlarını tek panelden kontrol edin."
+      panelCaption="Mağaza paneli"
+    />
   )
 }

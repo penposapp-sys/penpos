@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRef } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Users as IconTenant } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
@@ -8,6 +8,9 @@ import BranchSelectorModal from './BranchSelectorModal.jsx'
 import MobileTopSheetNav from './MobileTopSheetNav.jsx'
 import { useTheme } from '../theme/ThemeContext.jsx'
 import { useAppDate } from '../context/AppDateContext.jsx'
+import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
+import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
+import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionExpired } from '../lib/subscription.js'
 
 const todayYmd = () => {
   const d = new Date()
@@ -23,10 +26,20 @@ export default function Layout() {
   const { user, logout, tenantCtx } = useAuth()
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const { themeKey, theme } = useTheme()
+  const { getSetting } = useBusinessSettings()
   const { selectedDate, setSelectedDate } = useAppDate()
   const dateInputRef = useRef(null)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useBodyLayoutMode('pos-app-layout')
+
+  useEffect(() => {
+    try { document.body.classList.add('app-shell-active') } catch {}
+    return () => {
+      try { document.body.classList.remove('app-shell-active') } catch {}
+    }
+  }, [])
 
   useEffect(() => {
     setMobileMenuOpen(false)
@@ -75,14 +88,14 @@ export default function Layout() {
   }, [isMobilePortrait])
 
   useEffect(() => {
-    if (pathname.startsWith('/login/platform')) document.title = 'PenPOS - Platform Yonetimi Girisi'
+    if (pathname.startsWith('/login/platform') || pathname.startsWith('/platform-login')) document.title = 'PenPOS - Platform Yönetimi Girişi'
     else if (pathname.startsWith('/login/restoran')) document.title = 'PenPOS - Restoran Girisi'
-    else if (pathname.startsWith('/login/kantin')) document.title = 'PenPOS - Kantin Girisi'
+    else if (pathname.startsWith('/login/kantin')) document.title = 'PenPOS - Mağaza Girişi'
     else if (pathname === '/') document.title = 'PenPOS - Giris Secimi'
     else if (pathname.startsWith('/superadmin/tenants')) document.title = 'PenPOS - Uyeler'
-    else if (pathname.startsWith('/platform/payments')) document.title = 'PenPOS - Odeme Talepleri'
+    else if (pathname.startsWith('/platform/billing-requests')) document.title = 'PenPOS - Uyelik Talepleri'
     else if (pathname.startsWith('/platform/kermes-tenants')) document.title = 'PenPOS - Kermes Uyeler'
-    else if (pathname.startsWith('/platform/canteen-tenants')) document.title = 'PenPOS - Kantin Uyeler'
+    else if (pathname.startsWith('/platform/canteen-tenants')) document.title = 'PenPOS - Mağaza Üyeleri'
     else if (pathname.startsWith('/platform/plans')) document.title = 'PenPOS - Paketler'
     else if (pathname.startsWith('/kermes')) document.title = 'PenPOS - Kermes'
     else document.title = 'PenPOS'
@@ -155,45 +168,54 @@ export default function Layout() {
   } else if (user.role === 'superadmin') {
     items.push({ path: '/superadmin/tenants', label: 'Uyeler', icon: IconTenant, show: true })
     items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
-    items.push({ path: '/platform/canteen-tenants', label: 'Kantin Uyeler', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
-    items.push({ path: '/platform/payments', label: 'Odeme Talepleri', icon: IconCreditCard, show: true })
+    items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })
   } else if (user.role === 'platform_admin') {
     items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
-    items.push({ path: '/platform/canteen-tenants', label: 'Kantin Uyeler', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
-    items.push({ path: '/platform/payments', label: 'Odeme Talepleri', icon: IconCreditCard, show: true })
+    items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })
   } else {
-    const isExpired = tenantCtx?.tenant?.plan?.status === 'expired'
+    const isExpired = isSubscriptionExpired(tenantCtx)
     const perms = Array.isArray(user?.permissions) ? user.permissions : []
     const canSettings = user.role === 'tenant_admin' || perms.includes('manage_settings') || perms.includes('manage_menu')
+    const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
 
-    if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) {
+    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view'))) {
       items.push({ path: '/kermes/app/dashboard', label: 'Anasayfa', icon: IconHome, show: true })
       items.push({ path: '/kermes/app/reports', label: 'Raporlar', icon: IconFileCheck, show: true })
     }
-    if (user.role === 'tenant_admin' || perms.includes('manage_tables')) {
+    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('manage_tables'))) {
       items.push({ path: '/kermes/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) {
       items.push({ path: '/kermes/app/kitchen', label: 'Hazirlanacaklar', icon: IconUtensils, show: true })
-      items.push({ path: '/kermes/app/kitchen/bulk', label: 'Toplu Hazirlama', icon: IconUtensils, show: true })
+      items.push({ path: '/kermes/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) {
-      items.push({ path: '/kermes/app/walkin', label: 'Masasiz Satis', icon: IconShoppingCart, show: true })
+      items.push({ path: '/kermes/app/walkin', label: 'Masasız Satış', icon: IconShoppingCart, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) {
       items.push({ path: '/kermes/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true })
     }
-    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) {
+    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('package_courier_page_view') || perms.includes('package_orders_view'))) {
+      items.push({ path: '/kermes/app/package-courier', label: 'Paket Kurye', icon: IconTruck, show: true })
+    }
+    if (!creditAccountsDisabled && !isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) {
       items.push({ path: '/kermes/app/accounts', label: 'Cari Hesaplar', icon: IconWallet, show: true })
     }
-    if (canSettings) {
+    if (isExpired) {
+      if (user.role === 'tenant_admin') {
+        items.push({ path: getSubscriptionUpgradePath(user.systemType), label: 'Paket Yükselt', icon: IconCreditCard, show: true })
+      }
+      items.push({ path: getSubscriptionProfilePath(user.systemType), label: 'Hesabım', icon: IconUserCog, show: true })
+    } else if (canSettings) {
       items.push({ path: '/kermes/settings', label: 'Ayarlar', icon: IconSettings, show: true })
     }
-    if (user.role === 'tenant_admin' || perms.includes('audit_view')) {
+    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('audit_view'))) {
       items.push({ path: '/kermes/app/audit', label: 'Denetim', icon: IconShieldCheck, show: true })
     }
   }
@@ -216,13 +238,25 @@ export default function Layout() {
     .sort((a, b) => String(b.to || '').length - String(a.to || '').length)[0]
 
   const activeIndex = navItems.findIndex((item) => item.to === current?.to)
-  const accountLabel = String(user?.name || user?.fullName || user?.username || user?.email || 'Kullanici').trim()
+  const accountLabel = String(user?.name || user?.fullName || user?.username || user?.email || 'Kullanıcı').trim()
   const pageTitle = pathname === '/kermes/app/pos'
     ? (String(location.state?.tableName || '').trim() || current?.label || 'Masalar')
     : (current?.label || 'Panel')
   const isDashboardPage = pathname === '/kermes/app/dashboard'
   const isReportsPage = pathname === '/kermes/app/reports'
+  const isSettingsRoute = pathname.startsWith('/kermes/settings')
   const isMonoTheme = themeKey === 'mono'
+  const sidebarTextColor = theme.darkMode ? 'var(--text-secondary)' : '#ffffff'
+  const sidebarActiveTextColor = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
+  const sidebarIconColor = theme.darkMode ? 'var(--text-secondary)' : '#ffffff'
+  const sidebarActiveIconColor = theme.darkMode ? '#b86e26' : '#d9862a'
+  const sidebarIconBg = theme.darkMode ? 'var(--surface-glass)' : 'rgba(255,255,255,0.08)'
+  const sidebarActiveIconBg = theme.darkMode ? '#f4f1ec' : 'transparent'
+  const logoutIconBg = theme.darkMode ? 'var(--surface-glass)' : 'rgba(255,255,255,0.16)'
+  const logoutTextColor = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
+  const sidebarLogoSrc = desktopCollapsed
+    ? '/logo-1.png'
+    : (theme.darkMode ? '/logo-3.png' : '/logo-2.png')
   const topbarDate = useMemo(() => {
     const value = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date()
     return value.toLocaleDateString('tr-TR', {
@@ -239,11 +273,11 @@ export default function Layout() {
   const navStep = navItemHeight + navItemGap
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', background: '#eef1f7', color: '#0f172a' }}>
+    <div className="pos-app-shell" style={{ background: 'transparent', color: 'var(--app-text, var(--text))' }}>
       <BranchSelectorModal />
       <MobileTopSheetNav
         open={isMobilePortrait && mobileMenuOpen}
-        title="Menu"
+        title="Menü"
         items={navItems}
         onClose={() => setMobileMenuOpen(false)}
         onSelect={(item) => {
@@ -251,20 +285,25 @@ export default function Layout() {
           nav(item.to)
         }}
       />
-      <div style={{ display: 'flex', height: '100%', alignItems: 'stretch', gap: 12, padding: isMobilePortrait ? 12 : 16, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: '100%', minHeight: 0, alignItems: isMobilePortrait ? 'stretch' : 'flex-start', gap: isSettingsRoute ? 10 : 12, padding: isMobilePortrait ? 12 : (isSettingsRoute ? 12 : 16) }}>
         {!isMobilePortrait && (
           <aside
+            className="pos-sidebar"
             style={{
-              position: 'relative',
+              position: 'sticky',
+              top: 16,
               zIndex: 20,
-              height: '100%',
+              alignSelf: 'flex-start',
               flexShrink: 0,
               width: sidebarWidth,
+              height: 'calc(100dvh - 32px)',
               overflow: 'hidden',
-              borderRadius: 34,
+              borderRadius: 36,
               background: theme.sidebar,
               padding: 12,
-              boxShadow: '0 24px 48px rgba(15, 23, 42, 0.22)',
+              border: '1px solid var(--border-soft)',
+              backdropFilter: 'blur(24px)',
+              boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -293,16 +332,18 @@ export default function Layout() {
                   height: 64,
                   display: 'grid',
                   placeItems: 'center',
-                  borderRadius: 22,
-                  background: '#ffffff',
-                  boxShadow: '0 18px 40px rgba(15, 23, 42, 0.16)',
+                  borderRadius: 24,
+                  border: '1px solid var(--border-soft)',
+                  background: 'var(--card-bg)',
+                  backdropFilter: 'var(--glass-blur)',
+                  boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
                   cursor: 'pointer',
                   transition: 'width 500ms ease'
                 }}
                 aria-label="Sidebari Ac Kapat"
               >
                 <img
-                  src={desktopCollapsed ? '/logo-1.png' : '/logo-2.png'}
+                  src={sidebarLogoSrc}
                   alt="PenPOS"
                   style={{
                     width: desktopCollapsed ? 36 : 110,
@@ -329,12 +370,13 @@ export default function Layout() {
                       zIndex: 0,
                       height: navItemHeight,
                       width: navButtonWidth,
-                      borderRadius: 22,
-                      background: 'rgba(255,255,255,0.95)',
-                      boxShadow: theme.activeGlow,
+                      borderRadius: 24,
+                      background: 'var(--menu-active-bg, var(--card-hover))',
+                      boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
                       transition: 'transform 500ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms ease',
                       transform: `translateY(${activeIndex * navStep}px)`,
-                      border: '1px solid rgba(255,255,255,0.6)'
+                      border: '1px solid var(--border-hover)',
+                      backdropFilter: 'var(--glass-blur)'
                     }}
                   />
                 )}
@@ -344,12 +386,19 @@ export default function Layout() {
                   const active = item.to === current?.to
 
                   return (
-                    <button
-                    className="sidebar-menu-button"
+                    <Link
+                    className="sidebar-menü-button"
                     key={item.to}
-                    type="button"
-                    onClick={() => {
-                      nav(item.to)
+                    to={item.to}
+                    onClick={(event) => {
+                      if (
+                        event.defaultPrevented
+                        || event.button !== 0
+                        || event.metaKey
+                        || event.ctrlKey
+                        || event.shiftKey
+                        || event.altKey
+                      ) return
                       if (!desktopCollapsed) setDesktopCollapsed(true)
                     }}
                     title={item.label}
@@ -363,16 +412,17 @@ export default function Layout() {
                         justifyContent: desktopCollapsed ? 'center' : 'flex-start',
                         gap: desktopCollapsed ? 0 : 8,
                         padding: desktopCollapsed ? 0 : '0 12px',
-                        borderRadius: 22,
+                        borderRadius: 24,
                         border: 'none',
                         background: 'transparent',
-                        color: active ? '#0f172a' : (isMonoTheme ? '#334155' : 'rgba(255,255,255,0.78)'),
-                        transition: 'all 300ms ease'
+                        color: active ? sidebarActiveTextColor : sidebarTextColor,
+                        transition: 'all .25s ease',
+                        textDecoration: 'none'
                       }}
                     >
                       {!active && (
                         <span
-                          className="sidebar-menu-hover"
+                          className="sidebar-menü-hover"
                           style={{
                             position: 'absolute',
                             inset: 0,
@@ -390,10 +440,10 @@ export default function Layout() {
                             width: desktopCollapsed ? 32 : 34,
                             height: desktopCollapsed ? 32 : 34,
                             placeItems: 'center',
-                            borderRadius: 15,
-                            background: active ? theme.accent : (isMonoTheme ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.08)'),
-                            color: active ? '#ffffff' : (isMonoTheme ? '#0f172a' : '#ffffff'),
-                            boxShadow: active ? theme.activeGlow : 'none',
+                            borderRadius: 16,
+                            background: active ? sidebarActiveIconBg : (isMonoTheme ? 'rgba(15,23,42,0.06)' : sidebarIconBg),
+                            color: active ? sidebarActiveIconColor : (isMonoTheme ? '#0f172a' : sidebarIconColor),
+                            boxShadow: active && theme.darkMode ? 'var(--shadow-soft), var(--shadow-glow)' : 'none',
                             transform: active ? 'scale(1.05)' : 'scale(1)'
                           }}
                         >
@@ -406,19 +456,19 @@ export default function Layout() {
                           </span>
                         )}
                       </span>
-                    </button>
+                    </Link>
                   )
                 })}
               </div>
             </nav>
             <div style={{ marginTop: 'auto', paddingTop: 10, display: 'grid', gap: 6, justifyItems: desktopCollapsed ? 'center' : 'end' }}>
               {!desktopCollapsed && (
-                <div style={{ width: navButtonWidth, color: 'rgba(255,255,255,0.72)', fontSize: 11.5, fontWeight: 800, padding: '0 6px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ width: navButtonWidth, color: sidebarTextColor, fontSize: 11.5, fontWeight: 800, padding: '0 6px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {accountLabel}
                 </div>
               )}
               <button
-                className="sidebar-menu-button"
+                className="sidebar-menü-button"
                 type="button"
                 onClick={logout}
                 style={{
@@ -429,17 +479,17 @@ export default function Layout() {
                   justifyContent: desktopCollapsed ? 'center' : 'flex-start',
                   gap: desktopCollapsed ? 0 : 8,
                   padding: desktopCollapsed ? 0 : '0 12px',
-                  borderRadius: 22,
+                  borderRadius: 24,
                   border: 'none',
-                  background: desktopCollapsed ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.95)',
-                  color: desktopCollapsed ? '#ffffff' : '#0f172a',
+                  background: desktopCollapsed ? 'var(--surface-glass)' : 'var(--card-hover)',
+                  color: desktopCollapsed ? sidebarTextColor : logoutTextColor,
                   cursor: 'pointer',
                   fontWeight: 900
                 }}
-                title="Cikis"
+                title="Çıkış"
               >
                 <span
-                  className="sidebar-menu-hover"
+                  className="sidebar-menü-hover"
                   style={{
                     position: 'absolute',
                     inset: 0,
@@ -454,14 +504,14 @@ export default function Layout() {
                       width: desktopCollapsed ? 32 : 34,
                       height: desktopCollapsed ? 32 : 34,
                       placeItems: 'center',
-                      borderRadius: 15,
-                      background: desktopCollapsed ? 'rgba(255,255,255,0.08)' : theme.accent,
-                      color: desktopCollapsed ? '#ffffff' : '#ffffff'
+                      borderRadius: 16,
+                      background: desktopCollapsed ? logoutIconBg : 'var(--surface-strong)',
+                      color: desktopCollapsed ? sidebarIconColor : 'var(--surface-strong-contrast)'
                     }}
                   >
                     <IconLogin size={13} />
                   </span>
-                  {!desktopCollapsed && <span>Cikis</span>}
+                  {!desktopCollapsed && <span>Çıkış</span>}
                 </span>
               </button>
             </div>
@@ -469,8 +519,8 @@ export default function Layout() {
           </aside>
         )}
 
-        <main style={{ position: 'relative', zIndex: 10, minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 34, background: '#ffffff', padding: isMobilePortrait ? 14 : 18, boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)' }}>
-          <header
+        <main className="pos-main" style={{ position: 'relative', zIndex: 10, minWidth: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: isSettingsRoute ? 30 : 36, background: 'var(--card-bg)', border: '1px solid var(--border-soft)', backdropFilter: 'var(--glass-blur)', padding: isMobilePortrait ? 12 : (isSettingsRoute ? 12 : 18), boxShadow: 'var(--shadow-soft), var(--shadow-glow)', maxWidth: '100%' }}>
+          {!isSettingsRoute ? <header
             className="topbar"
             style={{
               marginBottom: 16,
@@ -491,10 +541,11 @@ export default function Layout() {
                 gap: 16,
                 flexWrap: 'wrap',
                 padding: isMobilePortrait ? '16px 18px' : '18px 22px',
-                borderRadius: 34,
+                borderRadius: 999,
                 background: theme.topbar,
-                border: `1px solid ${theme.border}`,
-                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)'
+                border: '1px solid var(--topbar-border)',
+                backdropFilter: 'blur(20px)',
+                boxShadow: 'var(--topbar-shadow)'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -502,7 +553,7 @@ export default function Layout() {
                   <button
                     className="hamburger-btn"
                     style={{ width: 40, height: 36, display: 'grid', placeItems: 'center', borderRadius: 14 }}
-                    aria-label="Menu"
+                    aria-label="Menü"
                     onClick={() => setMobileMenuOpen((value) => !value)}
                   >
                     ≡
@@ -528,7 +579,7 @@ export default function Layout() {
                     input.focus()
                     input.click()
                   }}
-                  style={{ position: 'relative', borderRadius: 16, background: '#ffffff', fontWeight: 800, overflow: 'hidden', cursor: isDashboardPage ? 'pointer' : 'default' }}
+                  style={{ position: 'relative', borderRadius: 999, background: 'var(--surface-glass)', color: 'var(--app-text, var(--text))', border: '1px solid var(--border-soft)', fontWeight: 800, overflow: 'hidden', cursor: isDashboardPage ? 'pointer' : 'default', backdropFilter: 'var(--glass-blur)' }}
                 >
                   {topbarDate}
                   {isDashboardPage && (
@@ -556,15 +607,15 @@ export default function Layout() {
                     type="button"
                     onClick={logout}
                     style={{
-                      borderRadius: 16,
-                      background: theme.accent,
-                      borderColor: theme.accent,
-                      color: '#ffffff',
+                      borderRadius: 999,
+                      background: 'linear-gradient(180deg, #ffffff 0%, #d7dbe3 100%)',
+                      borderColor: 'rgba(255,255,255,0.28)',
+                      color: '#111111',
                       fontWeight: 900,
-                      boxShadow: theme.activeGlow
+                      boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}
                   >
-                    Cikis
+                    Çıkış
                   </button>
                 )}
 
@@ -578,12 +629,12 @@ export default function Layout() {
                       } catch {}
                     }}
                     style={{
-                      borderRadius: 16,
-                      background: theme.accent,
-                      borderColor: theme.accent,
-                      color: '#ffffff',
+                      borderRadius: 999,
+                      background: 'linear-gradient(180deg, #ffffff 0%, #d7dbe3 100%)',
+                      borderColor: 'rgba(255,255,255,0.28)',
+                      color: '#111111',
                       fontWeight: 900,
-                      boxShadow: theme.activeGlow
+                      boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}
                   >
                     Rapor Indir
@@ -591,11 +642,11 @@ export default function Layout() {
                 )}
               </div>
             </div>
-          </header>
+          </header> : null}
 
-          <section style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: isMobilePortrait ? 0 : 2 }}>
-            <div style={{ minWidth: 0, minHeight: '100%' }}>
-              <div className="main" style={{ minHeight: '100%', padding: 0 }}>
+          <section className="page-scroll page-scroll-area scrollbar-hidden" style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingRight: isMobilePortrait ? 0 : 2, maxWidth: '100%' }}>
+            <div className="page-content" key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>
+              <div className="main" style={{ padding: 0 }}>
                 <Outlet />
               </div>
             </div>

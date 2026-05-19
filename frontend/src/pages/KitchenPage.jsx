@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import InputModal from '../components/InputModal.jsx'
 import MenuItemFilterDrawer from '../components/MenuItemFilterDrawer.jsx'
@@ -27,10 +28,10 @@ const SpeakerIcon = ({ muted = false }) => (
 
 const STATUS_LABELS_TR = {
   open: 'Bekliyor',
-  sent: 'Hazirlaniyor',
+  sent: 'Hazırlanıyor',
   cooking: 'Ocakta',
-  completed: 'Hazir',
-  cancelled: 'Iptal',
+  completed: 'Hazır',
+  cancelled: 'İptal',
   closed: 'Kapandi'
 }
 
@@ -108,6 +109,8 @@ export default function KitchenPage() {
   const initialLoadedRef = useRef(false)
   const restoreMainScrollTopRef = useRef(null)
   const { allowedBranchIds } = useAuth()
+  const { getSetting } = useBusinessSettings()
+  const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_normal' })
   const { soundEnabled, setSoundEnabled, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
   const [viewMode, setViewMode] = useState(() => {
@@ -296,18 +299,23 @@ export default function KitchenPage() {
 
   const submitCancel = async (reason) => {
     if (!cancelSelection) return
+    const safeReason = String(reason || '').trim()
+    if (requireCancelReasonForProduct && !safeReason) {
+      setError('İptal nedeni zorunlu')
+      return false
+    }
     try {
       const { orderId, itemIds, grouped, unitIndex } = cancelSelection
       const ids = Array.isArray(itemIds) ? itemIds : []
       if (grouped) {
         await api(`/api/kitchen/orders/${orderId}/items/group-cancel`, {
           method: 'PUT',
-          body: JSON.stringify({ itemIds: ids, reason })
+          body: JSON.stringify({ itemIds: ids, reason: safeReason })
         })
       } else if (ids.length === 1) {
         await api(`/api/kitchen/orders/${orderId}/items/${ids[0]}/cancel`, {
           method: 'PUT',
-          body: JSON.stringify({ reason, unitIndex })
+          body: JSON.stringify({ reason: safeReason, unitIndex })
         })
       }
       await load({ preserveScroll: true })
@@ -391,8 +399,8 @@ export default function KitchenPage() {
           : (o.saleType === 'delivery'
             ? (o.customerName ? `Paket • ${o.customerName}` : 'Paket')
             : (o.saleType === 'walkin'
-              ? (o.customerName ? `Hizli • ${o.customerName}` : 'Hizli Satis')
-              : (o?.orderNo ? `Siparis ${o.orderNo}` : `Siparis #${String(o.id).slice(-6)}`)))
+              ? (o.customerName ? `Hızlı • ${o.customerName}` : 'Hızlı Satis')
+              : (o?.orderNo ? `Sipariş ${o.orderNo}` : `Sipariş #${String(o.id).slice(-6)}`)))
         const sendTime = o.batchSentAt
           ? new Date(o.batchSentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
           : '-'
@@ -480,7 +488,7 @@ export default function KitchenPage() {
                             }}
                             disabled={!['sent', 'cooking'].includes(String(it.status || '')) || (viewMode === 'grouped' ? actionItemIds.length === 0 : !actionItemId)}
                           >
-                            Hazir
+                            Hazır
                           </button>
                           <button
                             type="button"
@@ -496,7 +504,7 @@ export default function KitchenPage() {
                             }}
                             disabled={!['sent', 'cooking'].includes(String(it.status || '')) || actionItemIds.length === 0}
                           >
-                            Iptal
+                            İptal
                           </button>
                         </div>
                       </div>
@@ -532,7 +540,7 @@ export default function KitchenPage() {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="stickyTop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingBottom: 12 }}>
+      <div className="stickyTop theme-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: 12, paddingBottom: 12, borderRadius: 16, border: '1px solid var(--app-border)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn" onClick={() => setViewMode('grouped')} aria-pressed={viewMode === 'grouped'}>Toplu</button>
           <button type="button" className="btn" onClick={() => setViewMode('separate')} aria-pressed={viewMode === 'separate'}>Ayri</button>
@@ -545,18 +553,18 @@ export default function KitchenPage() {
               setSoundEnabled(next)
               if (next) await ensureAudioUnlocked()
             }}
-            title={soundEnabled ? 'Ses Acik (Kapat)' : 'Ses Kapali (Ac)'}
+            title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapali (Ac)'}
           >
             <SpeakerIcon muted={!soundEnabled} />
           </button>
         </div>
       </div>
 
-      {error && <div style={{ color: '#ef4444' }}>{error}</div>}
+      {error && <div className="theme-card-soft" style={{ color: '#fca5a5', borderRadius: 16, padding: 12 }}>{error}</div>}
 
       {filteredOut && (
-        <div className="card" style={{ borderColor: '#f59e0b', color: '#111827' }}>
-          Filtreler tum urunleri gizliyor.
+        <div className="card theme-card-soft" style={{ borderColor: '#f59e0b', color: 'var(--app-text)' }}>
+          Filtreler tüm urunleri gizliyor.
           <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn" type="button" onClick={() => setFilterOpen(true)}>Filtreyi Ac</button>
             <button className="btn" type="button" onClick={() => menuFilters.resetAllVisible()}>Hepsini Ac</button>
@@ -569,9 +577,9 @@ export default function KitchenPage() {
       <InputModal
         open={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
-        title="Iptal Sebebi"
+        title="İptal Sebebi"
         initialValue={cancelReason}
-        placeholder="Iptal sebebi..."
+        placeholder="İptal sebebi..."
         onSubmit={submitCancel}
         autoFocus={false}
       />

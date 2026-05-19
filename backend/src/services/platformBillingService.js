@@ -5,6 +5,7 @@ import MembershipRequest from '../models/MembershipRequest.js'
 import Tenant from '../models/Tenant.js'
 import Plan from '../models/Plan.js'
 import { updateById as updateTenantById } from '../repositories/tenantRepository.js'
+import { ensurePlanMatchesTenant } from './planService.js'
 
 const normalizeStatus = (s) => {
   const t = String(s || '').trim().toLowerCase()
@@ -60,7 +61,7 @@ export const listMembershipRequestsService = async ({ status, systemType } = {})
     ? await Tenant.find({ _id: { $in: tenantIds.map(id => new mongoose.Types.ObjectId(id)) } }).select('name systemType').lean()
     : []
   const plans = planIds.length > 0
-    ? await Plan.find({ _id: { $in: planIds.map(id => new mongoose.Types.ObjectId(id)) } }).select('name price systemType isActive trialDays').lean()
+    ? await Plan.find({ _id: { $in: planIds.map(id => new mongoose.Types.ObjectId(id)) } }).select('name price systemType isActive trialDays isTrial packageType vertical').lean()
     : []
 
   const tenantById = new Map(tenants.map(t => [String(t._id), t]))
@@ -75,18 +76,16 @@ export const listMembershipRequestsService = async ({ status, systemType } = {})
 export const approveMembershipRequestService = async (id, actorUserId, decisionNote) => {
   if (!mongoose.isValidObjectId(id)) throw error('invalid_request', 'Invalid request id', 400)
   const reqDoc = await MembershipRequest.findById(id)
-  if (!reqDoc) throw error('not_found', 'Talep bulunamadı', 404)
+  if (!reqDoc) throw error('not_found', 'Talep bulunamadi', 404)
   if (reqDoc.status !== 'pending') throw error('invalid_state', 'Talep beklemiyor', 409)
 
   const tenant = await Tenant.findById(reqDoc.tenantId)
-  if (!tenant) throw error('not_found', 'Tenant bulunamadı', 404)
+  if (!tenant) throw error('not_found', 'Tenant bulunamadi', 404)
   if (!reqDoc.requestedPlanId) throw error('invalid_request', 'requestedPlanId yok', 400)
   const plan = await Plan.findById(reqDoc.requestedPlanId)
-  if (!plan || !plan.isActive) throw error('plan_inactive', 'Plan aktif değil', 400)
-
-  const tenantSystem = String(tenant.systemType || 'kermes')
-  const planSystem = String(plan.systemType || 'kermes')
-  if (tenantSystem !== planSystem) throw error('plan_system_mismatch', 'Plan sistem tipi uyumsuz', 409)
+  if (!plan || !plan.isActive) throw error('plan_inactive', 'Plan aktif degil', 400)
+  if (plan.isTrial) throw error('invalid_plan', 'Deneme paketi manuel onay akisi icin kullanilamaz', 400)
+  ensurePlanMatchesTenant(tenant, plan)
 
   const now = new Date()
   const endsAt = plan.trialDays && plan.trialDays > 0
@@ -101,7 +100,7 @@ export const approveMembershipRequestService = async (id, actorUserId, decisionN
     : (reqDoc.decisionNote || '')
   await reqDoc.save()
 
-  await updateTenantById(String(tenant._id), { planId: plan._id, planStartedAt: now, planEndsAt: endsAt, status: 'active' })
+  await updateTenantById(String(tenant._id), { planId: plan._id, packageId: plan._id, planStartedAt: now, planEndsAt: endsAt, trialStartsAt: plan.isTrial ? now : null, trialEndsAt: plan.isTrial ? endsAt : null, subscriptionStatus: plan.isTrial ? 'trial' : 'active', status: 'active' })
   await auditLog(String(tenant._id), actorUserId || null, 'membership_request_approved', 'MembershipRequest', String(reqDoc._id), { planId: String(plan._id) })
   await auditLog(String(tenant._id), actorUserId || null, 'uye_plan_degisti', 'Tenant', String(tenant._id), { planId: String(plan._id) })
   return { success: true, tenantId: String(tenant._id), planId: String(plan._id) }
@@ -110,7 +109,7 @@ export const approveMembershipRequestService = async (id, actorUserId, decisionN
 export const rejectMembershipRequestService = async (id, actorUserId, decisionNote) => {
   if (!mongoose.isValidObjectId(id)) throw error('invalid_request', 'Invalid request id', 400)
   const reqDoc = await MembershipRequest.findById(id)
-  if (!reqDoc) throw error('not_found', 'Talep bulunamadı', 404)
+  if (!reqDoc) throw error('not_found', 'Talep bulunamadi', 404)
   if (reqDoc.status !== 'pending') throw error('invalid_state', 'Talep beklemiyor', 409)
   const now = new Date()
   reqDoc.status = 'rejected'

@@ -2,13 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
+import { isSubscriptionExpired } from '../../lib/subscription.js'
+import {
+  formatPlanBadge,
+  formatPlanDate,
+  getPlanDisplayName,
+  getRemainingPlanMeta,
+  resolvePlanType,
+} from '../../lib/planPresentation.js'
 
 const statusLabel = (s) => {
   const t = String(s || '').toLowerCase()
   if (t === 'pending') return 'Beklemede'
-  if (t === 'approved') return 'Onaylandı'
+  if (t === 'approved') return 'Onaylandi'
   if (t === 'rejected') return 'Reddedildi'
-  if (t === 'cancelled') return 'İptal edildi'
+  if (t === 'cancelled') return 'Iptal edildi'
   return String(s || '')
 }
 
@@ -29,13 +37,24 @@ const toLocal = (d) => {
 const normalizeLimits = (raw) => {
   const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null
   if (!obj) return []
+  const labelMap = {
+    products: 'Ürün',
+    product: 'Ürün',
+    tables: 'Masa',
+    table: 'Masa',
+    staff: 'Personel',
+    users: 'Kullanıcı',
+    branches: 'Şube',
+    devices: 'Cihaz'
+  }
   return Object.entries(obj)
-    .map(([k, v]) => [String(k || ''), v])
+    .map(([k, v]) => [labelMap[String(k || '').trim().toLowerCase()] || String(k || ''), v])
     .filter(([k]) => !!k)
 }
 
 export default function CanteenSettingsBillingPage() {
-  const { me } = useOutletContext()
+  const { me, tenantCtx } = useOutletContext()
+  const expired = isSubscriptionExpired(tenantCtx)
   const perms = Array.isArray(me?.permissions) ? me.permissions : []
   const canView = me?.role === 'tenant_admin' || perms.includes('canteen_settings_manage') || perms.includes('canteen_billing_view')
   const canManage = me?.role === 'tenant_admin' || perms.includes('canteen_settings_manage') || perms.includes('canteen_billing_manage')
@@ -61,31 +80,39 @@ export default function CanteenSettingsBillingPage() {
   const [saving, setSaving] = useState(false)
 
   const requestablePlans = useMemo(() => {
-    return (plans || []).map(p => ({ key: String(p.id || ''), label: String(p.name || ''), price: Number(p.price || 0) }))
+    return (plans || []).map((p) => ({ key: String(p.id || ''), label: String(p.name || ''), price: Number(p.price || 0) }))
   }, [plans])
 
-  const loadPlan = async () => {
-    setPlanLoading(true)
-    setPlanError('')
-    const ctx = await api('/api/tenant/context', { silent: true })
-    const p = ctx?.tenant?.plan || null
-    if (!ctx?.tenant) setPlanError('Plan bilgisi bulunamadı')
-    setPlan(p)
-    setPlanLoading(false)
+  const loadPlan = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setPlanLoading(true)
+    if (!background) setPlanError('')
+    try {
+      const ctx = await api('/api/tenant/context', { silent: true, portalOverride: 'canteen' })
+      const nextPlan = ctx?.tenant?.currentPlan || ctx?.tenant?.plan || ctx?.tenant?.expiredPlan || null
+      if (!ctx?.tenant) setPlanError('Plan bilgisi bulunamadi')
+      setPlan(nextPlan)
+    } catch (err) {
+      setPlan(null)
+      setPlanError(err?.message || 'Plan bilgisi bulunamadi')
+    } finally {
+      if (!background) setPlanLoading(false)
+    }
   }
 
-  const loadRequests = async () => {
-    setLoading(true)
-    setError('')
+  const loadRequests = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setLoading(true)
+    if (!background) setError('')
     const res = await api('/api/canteen/billing/requests', { silent: true })
     if (!res?.ok) {
-      setError(res?.message || 'Üyelik talepleri alınamadı')
+      setError(res?.message || 'Uyelik talepleri alinamadi')
       setItems([])
-      setLoading(false)
+      if (!background) setLoading(false)
       return
     }
     setItems(Array.isArray(res?.items) ? res.items : [])
-    setLoading(false)
+    if (!background) setLoading(false)
   }
 
   const loadPlans = async () => {
@@ -93,12 +120,12 @@ export default function CanteenSettingsBillingPage() {
     setPlansError('')
     const res = await api('/api/canteen/billing/plans', { silent: true })
     if (!res?.ok) {
-      setPlansError(res?.message || 'Planlar alınamadı')
+      setPlansError(res?.message || 'Planlar alinamadi')
       setPlans([])
       setPlansLoading(false)
       return
     }
-    const list = Array.isArray(res?.items) ? res.items : []
+    const list = (Array.isArray(res?.items) ? res.items : []).filter((item) => resolvePlanType(item) === 'canteen')
     setPlans(list)
     if (!requestedPlanId && list.length > 0) setRequestedPlanId(String(list[0].id || ''))
     setPlansLoading(false)
@@ -126,7 +153,7 @@ export default function CanteenSettingsBillingPage() {
     if (!canManage) return
     const planId = String(requestedPlanId || '').trim()
     if (!planId) {
-      setError('Plan seçimi gerekli')
+      setError('Plan secimi gerekli')
       return
     }
     const limits = {}
@@ -145,7 +172,7 @@ export default function CanteenSettingsBillingPage() {
     const res = await api('/api/canteen/billing/requests', { method: 'POST', data: payload, silent: true })
     setSaving(false)
     if (!res?.ok) {
-      setError(res?.message || 'Talep oluşturulamadı')
+      setError(res?.message || 'Talep olusturulamadi')
       return
     }
     setCreateOpen(false)
@@ -166,34 +193,49 @@ export default function CanteenSettingsBillingPage() {
     await loadRequests()
   }
 
-  if (!canView) return <div className="card">403 – Bu sayfaya yetkin yok</div>
+  if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
   const planLimits = normalizeLimits(plan?.limits)
+  const planMeta = formatPlanBadge(plan || {})
+  const remainingMeta = getRemainingPlanMeta(plan || {})
+  const planName = getPlanDisplayName(plan)
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
+      {expired && (
+        <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>
+          Paket sureniz doldu. Sistemi kullanmaya devam etmek icin planinizi yukseltin.
+        </div>
+      )}
+
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontWeight: 700 }}>Mevcut Plan</div>
-            <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>Abonelik/plan ve limit bilgileri.</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>Abonelik, plan ve limit bilgileri.</div>
           </div>
           <button className="btn btn--compact" type="button" onClick={loadPlan} disabled={planLoading || saving}>{planLoading ? '...' : 'Yenile'}</button>
         </div>
 
         {planError && <div style={{ color: 'var(--muted)' }}>{planError}</div>}
 
-        {!planLoading && !plan && !planError && <div style={{ color: 'var(--muted)' }}>Plan bilgisi bulunamadı</div>}
+        {!planLoading && !planName && !planError && <div style={{ color: 'var(--muted)' }}>Plan bilgisi bulunamadi</div>}
 
-        {!!plan && (
+        {!!planName && (
           <div style={{ display: 'grid', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 900, fontSize: 18 }}>{String(plan?.name || 'Plan')}</div>
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-                {plan?.status ? `Durum: ${String(plan.status)}` : ''}
-                {plan?.endsAt ? ` • Bitiş: ${toLocal(plan.endsAt)}` : ''}
-              </div>
+              <div style={{ fontWeight: 900, fontSize: 18 }}>{planName}</div>
+              <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--border)', background: '#f9fafb', fontWeight: 800 }}>
+                {planMeta.label}
+              </span>
             </div>
+
+            <div style={{ display: 'grid', gap: 6, color: 'var(--muted)', fontSize: 13 }}>
+              <div>Baslangic: {formatPlanDate(plan?.startsAt) || '-'}</div>
+              <div>Bitis: {formatPlanDate(plan?.endsAt) || '-'}</div>
+              <div>Kalan sure: {remainingMeta.label}</div>
+            </div>
+
             {planLimits.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {planLimits.slice(0, 8).map(([k, v]) => (
@@ -203,7 +245,7 @@ export default function CanteenSettingsBillingPage() {
                 ))}
               </div>
             ) : (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Limit bilgisi bulunamadı</div>
+              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Limit bilgisi bulunamadi</div>
             )}
           </div>
         )}
@@ -214,8 +256,8 @@ export default function CanteenSettingsBillingPage() {
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontWeight: 700 }}>Üyelik Talepleri</div>
-            <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>Yükseltme / limit artırma talepleri.</div>
+            <div style={{ fontWeight: 700 }}>Uyelik Talepleri</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>Yukseltme ve limit artirma talepleri.</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn--compact" type="button" onClick={loadRequests} disabled={loading || saving}>{loading ? '...' : 'Yenile'}</button>
@@ -257,7 +299,7 @@ export default function CanteenSettingsBillingPage() {
 
                 {canManage && isPending && (
                   <div>
-                    <button className="btn btn--danger btn--compact" type="button" onClick={() => cancel(it.id)} disabled={saving}>İptal Et</button>
+                    <button className="btn btn--danger btn--compact" type="button" onClick={() => cancel(it.id)} disabled={saving}>Iptal Et</button>
                   </div>
                 )}
               </div>
@@ -266,40 +308,41 @@ export default function CanteenSettingsBillingPage() {
         </div>
       </div>
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Üyelik Talebi">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Uyelik Talebi">
         <div style={{ display: 'grid', gap: 10 }}>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Paket</div>
             <select className="input" value={requestedPlanId} onChange={(e) => setRequestedPlanId(e.target.value)} style={{ height: 38 }} disabled={saving || plansLoading}>
-              {requestablePlans.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+              <option value="">Seciniz</option>
+              {requestablePlans.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
             </select>
             {!!plansError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 6 }}>{plansError}</div>}
-            {plansLoading && <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>Planlar yükleniyor...</div>}
+            {plansLoading && <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>Planlar yukleniyor...</div>}
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanıcı limiti</div>
-              <input className="input" value={limitUsers} onChange={(e) => setLimitUsers(e.target.value)} placeholder="örn: 10" disabled={saving} />
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanici limiti</div>
+              <input className="input" value={limitUsers} onChange={(e) => setLimitUsers(e.target.value)} placeholder="orn: 10" disabled={saving} />
             </label>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şube limiti</div>
-              <input className="input" value={limitBranches} onChange={(e) => setLimitBranches(e.target.value)} placeholder="örn: 3" disabled={saving} />
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sube limiti</div>
+              <input className="input" value={limitBranches} onChange={(e) => setLimitBranches(e.target.value)} placeholder="orn: 3" disabled={saving} />
             </label>
             <label>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Cihaz/Kasa limiti</div>
-              <input className="input" value={limitDevices} onChange={(e) => setLimitDevices(e.target.value)} placeholder="örn: 2" disabled={saving} />
+              <input className="input" value={limitDevices} onChange={(e) => setLimitDevices(e.target.value)} placeholder="orn: 2" disabled={saving} />
             </label>
           </div>
 
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
-            <textarea className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="örn: 2 kasa daha eklemek istiyoruz" rows={3} disabled={saving} />
+            <textarea className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="orn: 2 kasa daha eklemek istiyoruz" rows={3} disabled={saving} />
           </label>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button className="btn btn--compact" type="button" onClick={() => setCreateOpen(false)} disabled={saving}>Vazgeç</button>
-            <button className="btn btn--compact btn--primary" type="button" onClick={submitCreate} disabled={saving}>{saving ? '...' : 'Gönder'}</button>
+            <button className="btn btn--compact" type="button" onClick={() => setCreateOpen(false)} disabled={saving}>Vazgec</button>
+            <button className="btn btn--compact btn--primary" type="button" onClick={submitCreate} disabled={saving || !requestedPlanId}>{saving ? '...' : 'Gonder'}</button>
           </div>
         </div>
       </Modal>

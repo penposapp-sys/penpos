@@ -1,9 +1,28 @@
 import bcrypt from 'bcryptjs'
 import { error } from '../utils/errors.js'
 import { createTenant, listTenants, findTenantById, updateById as updateTenantById } from '../repositories/tenantRepository.js'
+import { findPlanById } from '../repositories/planRepository.js'
 import { createUser } from '../repositories/userRepository.js'
-import { getPlanStatus, getPlanDaysLeft, pickDefaultPlan } from './planService.js'
+import { getPlanStatus, getPlanDaysLeft } from './planService.js'
 import { log as auditLog } from './auditService.js'
+
+const buildPlanDto = async (tenant) => {
+  const status = getPlanStatus(tenant)
+  let planDoc = null
+  if (tenant?.planId) {
+    try {
+      planDoc = await findPlanById(tenant.planId)
+    } catch {}
+  }
+  return {
+    status,
+    name: planDoc?.name || '',
+    isTrial: planDoc?.isTrial === true || status === 'trial',
+    endsAt: tenant?.planEndsAt || tenant?.trialEndsAt || null,
+    startsAt: tenant?.planStartedAt || tenant?.trialStartsAt || null,
+    daysLeft: getPlanDaysLeft(tenant)
+  }
+}
 
 export const createTenantService = async ({ name, slug }, actorUserId) => {
   if (!name || !slug) throw error('validation_error', 'name and slug required', 400)
@@ -16,33 +35,24 @@ export const createTenantService = async ({ name, slug }, actorUserId) => {
     }
     throw err
   }
-  try {
-    const def = await pickDefaultPlan()
-    if (def) {
-      const now = new Date()
-      const ends = def.trialDays && def.trialDays > 0 ? new Date(now.getTime() + def.trialDays * 24 * 60 * 60 * 1000) : null
-      await updateTenantById(tenant.id, { planId: def.id, planStartedAt: now, planEndsAt: ends })
-      await auditLog(tenant.id, actorUserId || null, 'tenant_plan_degisti', 'Tenant', tenant.id, { planId: def.id, planName: def.name })
-    }
-  } catch {}
   return { id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status }
 }
 
 export const listTenantsService = async () => {
   const tenants = await listTenants()
-  return tenants.map(t => ({
-    id: t.id,
-    name: t.name,
-    slug: t.slug,
-    isActive: t.isActive,
-    status: t.status,
-    createdAt: t.createdAt,
-    plan: {
-      status: getPlanStatus(t),
-      endsAt: t.planEndsAt || null,
-      daysLeft: getPlanDaysLeft(t)
-    }
-  }))
+  const items = []
+  for (const t of tenants) {
+    items.push({
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      isActive: t.isActive,
+      status: t.status,
+      createdAt: t.createdAt,
+      plan: await buildPlanDto(t)
+    })
+  }
+  return items
 }
 
 export const createTenantAdminService = async (tenantId, { name, email, password }) => {
@@ -70,11 +80,7 @@ export const extendTrialService = async (tenantId, days, actorUserId) => {
   await auditLog(updated.id, actorUserId || null, 'trial_uzatildi', 'Tenant', updated.id, { days: safeDays })
   return {
     id: updated.id,
-    plan: {
-      status: getPlanStatus(updated),
-      endsAt: updated.planEndsAt || null,
-      daysLeft: getPlanDaysLeft(updated)
-    }
+    plan: await buildPlanDto(updated)
   }
 }
 
@@ -86,11 +92,7 @@ export const endTrialService = async (tenantId, actorUserId) => {
   await auditLog(updated.id, actorUserId || null, 'trial_sonlandirildi', 'Tenant', updated.id, {})
   return {
     id: updated.id,
-    plan: {
-      status: getPlanStatus(updated),
-      endsAt: updated.planEndsAt || null,
-      daysLeft: getPlanDaysLeft(updated)
-    }
+    plan: await buildPlanDto(updated)
   }
 }
 

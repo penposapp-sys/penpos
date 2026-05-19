@@ -7,15 +7,19 @@ import InputModal from '../components/InputModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import { isValidObjectId } from '../lib/ids.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import { useSafeOrderActions } from '../lib/useSafeOrderActions.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
-import { trPaymentMethodLabel, trStatusLabel } from '../i18n/tr.js'
+import { trStatusLabel } from '../i18n/tr.js'
 import ProductCard from '../components/ProductCard.jsx'
+import ProductImage from '../components/ProductImage.jsx'
 import { ServingType, normalizeServingType, servingTypeLabelTR } from '../utils/servingType.js'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
+import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
+import { openReceiptPopup } from '../lib/receiptPopup.js'
 
 export default function PosPage() {
   const nav = useNavigate()
@@ -25,6 +29,10 @@ export default function PosPage() {
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canTakePayment = hasPerm('take_payment')
   const canCreateVeresiye = hasPerm('create_veresiye')
+  const { getSetting } = useBusinessSettings()
+  const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
+  const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
+  const returnToOpenTablesAfterOrder = getSetting('order.returnToOpenTablesAfterOrder', false) === true
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const [categories, setCategories] = useState([])
@@ -34,7 +42,7 @@ export default function PosPage() {
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [payOpen, setPayOpen] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [discountDraft, setDiscountDraft] = useState(0)
@@ -594,10 +602,9 @@ export default function PosPage() {
           setPayMethods([])
           return
         }
-        const methods = Array.isArray(res?.methods) ? res.methods : []
-        setPayMethods(methods.filter(m => m.isEnabled))
-        const def = methods.find(m => m.isDefault && m.isEnabled)
-        if (def) setPaymentMethod(def.key)
+        const methods = Array.isArray(res?.methods) ? res.methods.filter((method) => method.isEnabled) : []
+        setPayMethods(methods)
+        setPaymentMethod((current) => pickInitialPaymentMethod(methods, current))
       } catch {}
     }
     loadPaymentSettings()
@@ -639,6 +646,16 @@ export default function PosPage() {
     if (fresh) {
       setOrder(fresh)
       setNote(fresh.note || '')
+    }
+  }
+
+  const openReceiptPreview = async () => {
+    const orderId = getOrderId(order)
+    if (!orderId) return
+    try {
+      await openReceiptPopup(orderId)
+    } catch (err) {
+      toast.error(err?.message || 'Fiş popup penceresi açılamadı')
     }
   }
 
@@ -739,9 +756,14 @@ export default function PosPage() {
       setError('Sipariş bulunamadı')
       return
     }
+    const reason = String(val || '').trim()
+    if (requireCancelReasonForProduct && !reason) {
+      toast.error('İptal nedeni zorunlu')
+      return false
+    }
     const key = `${orderId}:${selectedItemForCancel}:cancel`
     if (isDebounced(key, 250)) return
-    const res = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items/${selectedItemForCancel}/cancel`, { method: 'PUT', signal, silent: true })))
+    const res = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items/${selectedItemForCancel}/cancel`, { method: 'PUT', body: JSON.stringify({ reason }), signal, silent: true })))
     const fresh = pickOrder(res)
     if (fresh) {
       setNote(fresh.note || '')
@@ -800,15 +822,22 @@ export default function PosPage() {
     await flushPendingOrderEdits()
 
     const payload = { servingType: normalizeServingType(servingType) }
-    await safeAction(
+    const result = await safeAction(
       (signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: payload, signal, silent: true }),
       { reload: false }
     )
+    if (result && returnToOpenTablesAfterOrder && order?.tableId) {
+      nav('/kermes/app/tables')
+    }
   }
 
   const payOrder = async () => {
     if (!canTakePayment) {
       toast.error('Ödeme alma yetkiniz yok')
+      return
+    }
+    if (!String(paymentMethod || '').trim()) {
+      toast.error('Odeme yontemi secin')
       return
     }
     const amount = paymentAmount ? Number(paymentAmount) : 0
@@ -858,6 +887,28 @@ export default function PosPage() {
     }
   }
 
+  const deleteDiscount = async () => {
+    setDiscountDraft(0)
+    const orderId = getOrderId(order)
+    if (!orderId) {
+      toast.error('Sipariş bulunamadı (orderId yok)')
+      setError('Sipariş bulunamadı')
+      return
+    }
+    const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/discount`, {
+      method: 'PUT',
+      body: JSON.stringify({ discountPercent: 0 }),
+      signal,
+      silent: true
+    }))
+    const fresh = pickOrder(res)
+    if (fresh) {
+      setNote(fresh.note || '')
+      const due = Number(fresh.balanceDue ?? fresh.totals?.balanceDue ?? 0)
+      setPaymentAmount(due > 0 ? String(due) : '')
+    }
+  }
+
   const deletePayment = async (paymentId) => {
     if (!canTakePayment) {
       toast.error('Ödeme silme yetkiniz yok')
@@ -879,8 +930,8 @@ export default function PosPage() {
   }
 
   const openVeresiye = () => {
-    if (!canCreateVeresiye) {
-      toast.error('Veresiye yetkiniz yok')
+    if (!canCreateVeresiye || creditAccountsDisabled) {
+      toast.error(creditAccountsDisabled ? 'Cari hesap özelliği kapalı' : 'Veresiye yetkiniz yok')
       return
     }
     setVeresiyeOpen(true)
@@ -894,8 +945,8 @@ export default function PosPage() {
   }
 
   const submitVeresiye = async () => {
-    if (!canCreateVeresiye) {
-      toast.error('Veresiye yetkiniz yok')
+    if (!canCreateVeresiye || creditAccountsDisabled) {
+      toast.error(creditAccountsDisabled ? 'Cari hesap özelliği kapalı' : 'Veresiye yetkiniz yok')
       return
     }
     const orderId = getOrderId(order)
@@ -1118,16 +1169,18 @@ export default function PosPage() {
   const signedBalanceLabel = signedBalance < -0.01 ? 'Fazla' : 'Kalan'
   const signedBalanceValue = signedBalance < -0.01 ? Math.abs(signedBalance) : signedBalance
 
+  const selectedPaymentMethod = payMethods.find((method) => String(method?.key || method?.id || '') === String(paymentMethod || '')) || null
+  const selectedPaymentIsCash = isCashPaymentMethod(selectedPaymentMethod || paymentMethod)
   const cashPaidTotal = (() => {
     const payments = Array.isArray(order?.payments) ? order.payments : []
     return payments
-      .filter(p => String(p?.method || '') === 'cash')
+      .filter((payment) => isCashPaymentMethod(payment))
       .reduce((sum, p) => sum + (Number(p?.amount) || 0), 0)
   })()
-  const tenderedCash = paymentMethod === 'cash' ? (Number(paymentAmount) || 0) : 0
+  const tenderedCash = selectedPaymentIsCash ? (Number(paymentAmount) || 0) : 0
   const changeDue = (order?.settlementType === 'veresiye')
     ? 0
-    : (paymentMethod === 'cash'
+    : (selectedPaymentIsCash
       ? Math.max(0, (cashPaidTotal + tenderedCash) - netTotal)
       : 0)
   const canCloseTable =
@@ -1140,6 +1193,18 @@ export default function PosPage() {
 
   const previousLines = useMemo(() => {
     const out = []
+    if (discountTotal > 0) {
+      out.push({
+        kind: 'discount',
+        id: `discount:${String(order?.id || order?._id || '')}`,
+        createdAt: order?.updatedAt || order?.createdAt || null,
+        amount: discountTotal,
+        label: 'İndirim',
+        note: discountPercent > 0 ? `%${discountPercent} indirim uygulandı` : '',
+        accountName: '',
+        canDelete: !!canTakePayment
+      })
+    }
     const payments = Array.isArray(order?.payments) ? order.payments : []
     for (const p of payments) {
       out.push({
@@ -1147,7 +1212,7 @@ export default function PosPage() {
         id: String(p?._id || p?.id || ''),
         createdAt: p?.createdAt || p?.paidAt || null,
         amount: Number(p?.amount || 0) || 0,
-        label: String(p?.methodLabel || '').trim() || trPaymentMethodLabel(p?.method),
+        label: paymentMethodLabel(p),
         note: String(p?.note || ''),
         accountName: '',
         canDelete: !!canTakePayment
@@ -1182,7 +1247,7 @@ export default function PosPage() {
     return out
       .filter(x => x.id)
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-  }, [order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye])
+  }, [order?.id, order?._id, order?.updatedAt, order?.createdAt, order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye, discountTotal, discountPercent])
 
   const openPaymentModal = async () => {
     try {
@@ -1250,7 +1315,7 @@ export default function PosPage() {
         </div>
       )}
 
-      <div className="saleCartList" style={{ marginTop: 12 }}>
+      <div className="saleCartList order-cart-scroll scrollbar-hidden" style={{ marginTop: 12 }}>
         <div style={{ display: 'grid', gap: 8 }}>
           {(() => {
             const raw = Array.isArray(order?.items) ? order.items : []
@@ -1307,13 +1372,8 @@ export default function PosPage() {
             return (
               <div
                 key={row.key}
+                className="sale-cart-line"
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: '8px 12px',
                   opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
                 }}
               >
@@ -1321,28 +1381,32 @@ export default function PosPage() {
                   onClick={() => {
                     if (isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId: rowItemId })
                   }}
-                  style={isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
+                  className="sale-cart-line__info"
+                  style={{ ...(isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : {}) }}
                 >
-                  {it?.status === 'sent' && (
-                    <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
-                      Hazırlanıyor
-                    </span>
-                  )}
-                  {it?.status === 'completed' && (
-                    <span className="page-pill" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857', marginBottom: 4, display: 'inline-block' }}>
-                      Hazır
-                    </span>
-                  )}
-                  {it?.status === 'cancelled' && (
-                    <span className="page-pill" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c', marginBottom: 4, display: 'inline-block' }}>
-                      İptal
-                    </span>
-                  )}
-                  <div style={{ fontWeight: 600 }}>{it?.nameSnapshot}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detailText}</div>
-                  {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
+                  <ProductImage product={it} alt={it?.nameSnapshot} width={72} height={72} style={{ width: 72, minWidth: 72, height: 72, objectFit: 'cover', borderRadius: 10 }} />
+                  <div className="sale-cart-line__meta">
+                    {it?.status === 'sent' && (
+                      <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
+                        Hazırlanıyor
+                      </span>
+                    )}
+                    {it?.status === 'completed' && (
+                      <span className="page-pill" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857', marginBottom: 4, display: 'inline-block' }}>
+                        Hazır
+                      </span>
+                    )}
+                    {it?.status === 'cancelled' && (
+                      <span className="page-pill" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c', marginBottom: 4, display: 'inline-block' }}>
+                        İptal
+                      </span>
+                    )}
+                    <div style={{ fontWeight: 600 }}>{it?.nameSnapshot}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detailText}</div>
+                    {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="sale-cart-line__actions">
                   {isOpen && (
                     <>
                       <button
@@ -1476,7 +1540,7 @@ export default function PosPage() {
                       </button>
                     </>
                   )}
-                  <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{row.subtotal} TL</div>
+                  <div className="sale-cart-line__price" style={{ whiteSpace: 'nowrap' }}>{row.subtotal} TL</div>
                 </div>
               </div>
             )
@@ -1559,7 +1623,7 @@ export default function PosPage() {
               <button className="btn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
               <button className="btn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
               <button className="btn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-              <a className="btn" href={`/kermes/app/pos/orders/${order.id}/receipt`}>Fişi Gör</a>
+              <button className="btn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
             </div>
           </div>
         </div>
@@ -1604,14 +1668,14 @@ export default function PosPage() {
         </div>
       </div>
 
-    <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Ödeme Al">
+    <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Ödeme Al" dialogStyle={{ width: 'min(700px, calc(100vw - 32px))' }} bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}>
       <div className="payment-modal-stack">
         <div className="payment-meta-line">
           {tableName ? `Masa: ${tableName}` : 'Masasız'} • {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş —'}
         </div>
 
-        <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div className="payment-summary-card">
+        <div className="payment-panel">
+          <div className="payment-panel-body payment-summary-card">
             <div className="payment-summary-row">
               <div style={{ color: 'var(--muted)' }}>Brüt</div>
               <div style={{ fontWeight: 600 }}>{grossTotal.toFixed(2)} TL</div>
@@ -1628,7 +1692,7 @@ export default function PosPage() {
                   onChange={(e) => setDiscountDraft(e.target.value)}
                   disabled={!canTakePayment || busy}
                 />
-                <button className="btn" onClick={applyDiscount} disabled={!canTakePayment || busy}>
+                <button className="btn btn--compact" onClick={applyDiscount} disabled={!canTakePayment || busy}>
                   Uygula
                 </button>
               </div>
@@ -1653,8 +1717,9 @@ export default function PosPage() {
         </div>
 
         {previousLines.length > 0 && (
-          <div className="card" style={{ borderColor: 'var(--border)' }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Önceki Ödemeler</div>
+          <div className="payment-panel">
+            <div className="payment-panel-body">
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>Önceki Ödemeler</div>
             <div className="payment-history-list">
               {previousLines.map((r) => (
                 <div key={`${r.kind}:${r.id}`} className="payment-history-row">
@@ -1668,11 +1733,12 @@ export default function PosPage() {
                   </div>
                   {r.canDelete && (
                     <button
-                      className="btn"
+                      className="btn btn--compact"
                       onClick={() => {
                         if (r.kind === 'payment') return deletePayment(r.id)
                         if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
                         if (r.kind === 'collection') return deleteCollection(r.id)
+                        if (r.kind === 'discount') return deleteDiscount()
                       }}
                       disabled={busy}
                     >
@@ -1682,13 +1748,14 @@ export default function PosPage() {
                 </div>
               ))}
             </div>
+            </div>
           </div>
         )}
 
-        <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ display: 'grid', gap: 10 }}>
+        <div className="payment-panel">
+          <div className="payment-panel-body">
             <div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yöntem</div>
+              <div className="payment-field-label">Yöntem</div>
               <div className="payment-method-grid">
                 {payMethods.map((m) => {
                   const active = paymentMethod === m.key
@@ -1696,16 +1763,9 @@ export default function PosPage() {
                     <button
                       key={m.key}
                       type="button"
-                      className="btn"
+                      className={`btn payment-method-btn ${active ? 'is-active' : ''}`}
                       disabled={!canTakePayment || busy}
                       onClick={() => setPaymentMethod(m.key)}
-                      style={{
-                        minWidth: 96,
-                        fontWeight: active ? 800 : 600,
-                        background: active ? '#111827' : undefined,
-                        color: active ? '#fff' : undefined,
-                        borderColor: active ? '#111827' : undefined
-                      }}
                     >
                       {m.label}
                     </button>
@@ -1714,7 +1774,7 @@ export default function PosPage() {
               </div>
             </div>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
+              <div className="payment-field-label">Tutar</div>
               <input
                 type="number"
                 className="input"
@@ -1725,23 +1785,23 @@ export default function PosPage() {
               />
             </label>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not (opsiyonel)</div>
+              <div className="payment-field-label">Not (opsiyonel)</div>
               <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
             </label>
-            {paymentMethod === 'cash' && (
+            {selectedPaymentIsCash && (
               <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
                 <div>Paraüstü</div>
                 <div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
               </div>
             )}
             <div className="payment-actions">
-              <button className="btn" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
+              <button className="btn btn--compact" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
                 Ödeme Ekle
               </button>
-              <button className="btn" onClick={openVeresiye} disabled={!canCreateVeresiye || busy || balanceDue <= 0.01}>
+              <button className="btn btn--compact" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
                 Veresiye Yap
               </button>
-              <button className="btn" onClick={() => setPayOpen(false)} disabled={busy}>
+              <button className="btn btn--compact" onClick={() => setPayOpen(false)} disabled={busy}>
                 Kapat
               </button>
             </div>
@@ -1801,7 +1861,7 @@ export default function PosPage() {
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
           <input className="input" value={veresiyeNote} onChange={(e) => setVeresiyeNote(e.target.value)} disabled={busy} />
         </label>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="app-modal-footer">
           <button className="btn" onClick={submitVeresiye} disabled={!selectedAccount?.id || busy}>
             Onayla
           </button>
@@ -1831,7 +1891,7 @@ export default function PosPage() {
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
           <input className="input" value={createForm.note} onChange={(e) => setCreateForm({ ...createForm, note: e.target.value })} disabled={busy} />
         </label>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="app-modal-footer">
           <button className="btn" onClick={submitCreateAccount} disabled={busy}>
             Kaydet
           </button>
@@ -1869,7 +1929,9 @@ export default function PosPage() {
             ))}
           </select>
         </label>
-        <button className="btn" onClick={submitSplit}>Onayla</button>
+        <div className="app-modal-footer">
+          <button className="btn" onClick={submitSplit}>Onayla</button>
+        </div>
       </div>
     </Modal>
     <Modal open={transferOpen} onClose={() => setTransferOpen(false)} title="Masa Taşı">
@@ -1883,7 +1945,9 @@ export default function PosPage() {
             ))}
           </select>
         </label>
-        <button className="btn" onClick={submitTransfer} disabled={!targetTableId}>Taşı</button>
+        <div className="app-modal-footer">
+          <button className="btn" onClick={submitTransfer} disabled={!targetTableId}>Taşı</button>
+        </div>
       </div>
     </Modal>
     <InputModal

@@ -2,24 +2,33 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
-import EntryPage from './pages/EntryPage.jsx'
 import SignIn from './pages/SignIn.jsx'
 import PlatformLogin from './pages/PlatformLogin.jsx'
+import LandingPage from './pages/LandingPage.jsx'
+import LoginSelectionPage from './pages/LoginSelectionPage.jsx'
+import RegisterPage from './pages/RegisterPage.jsx'
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import SuperadminTenants from './pages/SuperadminTenants.jsx'
 import PlatformAdminTenants from './pages/PlatformAdminTenants.jsx'
 import PlatformAdminPlans from './pages/PlatformAdminPlans.jsx'
-import PlatformAdminPaymentRequests from './pages/PlatformAdminPaymentRequests.jsx'
+import PlatformAdminMembershipRequests from './pages/PlatformAdminMembershipRequests.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
+import { BusinessSettingsProvider } from './context/BusinessSettingsContext.jsx'
 import StaffPage from './pages/StaffPage.jsx'
-import SettingsPage, { SettingsSystemContent, SettingsMenuHub, SettingsTablesContent, SettingsPaymentsContent } from './pages/SettingsPage.jsx'
+import SettingsPage, { SettingsTablesContent, SettingsPaymentsContent } from './pages/SettingsPage.jsx'
+import { SettingsMenuHub, SettingsSystemContent } from './pages/BusinessSettingsPage.jsx'
 import SettingsMePage from './pages/SettingsMePage.jsx'
 import SettingsDeliveryPage from './pages/SettingsDeliveryPage.jsx'
 import CategoriesPage from './pages/CategoriesPage.jsx'
 import MenuItemsPage from './pages/MenuItemsPage.jsx'
+import ProductItemSettingsPage from './pages/ProductItemSettingsPage.jsx'
 import PosPage from './pages/PosPage.jsx'
 import WalkInPosPage from './pages/WalkInPosPage.jsx'
 import DeliveryOrdersPage from './pages/DeliveryOrdersPage.jsx'
+import DeliveryOrderDetailPage from './pages/DeliveryOrderDetailPage.jsx'
+import PackageCourierPage from './pages/PackageCourierPage.jsx'
 import KitchenPage from './pages/KitchenPage.jsx'
 import KitchenBulkPage from './pages/KitchenBulkPage.jsx'
 import ReportsSales from './pages/ReportsSales.jsx'
@@ -36,9 +45,11 @@ import AccountDetailPage from './pages/AccountDetailPage.jsx'
 import PublicMenuPage from './pages/PublicMenuPage.jsx'
 import DigitalMenuPage from './pages/DigitalMenuPage.tsx'
 import QrMenuSettingsPage from './pages/QrMenuSettingsPage.jsx'
+import PublicTenantWebsitePage, { RootPublicEntryPage } from './pages/PublicTenantWebsitePage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
+import WebsiteLoadingScreen from './components/WebsiteLoadingScreen.jsx'
 
 import CanteenLayout from './canteen/layout/CanteenLayout.jsx'
 import CanteenLogin from './canteen/pages/CanteenLogin.jsx'
@@ -57,6 +68,10 @@ import CanteenSettingsPaymentsPage from './canteen/pages/CanteenSettingsPayments
 import CanteenSettingsBillingPage from './canteen/pages/CanteenSettingsBillingPage.jsx'
 import CanteenPrintingSettingsPage from './canteen/pages/CanteenPrintingSettingsPage.jsx'
 import CanteenPrintStationPage from './canteen/pages/CanteenPrintStationPage.jsx'
+import CanteenSettingsQrPage from './canteen/pages/CanteenSettingsQrPage.jsx'
+import CanteenQrPricePage from './canteen/pages/CanteenQrPricePage.jsx'
+import CanteenQrOrdersPage from './canteen/pages/CanteenQrOrdersPage.jsx'
+import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionExpired } from './lib/subscription.js'
 
 const ProductReportPage = _ProductReportPage
 
@@ -64,17 +79,25 @@ const getDefaultRoute = (user, tenantCtx) => {
   if (!user) return null
   if (user.role === 'superadmin') return '/superadmin/tenants'
   if (user.role === 'platform_admin') return '/platform/kermes-tenants'
-  if (user.systemType === 'canteen') return '/canteen/kasa'
 
   const perms = Array.isArray(user.permissions) ? user.permissions : []
-  const isExpired = tenantCtx?.tenant?.plan?.status === 'expired'
+  const isExpired = isSubscriptionExpired(tenantCtx)
   const canSettings = user.role === 'tenant_admin' || perms.includes('manage_settings') || perms.includes('manage_menu')
+
+  if (isExpired) {
+    return user.role === 'tenant_admin'
+      ? getSubscriptionUpgradePath(user.systemType)
+      : getSubscriptionProfilePath(user.systemType)
+  }
+
+  if (user.systemType === 'canteen') return '/canteen/kasa'
 
   if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/kermes/app/dashboard'
   if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/kermes/app/tables'
   if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) return '/kermes/app/kitchen'
   if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) return '/kermes/app/walkin'
   if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) return '/kermes/app/delivery'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('package_courier_page_view') || perms.includes('package_orders_view'))) return '/kermes/app/package-courier'
   if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) return '/kermes/app/reports/sales'
   if (!isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) return '/kermes/app/accounts'
   if (canSettings) return '/kermes/settings'
@@ -82,38 +105,51 @@ const getDefaultRoute = (user, tenantCtx) => {
   return null
 }
 
-const RootIndexRedirect = () => {
-  const { user, loading, tenantCtx } = useAuth()
-  if (loading) return <div className="card">Yükleniyor...</div>
-  if (!user) return <EntryPage />
-
-  const nextPath = getDefaultRoute(user, tenantCtx)
-  if (nextPath) return <Navigate to={nextPath} replace />
-  return <div className="card">Yetkili sayfa yok, yöneticinle görüş</div>
-}
-
 const KermesIndexRedirect = () => {
   const { user, loading, tenantCtx } = useAuth()
-  if (loading) return <div className="card">Yükleniyor...</div>
-  if (!user) return <Navigate to="/" replace />
+  if (loading) {
+    return (
+      <WebsiteLoadingScreen
+        badge="Restoran paneli"
+        title="Paneliniz hazirlaniyor"
+        message="Oturum ve abonelik bilgileri kontrol edilirken restoran akisiniz web sitesi temasi ile kuruluyor."
+      />
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
 
   const nextPath = getDefaultRoute(user, tenantCtx)
   if (nextPath) return <Navigate to={nextPath} replace />
-  return <div className="card">Yetkili sayfa yok, yöneticinle görüş</div>
+  return <div className="card">Yetkili sayfa yok, yoneticinle gorus</div>
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <Toast />
-      <Routes>
+      <BusinessSettingsProvider>
+        <Toast />
+        <Routes>
+        <Route path="/" element={<RootPublicEntryPage fallback={<LandingPage />} />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/login" element={<LoginSelectionPage />} />
+        <Route path="/platform-login" element={<PlatformLogin />} />
+        <Route path="/login/platform" element={<Navigate to="/platform-login" replace />} />
+        <Route path="/login/restoran" element={<SignIn portal="kermes" />} />
+        <Route path="/login/kantin" element={<Navigate to="/canteen/login" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/menu/:tenantSlug" element={<PublicMenuPage />} />
+        <Route path="/site/:slug" element={<PublicTenantWebsitePage />} />
+        <Route path="/qr/:slug" element={<CanteenQrPricePage />} />
         <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
         <Route path="/canteen/login" element={<CanteenLogin />} />
+
         <Route path="/canteen" element={<CanteenLayout />}>
           <Route index element={<Navigate to="/canteen/kasa" replace />} />
           <Route path="kasa" element={<CanteenCashierPage />} />
+          <Route path="qr-siparisleri" element={<CanteenQrOrdersPage />} />
           <Route path="cariler" element={<CanteenCustomersPage />} />
           <Route path="cariler/:id" element={<CanteenCustomerDetailPage />} />
           <Route path="raporlar" element={<CanteenReportsPage />} />
@@ -125,75 +161,32 @@ export default function App() {
             <Route path="subeler" element={<CanteenSettingsBranchesPage />} />
             <Route path="personel" element={<CanteenSettingsStaffPage />} />
             <Route path="urunler" element={<CanteenSettingsProductsPage />} />
+            <Route path="qr" element={<CanteenSettingsQrPage />} />
             <Route path="yazicilar" element={<CanteenPrintingSettingsPage />} />
+            <Route path="yazıcılar" element={<CanteenPrintingSettingsPage />} />
             <Route path="odeme" element={<CanteenSettingsPaymentsPage />} />
+            <Route path="ödeme" element={<CanteenSettingsPaymentsPage />} />
             <Route path="paket" element={<CanteenSettingsBillingPage />} />
           </Route>
         </Route>
 
         <Route path="/" element={<Layout />}>
-          <Route index element={<RootIndexRedirect />} />
-          <Route path="login" element={<Navigate to="/" replace />} />
-          <Route path="login/platform" element={<PlatformLogin />} />
-          <Route path="login/restoran" element={<SignIn portal="kermes" />} />
-          <Route path="login/kantin" element={<Navigate to="/canteen/login" replace />} />
-          <Route path="platform-login" element={<Navigate to="/login/platform" replace />} />
           <Route path="platform-admin" element={<Navigate to="/platform/kermes-tenants" replace />} />
           <Route path="platform" element={<Navigate to="/platform/kermes-tenants" replace />} />
-          <Route
-            path="platform/kermes-tenants"
-            element={
-              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
-                <PlatformAdminTenants key="kermes" system="kermes" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="platform/canteen-tenants"
-            element={
-              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
-                <PlatformAdminTenants key="canteen" system="canteen" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="platform/plans"
-            element={
-              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
-                <PlatformAdminPlans />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="platform/payments"
-            element={
-              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
-                <PlatformAdminPaymentRequests />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="platform/settings/me"
-            element={
-              <ProtectedRoute roles={['platform_admin', 'superadmin']}>
-                <SettingsMePage apiBase="/api/platform" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="superadmin/tenants"
-            element={
-              <ProtectedRoute roles={['superadmin']}>
-                <SuperadminTenants />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="platform/kermes-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="kermes" system="kermes" /></ProtectedRoute>} />
+          <Route path="platform/canteen-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="canteen" system="canteen" /></ProtectedRoute>} />
+          <Route path="platform/plans" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminPlans /></ProtectedRoute>} />
+          <Route path="platform/billing-requests" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminMembershipRequests /></ProtectedRoute>} />
+          <Route path="platform/payments" element={<Navigate to="/platform/billing-requests" replace />} />
+          <Route path="platform/settings/me" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><SettingsMePage apiBase="/api/platform" /></ProtectedRoute>} />
+          <Route path="superadmin/tenants" element={<ProtectedRoute roles={['superadmin']}><SuperadminTenants /></ProtectedRoute>} />
         </Route>
 
         <Route path="/platform/tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
         <Route path="/platform-admin/kermes-tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
         <Route path="/platform-admin/plans" element={<Navigate to="/platform/plans" replace />} />
-        <Route path="/platform-admin/payments" element={<Navigate to="/platform/payments" replace />} />
+        <Route path="/platform-admin/billing-requests" element={<Navigate to="/platform/billing-requests" replace />} />
+        <Route path="/platform-admin/payments" element={<Navigate to="/platform/billing-requests" replace />} />
 
         <Route path="/kermes" element={<Layout />}>
           <Route index element={<KermesIndexRedirect />} />
@@ -204,7 +197,8 @@ export default function App() {
           <Route path="app/walkin" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />
           <Route path="app/walkin/:orderId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />
           <Route path="app/delivery" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'view_delivery']} system="kermes"><DeliveryOrdersPage /></ProtectedRoute>} />
-          <Route path="app/delivery/:orderId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'view_delivery']} system="kermes"><DeliveryOrdersPage /></ProtectedRoute>} />
+          <Route path="app/delivery/:orderId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'view_delivery']} system="kermes"><DeliveryOrderDetailPage /></ProtectedRoute>} />
+          <Route path="app/package-courier" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['package_courier_page_view', 'package_orders_view', 'view_delivery']} permissionsMode="any" system="kermes"><PackageCourierPage /></ProtectedRoute>} />
           <Route path="app/reports" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><ReportsPage /></ProtectedRoute>} />
           <Route path="app/reports/sales" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['closed_tables_page_view']} system="kermes"><ReportsSales /></ProtectedRoute>} />
           <Route path="app/product-report" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><ProductReportPage /></ProtectedRoute>} />
@@ -213,25 +207,25 @@ export default function App() {
           <Route path="app/audit" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['audit_view']} system="kermes"><AuditPage /></ProtectedRoute>} />
           <Route path="app/pos" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access']} system="kermes"><PosPage /></ProtectedRoute>} />
           <Route path="app/pos/orders/:id/receipt" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access']} system="kermes"><ReceiptPage /></ProtectedRoute>} />
-          <Route path="settings" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes"><SettingsPage /></ProtectedRoute>}>
-            <Route path="me" element={<SettingsMePage apiBase="/api/tenant" />} />
+          <Route path="settings" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes" allowExpired><SettingsPage /></ProtectedRoute>}>
+            <Route path="me" element={<ProtectedRoute roles={['tenant_admin', 'staff']} system="kermes" allowExpired><SettingsMePage apiBase="/api/tenant" /></ProtectedRoute>} />
             <Route path="system" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsSystemContent /></ProtectedRoute>} />
             <Route path="branches" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><BranchesPage /></ProtectedRoute>} />
             <Route path="staff" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><StaffPage systemType="kermes" /></ProtectedRoute>} />
-            <Route path="catalog" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><SettingsMenuHub /></ProtectedRoute>} />
-            <Route path="catalog/categories" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><CategoriesPage /></ProtectedRoute>} />
+            <Route path="catalog" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
+            <Route path="catalog/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
             <Route path="catalog/items" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><MenuItemsPage /></ProtectedRoute>} />
+            <Route path="catalog/items/:itemId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><ProductItemSettingsPage /></ProtectedRoute>} />
             <Route path="tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsTablesContent /></ProtectedRoute>} />
             <Route path="printers" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><PrintingSettingsPage system="kermes" /></ProtectedRoute>} />
             <Route path="payments" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsPaymentsContent /></ProtectedRoute>} />
             <Route path="delivery" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsDeliveryPage /></ProtectedRoute>} />
-            <Route path="billing" element={<ProtectedRoute roles={['tenant_admin']} system="kermes"><UpgradePlan /></ProtectedRoute>} />
+            <Route path="billing" element={<ProtectedRoute roles={['tenant_admin']} system="kermes" allowExpired><UpgradePlan /></ProtectedRoute>} />
             <Route path="qr" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><QrMenuSettingsPage /></ProtectedRoute>} />
-
-            <Route path="menu" element={<Navigate to="/kermes/settings/catalog" replace />} />
-            <Route path="menu/categories" element={<Navigate to="/kermes/settings/catalog/categories" replace />} />
+            <Route path="menü" element={<Navigate to="/kermes/settings/catalog" replace />} />
+            <Route path="menu/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
             <Route path="menu/items" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
-            <Route path="qr-menu" element={<Navigate to="/kermes/settings/qr" replace />} />
+            <Route path="qr-menü" element={<Navigate to="/kermes/settings/qr" replace />} />
           </Route>
           <Route path="print-station" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><PrintStationPage system="kermes" /></ProtectedRoute>} />
           <Route path="*" element={<KermesIndexRedirect />} />
@@ -241,7 +235,8 @@ export default function App() {
         <Route path="/app/*" element={<Navigate to="/kermes" replace />} />
         <Route path="/accounts" element={<Navigate to="/kermes/app/accounts" replace />} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </BusinessSettingsProvider>
     </AuthProvider>
   )
 }

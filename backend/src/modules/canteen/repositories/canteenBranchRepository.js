@@ -15,6 +15,9 @@ export const findByIdAndTenant = (id, tenantId) =>
 export const findAnyByIdAndTenant = (id, tenantId) =>
   CanteenBranch.findOne({ _id: id, tenantId })
 
+export const findAnyByPublicSlug = (publicSlug) =>
+  CanteenBranch.findOne({ publicSlug: String(publicSlug || '').trim() })
+
 export const create = (data) => CanteenBranch.create(data)
 
 export const updateByIdAndTenant = (id, tenantId, update) =>

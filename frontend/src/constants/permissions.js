@@ -18,6 +18,16 @@ export const PERMISSIONS = {
   CARI_TAHSILAT_SIL: 'cari_tahsilat_sil',
   VIEW_DELIVERY: 'view_delivery',
   MANAGE_DELIVERY: 'manage_delivery',
+  PACKAGE_COURIER_PAGE_VIEW: 'package_courier_page_view',
+  PACKAGE_ORDERS_VIEW: 'package_orders_view',
+  PACKAGE_ASSIGN_COURIER: 'package_assign_courier',
+  PACKAGE_STATUS_UPDATE: 'package_status_update',
+  PACKAGE_PAYMENT_STATUS_UPDATE: 'package_payment_status_update',
+  PACKAGE_CANCEL: 'package_cancel',
+  COURIER_REPORTS_VIEW: 'courier_reports_view',
+  CUSTOMER_PHONE_VIEW: 'customer_phone_view',
+  CUSTOMER_ADDRESS_VIEW: 'customer_address_view',
+  CUSTOMER_LOCATION_OPEN: 'customer_location_open',
   WALKIN_ACCESS: 'walkin_access',
   MANAGE_MENU: 'manage_menu',
   MANAGE_SETTINGS: 'manage_settings',
@@ -49,6 +59,12 @@ export const PERMISSION_ALIASES = {
   accounts_manage: [PERMISSIONS.MANAGE_ACCOUNTS],
   package_orders_view: [PERMISSIONS.VIEW_DELIVERY],
   package_orders_manage: [PERMISSIONS.MANAGE_DELIVERY],
+  package_courier_page_view: [PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW],
+  package_assign_courier: [PERMISSIONS.PACKAGE_ASSIGN_COURIER],
+  package_status_update: [PERMISSIONS.PACKAGE_STATUS_UPDATE],
+  package_payment_status_update: [PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE],
+  package_cancel: [PERMISSIONS.PACKAGE_CANCEL],
+  courier_reports_view: [PERMISSIONS.COURIER_REPORTS_VIEW],
   walkin_sale: [PERMISSIONS.WALKIN_ACCESS],
 
   settings_manage: [PERMISSIONS.MANAGE_SETTINGS],
@@ -59,6 +75,10 @@ export const PERMISSION_ALIASES = {
 
   [PERMISSIONS.HOME_PAGE_VIEW]: [PERMISSIONS.REPORTS_DASHBOARD_VIEW],
   [PERMISSIONS.MANAGE_DELIVERY]: [PERMISSIONS.VIEW_DELIVERY],
+  [PERMISSIONS.PACKAGE_ASSIGN_COURIER]: [PERMISSIONS.PACKAGE_ORDERS_VIEW, PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW],
+  [PERMISSIONS.PACKAGE_STATUS_UPDATE]: [PERMISSIONS.PACKAGE_ORDERS_VIEW, PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW],
+  [PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE]: [PERMISSIONS.PACKAGE_ORDERS_VIEW, PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW],
+  [PERMISSIONS.PACKAGE_CANCEL]: [PERMISSIONS.PACKAGE_ORDERS_VIEW, PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW],
   [PERMISSIONS.MANAGE_ACCOUNTS]: [PERMISSIONS.VIEW_ACCOUNTS],
 
   [PERMISSIONS.CANTEEN_SETTINGS_MANAGE]: [PERMISSIONS.MANAGE_SETTINGS],
@@ -95,14 +115,24 @@ export const PERMISSION_LABELS_TR = {
   [PERMISSIONS.CARI_TAHSILAT_SIL]: 'Cari Tahsilat Silme',
   [PERMISSIONS.VIEW_DELIVERY]: 'Paket Siparişleri Görüntüleme',
   [PERMISSIONS.MANAGE_DELIVERY]: 'Paket Sipariş Yönetimi (Onay/İptal/Teslim)',
+  [PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW]: 'Paket Kurye Sayfasını Gör',
+  [PERMISSIONS.PACKAGE_ORDERS_VIEW]: 'Paket Siparişleri Gör',
+  [PERMISSIONS.PACKAGE_ASSIGN_COURIER]: 'Paket Siparişe Kurye Ata',
+  [PERMISSIONS.PACKAGE_STATUS_UPDATE]: 'Paket Sipariş Durumu Değiştir',
+  [PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE]: 'Paket Sipariş Ödeme Durumu Değiştir',
+  [PERMISSIONS.PACKAGE_CANCEL]: 'Paket Sipariş İptal Et',
+  [PERMISSIONS.COURIER_REPORTS_VIEW]: 'Kurye Raporlarını Gör',
+  [PERMISSIONS.CUSTOMER_PHONE_VIEW]: 'Müşteri Telefonunu Gör',
+  [PERMISSIONS.CUSTOMER_ADDRESS_VIEW]: 'Müşteri Adresini Gör',
+  [PERMISSIONS.CUSTOMER_LOCATION_OPEN]: 'Konum Aç',
   [PERMISSIONS.WALKIN_ACCESS]: 'Masasız Satış Yapabilme',
   [PERMISSIONS.MANAGE_MENU]: 'Ürün/Kategori Yönetimi',
   [PERMISSIONS.MANAGE_SETTINGS]: 'Ayarlar Yönetimi',
-  [PERMISSIONS.CANTEEN_CUSTOMERS_VIEW]: 'Kantin Carileri Görüntüleme',
-  [PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]: 'Kantin Carileri Yönetim',
-  [PERMISSIONS.CANTEEN_CUSTOMERS_CREATE]: 'Kantin Cari Oluşturma',
-  [PERMISSIONS.CANTEEN_CUSTOMERS_EDIT]: 'Kantin Cari Düzenleme',
-  [PERMISSIONS.CANTEEN_CUSTOMER_PAYMENT_DELETE]: 'Kantin Cari Tahsilat Silme'
+  [PERMISSIONS.CANTEEN_CUSTOMERS_VIEW]: 'Mağaza Carilerini Görüntüleme',
+  [PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]: 'Mağaza Carilerini Yönetme',
+  [PERMISSIONS.CANTEEN_CUSTOMERS_CREATE]: 'Mağaza Cari Oluşturma',
+  [PERMISSIONS.CANTEEN_CUSTOMERS_EDIT]: 'Mağaza Cari Düzenleme',
+  [PERMISSIONS.CANTEEN_CUSTOMER_PAYMENT_DELETE]: 'Mağaza Cari Tahsilat Silme'
 }
 
 export const PERMISSION_GROUPS_TR = [
@@ -158,6 +188,56 @@ export const PERMISSION_GROUPS_TR = [
         permission: PERMISSIONS.MANAGE_DELIVERY,
         label: 'Paket Sipariş Yönetimi (Onay/İptal/Teslim)',
         description: 'Teslim edildi, onaylandı, iptal gibi aksiyonlar yapar'
+      },
+      {
+        permission: PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW,
+        label: 'Paket Kurye Sayfasını Gör',
+        description: 'Kurye operasyon ekranına giriş yapar'
+      },
+      {
+        permission: PERMISSIONS.PACKAGE_ORDERS_VIEW,
+        label: 'Paket Siparişleri Gör',
+        description: 'Paket kurye ekranında siparişleri listeler'
+      },
+      {
+        permission: PERMISSIONS.PACKAGE_ASSIGN_COURIER,
+        label: 'Paket Siparişe Kurye Ata',
+        description: 'Siparişe kurye atar veya kuryeyi değiştirir'
+      },
+      {
+        permission: PERMISSIONS.PACKAGE_STATUS_UPDATE,
+        label: 'Paket Sipariş Durumu Değiştir',
+        description: 'Teslimat ve kurye durumlarını günceller'
+      },
+      {
+        permission: PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE,
+        label: 'Paket Sipariş Ödeme Durumu Değiştir',
+        description: 'Teslimat ödeme durumlarını günceller'
+      },
+      {
+        permission: PERMISSIONS.PACKAGE_CANCEL,
+        label: 'Paket Sipariş İptal Et',
+        description: 'Paket siparişi iptal eder'
+      },
+      {
+        permission: PERMISSIONS.COURIER_REPORTS_VIEW,
+        label: 'Kurye Raporlarını Gör',
+        description: 'Kurye raporlarını ve teslimat performansını görüntüler'
+      },
+      {
+        permission: PERMISSIONS.CUSTOMER_PHONE_VIEW,
+        label: 'Müşteri Telefonunu Gör',
+        description: 'Kurye ekranında telefon bilgisini gösterir'
+      },
+      {
+        permission: PERMISSIONS.CUSTOMER_ADDRESS_VIEW,
+        label: 'Müşteri Adresini Gör',
+        description: 'Kurye ekranında adres bilgisini gösterir'
+      },
+      {
+        permission: PERMISSIONS.CUSTOMER_LOCATION_OPEN,
+        label: 'Konum Aç',
+        description: 'Harita ve konum bağlantılarını açabilir'
       }
     ]
   },

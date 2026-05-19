@@ -26,6 +26,20 @@ export const sumByCustomer = async (tenantId, branchId, customerId) => {
 export const listByCustomerAllBranches = (tenantId, customerId, { limit = 50 } = {}) =>
   CanteenCustomerCollection.find({ tenantId, customerId, isActive: true, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).limit(Number(limit || 50))
 
+export const listByCustomersAllBranches = (tenantId, customerIds = [], { limit = 500 } = {}) => {
+  const ids = (Array.isArray(customerIds) ? customerIds : [])
+    .map((value) => toObjectId(value))
+    .filter(Boolean)
+  const tid = toObjectId(tenantId)
+  if (!tid || ids.length === 0) return Promise.resolve([])
+  return CanteenCustomerCollection.find({
+    tenantId: tid,
+    customerId: { $in: ids },
+    isActive: true,
+    isDeleted: { $ne: true }
+  }).sort({ createdAt: -1 }).limit(Number(limit || 500))
+}
+
 export const sumByCustomerAllBranches = async (tenantId, customerId) => {
   const tid = toObjectId(tenantId)
   const cid = toObjectId(customerId)

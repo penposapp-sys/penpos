@@ -174,7 +174,7 @@ export default function BulkProductsExcelCard() {
           {errors.length > 0 && (
             <div className="card" style={{ borderColor: 'var(--border)' }}>
               <div style={{ fontWeight: 700, marginBottom: 8 }}>Hatalı Satırlar</div>
-              <div style={{ maxHeight: 320, overflow: 'auto' }}>
+              <div style={{ overflow: 'visible' }}>
                 <table className="table">
                   <thead>
                     <tr><th>Satır</th><th>Alan</th><th>Mesaj</th></tr>

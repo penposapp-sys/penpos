@@ -4,7 +4,7 @@ import { requireRole } from '../middlewares/requireRole.js'
 import { sendError } from '../utils/errors.js'
 import { error } from '../utils/errors.js'
 import * as selfAccount from '../services/selfAccountService.js'
-import { createTenantWithOwnerService, listPlatformTenantsService, updateTenantStatusService, createPlanService, listPlansService, updatePlanService, deletePlanService, assignTenantPlanService, trialExtendService, trialEndService, editTenantService, softDeleteTenantService, hardDeleteTenantService, setPlatformUserPasswordService } from '../services/platformAdminService.js'
+import { createTenantWithOwnerService, listPlatformTenantsService, updateTenantStatusService, createPlanService, listPlansService, listPlansForTenantService, updatePlanService, deletePlanService, assignTenantPlanService, trialExtendService, trialEndService, editTenantService, softDeleteTenantService, hardDeleteTenantService, setPlatformUserPasswordService } from '../services/platformAdminService.js'
 import { listPaymentRequestsService, approvePaymentRequestService, rejectPaymentRequestService } from '../services/paymentService.js'
 import { listMembershipRequestsService, approveMembershipRequestService, rejectMembershipRequestService } from '../services/platformBillingService.js'
 
@@ -61,10 +61,10 @@ router.post('/tenants/kermes', requireAuth, requireRole(['platform_admin', 'supe
 router.post('/tenants/canteen', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
     const incoming = req.body || {}
-    if (incoming.systemType !== undefined && String(incoming.systemType) !== 'kantin') {
+    if (incoming.systemType !== undefined && !['kantin', 'canteen'].includes(String(incoming.systemType))) {
       throw error('invalid_request', 'Invalid system type', 400)
     }
-    const result = await createTenantWithOwnerService({ ...incoming, systemType: 'kantin' })
+    const result = await createTenantWithOwnerService({ ...incoming, systemType: 'canteen' })
     res.json({ success: true, id: result.tenant?._id || null })
   } catch (err) {
     sendError(res, err)
@@ -129,7 +129,10 @@ router.post('/plans', requireAuth, requireRole(['platform_admin', 'superadmin'])
 
 router.get('/plans', requireAuth, requireRole(['platform_admin', 'superadmin']), async (req, res) => {
   try {
-    const items = await listPlansService(req.query?.systemType)
+    const tenantId = String(req.query?.tenantId || '').trim()
+    const items = tenantId
+      ? await listPlansForTenantService(tenantId, req.query?.systemType)
+      : await listPlansService(req.query?.systemType)
     res.json({ success: true, items, plans: items })
   } catch (err) {
     sendError(res, err)

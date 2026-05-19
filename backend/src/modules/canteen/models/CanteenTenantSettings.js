@@ -8,6 +8,18 @@ const schema = new mongoose.Schema({
   defaultVatRate: { type: Number, default: 0 },
   receiptHeader: { type: String, default: '' },
   receiptFooter: { type: String, default: '' },
+  qrTitle: { type: String, default: '' },
+  qrDescription: { type: String, default: '' },
+  qrLogoUrl: { type: String, default: '' },
+  qrCoverImageUrl: { type: String, default: '' },
+  qrTheme: { type: String, default: 'green' },
+  themeId: { type: String, default: 'default' },
+  darkMode: { type: Boolean, default: false },
+  qrPhone: { type: String, default: '' },
+  qrWhatsapp: { type: String, default: '' },
+  qrEmail: { type: String, default: '' },
+  qrAddress: { type: String, default: '' },
+  qrWorkingHours: { type: String, default: '' },
   updatedAt: { type: Date, default: Date.now }
 }, { collection: 'canteen_tenant_settings' })
 

@@ -4,7 +4,7 @@ const schema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
   branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'CanteenBranch', required: false, default: null, index: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'CanteenCustomer', required: true, index: true },
-  method: { type: String, enum: ['cash', 'pos', 'bank'], required: true },
+  method: { type: String, enum: ['cash', 'pos', 'bank', 'discount'], required: true },
   amount: { type: Number, required: true },
   note: { type: String, default: '' },
   isActive: { type: Boolean, default: true, index: true },

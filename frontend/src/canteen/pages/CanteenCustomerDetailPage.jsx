@@ -7,6 +7,7 @@ import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import Modal from '../../components/Modal.jsx'
 import { deleteCustomerPayment, getCustomerMovements } from '../lib/api.js'
 import { paymentMethodLabel } from '../utils/cariLabels.js'
+import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 
 const money = (n) => {
   const v = Number(n || 0)
@@ -52,25 +53,27 @@ export default function CanteenCustomerDetailPage() {
   const canCollect = canManage
   const canDeletePayment = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customer_payment_delete') || me.permissions.includes('canteen_customers_manage')))
 
-  const load = async () => {
-    setLoading(true)
-    setError('')
+  const load = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setLoading(true)
+    if (!background) setError('')
     const c = await api(`/api/canteen/customers/${id}`, { silent: true })
     const s = await api(`/api/canteen/customers/${id}/sales`, { silent: true })
-    setMovementsLoading(true)
+    if (!background) setMovementsLoading(true)
     const m = await getCustomerMovements(id)
     setMovements(Array.isArray(m?.movements) ? m.movements : [])
-    setMovementsLoading(false)
+    if (!background) setMovementsLoading(false)
     setCustomer(c?.ok ? (c.customer || null) : null)
     setSales(Array.isArray(s?.items) ? s.items : [])
     if (!c?.ok) setError(c?.message || 'Cari bulunamadı')
-    setLoading(false)
+    if (!background) setLoading(false)
   }
 
   useEffect(() => {
     if (!id) return
     load()
   }, [id])
+  useCanteenAutoRefresh(() => load({ background: true }), [id], { enabled: !!id && canView })
 
   useEffect(() => {
     if (!customer) return

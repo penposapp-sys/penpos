@@ -7,6 +7,7 @@ import { listBranches, createBranchService } from '../services/branchService.js'
 import { sendError } from '../utils/errors.js'
 import * as branchCtrl from '../controllers/branchesController.js'
 import { PERMISSIONS } from '../constants/permissions.js'
+import { getUserAccessibleBranchIds } from '../utils/branchVisibility.js'
 
 const router = Router()
 
@@ -19,18 +20,24 @@ router.get('/', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff'])
         _id: b._id || b.id,
         name: b.name,
         description: b.description || '',
+        address: b.address || '',
         isActive: b.isActive !== false
       }))
       return res.json({ success: true, branches })
     }
 
-    const allowed = Array.isArray(req.user?.branchIds) && req.user.branchIds.length > 0
-      ? req.user.branchIds.map(String)
-      : (req.user?.branchId ? [String(req.user.branchId)] : [])
-
     const items = await listBranches(req.user.tenantId, { includeInactive: false })
-    const filtered = (items || []).filter(b => allowed.includes(String(b.id)))
-    const branches = filtered.map(b => ({ _id: b._id || b.id, name: b.name }))
+    const allowed = getUserAccessibleBranchIds(req.user).map(String)
+    const filtered = allowed.length > 0
+      ? (items || []).filter(b => allowed.includes(String(b.id)))
+      : (items || [])
+    const branches = filtered.map(b => ({
+      _id: b._id || b.id,
+      name: b.name,
+      description: b.description || '',
+      address: b.address || '',
+      isActive: b.isActive !== false
+    }))
     return res.json({ success: true, branches })
   } catch (err) {
     sendError(res, err)
@@ -41,8 +48,9 @@ router.post('/', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']
   try {
     const name = String(req.body?.name || '').trim()
     const description = String(req.body?.description || '').trim()
+    const address = String(req.body?.address || '').trim()
     if (!name) return res.status(400).json({ success: false, code: 'name_required', error: 'name_required', message: 'Name required' })
-    const b = await createBranchService(req.user.tenantId, req.user.id, { name, description })
+    const b = await createBranchService(req.user.tenantId, req.user.id, { name, description, address })
     res.json({ success: true, branch: b })
   } catch (err) {
     sendError(res, err)
@@ -50,9 +58,8 @@ router.post('/', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']
 })
 
 router.put('/:id', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), branchCtrl.update)
+router.delete('/:id', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), branchCtrl.remove)
 
 router.put('/:id/toggle', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), branchCtrl.toggle)
-
-router.put('/:id/staff', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), branchCtrl.setStaff)
 
 export default router

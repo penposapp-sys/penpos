@@ -8,8 +8,25 @@ export const DEFAULT_SETTINGS = Object.freeze({
   defaultBranchId: null,
   defaultVatRate: 0,
   receiptHeader: '',
-  receiptFooter: ''
+  receiptFooter: '',
+  appearance: {
+    themeId: 'default',
+    darkMode: false
+  },
+  qrTitle: '',
+  qrDescription: '',
+  qrLogoUrl: '',
+  qrCoverImageUrl: '',
+  qrPhone: '',
+  qrWhatsapp: '',
+  qrEmail: '',
+  qrAddress: '',
+  qrWorkingHours: '',
+  qrTheme: 'green'
 })
+
+const QR_THEME_IDS = new Set(['dark', 'blue', 'green', 'orange'])
+const SYSTEM_THEME_IDS = new Set(['default', 'ocean', 'slate', 'emerald', 'amber', 'ruby', 'coffee', 'indigo', 'mono'])
 
 export const DEFAULT_PAYMENT_SETTINGS = Object.freeze({
   cashEnabled: true,
@@ -48,7 +65,21 @@ export const getSettings = async (tenantId) => {
     defaultBranchId,
     defaultVatRate: Number(doc.defaultVatRate || 0),
     receiptHeader: String(doc.receiptHeader || ''),
-    receiptFooter: String(doc.receiptFooter || '')
+    receiptFooter: String(doc.receiptFooter || ''),
+    appearance: {
+      themeId: SYSTEM_THEME_IDS.has(String(doc.themeId || '').trim()) ? String(doc.themeId || '').trim() : DEFAULT_SETTINGS.appearance.themeId,
+      darkMode: doc.darkMode === true
+    },
+    qrTitle: String(doc.qrTitle || ''),
+    qrDescription: String(doc.qrDescription || ''),
+    qrLogoUrl: String(doc.qrLogoUrl || ''),
+    qrCoverImageUrl: String(doc.qrCoverImageUrl || ''),
+    qrPhone: String(doc.qrPhone || ''),
+    qrWhatsapp: String(doc.qrWhatsapp || ''),
+    qrEmail: String(doc.qrEmail || ''),
+    qrAddress: String(doc.qrAddress || ''),
+    qrWorkingHours: String(doc.qrWorkingHours || ''),
+    qrTheme: QR_THEME_IDS.has(String(doc.qrTheme || '').trim()) ? String(doc.qrTheme || '').trim() : DEFAULT_SETTINGS.qrTheme
   } : { allowedBranchIds, defaultBranchId }
 
   return { ...DEFAULT_SETTINGS, ...data }
@@ -107,7 +138,25 @@ export const updateSettings = async (tenantId, input) => {
     defaultBranchId: defaultBranchId === undefined ? undefined : defaultBranchId,
     defaultVatRate: patch.defaultVatRate === undefined ? undefined : Number(patch.defaultVatRate || 0),
     receiptHeader: patch.receiptHeader === undefined ? undefined : String(patch.receiptHeader || ''),
-    receiptFooter: patch.receiptFooter === undefined ? undefined : String(patch.receiptFooter || '')
+    receiptFooter: patch.receiptFooter === undefined ? undefined : String(patch.receiptFooter || ''),
+    themeId: patch.appearance?.themeId === undefined && patch.themeId === undefined
+      ? undefined
+      : (SYSTEM_THEME_IDS.has(String(patch.appearance?.themeId ?? patch.themeId ?? '').trim()) ? String(patch.appearance?.themeId ?? patch.themeId).trim() : DEFAULT_SETTINGS.appearance.themeId),
+    darkMode: patch.appearance?.darkMode === undefined && patch.darkMode === undefined
+      ? undefined
+      : (patch.appearance?.darkMode ?? patch.darkMode) === true,
+    qrTitle: patch.qrTitle === undefined ? undefined : String(patch.qrTitle || ''),
+    qrDescription: patch.qrDescription === undefined ? undefined : String(patch.qrDescription || ''),
+    qrLogoUrl: patch.qrLogoUrl === undefined ? undefined : String(patch.qrLogoUrl || ''),
+    qrCoverImageUrl: patch.qrCoverImageUrl === undefined ? undefined : String(patch.qrCoverImageUrl || ''),
+    qrPhone: patch.qrPhone === undefined ? undefined : String(patch.qrPhone || ''),
+    qrWhatsapp: patch.qrWhatsapp === undefined ? undefined : String(patch.qrWhatsapp || ''),
+    qrEmail: patch.qrEmail === undefined ? undefined : String(patch.qrEmail || ''),
+    qrAddress: patch.qrAddress === undefined ? undefined : String(patch.qrAddress || ''),
+    qrWorkingHours: patch.qrWorkingHours === undefined ? undefined : String(patch.qrWorkingHours || ''),
+    qrTheme: patch.qrTheme === undefined
+      ? undefined
+      : (QR_THEME_IDS.has(String(patch.qrTheme || '').trim()) ? String(patch.qrTheme || '').trim() : DEFAULT_SETTINGS.qrTheme)
   }
 
   const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined))
@@ -144,4 +193,46 @@ export const updatePaymentSettings = async (tenantId, input) => {
   const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined))
   await repo.upsertTenantPaymentSettings(tenantId, cleaned)
   return getPaymentSettings(tenantId)
+}
+
+export const updateQrSettings = async (tenantId, branchId, input) => {
+  const patch = input || {}
+  const settingsPatch = {
+    qrTitle: patch.qrTitle === undefined ? undefined : String(patch.qrTitle || ''),
+    qrDescription: patch.qrDescription === undefined ? undefined : String(patch.qrDescription || ''),
+    qrLogoUrl: patch.qrLogoUrl === undefined ? undefined : String(patch.qrLogoUrl || ''),
+    qrCoverImageUrl: patch.qrCoverImageUrl === undefined ? undefined : String(patch.qrCoverImageUrl || ''),
+    qrPhone: patch.qrPhone === undefined ? undefined : String(patch.qrPhone || ''),
+    qrWhatsapp: patch.qrWhatsapp === undefined ? undefined : String(patch.qrWhatsapp || ''),
+    qrEmail: patch.qrEmail === undefined ? undefined : String(patch.qrEmail || ''),
+    qrAddress: patch.qrAddress === undefined ? undefined : String(patch.qrAddress || ''),
+    qrWorkingHours: patch.qrWorkingHours === undefined ? undefined : String(patch.qrWorkingHours || ''),
+    qrTheme: patch.qrTheme === undefined
+      ? undefined
+      : (QR_THEME_IDS.has(String(patch.qrTheme || '').trim()) ? String(patch.qrTheme || '').trim() : DEFAULT_SETTINGS.qrTheme)
+  }
+  const cleanedSettingsPatch = Object.fromEntries(Object.entries(settingsPatch).filter(([, value]) => value !== undefined))
+  if (Object.keys(cleanedSettingsPatch).length > 0) {
+    await repo.upsertTenantSettings(tenantId, cleanedSettingsPatch)
+  }
+
+  const products = (Array.isArray(patch.products) ? patch.products : [])
+    .map((item) => ({
+      id: String(item?.id || item?._id || '').trim(),
+      imageUrl: String(item?.imageUrl || '').trim()
+    }))
+    .filter((item) => item.id)
+
+  if (products.length > 0) {
+    const { listByIdsAndScope, updateByIdAndScope } = await import('../repositories/canteenProductRepository.js')
+    const existing = await listByIdsAndScope(products.map((item) => item.id), tenantId, branchId)
+    const existingIds = new Set((existing || []).map((item) => String(item.id || item._id)))
+    await Promise.all(
+      products
+        .filter((item) => existingIds.has(item.id))
+        .map((item) => updateByIdAndScope(item.id, tenantId, branchId, { imageUrl: item.imageUrl }))
+    )
+  }
+
+  return getSettings(tenantId)
 }

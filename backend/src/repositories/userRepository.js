@@ -2,10 +2,10 @@ import User from '../models/User.js'
 
 const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-export const findByEmail = (email) => {
+export const findByEmail = (email, extraFilter = {}) => {
   const normalized = String(email || '').trim()
   if (!normalized) return Promise.resolve(null)
-  return User.findOne({ email: new RegExp(`^${escapeRegex(normalized)}$`, 'i') })
+  return User.findOne({ ...extraFilter, email: new RegExp(`^${escapeRegex(normalized)}$`, 'i') })
 }
 
 export const findByUsername = (username, extraFilter = {}) => {

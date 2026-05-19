@@ -9,5 +9,8 @@ const router = Router()
 
 router.get('/', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), ctrl.getSettings)
 router.put('/', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin']), ctrl.updateSettings)
+router.post('/', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin']), ctrl.createPaymentMethod)
+router.patch('/:id', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin']), ctrl.patchPaymentMethod)
+router.delete('/:id', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin']), ctrl.deletePaymentMethod)
 
 export default router

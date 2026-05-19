@@ -1,32 +1,44 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../lib/apiClient.js'
-import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import { toast } from '../lib/toast.js'
+import { SettingsField, SettingsToggle, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
+
+const isVisibleItem = (item) => item?.isDeleted !== true && item?.status !== 'deleted'
 
 export default function BranchesPage() {
-  const getBranchId = (b) => b?._id || b?.id
+  const getBranchId = (branch) => branch?._id || branch?.id
 
   const [items, setItems] = useState([])
-  const [staff, setStaff] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [staffOpen, setStaffOpen] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [createForm, setCreateForm] = useState({ name: '', description: '' })
-  const [editForm, setEditForm] = useState({ name: '', description: '', isActive: true })
-  const [staffIds, setStaffIds] = useState([])
+  const [createForm, setCreateForm] = useState({ name: '', description: '', address: '' })
+  const [editForm, setEditForm] = useState({ name: '', description: '', address: '', isActive: true })
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const load = async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await api('/api/branches')
+      const res = await api('/api/branches', { skipBranchHeader: true })
       const branches = Array.isArray(res?.branches) ? res.branches : []
-      setItems(branches.map(b => ({ ...b, isActive: b?.isActive !== false, description: b?.description || '' })))
+      setItems(
+        branches
+          .filter(isVisibleItem)
+          .map((branch) => ({
+            ...branch,
+            isActive: branch?.isActive !== false,
+            description: branch?.description || '',
+            address: branch?.address || ''
+          }))
+      )
     } catch (err) {
       setError(err.message)
     } finally {
@@ -34,32 +46,29 @@ export default function BranchesPage() {
     }
   }
 
-  const loadStaff = async () => {
-    try {
-      const res = await api('/api/tenant/staff', { silent: true })
-      const list = Array.isArray(res?.staff) ? res.staff : []
-      setStaff(list)
-      return list
-    } catch {
-      setStaff([])
-      return []
-    }
-  }
-
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const openCreate = () => {
-    setCreateForm({ name: '', description: '' })
+    setCreateForm({ name: '', description: '', address: '' })
     setFormError('')
     setCreateOpen(true)
   }
-  const onCreate = async (e) => {
-    e.preventDefault()
+
+  const onCreate = async (event) => {
+    event.preventDefault()
     setFormLoading(true)
     setFormError('')
     try {
-      const { branch } = await api('/api/branches', { method: 'POST', body: JSON.stringify(createForm) })
-      if (branch) setItems([branch, ...items])
+      const { branch } = await api('/api/branches', {
+        method: 'POST',
+        body: JSON.stringify(createForm),
+        skipBranchHeader: true
+      })
+      if (branch && isVisibleItem(branch)) {
+        setItems((prev) => [{ ...branch, description: branch?.description || '', address: branch?.address || '' }, ...prev])
+      }
       setCreateOpen(false)
     } catch (err) {
       setFormError(err.message)
@@ -68,25 +77,36 @@ export default function BranchesPage() {
     }
   }
 
-  const openEdit = (b) => {
-    setSelected(b)
-    setEditForm({ name: b?.name || '', description: b?.description || '', isActive: b?.isActive !== false })
+  const openEdit = (branch) => {
+    setSelected(branch)
+    setEditForm({
+      name: branch?.name || '',
+      description: branch?.description || '',
+      address: branch?.address || '',
+      isActive: branch?.isActive !== false
+    })
     setFormError('')
     setEditOpen(true)
   }
-  const onEdit = async (e) => {
-    e.preventDefault()
+
+  const onEdit = async (event) => {
+    event.preventDefault()
     setFormLoading(true)
     setFormError('')
     try {
-      const bid = getBranchId(selected)
-      if (!bid) {
-        toast.error('Şube id bulunamadı (id/_id). Backend response alanlarını kontrol edin.')
-        console.warn('[BRANCH_ID_MISSING]', selected)
+      const branchId = getBranchId(selected)
+      if (!branchId) {
+        toast.error('Şube kaydı bulunamadı.')
         return
       }
-      const { branch } = await api(`/api/branches/${bid}`, { method: 'PUT', body: JSON.stringify(editForm) })
-      if (branch) setItems(items.map(i => (String(getBranchId(i)) === String(getBranchId(branch)) ? branch : i)))
+      const { branch } = await api(`/api/branches/${branchId}`, {
+        method: 'PUT',
+        body: JSON.stringify(editForm),
+        skipBranchHeader: true
+      })
+      if (branch) {
+        setItems((prev) => prev.map((item) => (String(getBranchId(item)) === String(getBranchId(branch)) ? branch : item)).filter(isVisibleItem))
+      }
       setEditOpen(false)
     } catch (err) {
       setFormError(err.message)
@@ -95,194 +115,145 @@ export default function BranchesPage() {
     }
   }
 
-  const onToggle = async (b) => {
-    const bid = getBranchId(b)
-    if (!bid) {
-      toast.error('Şube id bulunamadı (id/_id). Backend response alanlarını kontrol edin.')
-      console.warn('[BRANCH_ID_MISSING]', b)
+  const openDeleteConfirm = (branch) => {
+    setDeleteTarget(branch)
+  }
+
+  const onDelete = async () => {
+    const branch = deleteTarget
+    if (!branch) return
+    const branchId = getBranchId(branch)
+    if (!branchId) {
+      toast.error('Şube kaydı bulunamadı.')
       return
     }
+    setDeleteLoading(true)
     try {
-      const { branch } = await api(`/api/branches/${bid}/toggle`, { method: 'PUT' })
-      if (branch) setItems(items.map(i => (String(getBranchId(i)) === String(getBranchId(branch)) ? branch : i)))
-      await load()
+      await api(`/api/branches/${branchId}`, { method: 'DELETE', skipBranchHeader: true })
+      setItems((prev) => prev.filter((item) => String(getBranchId(item)) !== String(branchId)))
+      setDeleteTarget(null)
     } catch (err) {
       setError(err.message)
-    }
-  }
-
-  const openStaffAssign = async (b) => {
-    const bid = getBranchId(b)
-    if (!bid) {
-      toast.error('Şube id bulunamadı (id/_id). Backend response alanlarını kontrol edin.')
-      console.warn('[BRANCH_ID_MISSING]', b)
-      return
-    }
-    setSelected(b)
-    setFormError('')
-    setStaffOpen(true)
-    const list = await loadStaff()
-    const selectedStaff = (list || []).filter(s => Array.isArray(s.branchIds) && s.branchIds.map(String).includes(String(bid))).map(s => s.id)
-    setStaffIds(selectedStaff)
-  }
-
-  const saveStaffAssign = async () => {
-    const bid = getBranchId(selected)
-    if (!bid) {
-      toast.error('Şube id bulunamadı (id/_id). Backend response alanlarını kontrol edin.')
-      console.warn('[BRANCH_ID_MISSING]', selected)
-      return
-    }
-    setFormLoading(true)
-    setFormError('')
-    try {
-      await api(`/api/branches/${bid}/staff`, { method: 'PUT', body: JSON.stringify({ staffIds }) })
-      await loadStaff()
-      setStaffOpen(false)
-    } catch (err) {
-      setFormError(err.message)
     } finally {
-      setFormLoading(false)
+      setDeleteLoading(false)
     }
   }
 
   return (
     <div>
+      <SettingsUiStyles />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ margin: 0 }}>Şubeler</h3>
         <button className="btn" onClick={openCreate}>Yeni Şube</button>
       </div>
-      {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      {loading ? 'Yükleniyor...' : (
-        items.length === 0 ? (
-          <div>Henüz şube yok. Başlamak için “Yeni Şube” ekle.</div>
-        ) : (
-          <>
-            <div className="desktop-only">
-              <table className="table">
-                <thead>
-                  <tr><th>Ad</th><th>Açıklama</th><th>Durum</th><th className="actions" style={{ width: 360 }}>Aksiyonlar</th></tr>
-                </thead>
-                <tbody>
-                  {items.map((b) => {
-                    const bid = getBranchId(b)
-                    const statusLabel = b.isActive ? 'Aktif' : 'Pasif'
-                    return (
-                      <tr key={bid || b.name}>
-                        <td>{b.name}</td>
-                        <td>{b.description || ''}</td>
-                        <td>{statusLabel}</td>
-                        <td className="actions">
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn" onClick={() => openEdit(b)}>Düzenle</button>
-                            <button className="btn" onClick={() => openStaffAssign(b)}>Personel</button>
-                            <button className="btn" onClick={() => onToggle(b)}>{b.isActive ? 'Pasifleştir' : 'Aktifleştir'}</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
 
-            <div className="mobile-only settings-mobile">
-              {(items || []).map((b) => {
-                const bid = getBranchId(b)
-                const statusLabel = b.isActive ? 'Aktif' : 'Pasif'
-                return (
-                  <div key={bid || b.name} className="mobile-list-item">
-                    <div className="mobile-item-title breakAny">{b.name}</div>
-                    <div className="mobile-item-meta">
-                      {!!String(b.description || '').trim() && <span className="breakAny">Açıklama: {b.description}</span>}
-                      <span>Durum: {statusLabel}</span>
-                    </div>
-                    <div className="mobile-actions-row">
-                      <button className="btn" type="button" onClick={() => openEdit(b)}>Düzenle</button>
-                      <button className="btn" type="button" onClick={() => openStaffAssign(b)}>Personel</button>
-                      <button className="btn" type="button" onClick={() => onToggle(b)}>{b.isActive ? 'Pasifleştir' : 'Aktifleştir'}</button>
-                    </div>
+      {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
+
+      {loading ? 'Yükleniyor...' : items.length === 0 ? (
+        <div>Henüz şube yok. Başlamak için “Yeni Şube” ekleyin.</div>
+      ) : (
+        <>
+          <div className="desktop-only">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Ad</th>
+                  <th>Açıklama</th>
+                  <th>Adres</th>
+                  <th>Durum</th>
+                  <th className="actions" style={{ width: 240 }}>Aksiyonlar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((branch) => {
+                  const branchId = getBranchId(branch)
+                  return (
+                    <tr key={branchId || branch.name}>
+                      <td>{branch.name}</td>
+                      <td>{branch.description || '-'}</td>
+                      <td>{branch.address || '-'}</td>
+                      <td>{branch.isActive ? 'Aktif' : 'Pasif'}</td>
+                      <td className="actions">
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button className="btn" type="button" onClick={() => openEdit(branch)}>Düzenle</button>
+                          <button className="settings-ui-btn-danger" type="button" onClick={() => openDeleteConfirm(branch)}>Sil</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mobile-only settings-mobile">
+            {items.map((branch) => {
+              const branchId = getBranchId(branch)
+              return (
+                <div key={branchId || branch.name} className="mobile-list-item">
+                  <div className="mobile-item-title breakAny">{branch.name}</div>
+                  <div className="mobile-item-meta">
+                    {!!String(branch.description || '').trim() && <span className="breakAny">Açıklama: {branch.description}</span>}
+                    {!!String(branch.address || '').trim() && <span className="breakAny">Adres: {branch.address}</span>}
+                    <span>Durum: {branch.isActive ? 'Aktif' : 'Pasif'}</span>
                   </div>
-                )
-              })}
-            </div>
-          </>
-        )
+                  <div className="mobile-actions-row">
+                    <button className="btn" type="button" onClick={() => openEdit(branch)}>Düzenle</button>
+                    <button className="settings-ui-btn-danger" type="button" onClick={() => openDeleteConfirm(branch)}>Sil</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Şube">
-        <form onSubmit={onCreate} style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
-            <input className="input" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
-            <input className="input" value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} />
-          </label>
+        <form onSubmit={onCreate} style={{ display: 'grid', gap: 12 }}>
+          <SettingsField label="Ad">
+            <input className="settings-ui-input" value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Açıklama">
+            <input className="settings-ui-input" value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Adres">
+            <textarea className="settings-ui-textarea" rows="3" value={createForm.address} onChange={(event) => setCreateForm({ ...createForm, address: event.target.value })} />
+          </SettingsField>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
           <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Oluştur'}</button>
         </form>
       </Modal>
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Şube Düzenle">
-        <form onSubmit={onEdit} style={{ display: 'grid', gap: 10 }}>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
-            <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
-            <input className="input" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={!!editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
-            Aktif
-          </label>
+        <form onSubmit={onEdit} style={{ display: 'grid', gap: 12 }}>
+          <SettingsField label="Ad">
+            <input className="settings-ui-input" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Açıklama">
+            <input className="settings-ui-input" value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Adres">
+            <textarea className="settings-ui-textarea" rows="3" value={editForm.address} onChange={(event) => setEditForm({ ...editForm, address: event.target.value })} />
+          </SettingsField>
+          <SettingsToggle label="Aktif" checked={!!editForm.isActive} onChange={(event) => setEditForm({ ...editForm, isActive: event.target.checked })} />
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
           <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>
         </form>
       </Modal>
 
-      <Modal open={staffOpen} onClose={() => setStaffOpen(false)} title="Şube Personel Yetkisi">
-        <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ color: 'var(--muted)', fontSize: 12 }}>Şube: {selected?.name || '-'}</div>
-          <div className="card" style={{ borderColor: 'var(--border)', maxHeight: 320, overflowY: 'auto' }}>
-            {(staff || []).length === 0 ? (
-              <div style={{ color: 'var(--muted)' }}>Personel bulunamadı</div>
-            ) : (
-              <div style={{ display: 'grid', gap: 6 }}>
-                {staff.map(s => {
-                  const checked = staffIds.includes(s.id)
-                  return (
-                    <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, border: '1px solid var(--border)', borderRadius: 10, background: checked ? '#eff6ff' : '#ffffff' }}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const next = e.target.checked
-                            ? Array.from(new Set([...staffIds, s.id]))
-                            : staffIds.filter(x => x !== s.id)
-                          setStaffIds(next)
-                        }}
-                      />
-                      <div style={{ display: 'grid', minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.email}</div>
-                      </div>
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-          {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => setStaffOpen(false)} disabled={formLoading}>Vazgeç</button>
-            <button className="btn" onClick={saveStaffAssign} disabled={formLoading}>{formLoading ? 'Kaydediliyor...' : 'Kaydet'}</button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Şubeyi Listeden Kaldır"
+        message="Bu şube aktif listeden kaldırılacak. Geçmiş satış ve raporlardaki şube adı korunacaktır. Devam etmek istiyor musunuz?"
+        confirmText="Şubeyi Sil"
+        loading={deleteLoading}
+        onConfirm={onDelete}
+        onClose={() => {
+          if (deleteLoading) return
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }

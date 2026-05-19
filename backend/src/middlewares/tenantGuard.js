@@ -24,7 +24,21 @@ export const tenantGuard = async (req, res, next) => {
       } catch {}
       return next(error('tenant_inactive', 'Tenant inactive or not found', 403))
     }
-    req.tenant = { id: tenant.id, name: tenant.name, slug: tenant.slug }
+    req.tenant = {
+      id: tenant.id,
+      _id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      systemType: tenant.systemType || null,
+      vertical: tenant.vertical || null,
+      businessType: tenant.businessType || null,
+      planId: tenant.planId || null,
+      packageId: tenant.packageId || null,
+      planEndsAt: tenant.planEndsAt || null,
+      trialStartsAt: tenant.trialStartsAt || null,
+      trialEndsAt: tenant.trialEndsAt || null,
+      subscriptionStatus: tenant.subscriptionStatus || 'inactive'
+    }
   }
   next()
 }

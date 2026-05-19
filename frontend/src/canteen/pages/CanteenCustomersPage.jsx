@@ -3,6 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import CreateCustomerModal from '../components/CreateCustomerModal.jsx'
 import EditCustomerModal from '../components/EditCustomerModal.jsx'
+import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 
 const money = (n) => {
   const v = Number(n || 0)
@@ -24,14 +25,16 @@ export default function CanteenCustomersPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState(null)
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (options = {}) => {
+    const background = options?.background === true
+    if (!background) setLoading(true)
     const res = await api('/api/canteen/customers', { silent: true })
     setItems(Array.isArray(res?.customers) ? res.customers : [])
-    setLoading(false)
+    if (!background) setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+  useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: canView })
 
   const filtered = useMemo(() => {
     const nq = normalize(q)
@@ -39,26 +42,21 @@ export default function CanteenCustomersPage() {
     return items.filter(c => normalize(c.name).includes(nq) || normalize(c.phone).includes(nq))
   }, [items, q])
 
-  if (!canView) return <div className="card">403 – Bu sayfaya yetkin yok</div>
+  if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700 }}>Cariler</div>
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Cari bakiyesi backend tarafından hesaplanır.</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn" type="button" onClick={load} disabled={loading} style={{ padding: '0 10px', height: 34 }}>{loading ? '...' : 'Yenile'}</button>
-          {canCreate && (
-            <button className="btn btn--primary" type="button" onClick={() => setCreateOpen(true)} style={{ padding: '0 10px', height: 34 }}>+ Cari Oluştur</button>
-          )}
-        </div>
-      </div>
-
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ara</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ara</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button className="btn" type="button" onClick={load} disabled={loading} style={{ padding: '0 10px', height: 34 }}>{loading ? '...' : 'Yenile'}</button>
+              {canCreate && (
+                <button className="btn btn--primary" type="button" onClick={() => setCreateOpen(true)} style={{ padding: '0 10px', height: 34 }}>+ Cari Oluştur</button>
+              )}
+            </div>
+          </div>
           <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="İsim veya telefon" />
         </label>
 
@@ -72,7 +70,7 @@ export default function CanteenCustomersPage() {
                 <div style={{ minWidth: 0 }}>
                   <div className="breakAny" style={{ fontWeight: 700 }}>{c.name}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{c.phone || ''}</div>
-                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Son işlem: {c.lastActionAt ? new Date(c.lastActionAt).toLocaleString('tr-TR') : '-'}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Son İşlem: {c.lastActionAt ? new Date(c.lastActionAt).toLocaleString('tr-TR') : '-'}</div>
                 </div>
               </Link>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: 120 }}>

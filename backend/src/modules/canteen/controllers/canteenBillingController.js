@@ -3,6 +3,8 @@ import { sendError, error } from '../../../utils/errors.js'
 import MembershipRequest from '../../../models/MembershipRequest.js'
 import Plan from '../../../models/Plan.js'
 import Tenant from '../../../models/Tenant.js'
+import { ensurePlanMatchesTenant } from '../../../services/planService.js'
+import { buildPlanTypeMatchQuery, normalizeSystemType } from '../../../utils/systemType.js'
 
 const toPublic = (r) => {
   if (!r) return null
@@ -37,7 +39,7 @@ export const listRequests = async (req, res) => {
     const items = await MembershipRequest
       .find({ tenantId })
       .sort({ createdAt: -1 })
-      .populate('requestedPlanId', 'name price systemType')
+      .populate('requestedPlanId', 'name price systemType packageType isTrial')
       .populate('createdBy', 'name')
       .populate('decidedBy', 'name')
       .lean()
@@ -60,10 +62,9 @@ export const createRequest = async (req, res) => {
     if (!tenant) throw error('tenant_required', 'Tenant required', 403)
 
     const plan = await Plan.findOne({ _id: requestedPlanIdRaw, isActive: true }).lean()
-    if (!plan) throw error('not_found', 'Plan bulunamadı', 404)
-    const planSystem = String(plan.systemType || 'kermes')
-    const tenantSystem = String(tenant.systemType || 'kermes')
-    if (planSystem !== tenantSystem) throw error('plan_system_mismatch', 'Plan sistem tipi uyumsuz', 409)
+    if (!plan) throw error('not_found', 'Plan bulunamadi', 404)
+    if (plan.isTrial) throw error('invalid_plan', 'Deneme paketi talep edilemez', 400)
+    ensurePlanMatchesTenant(tenant, plan)
 
     const hasPending = await MembershipRequest.exists({ tenantId, status: 'pending' })
     if (hasPending) throw error('pending_request_exists', 'Beklemede bir talebiniz var', 409)
@@ -90,7 +91,7 @@ export const createRequest = async (req, res) => {
 
     const populated = await MembershipRequest
       .findById(doc._id)
-      .populate('requestedPlanId', 'name price systemType')
+      .populate('requestedPlanId', 'name price systemType packageType isTrial')
       .populate('createdBy', 'name')
       .populate('decidedBy', 'name')
       .lean()
@@ -110,7 +111,7 @@ export const cancelRequest = async (req, res) => {
     if (!mongoose.isValidObjectId(id)) throw error('invalid_request', 'Invalid request id', 400)
 
     const current = await MembershipRequest.findOne({ _id: id, tenantId }).lean()
-    if (!current) throw error('not_found', 'Talep bulunamadı', 404)
+    if (!current) throw error('not_found', 'Talep bulunamadi', 404)
     if (String(current.status) !== 'pending') throw error('invalid_status', 'Sadece beklemedeki talepler iptal edilebilir', 400)
 
     await MembershipRequest.updateOne(
@@ -120,14 +121,14 @@ export const cancelRequest = async (req, res) => {
           status: 'cancelled',
           decidedBy: new mongoose.Types.ObjectId(actorUserId),
           decidedAt: new Date(),
-          decisionNote: 'İptal edildi'
+          decisionNote: 'Iptal edildi'
         }
       }
     )
 
     const updated = await MembershipRequest
       .findById(id)
-      .populate('requestedPlanId', 'name price systemType')
+      .populate('requestedPlanId', 'name price systemType packageType isTrial')
       .populate('createdBy', 'name')
       .populate('decidedBy', 'name')
       .lean()
@@ -143,8 +144,13 @@ export const listPlans = async (req, res) => {
     if (!tenantId) throw error('tenant_required', 'Tenant required', 403)
     const tenant = await Tenant.findById(tenantId).lean()
     if (!tenant) throw error('tenant_required', 'Tenant required', 403)
-    const systemType = String(tenant.systemType || 'kermes')
-    const list = await Plan.find({ isActive: true, systemType }).sort({ createdAt: -1 }).lean()
+    const normalizedType = normalizeSystemType(tenant.vertical || tenant.businessType || tenant.systemType, 'canteen')
+    const list = await Plan.find({
+      $and: [
+        { isActive: true, isTrial: { $ne: true } },
+        { $or: buildPlanTypeMatchQuery(normalizedType) }
+      ]
+    }).setOptions({ strictQuery: false }).sort({ createdAt: -1 }).lean()
     const items = (list || []).map(p => ({
       id: String(p._id || ''),
       name: String(p.name || ''),
@@ -152,7 +158,8 @@ export const listPlans = async (req, res) => {
       limits: p.limits || null,
       features: p.features || null,
       trialDays: Number(p.trialDays || 0),
-      systemType: String(p.systemType || '')
+      systemType: String(p.systemType || ''),
+      packageType: String(p.packageType || '')
     }))
     res.json({ success: true, items })
   } catch (err) {

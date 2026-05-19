@@ -48,7 +48,7 @@ export default function AutoPrintInfoCard({
           ) : null}
           {!!String(latestVersion || '').trim() && (
             <div style={{ marginTop: 4, fontSize: 12, color: updateAvailable ? '#f59e0b' : 'var(--muted)', fontWeight: updateAvailable ? 700 : 500 }}>
-              {updateAvailable ? `Guncelleme var: ${latestVersion}` : `Guncel surum: ${latestVersion}`}
+              {updateAvailable ? `Güncelleme var: ${latestVersion}` : `Güncel surum: ${latestVersion}`}
             </div>
           )}
         </div>

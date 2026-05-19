@@ -74,14 +74,14 @@ export default function PlatformAdminPaymentRequests() {
 
   const systemLabel = (value) => {
     const type = String(value || 'kermes').toLowerCase()
-    if (type === 'kantin') return 'KANTIN'
+    if (type === 'kantin') return 'MAĞAZA'
     return 'RESTORAN'
   }
 
   return (
     <div className="main">
       <div className="actionWrap" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>Odeme Talepleri</h3>
+        <h3 style={{ margin: 0 }}>Ödeme Talepleri</h3>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value)} style={{ height: 36 }}>
             <option value="pending">Beklemede</option>
@@ -98,7 +98,7 @@ export default function PlatformAdminPaymentRequests() {
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
 
       <div className="card">
-        {loading ? 'Yukleniyor...' : (
+        {loading ? 'Yükleniyor...' : (
           items.length === 0 ? (
             <div>Henuz talep yok.</div>
           ) : (

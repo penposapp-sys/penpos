@@ -1,10 +1,26 @@
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
 import * as logger from '../utils/logger.js'
+import User from '../models/User.js'
 
 dotenv.config()
 
 let transactionsSupported = false
+
+const syncUserIndexes = async () => {
+  try {
+    const collection = mongoose.connection.db.collection('users')
+    const indexes = await collection.indexes()
+    const legacyEmailUnique = indexes.find((idx) => idx.unique && idx.key && idx.key.email === 1 && Object.keys(idx.key).length === 1)
+    if (legacyEmailUnique) {
+      await collection.dropIndex(legacyEmailUnique.name)
+      logger.info(`Dropped legacy users index: ${legacyEmailUnique.name}`)
+    }
+    await User.syncIndexes()
+  } catch (err) {
+    logger.warn('User index sync failed', err?.message || String(err))
+  }
+}
 
 export const connectDB = async () => {
   const uri = (process.env.MONGODB_URI || process.env.MONGO_URI || '').trim()
@@ -14,6 +30,7 @@ export const connectDB = async () => {
     }
     await mongoose.connect(uri)
     logger.info('MongoDB connected')
+    await syncUserIndexes()
     try {
       const admin = mongoose.connection.db.admin()
       let info

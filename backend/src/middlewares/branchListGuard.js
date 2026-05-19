@@ -1,6 +1,7 @@
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { findAllByTenant as listActiveBranchesByTenant } from '../repositories/branchRepository.js'
 import { parseBranchIds, requireValidObjectIds, intersectAllowed } from '../utils/branchIds.js'
+import { getUserAccessibleBranchIds } from '../utils/branchVisibility.js'
 
 export const branchListGuard = async (req, res, next) => {
   try {
@@ -26,9 +27,8 @@ export const branchListGuard = async (req, res, next) => {
     } catch {}
     let staffAllowed = null
     if (role === 'staff') {
-      staffAllowed = Array.isArray(req.user?.branchIds) && req.user.branchIds.length > 0
-        ? req.user.branchIds.map(String)
-        : (req.user?.branchId ? [String(req.user.branchId)] : [])
+      const explicitStaffAllowed = getUserAccessibleBranchIds(req.user)
+      staffAllowed = explicitStaffAllowed.length > 0 ? explicitStaffAllowed.map(String) : null
     }
     const effectiveAllowed = staffAllowed
       ? tenantAllowed.filter(id => staffAllowed.includes(String(id)))
