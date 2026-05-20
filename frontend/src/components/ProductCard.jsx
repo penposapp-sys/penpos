@@ -1,28 +1,30 @@
-import React, { memo } from 'react'
+import React, { memo, useCallback } from 'react'
 import ProductImage from './ProductImage.jsx'
 
 function ProductCard({ item, disabled = false, onClick }) {
   const price = item?.price
   const isWeightBased = !!item?.isWeightBased
   const name = item?.name
+  const handleClick = useCallback(() => {
+    if (disabled) return
+    if (typeof onClick === 'function') onClick(item)
+  }, [disabled, item, onClick])
+  const handleKeyDown = useCallback((e) => {
+    if (disabled) return
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    if (typeof onClick === 'function') onClick(item)
+  }, [disabled, item, onClick])
 
   return (
     <div
       className="card productCard productCard--photo"
       data-disabled={disabled ? 'true' : 'false'}
-      onClick={() => {
-        if (disabled) return
-        if (typeof onClick === 'function') onClick(item)
-      }}
+      onClick={handleClick}
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled ? 'true' : 'false'}
-      onKeyDown={(e) => {
-        if (disabled) return
-        if (e.key !== 'Enter' && e.key !== ' ') return
-        e.preventDefault()
-        if (typeof onClick === 'function') onClick(item)
-      }}
+      onKeyDown={handleKeyDown}
     >
       <ProductImage
         className="productCard__img"
@@ -31,6 +33,7 @@ function ProductCard({ item, disabled = false, onClick }) {
         width={96}
         height={96}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        loading="lazy"
       />
       <div className="productCard__overlay" />
       <div className="productCard__content">

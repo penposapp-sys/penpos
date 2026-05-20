@@ -1,4 +1,4 @@
-import React, { memo } from 'react'
+import React, { memo, useCallback } from 'react'
 
 function SaleCategorySidebar({
   title = 'Kategoriler',
@@ -6,6 +6,8 @@ function SaleCategorySidebar({
   activeCategoryId,
   onSelect
 }) {
+  const handleSelect = useCallback((categoryId) => onSelect?.(categoryId), [onSelect])
+
   return (
     <div className="card salePanel">
       <div style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', fontWeight: 800 }}>{title}</div>
@@ -15,7 +17,7 @@ function SaleCategorySidebar({
             key={c.id}
             className="btn btn--full btn--left"
             type="button"
-            onClick={() => onSelect?.(c.id)}
+            onClick={() => handleSelect(c.id)}
             aria-pressed={String(activeCategoryId) === String(c.id)}
             style={{
               marginBottom: 8,

@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { Barcode, Search } from 'lucide-react'
 
 const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
 const CASHIER_CART_STORAGE_KEY = 'canteen_cashier_cart_v1'
+const MOBILE_PRODUCT_BATCH_SIZE = 24
 
 const money = (n) => {
   const v = Number(n || 0)
@@ -17,6 +19,7 @@ const money = (n) => {
 const roundMoney = (n) => Number(Number(n || 0).toFixed(2))
 
 const normalize = (s) => String(s || '').toLowerCase().trim()
+const normalizeId = (value) => String(value || '').trim()
 const normalizePaymentType = (method = {}) => {
   const type = String(method?.type || method?.bucket || method?.methodType || '').trim().toLowerCase()
   if (type === 'credit' || type === 'account') return 'account'
@@ -26,9 +29,132 @@ const normalizePaymentType = (method = {}) => {
   return 'other'
 }
 
+const CashierCategoryRail = memo(function CashierCategoryRail({
+  categories,
+  activeCategoryId,
+  onSelectCategory
+}) {
+  return (
+    <div className="kasaCategoryColumn kasaCategoryRail">
+      {categories.map((category) => {
+        const isActive = String(activeCategoryId) === String(category.id)
+        return (
+          <button
+            key={category.id}
+            type="button"
+            className="kasaCategoryCard"
+            data-active={isActive ? 'true' : 'false'}
+            onClick={() => onSelectCategory(String(category.id))}
+          >
+            <img
+              className="kasaCategoryCardImage"
+              src={String(category.imageUrl || IMAGE_PLACEHOLDER)}
+              alt={category.name}
+              loading="lazy"
+              decoding="async"
+              width="92"
+              height="92"
+              onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
+            />
+            <div className="kasaCategoryCardBody">
+              <span>{category.name}</span>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}, (prev, next) => (
+  prev.categories === next.categories &&
+  String(prev.activeCategoryId || '') === String(next.activeCategoryId || '')
+))
+
+const CashierProductCard = memo(function CashierProductCard({
+  product,
+  branchName,
+  onAdd,
+  themeText,
+  accentText,
+  compact = false
+}) {
+  const hasImage = String(product?.imageUrl || '').trim().length > 0
+  const handleClick = useCallback(() => onAdd(product), [onAdd, product])
+  const handleImageError = useCallback((event) => {
+    event.currentTarget.style.display = 'none'
+    const placeholder = event.currentTarget.nextElementSibling
+    if (placeholder) placeholder.style.display = 'grid'
+  }, [])
+
+  return (
+    <button
+      type="button"
+      className="card kasaProductCard"
+      data-has-image={hasImage ? 'true' : 'false'}
+      data-compact={compact ? 'true' : 'false'}
+      onClick={handleClick}
+    >
+      {hasImage ? (
+        <img
+          className="kasaProductCardImage"
+          src={String(product.imageUrl)}
+          alt={product.name}
+          loading="lazy"
+          decoding="async"
+          width="144"
+          height="144"
+          onError={handleImageError}
+        />
+      ) : null}
+      <div className="kasaProductCardImage kasaProductCardImage--placeholder" aria-hidden={hasImage ? 'true' : 'false'} style={{ display: hasImage ? 'none' : 'grid' }}>
+        <span className="kasaProductCardImagePlaceholderIcon" />
+        <span className="kasaProductCardImagePlaceholderText">URUN</span>
+      </div>
+      <div className="kasaProductCardBody">
+        <div className="kasaProductCardTitle" style={{ color: themeText }}>{product.name}</div>
+        {!compact && product.categoryName ? (
+          <div className="kasaProductCardMeta" style={{ color: accentText }}>
+            {product.categoryName}
+          </div>
+        ) : null}
+        {!compact && branchName ? (
+          <div className="kasaProductCardMeta" style={{ color: accentText }}>
+            {branchName}
+          </div>
+        ) : null}
+        <div className="kasaProductCardFooter">
+          <div className="kasaProductCardPrice" style={{ color: accentText }}>{money(product.price)} ₺</div>
+          {!compact ? (
+            <div className="kasaProductCardStock">
+              {product.stockTrackingEnabled === true ? `Stok: ${Number(product.stockQty || 0)}` : 'Stok: —'}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </button>
+  )
+}, (prev, next) => {
+  const prevProduct = prev.product || {}
+  const nextProduct = next.product || {}
+  return (
+    prev.onAdd === next.onAdd &&
+    prev.compact === next.compact &&
+    prev.themeText === next.themeText &&
+    prev.accentText === next.accentText &&
+    prev.branchName === next.branchName &&
+    normalizeId(prevProduct.id || prevProduct._id) === normalizeId(nextProduct.id || nextProduct._id) &&
+    String(prevProduct.name || '') === String(nextProduct.name || '') &&
+    String(prevProduct.imageUrl || '') === String(nextProduct.imageUrl || '') &&
+    String(prevProduct.categoryName || '') === String(nextProduct.categoryName || '') &&
+    Number(prevProduct.price || 0) === Number(nextProduct.price || 0) &&
+    Number(prevProduct.stockQty || 0) === Number(nextProduct.stockQty || 0) &&
+    prevProduct.stockTrackingEnabled === nextProduct.stockTrackingEnabled
+  )
+})
+
 export default function CanteenCashierPage() {
   const { me, session } = useOutletContext()
-  const { theme, themeKey } = useTheme()
+  const { theme } = useTheme()
+  const { isMobilePortrait } = useResponsiveFlags()
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [q, setQ] = useState('')
@@ -79,23 +205,7 @@ export default function CanteenCashierPage() {
   })
 
   const [branchModalOpen, setBranchModalOpen] = useState(false)
-
-  const softProductCardStyle = useMemo(() => {
-    const borderColor = theme.border
-    const accentRgb = (() => {
-      const hex = String(theme.accent || '').replace('#', '')
-      if (hex.length !== 6) return '17,24,39'
-      const r = parseInt(hex.slice(0, 2), 16)
-      const g = parseInt(hex.slice(2, 4), 16)
-      const b = parseInt(hex.slice(4, 6), 16)
-      return `${r}, ${g}, ${b}`
-    })()
-    return {
-      borderColor,
-      background: `linear-gradient(180deg, ${theme.accentSoft} 0%, rgba(${accentRgb}, ${themeKey === 'mono' ? '0.05' : '0.1'}) 100%)`,
-      boxShadow: `0 14px 34px rgba(${accentRgb}, ${themeKey === 'mono' ? '0.08' : '0.12'})`
-    }
-  }, [theme, themeKey])
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(MOBILE_PRODUCT_BATCH_SIZE)
 
   const scheduleBarcodeFocus = (delayMs = 250) => {
     setTimeout(() => {
@@ -259,6 +369,43 @@ export default function CanteenCashierPage() {
   }, [activeCategoryId, products, q])
 
   useEffect(() => {
+    setMobileVisibleCount(MOBILE_PRODUCT_BATCH_SIZE)
+  }, [activeCategoryId, q, selectedBranchId])
+
+  const visibleProducts = useMemo(() => {
+    if (!isMobilePortrait) return filteredProducts
+    return filteredProducts.slice(0, mobileVisibleCount)
+  }, [filteredProducts, isMobilePortrait, mobileVisibleCount])
+
+  const hasMoreProducts = isMobilePortrait && visibleProducts.length < filteredProducts.length
+
+  const branchNameById = useMemo(() => {
+    const map = new Map()
+    allowedBranches.forEach((branch) => {
+      const id = normalizeId(branch?.id)
+      if (!id) return
+      map.set(id, String(branch?.name || ''))
+    })
+    return map
+  }, [allowedBranches])
+
+  const handleCategorySelect = useCallback((categoryId) => {
+    startTransition(() => {
+      setActiveCategoryId(String(categoryId || ''))
+    })
+  }, [])
+
+  const handleQueryChange = useCallback((value) => {
+    startTransition(() => {
+      setQ(value)
+    })
+  }, [])
+
+  const showMoreProducts = useCallback(() => {
+    setMobileVisibleCount((prev) => prev + MOBILE_PRODUCT_BATCH_SIZE)
+  }, [])
+
+  useEffect(() => {
     const branchId = String(selectedBranchId || '').trim()
     cartHydratedRef.current = false
     cartHydratedBranchRef.current = branchId
@@ -367,7 +514,7 @@ export default function CanteenCashierPage() {
     return Array.from(new Set(ids))
   }, [cart])
 
-  const addToCart = (p, qtyAdd = 1) => {
+  const addToCart = useCallback((p, qtyAdd = 1) => {
     const id = String(p?.id || p?._id || '')
     if (!id) return
     const addQty = Math.max(1, Number(qtyAdd || 1))
@@ -381,7 +528,7 @@ export default function CanteenCashierPage() {
       next.unshift({ productId: id, name: p.name, barcode: String(p.barcode || ''), unitPrice: Number(p.price || 0), qty: addQty, productBranchId: p?.branchId ? String(p.branchId) : null })
       return next
     })
-  }
+  }, [])
 
   const scanBarcode = async (raw, opts = {}) => {
     const code = String(raw || '').trim()
@@ -590,29 +737,29 @@ export default function CanteenCashierPage() {
     return String(allowedBranches.find(b => String(b.id) === id)?.name || '')
   }, [allowedBranches, selectedBranchId])
 
-  const inc = (productId) => {
+  const inc = useCallback((productId) => {
     setCart(prev => prev.map(it => it.productId === productId ? { ...it, qty: Number(it.qty || 0) + 1 } : it))
-  }
+  }, [])
 
-  const dec = (productId) => {
+  const dec = useCallback((productId) => {
     setCart(prev => {
       const next = prev.map(it => it.productId === productId ? { ...it, qty: Number(it.qty || 0) - 1 } : it)
       return next.filter(it => Number(it.qty || 0) > 0)
     })
-  }
+  }, [])
 
-  const setQty = (productId, nextQty) => {
+  const setQty = useCallback((productId, nextQty) => {
     const raw = String(nextQty ?? '').replace(/[^\d]/g, '')
     const qty = raw === '' ? 0 : Math.floor(Number(raw))
     setCart(prev => {
       if (!Number.isFinite(qty) || qty < 0) return prev
       return prev.map(it => it.productId === productId ? { ...it, qty } : it)
     })
-  }
+  }, [])
 
-  const removeLine = (productId) => {
+  const removeLine = useCallback((productId) => {
     setCart(prev => prev.filter(it => it.productId !== productId))
-  }
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedCustomerQuery(String(customerQuery || '').trim()), 350)
@@ -843,82 +990,35 @@ export default function CanteenCashierPage() {
               className="input kasaSearchSecondaryInput"
               value={q}
               onBlur={() => scheduleBarcodeFocus(250)}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => handleQueryChange(e.target.value)}
               placeholder="Ürün adı"
             />
           </label>
           <div className="kasaCatalogLayout">
-            <div className="kasaCategoryColumn kasaProductGridScroll kasaCategoryRail">
-              {categories.map((category) => {
-                const isActive = String(activeCategoryId) === String(category.id)
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    className="kasaCategoryCard"
-                    data-active={isActive ? 'true' : 'false'}
-                    onClick={() => setActiveCategoryId(String(category.id))}
-                  >
-                    <img
-                      className="kasaCategoryCardImage"
-                      src={String(category.imageUrl || IMAGE_PLACEHOLDER)}
-                      alt={category.name}
-                      onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
-                    />
-                    <div className="kasaCategoryCardBody">
-                      <span>{category.name}</span>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            <CashierCategoryRail
+              categories={categories}
+              activeCategoryId={activeCategoryId}
+              onSelectCategory={handleCategorySelect}
+            />
             <div className="kasaProductGrid kasaProductGridScroll">
-            {filteredProducts.map(p => (
-              <button
-                key={p.id || p._id}
-                type="button"
-                className="card kasaProductCard"
-                data-has-image={String(p.imageUrl || '').trim() ? 'true' : 'false'}
-                onClick={() => addToCart(p)}
-                style={{ ...softProductCardStyle, cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6 }}
-              >
-                {String(p.imageUrl || '').trim()
-                  ? (
-                    <img
-                      className="kasaProductCardImage"
-                      src={String(p.imageUrl)}
-                      alt={p.name}
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none'
-                        const placeholder = event.currentTarget.nextElementSibling
-                        if (placeholder) placeholder.style.display = 'grid'
-                      }}
-                    />
-                  )
-                  : null}
-                <div className="kasaProductCardBody">
-                  <div className="kasaProductCardTitle" style={{ color: theme.text }}>{p.name}</div>
-                {p.categoryName && (
-                  <div className="kasaProductCardMeta" style={{ color: theme.accentText }}>
-                    {p.categoryName}
-                  </div>
-                )}
-                {p.branchId && (
-                  <div className="kasaProductCardMeta" style={{ color: theme.accentText }}>
-                    {(allowedBranches.find(b => String(b.id) === String(p.branchId))?.name) || 'Şube'}
-                  </div>
-                )}
-                <div className="kasaProductCardFooter">
-                  <div style={{ color: theme.accentText, fontSize: 13, fontWeight: 700 }}>{money(p.price)} ₺</div>
-                  <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>
-                    {p.stockTrackingEnabled === true ? `Stok: ${Number(p.stockQty || 0)}` : 'Stok: —'}
-                  </div>
-                </div>
-                </div>
-              </button>
-            ))}
-            {!loadingProducts && filteredProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}
+              {visibleProducts.map((p) => (
+                <CashierProductCard
+                  key={p.id || p._id}
+                  product={p}
+                  branchName={branchNameById.get(normalizeId(p.branchId)) || ''}
+                  onAdd={addToCart}
+                  themeText={theme.text}
+                  accentText={theme.accentText}
+                  compact={isMobilePortrait}
+                />
+              ))}
+              {!loadingProducts && visibleProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}
           </div>
+          {hasMoreProducts ? (
+            <button type="button" className="btn kasaLoadMoreButton" onClick={showMoreProducts}>
+              Daha fazla ürün göster ({filteredProducts.length - visibleProducts.length})
+            </button>
+          ) : null}
           </div>
         </div>
 
