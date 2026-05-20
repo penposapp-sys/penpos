@@ -73,9 +73,9 @@ const CashierProductCard = memo(function CashierProductCard({
   product,
   branchName,
   onAdd,
+  style,
   themeText,
-  accentText,
-  compact = false
+  accentText
 }) {
   const hasImage = String(product?.imageUrl || '').trim().length > 0
   const handleClick = useCallback(() => onAdd(product), [onAdd, product])
@@ -90,8 +90,8 @@ const CashierProductCard = memo(function CashierProductCard({
       type="button"
       className="card kasaProductCard"
       data-has-image={hasImage ? 'true' : 'false'}
-      data-compact={compact ? 'true' : 'false'}
       onClick={handleClick}
+      style={{ ...style, cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6 }}
     >
       {hasImage ? (
         <img
@@ -105,29 +105,23 @@ const CashierProductCard = memo(function CashierProductCard({
           onError={handleImageError}
         />
       ) : null}
-      <div className="kasaProductCardImage kasaProductCardImage--placeholder" aria-hidden={hasImage ? 'true' : 'false'} style={{ display: hasImage ? 'none' : 'grid' }}>
-        <span className="kasaProductCardImagePlaceholderIcon" />
-        <span className="kasaProductCardImagePlaceholderText">URUN</span>
-      </div>
       <div className="kasaProductCardBody">
         <div className="kasaProductCardTitle" style={{ color: themeText }}>{product.name}</div>
-        {!compact && product.categoryName ? (
+        {product.categoryName ? (
           <div className="kasaProductCardMeta" style={{ color: accentText }}>
             {product.categoryName}
           </div>
         ) : null}
-        {!compact && branchName ? (
+        {branchName ? (
           <div className="kasaProductCardMeta" style={{ color: accentText }}>
             {branchName}
           </div>
         ) : null}
         <div className="kasaProductCardFooter">
           <div className="kasaProductCardPrice" style={{ color: accentText }}>{money(product.price)} ₺</div>
-          {!compact ? (
-            <div className="kasaProductCardStock">
-              {product.stockTrackingEnabled === true ? `Stok: ${Number(product.stockQty || 0)}` : 'Stok: —'}
-            </div>
-          ) : null}
+          <div className="kasaProductCardStock">
+            {product.stockTrackingEnabled === true ? `Stok: ${Number(product.stockQty || 0)}` : 'Stok: —'}
+          </div>
         </div>
       </div>
     </button>
@@ -137,7 +131,7 @@ const CashierProductCard = memo(function CashierProductCard({
   const nextProduct = next.product || {}
   return (
     prev.onAdd === next.onAdd &&
-    prev.compact === next.compact &&
+    prev.style === next.style &&
     prev.themeText === next.themeText &&
     prev.accentText === next.accentText &&
     prev.branchName === next.branchName &&
@@ -153,7 +147,7 @@ const CashierProductCard = memo(function CashierProductCard({
 
 export default function CanteenCashierPage() {
   const { me, session } = useOutletContext()
-  const { theme } = useTheme()
+  const { theme, themeKey } = useTheme()
   const { isMobilePortrait } = useResponsiveFlags()
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
@@ -206,6 +200,23 @@ export default function CanteenCashierPage() {
 
   const [branchModalOpen, setBranchModalOpen] = useState(false)
   const [mobileVisibleCount, setMobileVisibleCount] = useState(MOBILE_PRODUCT_BATCH_SIZE)
+
+  const softProductCardStyle = useMemo(() => {
+    const borderColor = theme.border
+    const accentRgb = (() => {
+      const hex = String(theme.accent || '').replace('#', '')
+      if (hex.length !== 6) return '17,24,39'
+      const r = parseInt(hex.slice(0, 2), 16)
+      const g = parseInt(hex.slice(2, 4), 16)
+      const b = parseInt(hex.slice(4, 6), 16)
+      return `${r}, ${g}, ${b}`
+    })()
+    return {
+      borderColor,
+      background: `linear-gradient(180deg, ${theme.accentSoft} 0%, rgba(${accentRgb}, ${themeKey === 'mono' ? '0.05' : '0.1'}) 100%)`,
+      boxShadow: `0 14px 34px rgba(${accentRgb}, ${themeKey === 'mono' ? '0.08' : '0.12'})`
+    }
+  }, [theme, themeKey])
 
   const scheduleBarcodeFocus = (delayMs = 250) => {
     setTimeout(() => {
@@ -1007,9 +1018,9 @@ export default function CanteenCashierPage() {
                   product={p}
                   branchName={branchNameById.get(normalizeId(p.branchId)) || ''}
                   onAdd={addToCart}
+                  style={softProductCardStyle}
                   themeText={theme.text}
                   accentText={theme.accentText}
-                  compact={isMobilePortrait}
                 />
               ))}
               {!loadingProducts && visibleProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}

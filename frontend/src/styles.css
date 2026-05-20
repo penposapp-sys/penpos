@@ -4627,55 +4627,6 @@ textarea::placeholder {
     gap: 8px;
   }
   body.sales-mobile-scroll .productCard { min-height: 84px }
-
-  .kasaShowcasePanel,
-  .kasaCartPanel,
-  .kasaPaymentPanel,
-  .kasaProductCard,
-  .kasaCategoryCard {
-    background: var(--app-surface, #fff) !important;
-    box-shadow: none !important;
-    filter: none !important;
-    backdrop-filter: none !important;
-    transition: none !important;
-  }
-
-  .kasaCategoryCard:hover,
-  .kasaProductCard:hover,
-  .productCard:hover {
-    transform: none !important;
-    box-shadow: none !important;
-  }
-
-  .kasaShowcaseLayout {
-    min-height: auto;
-  }
-
-  .kasaShowcasePanel {
-    overflow: hidden;
-  }
-
-  .kasaCategoryRail {
-    overflow-x: auto;
-    overflow-y: hidden;
-    max-height: none;
-  }
-
-  .kasaProductGridScroll {
-    max-height: min(52vh, 520px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    padding-right: 0;
-  }
-
-  .kasaCartList {
-    max-height: 26vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
 }
 
 @media (max-width: 768px) and (orientation: portrait) {
@@ -4711,48 +4662,6 @@ textarea::placeholder {
   }
   .sale-cart-line {
     contain-intrinsic-size: 96px 120px;
-  }
-
-  .kasaProductGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .kasaProductCard {
-    min-height: 124px;
-    padding: 6px;
-    border-radius: 12px;
-  }
-
-  .kasaProductCardImage {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-  }
-
-  .kasaProductCardBody {
-    gap: 2px;
-    padding-top: 4px;
-  }
-
-  .kasaProductCardTitle {
-    font-size: 11px;
-    line-height: 1.15;
-  }
-
-  .kasaProductCardFooter {
-    justify-content: flex-start;
-  }
-
-  .kasaProductCardStock,
-  .kasaProductCardMeta {
-    display: none !important;
-  }
-
-  .kasaLoadMoreButton {
-    min-height: 40px;
-    border-radius: 12px;
-    box-shadow: none !important;
   }
 }
 
