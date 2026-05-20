@@ -2427,6 +2427,13 @@ body.modal-open .qr-menu .menu-row:hover {
   -webkit-overflow-scrolling: touch;
   padding-right: 6px;
 }
+.salePanelScroll.saleProductsVirtualScroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  contain: layout paint style;
+}
 
 .saleCartHeader {
   padding-bottom: 8px;
@@ -3312,6 +3319,13 @@ body.modal-open .qr-menu .menu-row:hover {
 .kasaProductGridScroll {
   max-height: calc(100vh - 330px);
   min-height: 0;
+}
+.kasaProductVirtualScroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  contain: layout paint style;
 }
 .kasaProductCard {
   min-height: 142px;
@@ -4573,6 +4587,12 @@ textarea::placeholder {
     justify-content: start;
   }
   .kasaProductGridScroll { max-height: none; overflow: visible; padding-right: 0 }
+  .kasaProductGridScroll.kasaProductVirtualScroll {
+    max-height: calc(100vh - 330px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0;
+  }
   .kasaCartList { max-height: 42vh }
   .stockPanels { grid-template-columns: 1fr }
   .stockCountScanRow { grid-template-columns: 1fr }
@@ -4605,6 +4625,12 @@ textarea::placeholder {
 
   body.sales-mobile-scroll .salePanel { overflow: visible }
   body.sales-mobile-scroll .salePanelScroll { overflow: visible; flex: none; padding-right: 0 }
+  body.sales-mobile-scroll .salePanelScroll.saleProductsVirtualScroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    padding-right: 0;
+  }
   body.sales-mobile-scroll .saleCartList { overflow: visible; flex: none; padding-right: 0 }
   body.sales-mobile-scroll .saleCartList--padActions { padding-bottom: 0 }
 

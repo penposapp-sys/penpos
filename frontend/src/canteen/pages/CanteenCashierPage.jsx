@@ -5,11 +5,11 @@ import Modal from '../../components/Modal.jsx'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
+import useVirtualProductGrid from '../../hooks/useVirtualProductGrid.js'
 import { Barcode, Search } from 'lucide-react'
 
 const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
 const CASHIER_CART_STORAGE_KEY = 'canteen_cashier_cart_v1'
-const MOBILE_PRODUCT_BATCH_SIZE = 24
 
 const money = (n) => {
   const v = Number(n || 0)
@@ -75,7 +75,8 @@ const CashierProductCard = memo(function CashierProductCard({
   onAdd,
   style,
   themeText,
-  accentText
+  accentText,
+  measureRef = null
 }) {
   const hasImage = String(product?.imageUrl || '').trim().length > 0
   const handleClick = useCallback(() => onAdd(product), [onAdd, product])
@@ -87,6 +88,7 @@ const CashierProductCard = memo(function CashierProductCard({
 
   return (
     <button
+      ref={measureRef}
       type="button"
       className="card kasaProductCard"
       data-has-image={hasImage ? 'true' : 'false'}
@@ -134,6 +136,7 @@ const CashierProductCard = memo(function CashierProductCard({
     prev.style === next.style &&
     prev.themeText === next.themeText &&
     prev.accentText === next.accentText &&
+    prev.measureRef === next.measureRef &&
     prev.branchName === next.branchName &&
     normalizeId(prevProduct.id || prevProduct._id) === normalizeId(nextProduct.id || nextProduct._id) &&
     String(prevProduct.name || '') === String(nextProduct.name || '') &&
@@ -199,7 +202,6 @@ export default function CanteenCashierPage() {
   })
 
   const [branchModalOpen, setBranchModalOpen] = useState(false)
-  const [mobileVisibleCount, setMobileVisibleCount] = useState(MOBILE_PRODUCT_BATCH_SIZE)
 
   const softProductCardStyle = useMemo(() => {
     const borderColor = theme.border
@@ -379,16 +381,20 @@ export default function CanteenCashierPage() {
     })
   }, [activeCategoryId, products, q])
 
-  useEffect(() => {
-    setMobileVisibleCount(MOBILE_PRODUCT_BATCH_SIZE)
-  }, [activeCategoryId, q, selectedBranchId])
-
-  const visibleProducts = useMemo(() => {
-    if (!isMobilePortrait) return filteredProducts
-    return filteredProducts.slice(0, mobileVisibleCount)
-  }, [filteredProducts, isMobilePortrait, mobileVisibleCount])
-
-  const hasMoreProducts = isMobilePortrait && visibleProducts.length < filteredProducts.length
+  const {
+    containerRef: productScrollRef,
+    gridMeasureRef: productGridMeasureRef,
+    cardMeasureRef: productCardMeasureRef,
+    handleScroll: handleProductScroll,
+    visibleItems: visibleProducts,
+    topSpacer: topProductSpacer,
+    bottomSpacer: bottomProductSpacer,
+    isVirtualized: productsVirtualized
+  } = useVirtualProductGrid({
+    items: filteredProducts,
+    enabled: isMobilePortrait,
+    resetDeps: [activeCategoryId, q, selectedBranchId]
+  })
 
   const branchNameById = useMemo(() => {
     const map = new Map()
@@ -410,10 +416,6 @@ export default function CanteenCashierPage() {
     startTransition(() => {
       setQ(value)
     })
-  }, [])
-
-  const showMoreProducts = useCallback(() => {
-    setMobileVisibleCount((prev) => prev + MOBILE_PRODUCT_BATCH_SIZE)
   }, [])
 
   useEffect(() => {
@@ -1011,25 +1013,29 @@ export default function CanteenCashierPage() {
               activeCategoryId={activeCategoryId}
               onSelectCategory={handleCategorySelect}
             />
-            <div className="kasaProductGrid kasaProductGridScroll">
-              {visibleProducts.map((p) => (
-                <CashierProductCard
-                  key={p.id || p._id}
-                  product={p}
-                  branchName={branchNameById.get(normalizeId(p.branchId)) || ''}
-                  onAdd={addToCart}
-                  style={softProductCardStyle}
-                  themeText={theme.text}
-                  accentText={theme.accentText}
-                />
-              ))}
-              {!loadingProducts && visibleProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}
-          </div>
-          {hasMoreProducts ? (
-            <button type="button" className="btn kasaLoadMoreButton" onClick={showMoreProducts}>
-              Daha fazla ürün göster ({filteredProducts.length - visibleProducts.length})
-            </button>
-          ) : null}
+            <div
+              ref={productScrollRef}
+              className="kasaProductGridScroll kasaProductVirtualScroll"
+              onScroll={handleProductScroll}
+            >
+              {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}
+              <div ref={productGridMeasureRef} className="kasaProductGrid">
+                {visibleProducts.map((p, index) => (
+                  <CashierProductCard
+                    key={p.id || p._id}
+                    product={p}
+                    branchName={branchNameById.get(normalizeId(p.branchId)) || ''}
+                    onAdd={addToCart}
+                    style={softProductCardStyle}
+                    themeText={theme.text}
+                    accentText={theme.accentText}
+                    measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null}
+                  />
+                ))}
+                {!loadingProducts && visibleProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}
+              </div>
+              {productsVirtualized ? <div style={{ height: bottomProductSpacer }} aria-hidden="true" /> : null}
+            </div>
           </div>
         </div>
 

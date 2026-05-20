@@ -1,7 +1,7 @@
 import React, { memo, useCallback } from 'react'
 import ProductImage from './ProductImage.jsx'
 
-function ProductCard({ item, disabled = false, onClick }) {
+function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
   const price = item?.price
   const isWeightBased = !!item?.isWeightBased
   const name = item?.name
@@ -18,6 +18,7 @@ function ProductCard({ item, disabled = false, onClick }) {
 
   return (
     <div
+      ref={measureRef}
       className="card productCard productCard--photo"
       data-disabled={disabled ? 'true' : 'false'}
       onClick={handleClick}
@@ -49,6 +50,7 @@ export default memo(ProductCard, (prev, next) => {
   const nextItem = next?.item || {}
   return (
     prev.disabled === next.disabled &&
+    prev.measureRef === next.measureRef &&
     String(prevItem?.id || prevItem?._id || '') === String(nextItem?.id || nextItem?._id || '') &&
     String(prevItem?.name || '') === String(nextItem?.name || '') &&
     String(prevItem?.imageUrl || '') === String(nextItem?.imageUrl || '') &&

@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { startTransition, useCallback } from 'react'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
@@ -20,6 +21,7 @@ import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
+import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
 
 export default function PosPage() {
   const nav = useNavigate()
@@ -352,8 +354,8 @@ export default function PosPage() {
     setCategories(categories)
     setActiveCategory(categories[0]?.id || '')
   }
-  const loadItems = async (categoryId) => {
-    const res = await api(`/api/tenant/menu-items?active=true${categoryId ? `&categoryId=${categoryId}` : ''}`)
+  const loadItems = async () => {
+    const res = await api('/api/tenant/menu-items?active=true')
     if (res?.success === false) {
       setItems([])
       return
@@ -376,7 +378,19 @@ export default function PosPage() {
     setBusy(actionBusy)
   }, [actionBusy])
   useEffect(() => { loadCategories() }, [])
-  useEffect(() => { if (activeCategory) loadItems(activeCategory) }, [activeCategory])
+  useEffect(() => { loadItems() }, [])
+
+  const filteredItems = useMemo(() => {
+    const activeId = String(activeCategory || '').trim()
+    if (!activeId) return items
+    return (items || []).filter((item) => String(item?.categoryId || '') === activeId)
+  }, [activeCategory, items])
+
+  const handleCategorySelect = useCallback((categoryId) => {
+    startTransition(() => {
+      setActiveCategory(String(categoryId || ''))
+    })
+  }, [])
 
   const loadOrderById = async (id) => {
     try {
@@ -610,7 +624,7 @@ export default function PosPage() {
     loadPaymentSettings()
   }, [Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : ''])
 
-  const addItem = async (menuItem) => {
+  const addItem = useCallback(async (menuItem) => {
     setError('')
     const orderId = getOrderId(order)
     if (!orderId) {
@@ -647,7 +661,22 @@ export default function PosPage() {
       setOrder(fresh)
       setNote(fresh.note || '')
     }
-  }
+  }, [order])
+
+  const {
+    containerRef: productScrollRef,
+    gridMeasureRef: productGridMeasureRef,
+    cardMeasureRef: productCardMeasureRef,
+    handleScroll: handleProductScroll,
+    visibleItems: visibleMenuItems,
+    topSpacer: topProductSpacer,
+    bottomSpacer: bottomProductSpacer,
+    isVirtualized: productsVirtualized
+  } = useVirtualProductGrid({
+    items: filteredItems,
+    enabled: isMobilePortrait,
+    resetDeps: [activeCategory]
+  })
 
   const openReceiptPreview = async () => {
     const orderId = getOrderId(order)
@@ -1634,7 +1663,7 @@ export default function PosPage() {
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="saleStandard3Col vhFit">
-        <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={setActiveCategory} />
+        <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={handleCategorySelect} />
 
         <div className="card salePanel">
           {(tableName || tableId || location.state?.fromTables) && (
@@ -1652,14 +1681,26 @@ export default function PosPage() {
           </div>
           <div style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div style={{ fontWeight: 800 }}>Ürünler</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{items.length} ürün</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{filteredItems.length} ürün</div>
           </div>
-          <div className="salePanelScroll" style={{ paddingTop: 10 }}>
-            <div className="posItemsGrid">
-              {items.map(i => (
-                <ProductCard key={i.id} item={i} onClick={() => addItem(i)} />
+          <div
+            ref={productScrollRef}
+            className="salePanelScroll saleProductsVirtualScroll"
+            style={{ paddingTop: 10 }}
+            onScroll={handleProductScroll}
+          >
+            {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}
+            <div ref={productGridMeasureRef} className="posItemsGrid">
+              {visibleMenuItems.map((i, index) => (
+                <ProductCard
+                  key={i.id}
+                  item={i}
+                  onClick={addItem}
+                  measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null}
+                />
               ))}
             </div>
+            {productsVirtualized ? <div style={{ height: bottomProductSpacer }} aria-hidden="true" /> : null}
           </div>
         </div>
 
