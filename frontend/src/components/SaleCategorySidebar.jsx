@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { memo } from 'react'
 
-export default function SaleCategorySidebar({
+function SaleCategorySidebar({
   title = 'Kategoriler',
   categories = [],
   activeCategoryId,
@@ -37,3 +37,9 @@ export default function SaleCategorySidebar({
     </div>
   )
 }
+
+export default memo(SaleCategorySidebar, (prev, next) => (
+  prev.title === next.title &&
+  String(prev.activeCategoryId || '') === String(next.activeCategoryId || '') &&
+  prev.categories === next.categories
+))

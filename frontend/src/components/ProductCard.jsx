@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { memo } from 'react'
 import ProductImage from './ProductImage.jsx'
 
-export default function ProductCard({ item, disabled = false, onClick }) {
+function ProductCard({ item, disabled = false, onClick }) {
   const price = item?.price
   const isWeightBased = !!item?.isWeightBased
   const name = item?.name
@@ -40,3 +40,16 @@ export default function ProductCard({ item, disabled = false, onClick }) {
     </div>
   )
 }
+
+export default memo(ProductCard, (prev, next) => {
+  const prevItem = prev?.item || {}
+  const nextItem = next?.item || {}
+  return (
+    prev.disabled === next.disabled &&
+    String(prevItem?.id || prevItem?._id || '') === String(nextItem?.id || nextItem?._id || '') &&
+    String(prevItem?.name || '') === String(nextItem?.name || '') &&
+    String(prevItem?.imageUrl || '') === String(nextItem?.imageUrl || '') &&
+    Number(prevItem?.price || 0) === Number(nextItem?.price || 0) &&
+    Boolean(prevItem?.isWeightBased) === Boolean(nextItem?.isWeightBased)
+  )
+})

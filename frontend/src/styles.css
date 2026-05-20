@@ -4646,6 +4646,23 @@ textarea::placeholder {
   .productsEditPriceGrid { grid-template-columns: 1fr; gap: 10px }
   .planLimitsGrid { grid-template-columns: 1fr; gap: 10px }
   .planFeaturesRow { flex-direction: column; align-items: stretch }
+  .productCard,
+  .kasaProductCard,
+  .kasaCategoryCard,
+  .sale-cart-line {
+    content-visibility: auto;
+    contain: layout paint style;
+  }
+  .productCard,
+  .kasaProductCard {
+    contain-intrinsic-size: 150px 96px;
+  }
+  .kasaCategoryCard {
+    contain-intrinsic-size: 108px 108px;
+  }
+  .sale-cart-line {
+    contain-intrinsic-size: 96px 120px;
+  }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {

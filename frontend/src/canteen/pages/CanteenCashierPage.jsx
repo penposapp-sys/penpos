@@ -57,6 +57,7 @@ export default function CanteenCashierPage() {
   const customerAbortRef = useRef(null)
   const lastCustomerKeyRef = useRef('')
   const cartHydratedRef = useRef(false)
+  const cartHydratedBranchRef = useRef('')
 
   const barcodeInputRef = useRef(null)
   const scanInFlightRef = useRef(new Set())
@@ -258,29 +259,35 @@ export default function CanteenCashierPage() {
   }, [activeCategoryId, products, q])
 
   useEffect(() => {
+    const branchId = String(selectedBranchId || '').trim()
     cartHydratedRef.current = false
+    cartHydratedBranchRef.current = branchId
+    if (!branchId) {
+      setCart([])
+      cartHydratedRef.current = true
+      return
+    }
     try {
       const raw = localStorage.getItem(CASHIER_CART_STORAGE_KEY)
-      if (!raw) return
+      if (!raw) {
+        setCart([])
+        return
+      }
       const parsed = JSON.parse(raw)
       const byBranch = parsed && typeof parsed === 'object' ? parsed : {}
-      const branchId = String(selectedBranchId || '').trim()
-      if (!branchId) return
       const saved = Array.isArray(byBranch[branchId]) ? byBranch[branchId] : []
-      if (saved.length === 0) return
       const restored = saved
         .map((item) => {
           const productId = String(item?.productId || '').trim()
-          const product = cartProductMap.get(productId)
-          if (!product) return null
+          if (!productId) return null
           const qty = Math.max(1, Number(item?.qty || 0))
           return {
             productId,
-            name: String(product?.name || item?.name || ''),
-            barcode: String(product?.barcode || item?.barcode || ''),
-            unitPrice: Number(product?.price ?? item?.unitPrice ?? 0),
+            name: String(item?.name || ''),
+            barcode: String(item?.barcode || ''),
+            unitPrice: Number(item?.unitPrice || 0),
             qty,
-            productBranchId: String(product?.branchId || item?.productBranchId || branchId)
+            productBranchId: String(item?.productBranchId || branchId)
           }
         })
         .filter(Boolean)
@@ -290,7 +297,35 @@ export default function CanteenCashierPage() {
     } finally {
       cartHydratedRef.current = true
     }
-  }, [selectedBranchId, cartProductMap])
+  }, [selectedBranchId])
+
+  useEffect(() => {
+    if (cartHydratedBranchRef.current !== String(selectedBranchId || '').trim()) return
+    if (cartProductMap.size === 0) return
+    setCart((prev) => prev.map((item) => {
+      const product = cartProductMap.get(String(item?.productId || '').trim())
+      if (!product) return item
+      const nextName = String(product?.name || item?.name || '')
+      const nextBarcode = String(product?.barcode || item?.barcode || '')
+      const nextPrice = Number(product?.price ?? item?.unitPrice ?? 0)
+      const nextBranchId = String(product?.branchId || item?.productBranchId || selectedBranchId || '')
+      if (
+        nextName === String(item?.name || '') &&
+        nextBarcode === String(item?.barcode || '') &&
+        nextPrice === Number(item?.unitPrice || 0) &&
+        nextBranchId === String(item?.productBranchId || '')
+      ) {
+        return item
+      }
+      return {
+        ...item,
+        name: nextName,
+        barcode: nextBarcode,
+        unitPrice: nextPrice,
+        productBranchId: nextBranchId
+      }
+    }))
+  }, [cartProductMap, selectedBranchId])
 
   useEffect(() => {
     const branchId = String(selectedBranchId || '').trim()
@@ -744,6 +779,16 @@ export default function CanteenCashierPage() {
       const bname = allowedBranches.find(b => String(b.id) === String(x.branchId))?.name || x.branchId
       return { branchId: x.branchId, name: bname, subTotal: Number(x.sale?.subTotal || 0), discountTotal: Number(x.sale?.discountTotal || 0), total: Number(x.sale?.total || 0), id: x.sale?.id }
     })
+    try {
+      const branchId = String(selectedBranchId || '').trim()
+      if (branchId) {
+        const raw = localStorage.getItem(CASHIER_CART_STORAGE_KEY)
+        const parsed = raw ? JSON.parse(raw) : {}
+        const next = parsed && typeof parsed === 'object' ? parsed : {}
+        next[branchId] = []
+        localStorage.setItem(CASHIER_CART_STORAGE_KEY, JSON.stringify(next))
+      }
+    } catch {}
     setLastSale({ subTotal: total, discountTotal, total: netTotal, breakdown })
     setCart([])
     setPayNote('')
