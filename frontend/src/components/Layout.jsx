@@ -29,8 +29,10 @@ export default function Layout() {
   const { getSetting } = useBusinessSettings()
   const { selectedDate, setSelectedDate } = useAppDate()
   const dateInputRef = useRef(null)
+  const topbarRef = useRef(null)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [topbarHeight, setTopbarHeight] = useState(0)
 
   useBodyLayoutMode('pos-app-layout')
 
@@ -258,6 +260,40 @@ export default function Layout() {
   const isDashboardPage = pathname === '/kermes/app/dashboard'
   const isReportsPage = pathname === '/kermes/app/reports'
   const isSettingsRoute = pathname.startsWith('/kermes/settings')
+  const isDesktopSalesRoute = !isMobilePortrait && (
+    pathname.startsWith('/kermes/app/pos') ||
+    pathname.startsWith('/kermes/app/walkin') ||
+    pathname.startsWith('/kermes/app/delivery')
+  )
+
+  useEffect(() => {
+    if (isSettingsRoute || !topbarRef.current) {
+      setTopbarHeight(0)
+      return undefined
+    }
+
+    const node = topbarRef.current
+    const updateHeight = () => {
+      const rect = node.getBoundingClientRect()
+      const computed = window.getComputedStyle(node)
+      const marginBottom = Number.parseFloat(computed.marginBottom || '0') || 0
+      setTopbarHeight(Math.ceil(rect.height + marginBottom))
+    }
+
+    updateHeight()
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => updateHeight())
+      : null
+
+    if (observer) observer.observe(node)
+    window.addEventListener('resize', updateHeight)
+
+    return () => {
+      if (observer) observer.disconnect()
+      window.removeEventListener('resize', updateHeight)
+    }
+  }, [isSettingsRoute, isMobilePortrait, pathname])
   const isMonoTheme = themeKey === 'mono'
   const sidebarTextColor = theme.darkMode ? 'var(--text-secondary)' : '#ffffff'
   const sidebarActiveTextColor = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
@@ -544,6 +580,7 @@ export default function Layout() {
 
         <main className="pos-main" style={{ position: 'relative', zIndex: 10, minWidth: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: isSettingsRoute ? 30 : 36, background: 'var(--card-bg)', border: '1px solid var(--border-soft)', backdropFilter: 'var(--glass-blur)', padding: isMobilePortrait ? 12 : (isSettingsRoute ? 12 : 18), boxShadow: 'var(--shadow-soft), var(--shadow-glow)', maxWidth: '100%' }}>
           {!isSettingsRoute ? <header
+            ref={topbarRef}
             className="topbar"
             style={{
               marginBottom: 16,
@@ -669,9 +706,21 @@ export default function Layout() {
             </div>
           </header> : null}
 
-          <section className="page-scroll page-scroll-area scrollbar-hidden" style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingRight: isMobilePortrait ? 0 : 2, maxWidth: '100%' }}>
-            <div className="page-content" key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>
-              <div className="main" style={{ padding: 0 }}>
+          <section
+            className={`page-scroll page-scroll-area scrollbar-hidden${isDesktopSalesRoute ? ' sales-page-content-shell' : ''}`}
+            style={{
+              minHeight: 0,
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+              paddingRight: isMobilePortrait ? 0 : 2,
+              maxWidth: '100%',
+              '--page-shell-header-height': `${topbarHeight}px`
+            }}
+          >
+            <div className={`page-content${isDesktopSalesRoute ? ' sales-page-content' : ''}`} key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>
+              <div className={`main${isDesktopSalesRoute ? ' sales-page-main' : ''}`} style={{ padding: 0 }}>
                 <Outlet />
               </div>
             </div>

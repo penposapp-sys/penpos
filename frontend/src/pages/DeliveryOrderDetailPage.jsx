@@ -13,6 +13,7 @@ import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 import ProductCard from '../components/ProductCard.jsx'
+import SaleCartLine from '../components/SaleCartLine.jsx'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { ServingType } from '../utils/servingType.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
@@ -1136,7 +1137,7 @@ export default function DeliveryOrderDetailPage() {
   const gridCols = '1fr'
 
   return (
-    <div className="splitLayout splitLayoutStretch vhFit delivery-orders-page" style={{ gridTemplateColumns: gridCols }}>
+    <div className="splitLayout splitLayoutStretch vhFit delivery-orders-page delivery-layout" style={{ gridTemplateColumns: gridCols }}>
 {showList && (
       <aside className="card delivery-left-panel">
         <div className="delivery-left-fixed">
@@ -1332,7 +1333,7 @@ export default function DeliveryOrderDetailPage() {
               </div>
             </div>
 
-            <div className="saleStandard3Col delivery-detail-layout" style={{ minHeight: 0, height: '100%' }}>
+            <div className="saleStandard3Col delivery-detail-layout pos-grid" style={{ minHeight: 0, height: '100%' }}>
               <div className="delivery-detail-categories">
                 <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={setActiveCategory} />
               </div>
@@ -1356,11 +1357,12 @@ export default function DeliveryOrderDetailPage() {
                 </div>
               </div>
 
-              <div className="card salePanel delivery-detail-summary" style={{ gap: 10 }}>
+              <div className="card salePanel saleCartPanelShell delivery-cart-panel delivery-detail-summary" style={{ gap: 10 }}>
+                <div className="saleCartPanelContent">
                 <div className="saleCartHeader delivery-detail-section-head" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button className="btn btn--toggle delivery-detail-btn delivery-detail-btn--small" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
-                      âœ“ Toplu
+                      Toplu
                     </button>
                     <button className="btn btn--toggle delivery-detail-btn delivery-detail-btn--small" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
                       Ayrı
@@ -1368,6 +1370,13 @@ export default function DeliveryOrderDetailPage() {
                   </div>
                   <span className="page-pill">Paket</span>
                 </div>
+                {canSendToKitchen && tab !== 'delivered' && (
+                  <div className="saleCartMobileActionBar">
+                    <button className="btn saleCartMobileActionBtn" onClick={sendKitchen} disabled={tab === 'delivered' || busy || !canSendToKitchen}>
+                      Mutfağa Gönder (PAKET)
+                    </button>
+                  </div>
+                )}
                 <div className="saleCartList order-cart-scroll scrollbar-hidden" style={{ marginTop: 8 }}>
                 <div style={{ display: 'grid', gap: 8 }}>
                   {(() => {
@@ -1407,78 +1416,77 @@ export default function DeliveryOrderDetailPage() {
                         cancelled: { label: 'İptal', bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
                       }
                       const m = itemStatusMeta[String(it?.status || '')] || null
+                      const detailText = `${it?.priceSnapshot} TL • x${displayQty}`
 
                       return (
-                        <div key={row.key} className="delivery-detail-cart-line" style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 8, opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <div style={{ fontWeight: 600, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              {!!m && (
-                                <span className="page-pill" style={{ background: m.bg, borderColor: m.border, color: m.color, marginBottom: 2, display: 'inline-block' }}>
-                                  {m.label}
-                                </span>
-                              )}
-                              <div>{it?.nameSnapshot}</div>
-                            </div>
-                            <div>{row.subtotal} TL</div>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                            {isOpen ? (
-                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                <button className="btn btn--xs" onClick={() => setItemQtyById(row.key, itemId, Math.max(0, Number(displayQty || 0) - 1))} disabled={disableBase || isMultiGroup || isQtyLocked} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>-</button>
-                                <span>{displayQty}</span>
-                                <button className="btn btn--xs" onClick={() => setItemQtyById(row.key, itemId, Number(displayQty || 0) + 1)} disabled={disableBase || isMultiGroup || isQtyLocked} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>+</button>
-                              </div>
-                            ) : (
-                              <div style={{ fontSize: 12, color: 'var(--muted)' }}>x{displayQty}</div>
-                            )}
-                            {(isOpen || isSent) ? (
-                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                <button className="btn btn--xs" onClick={() => openItemNoteModal(row.itemId, row.note)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>Not</button>
-                                {isSent && (
-                                  <button className="btn btn--xs" onClick={() => openItemCancelModal(row.itemId)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>İptal</button>
-                                )}
-                                {!isGrouped && (
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    min="1"
-                                    className="input"
-                                    style={{ width: 72 }}
-                                    value={getQtyDraft(row.key, row.qty)}
-                                    onChange={(e) => onQtyInputChange(row.key, e.target.value)}
-                                    ref={(el) => {
-                                      const m = qtyInputRefs.current
-                                      if (!m) return
-                                      if (el) m.set(row.key, el)
-                                      else m.delete(row.key)
-                                    }}
-                                    onFocus={(e) => {
-                                      activeQtyRowKeyRef.current = row.key
-                                      activeQtySelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
-                                    }}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onKeyUp={(e) => {
-                                      activeQtySelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.currentTarget.blur()
-                                      }
-                                    }}
-                                    onBlur={async (e) => {
-                                      activeQtyRowKeyRef.current = null
-                                      commitQtyDraft(row.key, getOrderId(order), itemId, row.qty, e.target.value)
-                                    }}
-                                    disabled={disableBase || isMultiGroup || !isOpen || isQtyLocked}
-                                  />
-                                )}
-                              </div>
-                            ) : (
-                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{it?.status}</div>
-                            )}
-                          </div>
+                        <SaleCartLine
+                          key={row.key}
+                          className="delivery-detail-cart-line"
+                          style={{ opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1 }}
+                          title={it?.nameSnapshot}
+                          badge={m ? (
+                            <span className="page-pill sale-cart-line-status" style={{ background: m.bg, borderColor: m.border, color: m.color }}>
+                              {m.label}
+                            </span>
+                          ) : null}
+                          detail={detailText}
+                          actions={(
+                            <>
+                              {isOpen ? (
+                                <>
+                                  <button className="btn sale-cart-line__action-btn" onClick={() => setItemQtyById(row.key, itemId, Math.max(0, Number(displayQty || 0) - 1))} disabled={disableBase || isMultiGroup || isQtyLocked} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>-</button>
+                                  <button className="btn sale-cart-line__action-btn" onClick={() => setItemQtyById(row.key, itemId, Number(displayQty || 0) + 1)} disabled={disableBase || isMultiGroup || isQtyLocked} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>+</button>
+                                </>
+                              ) : null}
+                              {(isOpen || isSent) ? (
+                                <>
+                                  <button className="btn sale-cart-line__action-btn" onClick={() => openItemNoteModal(row.itemId, row.note)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>Not</button>
+                                  {isSent && (
+                                    <button className="btn sale-cart-line__action-btn" onClick={() => openItemCancelModal(row.itemId)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>İptal</button>
+                                  )}
+                                  {!isGrouped && (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      min="1"
+                                      className="input"
+                                      style={{ width: 72 }}
+                                      value={getQtyDraft(row.key, row.qty)}
+                                      onChange={(e) => onQtyInputChange(row.key, e.target.value)}
+                                      ref={(el) => {
+                                        const m = qtyInputRefs.current
+                                        if (!m) return
+                                        if (el) m.set(row.key, el)
+                                        else m.delete(row.key)
+                                      }}
+                                      onFocus={(e) => {
+                                        activeQtyRowKeyRef.current = row.key
+                                        activeQtySelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
+                                      }}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onKeyUp={(e) => {
+                                        activeQtySelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.currentTarget.blur()
+                                        }
+                                      }}
+                                      onBlur={async (e) => {
+                                        activeQtyRowKeyRef.current = null
+                                        commitQtyDraft(row.key, getOrderId(order), itemId, row.qty, e.target.value)
+                                      }}
+                                      disabled={disableBase || isMultiGroup || !isOpen || isQtyLocked}
+                                    />
+                                  )}
+                                </>
+                              ) : null}
+                            </>
+                          )}
+                          price={`${row.subtotal} TL`}
+                        >
                           {isMobilePortrait && inlineNoteItemId === row.itemId && (
                             <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
                               <textarea className="input" rows={3} value={inlineNoteText} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onChange={(e) => setInlineNoteText(e.target.value)} />
@@ -1506,7 +1514,7 @@ export default function DeliveryOrderDetailPage() {
                             </div>
                           )}
                           {!!row.note && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{row.note}</div>}
-                        </div>
+                        </SaleCartLine>
                       )
                     }
 
@@ -1524,17 +1532,16 @@ export default function DeliveryOrderDetailPage() {
 
                 </div>
 
-                <div className="saleCartFooter delivery-detail-cart-footer" style={{ display: 'grid', gap: 8 }}>
-                  <div className="card delivery-detail-payment-card" style={{ borderColor: 'var(--border)', display: 'grid', gap: 8, padding: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontWeight: 700 }}>Ödemeler</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{payments.length} kayıt</div>
-                    </div>
+                <div className="saleCartFooter delivery-detail-cart-footer">
+                  <div className="saleCartFooterInner delivery-detail-cart-footerInner">
+                  {payments.length > 0 && (
+                    <div className="card delivery-detail-payment-card delivery-payment-panel" style={{ borderColor: 'var(--border)', display: 'grid', gap: 8, padding: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 700 }}>Ödemeler</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{payments.length} kayıt</div>
+                      </div>
 
-                    {payments.length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ödeme yok</div>
-                    ) : (
-                      <div style={{ display: 'grid', gap: 6 }}>
+                      <div className="delivery-detail-payment-list" style={{ display: 'grid', gap: 6 }}>
                         {payments.map((p) => (
                           <div key={p._id || p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                             <div style={{ display: 'grid' }}>
@@ -1545,28 +1552,41 @@ export default function DeliveryOrderDetailPage() {
                           </div>
                         ))}
                       </div>
-                    )}
 
-                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'grid', gap: 4, fontSize: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div style={{ color: 'var(--muted)' }}>Toplam</div>
-                        <div style={{ fontWeight: 700 }}>{netTotal.toFixed(2)} TL</div>
+                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'grid', gap: 4, fontSize: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div style={{ color: 'var(--muted)' }}>Toplam</div>
+                          <div style={{ fontWeight: 700 }}>{netTotal.toFixed(2)} TL</div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div style={{ color: 'var(--muted)' }}>Ödenen</div>
+                          <div style={{ fontWeight: 600 }}>{paidTotal.toFixed(2)} TL</div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div style={{ color: 'var(--muted)' }}>{signedBalanceLabel}</div>
+                          <div style={{ fontWeight: 800 }}>{signedBalanceValue.toFixed(2)} TL</div>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div style={{ color: 'var(--muted)' }}>Ödenen</div>
-                        <div style={{ fontWeight: 600 }}>{paidTotal.toFixed(2)} TL</div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div style={{ color: 'var(--muted)' }}>{signedBalanceLabel}</div>
-                        <div style={{ fontWeight: 800 }}>{signedBalanceValue.toFixed(2)} TL</div>
-                      </div>
+                    </div>
+                  )}
+
+                  <div className="saleCartFooterSummary delivery-detail-footer-summary">
+                    <div className="saleCartFooterSummaryMain">
+                      <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceLabel}</div>
+                      <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceValue.toFixed(2)} TL</div>
+                    </div>
+                    <div className="saleCartFooterSummaryMeta">
+                      <div className="saleCartFooterSummaryMetaLine">Toplam: {netTotal.toFixed(2)} TL</div>
+                      <div className="saleCartFooterSummaryMetaLine">Ödenen: {paidTotal.toFixed(2)} TL</div>
+                      {Number(order?.discountPercent || 0) > 0 ? (
+                        <div className="saleCartFooterSummaryMetaLine">İndirim: %{Number(order?.discountPercent || 0)}</div>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="delivery-detail-footer-actions" style={{ display: 'grid', gap: 8 }}>
-                    <button className="btn delivery-detail-btn" onClick={sendKitchen} disabled={tab === 'delivered' || busy || !canSendToKitchen}>Mutfağa Gönder</button>
+                  <div className="delivery-detail-footer-actions saleCartFooterActions" style={{ display: 'grid', gap: 8 }}>
                     <button
-                      className="btn delivery-detail-btn"
+                      className="btn saleCartFooterActionBtn"
                       onClick={() => {
                         setDiscountDraft(Number(order?.discountPercent || 0))
                         setPaymentAmount(signedBalance > 0.01 ? String(signedBalance) : '')
@@ -1575,8 +1595,10 @@ export default function DeliveryOrderDetailPage() {
                       }}
                       disabled={!getOrderId(order)}
                     >Ödeme Al</button>
-                    <button className="btn delivery-detail-btn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal Et</button>
+                    <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal Et</button>
                   </div>
+                  </div>
+                </div>
                 </div>
               </div>
             </div>

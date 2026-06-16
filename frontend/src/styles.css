@@ -2051,6 +2051,12 @@ body.scroll-lock { overflow: hidden !important }
   min-height: 100%;
 }
 
+.sales-page-content-shell,
+.sales-page-content,
+.sales-page-main {
+  min-height: 0;
+}
+
 .topbar-meta {
   display: flex;
   align-items: center;
@@ -2231,7 +2237,7 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .delivery-orders-page {
-  height: calc(100vh - var(--topbar-height, 132px));
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -2684,49 +2690,11 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 @media (min-width: 769px) {
-  .saleStandard3Col {
-    overflow: visible;
-  }
-
-  .saleCartPanelShell {
-    position: sticky;
-    top: 120px;
-    align-self: start;
-    height: calc(100dvh - 150px);
-    max-height: calc(100dvh - 150px);
-    overflow: hidden;
-  }
-
-  .saleCartPanelContent {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .saleCartPanelShell .order-cart-scroll {
-    max-height: none;
-  }
-
-  .saleCartPanelShell .saleCartList {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
-  .saleCartPanelShell .saleCartFooter {
-    flex-shrink: 0;
-    margin-top: 0;
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    background: var(--panel);
-  }
-
   .sale-cart-line {
     grid-template-columns: minmax(0, 1fr) auto auto 70px;
     column-gap: 4px;
+    min-height: 40px;
+    padding: 3px 6px;
   }
 
   .sale-cart-line-main {
@@ -2742,6 +2710,302 @@ body.modal-open .qr-menu .menu-row:hover {
   .sale-cart-line__detail {
     font-size: var(--pos-font-meta);
     white-space: nowrap;
+  }
+
+  .sale-cart-line-status {
+    padding: 1px 4px !important;
+  }
+
+  .walkin-cart-panel .sale-cart-line {
+    min-height: 40px;
+    grid-template-columns: minmax(0, 1fr) auto auto 70px;
+  }
+
+  .walkin-cart-panel .sale-cart-line__action-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 30px;
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  .walkin-cart-panel .sale-cart-line__actions .input {
+    width: 48px !important;
+    min-width: 48px;
+    height: 30px;
+    min-height: 30px;
+    font-size: 11px;
+    padding: 0 4px;
+  }
+
+  .walkin-cart-panel .saleCartList {
+    flex: 0 1 auto;
+    max-height: 260px;
+    min-height: 160px;
+    overflow-y: auto;
+  }
+
+  .walkin-cart-panel .saleCartFooterSummary {
+    flex-shrink: 0;
+    margin-top: 4px;
+    padding: 4px 0;
+  }
+
+  .walkin-cart-panel .saleCartFooter {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    padding: 6px 0;
+    background: var(--panel);
+    z-index: 5;
+  }
+
+  .walkin-sales-page,
+  .delivery-orders-page {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .walkin-sales-page__body,
+  .delivery-orders-page .delivery-detail-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .walkin-sales-page .saleStandard3Col,
+  .delivery-orders-page .saleStandard3Col {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    align-items: stretch;
+  }
+
+  .walkin-sales-page .salePanel,
+  .walkin-sales-page .saleCategoryPanel,
+  .walkin-sales-page .saleProductsPanel,
+  .walkin-sales-page .saleCartPanelShell,
+  .delivery-orders-page .salePanel,
+  .delivery-orders-page .delivery-detail-categories,
+  .delivery-orders-page .delivery-detail-products,
+  .delivery-orders-page .delivery-detail-summary {
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .walkin-sales-page .saleCartPanelShell,
+  .walkin-sales-page .walkin-cart-panel,
+  .delivery-orders-page .saleCartPanelShell,
+  .delivery-orders-page .delivery-cart-panel,
+  .delivery-orders-page .delivery-detail-summary {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .walkin-sales-page .saleCartPanelContent,
+  .delivery-orders-page .saleCartPanelContent {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .walkin-sales-page .salePanelScroll,
+  .delivery-orders-page .salePanelScroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .walkin-sales-page .saleCartList,
+  .delivery-orders-page .delivery-detail-summary .saleCartList {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 8px;
+  }
+
+  .walkin-sales-page .saleCartFooter,
+  .delivery-orders-page .delivery-detail-summary .saleCartFooter {
+    flex: 0 0 120px;
+    height: 120px;
+    max-height: 120px;
+    min-height: 120px;
+    margin-top: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: inherit;
+    overflow: hidden;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .walkin-sales-page .saleCartFooterInner,
+  .delivery-orders-page .delivery-detail-cart-footerInner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .walkin-sales-page .saleCartFooterSummary,
+  .delivery-orders-page .delivery-detail-footer-summary {
+    display: grid;
+    gap: 2px;
+    min-height: 0;
+  }
+
+  .walkin-sales-page .saleCartFooterSummaryMain,
+  .delivery-orders-page .delivery-detail-footer-summary .saleCartFooterSummaryMain {
+    font-size: 11px;
+    line-height: 1.1;
+  }
+
+  .walkin-sales-page .saleCartFooterSummaryMeta,
+  .delivery-orders-page .delivery-detail-footer-summary .saleCartFooterSummaryMeta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 1px 8px;
+    font-size: 10px;
+    line-height: 1.05;
+    text-align: right;
+  }
+
+  .walkin-sales-page .saleCartFooterSummaryMetaLine,
+  .delivery-orders-page .delivery-detail-footer-summary .saleCartFooterSummaryMetaLine {
+    font-size: 10px;
+  }
+
+  .walkin-sales-page .saleCartFooterActions,
+  .delivery-orders-page .delivery-detail-footer-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 30px;
+    gap: 5px;
+    min-height: 0;
+  }
+
+  .walkin-sales-page .saleCartFooterActionBtn,
+  .delivery-orders-page .saleCartFooterActionBtn {
+    height: 30px;
+    min-height: 30px;
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 0 8px;
+    line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .delivery-orders-page .delivery-detail-payment-card {
+    display: none !important;
+  }
+
+  .delivery-orders-page .delivery-detail-footer-actions .saleCartFooterActionBtn {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 1025px) {
+  .sales-page-content-shell {
+    height: calc(100dvh - var(--page-shell-header-height, 0px));
+    max-height: calc(100dvh - var(--page-shell-header-height, 0px));
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sales-page-content {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sales-page-main {
+    flex: 1 1 auto;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .pageShell.pos-layout,
+  .pageShell.walkin-layout,
+  .delivery-layout {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .pageShell.pos-layout,
+  .pageShell.walkin-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .delivery-layout {
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  .pageShell.pos-layout > .pos-grid,
+  .pageShell.walkin-layout > .walkin-sales-page__body,
+  .delivery-layout > .card,
+  .delivery-layout > .delivery-detail-shell {
+    min-height: 0;
+  }
+
+  .pageShell.pos-layout .pos-grid,
+  .pageShell.walkin-layout .pos-grid,
+  .delivery-layout .pos-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    align-items: stretch;
+  }
+
+  .pageShell.pos-layout .saleCategoryPanel,
+  .pageShell.pos-layout .saleProductsPanel,
+  .pageShell.pos-layout .saleCartPanelShell,
+  .pageShell.walkin-layout .saleCategoryPanel,
+  .pageShell.walkin-layout .saleProductsPanel,
+  .pageShell.walkin-layout .saleCartPanelShell,
+  .delivery-layout .delivery-detail-categories,
+  .delivery-layout .delivery-detail-products,
+  .delivery-layout .delivery-detail-summary {
+    height: 100%;
+    max-height: 100%;
   }
 }
 
@@ -2826,10 +3090,16 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .delivery-orders-page .delivery-detail-layout {
+  --pos-font-base: 13px;
+  --pos-font-title: 14px;
+  --pos-font-meta: 11px;
+  --pos-font-badge: 10px;
+  --pos-font-button: 13px;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 360px;
+  grid-template-columns: 170px minmax(520px, 1fr) minmax(420px, 460px);
   gap: 12px;
   min-height: 0;
+  align-items: stretch;
 }
 
 .delivery-orders-page .delivery-detail-layout > * {
@@ -2907,24 +3177,104 @@ body.modal-open .qr-menu .menu-row:hover {
 
 .delivery-orders-page .delivery-detail-summary {
   padding: 12px;
+  position: relative;
+  top: auto;
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .delivery-orders-page .delivery-detail-cart-line {
-  border-radius: 12px !important;
-  padding: 8px !important;
+  border-radius: 8px !important;
+  padding: 6px !important;
 }
 
 .delivery-orders-page .delivery-detail-cart-footer {
-  padding-top: 8px;
+  padding-top: 6px;
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 .delivery-orders-page .delivery-detail-payment-card {
   border-radius: 16px;
-  padding: 10px !important;
+  padding: 6px !important;
+  max-height: 70px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.delivery-payment-panel {
+  max-height: 70px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.delivery-orders-page .delivery-detail-payment-list {
+  max-height: 18px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .delivery-orders-page .delivery-detail-footer-actions {
   gap: 6px !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.delivery-orders-page .delivery-detail-summary .saleCartList {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 6px;
+}
+
+.delivery-orders-page .delivery-detail-summary .saleCartFooter {
+  flex-shrink: 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  position: sticky;
+  bottom: 0;
+  background: var(--panel);
+  z-index: 5;
+}
+
+.delivery-orders-page .delivery-detail-summary .saleCartFooterSummary,
+.delivery-orders-page .delivery-detail-summary .delivery-detail-payment-card,
+.delivery-orders-page .delivery-detail-summary .delivery-detail-footer-actions {
+  flex-shrink: 0;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.delivery-orders-page .delivery-detail-summary .saleCartHeader,
+.walkin-cart-panel .saleCartHeader,
+.walkin-cart-panel .saleCartMobileActionBar,
+.walkin-cart-panel .saleCartHeader + div,
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBar {
+  flex-shrink: 0;
+}
+
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBar {
+  margin-top: 8px;
+}
+
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBtn {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.delivery-orders-page .delivery-detail-summary .delivery-detail-btn,
+.delivery-orders-page .delivery-detail-summary .saleCartFooterActionBtn {
+  min-height: 34px;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-radius: 999px;
 }
 
 @media (max-width: 1200px) {
@@ -2945,6 +3295,13 @@ body.modal-open .qr-menu .menu-row:hover {
 @media (max-width: 980px) {
   .delivery-orders-page .delivery-detail-layout {
     grid-template-columns: 1fr;
+  }
+
+  .delivery-orders-page .delivery-detail-summary {
+    position: static;
+    top: auto;
+    height: auto;
+    max-height: none;
   }
 
   .delivery-orders-page .delivery-detail-actions {
@@ -3017,6 +3374,13 @@ body.modal-open .qr-menu .menu-row:hover {
   text-align: right;
 }
 
+.saleCartFooterSummaryMetaLine {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .saleCartFooterActions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3035,6 +3399,26 @@ body.modal-open .qr-menu .menu-row:hover {
   align-items: center;
   justify-content: center;
   overflow-wrap: anywhere;
+}
+
+.saleCartMobileActionBar {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  flex: 0 0 auto;
+}
+
+.saleCartMobileActionBtn {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 14px;
+  font-weight: 800;
+}
+
+.saleCartMobileActionHint {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .saleOrderNoteModalTextarea {
@@ -5050,6 +5434,7 @@ textarea::placeholder {
   body.sales-mobile-scroll .saleCategoryPanel {
     height: auto;
     min-height: 0;
+    overflow: visible;
   }
   body.sales-mobile-scroll .saleCategoryPanelTitle {
     display: none;
@@ -5059,9 +5444,20 @@ textarea::placeholder {
     gap: 6px;
     overflow-x: auto;
     overflow-y: hidden;
+    white-space: nowrap;
     padding-top: 0 !important;
     padding-right: 0;
     padding-bottom: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  body.sales-mobile-scroll .saleCategoryPanelScroll::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
   }
   body.sales-mobile-scroll .saleCategoryButton {
     flex: 0 0 auto;
@@ -5080,7 +5476,20 @@ textarea::placeholder {
   }
   body.sales-mobile-scroll .saleCartPanelShell {
     min-height: 0;
+    height: auto;
+    max-height: calc(100dvh - 220px);
+    overflow: hidden;
+  }
+  body.sales-mobile-scroll .saleCartPanelContent {
     height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body.sales-mobile-scroll .saleCartHeader,
+  body.sales-mobile-scroll .saleCartMobileActionBar {
+    flex-shrink: 0;
   }
 
   body.sales-mobile-scroll .salePanel {
@@ -5113,13 +5522,15 @@ textarea::placeholder {
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1 1 auto;
-    min-height: 0;
+    min-height: 240px;
     padding-right: 0;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    scroll-padding-bottom: 136px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    scroll-padding-bottom: 112px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   body.sales-mobile-scroll .saleCartList--padActions {
-    padding-bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   }
   body.sales-mobile-scroll .saleCartFooter {
     flex-shrink: 0;
@@ -5127,6 +5538,56 @@ textarea::placeholder {
     position: sticky;
     bottom: 0;
     z-index: 4;
+    padding-top: 4px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+  body.sales-mobile-scroll .saleCartFooterInner {
+    gap: 4px;
+  }
+  body.sales-mobile-scroll .saleCartFooterSummary {
+    gap: 1px;
+  }
+  body.sales-mobile-scroll .saleCartFooterSummaryMain {
+    font-size: 12px;
+    gap: 6px;
+  }
+  body.sales-mobile-scroll .saleCartFooterSummaryMeta {
+    display: block;
+    justify-items: initial;
+    font-size: 10px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  body.sales-mobile-scroll .saleCartFooterActions--mobile {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(72px, 1fr));
+    gap: 5px;
+    align-items: stretch;
+  }
+  body.sales-mobile-scroll .saleCartFooterActionBtn {
+    min-height: 30px;
+    height: 30px;
+    min-width: 72px;
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  body.sales-mobile-scroll .saleCartMobileActionBar {
+    max-height: 40px;
+    overflow: hidden;
+  }
+
+  @media (max-width: 380px) {
+    body.sales-mobile-scroll .saleCartFooterActions--mobile {
+      grid-template-columns: repeat(3, minmax(78px, 1fr));
+    }
   }
 
   body.sales-mobile-scroll .salePanel .btn.btn--full.btn--left {

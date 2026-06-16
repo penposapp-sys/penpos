@@ -288,6 +288,8 @@ export const forgotPassword = async (email, portal) => {
   const rawToken = crypto.randomBytes(32).toString('hex')
   const hashedToken = hashResetToken(rawToken)
   const expiresAt = new Date(Date.now() + RESET_PASSWORD_TTL_MS)
+  const previousResetPasswordToken = user.resetPasswordToken
+  const previousResetPasswordExpires = user.resetPasswordExpires
 
   user.resetPasswordToken = hashedToken
   user.resetPasswordExpires = expiresAt
@@ -295,12 +297,24 @@ export const forgotPassword = async (email, portal) => {
 
   const resetUrl = buildResetPasswordUrl(rawToken)
   const mail = buildResetPasswordMail({ name: user.name, resetUrl })
-  await sendMail({
-    to: user.email,
-    subject: mail.subject,
-    text: mail.text,
-    html: mail.html,
-  })
+  try {
+    await sendMail({
+      to: user.email,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+    })
+  } catch (err) {
+    user.resetPasswordToken = previousResetPasswordToken
+    user.resetPasswordExpires = previousResetPasswordExpires
+    await user.save().catch(() => {})
+
+    throw error(
+      'password_reset_unavailable',
+      'Şifre sıfırlama e-postası şu anda gönderilemiyor. Lütfen daha sonra tekrar deneyin.',
+      503
+    )
+  }
 
   return { success: true, message: 'Eğer bu e-posta sistemde kayıtlıysa şifre sıfırlama bağlantısı gönderildi.' }
 }

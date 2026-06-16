@@ -67,12 +67,16 @@ export const createServer = () => {
       'http://127.0.0.1:5173',
       'http://192.168.1.233:5173'
     ])
-    const lanRegex = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:5173$/
+    const privateLanRegexes = [
+      /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:5173$/,
+      /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:5173$/,
+      /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}:5173$/
+    ]
     const opts = {
       origin: (origin, cb) => {
         if (!origin) return cb(null, true)
         if (allowlist.has(origin)) return cb(null, true)
-        if (lanRegex.test(origin)) return cb(null, true)
+        if (privateLanRegexes.some((regex) => regex.test(origin))) return cb(null, true)
         return cb(null, false)
       },
       credentials: true,

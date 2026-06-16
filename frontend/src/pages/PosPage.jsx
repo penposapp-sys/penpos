@@ -1424,7 +1424,7 @@ export default function PosPage() {
       <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
-            ✓ Toplu
+            Toplu
           </button>
           <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
             Ayrı
@@ -1446,6 +1446,23 @@ export default function PosPage() {
       {order?.servingType && servingType !== order.servingType && (
         <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
           Seçim bir sonraki gönderimde geçerli
+        </div>
+      )}
+
+      {canSendToKitchen && (
+        <div className="saleCartMobileActionBar">
+          <button
+            className="btn saleCartMobileActionBtn"
+            onClick={sendKitchen}
+            disabled={
+              busy ||
+              !canSendToKitchen ||
+              !getOrderId(order) ||
+              (order.items || []).length === 0
+            }
+          >
+            Mutfağa Gönder ({servingTypeLabelTR(servingType) || '-'})
+          </button>
         </div>
       )}
 
@@ -1710,42 +1727,57 @@ export default function PosPage() {
                 <div>{balanceDue.toFixed(2)} TL</div>
               </div>
               <div className="saleCartFooterSummaryMeta">
-                <div>Brüt: {grossTotal.toFixed(2)} TL</div>
-                <div>İndirim: %{discountPercent || 0} ({discountTotal.toFixed(2)} TL)</div>
-                <div>Net: {netTotal.toFixed(2)} TL</div>
-                {paidTotal > 0 && (
-                  <div style={{ color: '#22c55e' }}>Ödenen: {paidTotal.toFixed(2)} TL</div>
+                {isMobilePortrait ? (
+                  <div className="saleCartFooterSummaryMetaLine">
+                    Brüt: {grossTotal.toFixed(2)} TL • İndirim: %{discountPercent || 0} • Net: {netTotal.toFixed(2)} TL
+                    {paidTotal > 0 ? ` • Ödenen: ${paidTotal.toFixed(2)} TL` : ''}
+                  </div>
+                ) : (
+                  <>
+                    <div>Brüt: {grossTotal.toFixed(2)} TL</div>
+                    <div>İndirim: %{discountPercent || 0} ({discountTotal.toFixed(2)} TL)</div>
+                    <div>Net: {netTotal.toFixed(2)} TL</div>
+                    {paidTotal > 0 && (
+                      <div style={{ color: '#22c55e' }}>Ödenen: {paidTotal.toFixed(2)} TL</div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
 
-            <div className="saleCartFooterActions">
-              <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
-                Sipariş Notu
-              </button>
-              <button
-                className="btn saleCartFooterActionBtn"
-                onClick={sendKitchen}
-                disabled={
-                  busy ||
-                  !canSendToKitchen ||
-                  !getOrderId(order) ||
-                  (order.items || []).length === 0
-                }
-              >
-                Mutfağa Gönder ({servingTypeLabelTR(servingType) || '-'})
-              </button>
-              <button
-                className="btn saleCartFooterActionBtn"
-                onClick={openPaymentModal}
-                disabled={!getOrderId(order)}
-              >Ödeme Al</button>
-              <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
-              <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
-              <button className="btn saleCartFooterActionBtn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
-              <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-              <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
-            </div>
+            {isMobilePortrait ? (
+              <div className="saleCartFooterActions saleCartFooterActions--mobile">
+                <button
+                  className="btn saleCartFooterActionBtn"
+                  onClick={openPaymentModal}
+                  disabled={!getOrderId(order)}
+                >Ödeme Al</button>
+                <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
+                <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
+                  Sipariş Notu
+                </button>
+                <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
+                <button className="btn saleCartFooterActionBtn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
+                <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+                <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+              </div>
+            ) : (
+              <div className="saleCartFooterActions">
+                <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
+                  Sipariş Notu
+                </button>
+                <button
+                  className="btn saleCartFooterActionBtn"
+                  onClick={openPaymentModal}
+                  disabled={!getOrderId(order)}
+                >Ödeme Al</button>
+                <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
+                <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
+                <button className="btn saleCartFooterActionBtn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
+                <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+                <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1753,8 +1785,8 @@ export default function PosPage() {
   )
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <div className="saleStandard3Col vhFit">
+    <div className="pageShell pos-layout" style={{ display: 'grid', gap: 12 }}>
+      <div className="saleStandard3Col vhFit pos-grid">
         <div className="card saleProductsMobileIntro">
           <div className="saleProductsMobileIntroRow">
             {(tableName || tableId || location.state?.fromTables) && (

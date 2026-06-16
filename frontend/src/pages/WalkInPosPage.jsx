@@ -1363,7 +1363,7 @@ export default function WalkInPosPage() {
   }
 
   return (
-    <div className="pageShell" style={{ gap: 12 }}>
+    <div className="pageShell walkin-sales-page walkin-layout" style={{ gap: 12 }}>
       <div className="card stickyTop" style={topbarStyle}>
         <button className="btn" onClick={() => nav('/kermes/app/walkin')}>← Geri</button>
         <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
@@ -1429,8 +1429,8 @@ export default function WalkInPosPage() {
         </button>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: isMobilePortrait ? 'visible' : 'hidden' }}>
-        <div className="saleStandard3Col" style={{ minHeight: 0 }}>
+      <div className="walkin-sales-page__body" style={{ flex: 1, minHeight: 0, overflow: isMobilePortrait ? 'visible' : 'hidden' }}>
+        <div className="saleStandard3Col pos-grid" style={{ minHeight: 0 }}>
           <div className="card saleProductsMobileIntro saleProductsMobileIntro--empty" aria-hidden="true" />
 
           <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={handleCategorySelect} />
@@ -1459,7 +1459,8 @@ export default function WalkInPosPage() {
             )}
           </div>
 
-          <div ref={cartAnchorRef} className="card salePanel saleCartPanelShell" style={{ minHeight: 0 }}>
+          <div ref={cartAnchorRef} className="card salePanel saleCartPanelShell walkin-cart-panel" style={{ minHeight: 0 }}>
+            <div className="saleCartPanelContent">
               <div className="saleCartHeader" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>Sepet</h3>
                 <div />
@@ -1470,7 +1471,7 @@ export default function WalkInPosPage() {
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
-                    ✓ Toplu
+                    Toplu
                   </button>
                   <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
                     Ayrı
@@ -1516,6 +1517,25 @@ export default function WalkInPosPage() {
               {order?.servingType && servingType !== order.servingType && (
                 <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
                   Seçim bir sonraki gönderimde geçerli
+                </div>
+              )}
+
+              {canSendToKitchen && (
+                <div className="saleCartMobileActionBar">
+                  <button
+                    className="btn saleCartMobileActionBtn"
+                    onClick={sendKitchen}
+                    disabled={
+                      busy ||
+                      !canSendToKitchen ||
+                      !getOrderId(order) ||
+                      (order.items || []).length === 0
+                    }
+                  >
+                    {effectiveKitchenEnabled === false
+                      ? 'Onayla (Mutfak Kapalı)'
+                      : `Mutfağa Gönder (${servingTypeLabelTR(servingType) || '-'})`}
+                  </button>
                 </div>
               )}
 
@@ -1778,6 +1798,14 @@ export default function WalkInPosPage() {
                       <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceLabel}</div>
                       <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceValue.toFixed(2)} TL</div>
                     </div>
+                    <div className="saleCartFooterSummaryMeta">
+                      <div>Brüt: {grossTotal.toFixed(2)} TL</div>
+                      <div>İndirim: %{discountPercent || 0} ({discountTotal.toFixed(2)} TL)</div>
+                      <div>Net: {netTotal.toFixed(2)} TL</div>
+                      {paidTotal > 0 && (
+                        <div style={{ color: '#22c55e' }}>Ödenen: {paidTotal.toFixed(2)} TL</div>
+                      )}
+                    </div>
                   </div>
                   <div className="saleCartFooterActions">
                     <button
@@ -1787,18 +1815,6 @@ export default function WalkInPosPage() {
                       disabled={!getOrderId(order)}
                     >
                       Sipariş Notu
-                    </button>
-                    <button
-                      className="btn saleCartFooterActionBtn"
-                      onClick={sendKitchen}
-                      disabled={
-                        busy ||
-                        !canSendToKitchen ||
-                        !getOrderId(order) ||
-                        (order.items || []).length === 0
-                      }
-                    >
-                      {effectiveKitchenEnabled === false ? 'Onayla (Mutfak Kapalı)' : 'Mutfağa Gönder'}
                     </button>
                     <button
                       className="btn saleCartFooterActionBtn"
@@ -1813,6 +1829,7 @@ export default function WalkInPosPage() {
                   </div>
                 </div>
               )}
+            </div>
           </div>
         </div>
       </div>
