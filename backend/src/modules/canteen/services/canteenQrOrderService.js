@@ -201,6 +201,7 @@ const buildOrderLines = async (tenantId, branchId, itemsInput) => {
     : []
   const categoryNameById = new Map((categories || []).map((category) => [String(category._id), String(category.name || '')]))
   const productById = new Map((products || []).map((product) => [String(product._id), product]))
+  const requestedQtyByProductId = new Map()
 
   const lines = items.map((item) => {
     const productId = String(item?.productId || '')
@@ -210,6 +211,7 @@ const buildOrderLines = async (tenantId, branchId, itemsInput) => {
     const quantity = Math.max(0, Math.floor(Number(item?.quantity ?? item?.qty ?? 0)))
     if (!quantity) throw error('invalid_request', 'Ürün adedi en az 1 olmalıdır', 400)
 
+    requestedQtyByProductId.set(productId, Number(requestedQtyByProductId.get(productId) || 0) + quantity)
     const unitPrice = toNumber(product.price)
     const totalPrice = Number((unitPrice * quantity).toFixed(2))
     return {
@@ -223,6 +225,13 @@ const buildOrderLines = async (tenantId, branchId, itemsInput) => {
       note: normalizeText(item?.note)
     }
   })
+
+  for (const [productId, requestedQty] of requestedQtyByProductId.entries()) {
+    const product = productById.get(productId)
+    if (!product || product.stockTrackingEnabled !== true) continue
+    const stockQty = Math.max(0, Number(product.stockQty || 0))
+    if (stockQty < requestedQty) throw error('insufficient_stock', `${String(product.name || 'Urun')} icin yeterli stok yok`, 400)
+  }
 
   const subtotal = Number(lines.reduce((sum, item) => sum + toNumber(item.totalPrice), 0).toFixed(2))
   return { lines, subtotal, total: subtotal }

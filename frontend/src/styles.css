@@ -2420,6 +2420,10 @@ body.modal-open .qr-menu .menu-row:hover {
   flex-direction: column;
 }
 
+.salePanel > * {
+  min-width: 0;
+}
+
 .salePanelScroll {
   flex: 1;
   min-height: 0;
@@ -2449,31 +2453,45 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .sale-cart-line {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
 }
 
 .sale-cart-line__info {
   display: flex;
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-  flex: 1 1 220px;
-}
-
-.sale-cart-line__meta {
+  align-items: flex-start;
   min-width: 0;
   flex: 1 1 auto;
 }
 
+.sale-cart-line__meta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sale-cart-line__title {
+  font-weight: 700;
+  line-height: 1.2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sale-cart-line__detail {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .sale-cart-line__actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
@@ -2718,6 +2736,8 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .saleCartFooter {
+  flex: 0 0 auto;
+  min-height: 0;
   padding-top: 10px;
   border-top: 1px solid var(--border);
 }
@@ -2813,17 +2833,21 @@ body.modal-open .qr-menu .menu-row:hover {
 
 @media (max-width: 767px) {
   .sale-cart-line {
+    grid-template-columns: minmax(0, 1fr);
     align-items: flex-start;
-    flex-wrap: wrap;
   }
 
   .sale-cart-line__info {
-    flex-basis: 100%;
+    width: 100%;
   }
 
   .sale-cart-line__actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .sale-cart-line__price {
+    margin-left: auto;
   }
 
   .kitchenOrdersGrid {
@@ -3209,7 +3233,7 @@ body.modal-open .qr-menu .menu-row:hover {
 /* Kasa minimal reference overrides */
 .kasaShowcaseLayout {
   grid-template-columns: minmax(0, 1fr) 300px;
-  min-height: calc(100vh - 180px);
+  min-height: calc(100dvh - 180px);
 }
 .kasaShowcasePanel {
   display: grid !important;
@@ -3317,7 +3341,7 @@ body.modal-open .qr-menu .menu-row:hover {
   align-content: start;
 }
 .kasaProductGridScroll {
-  max-height: calc(100vh - 330px);
+  max-height: calc(100dvh - 330px);
   min-height: 0;
 }
 .kasaProductVirtualScroll {
@@ -4600,39 +4624,75 @@ textarea::placeholder {
 }
 
 @media (max-width: 768px) {
-  body.sales-mobile-scroll { overflow: hidden }
-  body.sales-mobile-scroll .app { height: auto; min-height: 100%; overflow: visible }
-  body.sales-mobile-scroll .main { height: auto; min-height: 0; overflow: visible }
+  body.sales-mobile-scroll,
+  body.mobile-sales-mode {
+    overflow: hidden;
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+  body.sales-mobile-scroll .app,
+  body.mobile-sales-mode .app { height: 100%; min-height: 100%; overflow: hidden }
+  body.sales-mobile-scroll .main,
+  body.mobile-sales-mode .main { height: 100%; min-height: 0; overflow: hidden }
 
   body.sales-mobile-scroll .vhFit,
-  body.sales-mobile-scroll .pageVhFit {
-    min-height: 100%;
+  body.sales-mobile-scroll .pageVhFit,
+  body.mobile-sales-mode .vhFit,
+  body.mobile-sales-mode .pageVhFit {
+    min-height: 0;
+    height: 100%;
   }
 
   body.sales-mobile-scroll .saleStandard3Col {
     grid-template-columns: 96px 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
       "saleCat saleProd"
       "saleCart saleCart";
-    min-height: 100%;
-    height: auto;
-    overflow: visible;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
   }
   body.sales-mobile-scroll .saleStandard3Col > :nth-child(1) { grid-area: saleCat }
   body.sales-mobile-scroll .saleStandard3Col > :nth-child(2) { grid-area: saleProd }
   body.sales-mobile-scroll .saleStandard3Col > :nth-child(3) { grid-area: saleCart }
 
-  body.sales-mobile-scroll .salePanel { overflow: visible }
-  body.sales-mobile-scroll .salePanelScroll { overflow: visible; flex: none; padding-right: 0 }
+  body.sales-mobile-scroll .salePanel {
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  body.sales-mobile-scroll .salePanelScroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-right: 0;
+  }
   body.sales-mobile-scroll .salePanelScroll.saleProductsVirtualScroll {
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1;
+    min-height: 0;
     padding-right: 0;
   }
-  body.sales-mobile-scroll .saleCartList { overflow: visible; flex: none; padding-right: 0 }
+  body.mobile-sales-mode .kasaProductGridScroll.kasaProductVirtualScroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0;
+  }
+  body.sales-mobile-scroll .saleCartList {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-right: 0;
+  }
   body.sales-mobile-scroll .saleCartList--padActions { padding-bottom: 0 }
+  body.sales-mobile-scroll .saleCartFooter {
+    flex-shrink: 0;
+    background: var(--panel);
+  }
 
   body.sales-mobile-scroll .salePanel .btn.btn--full.btn--left {
     background: #ffffff;
@@ -4653,6 +4713,35 @@ textarea::placeholder {
     gap: 8px;
   }
   body.sales-mobile-scroll .productCard { min-height: 84px }
+
+  .saleProductsVirtualScroll,
+  .kasaProductVirtualScroll {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    contain: strict;
+  }
+
+  body.sales-mobile-scroll .saleProductsVirtualScroll .productCard,
+  body.mobile-sales-mode .kasaProductVirtualScroll .kasaProductCard {
+    box-shadow: 0 2px 8px rgba(0,0,0,.08) !important;
+  }
+  body.mobile-sales-mode .stickyBottom,
+  body.mobile-sales-mode .kasaBottomBar {
+    backdrop-filter: none;
+  }
+  body.mobile-sales-mode .kasaBottomBar {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  body.mobile-sales-mode .kasaShowcaseLayout {
+    min-height: calc(100dvh - 180px);
+  }
+  body.mobile-sales-mode .kasaProductGridScroll.kasaProductVirtualScroll {
+    max-height: calc(100dvh - 330px);
+  }
+  body.mobile-sales-mode .kasaCartList {
+    max-height: min(42dvh, 42vh);
+  }
 }
 
 @media (max-width: 768px) and (orientation: portrait) {

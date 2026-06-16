@@ -1,4 +1,5 @@
-import React, { memo, useCallback } from 'react'
+import React, { memo, useCallback, useEffect } from 'react'
+import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
 function SaleCategorySidebar({
   title = 'Kategoriler',
@@ -7,6 +8,18 @@ function SaleCategorySidebar({
   onSelect
 }) {
   const handleSelect = useCallback((categoryId) => onSelect?.(categoryId), [onSelect])
+
+  useEffect(() => {
+    const renderCount = incrementPerfCounter('sidebarRenders', title || 'categories')
+    if (renderCount > 0 && renderCount <= 2) {
+      logPerf('SaleCategorySidebar', 'render', {
+        title,
+        renderCount,
+        categoryCount: categories.length,
+        activeCategoryId: String(activeCategoryId || '')
+      })
+    }
+  })
 
   return (
     <div className="card salePanel">

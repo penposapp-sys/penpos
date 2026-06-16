@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { PRODUCT_PLACEHOLDER_SRC, resolveProductImageUrl } from '../lib/productImage.js'
+import { isProductImagesDisabled } from '../lib/perfDebug.js'
 
 export default function ProductImage({
   product,
@@ -12,9 +13,13 @@ export default function ProductImage({
   loading = 'lazy'
 }) {
   const [failed, setFailed] = useState(false)
-  const resolved = failed
-    ? PRODUCT_PLACEHOLDER_SRC
-    : (src && String(src).trim() ? resolveProductImageUrl({ imageUrl: src }) : resolveProductImageUrl(product))
+  const disableImages = isProductImagesDisabled()
+  const resolved = useMemo(() => {
+    if (disableImages || failed) return PRODUCT_PLACEHOLDER_SRC
+    return src && String(src).trim()
+      ? resolveProductImageUrl({ imageUrl: src })
+      : resolveProductImageUrl(product)
+  }, [disableImages, failed, product, src])
 
   return (
     <img

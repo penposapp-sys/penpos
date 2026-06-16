@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
 const DEFAULT_MIN_CARD_WIDTH = 116
 const DEFAULT_GRID_GAP = 8
@@ -8,6 +9,7 @@ const DEFAULT_BUFFER_ROWS = 3
 export function useVirtualProductGrid({
   items,
   enabled,
+  debugKey = 'default',
   minCardWidth = DEFAULT_MIN_CARD_WIDTH,
   gridGap = DEFAULT_GRID_GAP,
   estimatedRowHeight = DEFAULT_ROW_HEIGHT,
@@ -19,6 +21,9 @@ export function useVirtualProductGrid({
   const cardMeasureRef = useRef(null)
   const scrollRafRef = useRef(null)
   const pendingScrollTopRef = useRef(0)
+  const scrollEventCountRef = useRef(0)
+  const scrollStateUpdateCountRef = useRef(0)
+  const lastScrollRowRef = useRef(-1)
   const [viewport, setViewport] = useState({
     scrollTop: 0,
     height: 0,
@@ -70,23 +75,45 @@ export function useVirtualProductGrid({
 
   const handleScroll = useCallback((event) => {
     if (!enabled) return
-    pendingScrollTopRef.current = Number(event?.currentTarget?.scrollTop || 0)
+    scrollEventCountRef.current += 1
+    incrementPerfCounter('virtualGridScrollEvents', debugKey)
+    const nextScrollTop = Number(event?.currentTarget?.scrollTop || event?.target?.scrollTop || 0)
+    pendingScrollTopRef.current = nextScrollTop
     if (scrollRafRef.current) return
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null
-      const nextScrollTop = pendingScrollTopRef.current
+      const committedScrollTop = pendingScrollTopRef.current
       setViewport((prev) => (
-        prev.scrollTop === nextScrollTop
-          ? prev
-          : { ...prev, scrollTop: nextScrollTop }
+        (() => {
+          const rowHeight = Math.max(1, Number(prev.rowHeight || estimatedRowHeight))
+          const nextRow = Math.max(0, Math.floor(committedScrollTop / rowHeight))
+          const prevRow = Math.max(0, Math.floor(Number(prev.scrollTop || 0) / rowHeight))
+          if (prev.scrollTop === committedScrollTop || prevRow === nextRow) return prev
+          lastScrollRowRef.current = nextRow
+          scrollStateUpdateCountRef.current += 1
+          incrementPerfCounter('virtualGridScrollStateUpdates', debugKey)
+          return { ...prev, scrollTop: committedScrollTop }
+        })()
       ))
     })
-  }, [enabled])
+  }, [debugKey, enabled, estimatedRowHeight])
+
+  useEffect(() => {
+    if (!enabled) return undefined
+    const container = containerRef.current
+    if (!container || typeof container.addEventListener !== 'function') return undefined
+    const listener = (event) => handleScroll(event)
+    container.addEventListener('scroll', listener, { passive: true })
+    return () => {
+      try { container.removeEventListener('scroll', listener) } catch {}
+    }
+  }, [enabled, handleScroll])
 
   const resetKey = JSON.stringify(resetDeps)
   useEffect(() => {
     if (!enabled) return
     pendingScrollTopRef.current = 0
+    lastScrollRowRef.current = -1
     setViewport((prev) => (prev.scrollTop === 0 ? prev : { ...prev, scrollTop: 0 }))
     try {
       if (containerRef.current) containerRef.current.scrollTop = 0
@@ -120,6 +147,23 @@ export function useVirtualProductGrid({
     return items.slice(virtual.startIndex, virtual.endIndex)
   }, [enabled, items, virtual])
 
+  const debugState = useMemo(() => ({
+    debugKey,
+    totalProducts: items.length,
+    visibleCount: visibleItems.length,
+    startIndex: virtual?.startIndex ?? 0,
+    endIndex: virtual?.endIndex ?? items.length,
+    columns: virtual?.columns ?? 1,
+    totalRows: virtual?.totalRows ?? Math.ceil(items.length || 0),
+    scrollEventCount: scrollEventCountRef.current,
+    scrollStateUpdateCount: scrollStateUpdateCountRef.current
+  }), [debugKey, items.length, visibleItems.length, virtual])
+
+  useEffect(() => {
+    if (!enabled) return
+    logPerf(`VirtualGrid:${debugKey}`, 'window', debugState)
+  }, [debugKey, debugState, enabled])
+
   return {
     containerRef,
     gridMeasureRef,
@@ -128,7 +172,8 @@ export function useVirtualProductGrid({
     visibleItems,
     topSpacer: enabled && virtual ? virtual.topSpacer : 0,
     bottomSpacer: enabled && virtual ? virtual.bottomSpacer : 0,
-    isVirtualized: enabled
+    isVirtualized: enabled,
+    debugState
   }
 }
 

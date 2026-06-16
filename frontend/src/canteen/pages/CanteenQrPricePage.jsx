@@ -397,8 +397,25 @@ function LogoBadge({ src, alt }) {
   return <img className="qr-ref-logo" src={src} alt={alt} onError={() => setFailed(true)} />
 }
 
+function getProductAvailableStock(product) {
+  if (product?.stockTrackingEnabled !== true) return Number.POSITIVE_INFINITY
+  return Math.max(0, Number(product?.stockQty || 0))
+}
+
+function isProductOutOfStock(product) {
+  return product?.stockTrackingEnabled === true && getProductAvailableStock(product) <= 0
+}
+
+function getProductStockLabel(product) {
+  if (product?.stockTrackingEnabled !== true) return 'Stok takibi yok'
+  const qty = getProductAvailableStock(product)
+  if (qty <= 0) return 'Stokta yok'
+  return `Stok: ${qty}`
+}
+
 function ProductCard({ product, favoriteIds, onToggleFavorite, onOpenDetail, onAddToCart }) {
   const isFavorite = favoriteIds.includes(String(product.id))
+  const outOfStock = isProductOutOfStock(product)
 
   return (
     <article className="qr-ref-product">
@@ -417,6 +434,7 @@ function ProductCard({ product, favoriteIds, onToggleFavorite, onOpenDetail, onA
             <h3>{product.name}</h3>
           </div>
           <p>{safeText(product.description, 'Detaylar için dokunun.')}</p>
+          <div className={`qr-ref-stock-pill${outOfStock ? ' is-empty' : ''}`}>{getProductStockLabel(product)}</div>
         </button>
       </div>
       <div className="qr-ref-product-side">
@@ -427,7 +445,7 @@ function ProductCard({ product, favoriteIds, onToggleFavorite, onOpenDetail, onA
           </button>
         </div>
         <div className="qr-ref-product-actions">
-          <button type="button" className="qr-ref-round-cta qr-ref-add-btn" onClick={() => onAddToCart(product)}>Sepete Ekle</button>
+          <button type="button" className="qr-ref-round-cta qr-ref-add-btn" onClick={() => onAddToCart(product)} disabled={outOfStock}>{outOfStock ? 'Stokta Yok' : 'Sepete Ekle'}</button>
         </div>
       </div>
     </article>
@@ -717,15 +735,19 @@ export default function CanteenQrPricePage() {
         const product = productById.get(String(item.productId || ''))
         if (!product) return null
         const quantity = Math.max(1, Math.floor(Number(item.quantity || 0)))
+        const cappedQuantity = product.stockTrackingEnabled === true
+          ? Math.min(quantity, getProductAvailableStock(product))
+          : quantity
+        if (product.stockTrackingEnabled === true && cappedQuantity <= 0) return null
         return {
           productId: String(product.id),
           branchId: String(product.branchId || ''),
           productName: String(product.name || ''),
           categoryName: String(product.categoryName || ''),
           imageUrl: String(product.imageUrl || ''),
-          quantity,
+          quantity: cappedQuantity,
           unitPrice: Number(product.price || 0),
-          totalPrice: Number((Number(product.price || 0) * quantity).toFixed(2)),
+          totalPrice: Number((Number(product.price || 0) * cappedQuantity).toFixed(2)),
           note: String(item.note || '')
         }
       })
@@ -800,6 +822,18 @@ export default function CanteenQrPricePage() {
   }
 
   const addToCart = (product, quantity = 1, options = {}) => {
+    const requestedQty = Math.max(1, Math.floor(Number(quantity || 0)))
+    const availableStock = getProductAvailableStock(product)
+    const currentItem = cart.find((item) => String(item.productId) === String(product.id))
+    const currentQty = Number(currentItem?.quantity || 0)
+    if (product?.stockTrackingEnabled === true && availableStock < requestedQty) {
+      if (options?.silent !== true) toast.error(`${product.name || 'Ürün'} stokta yok`)
+      return false
+    }
+    if (product?.stockTrackingEnabled === true && (currentQty + requestedQty) > availableStock) {
+      if (options?.silent !== true) toast.error(`${product.name || 'Ürün'} için yeterli stok yok`)
+      return false
+    }
     setCart((current) => {
       const index = current.findIndex((item) => String(item.productId) === String(product.id))
       if (index === -1) {
@@ -809,28 +843,32 @@ export default function CanteenQrPricePage() {
           productName: String(product.name || ''),
           categoryName: String(product.categoryName || ''),
           imageUrl: String(product.imageUrl || ''),
-          quantity,
+          quantity: requestedQty,
           unitPrice: Number(product.price || 0),
-          totalPrice: Number((Number(product.price || 0) * quantity).toFixed(2)),
+          totalPrice: Number((Number(product.price || 0) * requestedQty).toFixed(2)),
           note: ''
         }])
       }
 
       return current.map((item, itemIndex) => {
         if (itemIndex !== index) return item
-        const nextQty = Number(item.quantity || 0) + quantity
+        const nextQty = Number(item.quantity || 0) + requestedQty
         return { ...item, quantity: nextQty, totalPrice: Number((Number(item.unitPrice || 0) * nextQty).toFixed(2)) }
       })
     })
-
     if (options?.silent !== true) toast.success(`${product.name || 'Ürün'} sepete eklendi`, { duration: 1800 })
+    return true
   }
 
   const updateCartQuantity = (productId, delta) => {
     setCart((current) => current
       .map((item) => {
         if (String(item.productId) !== String(productId)) return item
+        const product = productById.get(String(productId))
         const nextQty = Number(item.quantity || 0) + delta
+        if (delta > 0 && product?.stockTrackingEnabled === true && nextQty > getProductAvailableStock(product)) {
+          return item
+        }
         return { ...item, quantity: nextQty, totalPrice: Number((Number(item.unitPrice || 0) * nextQty).toFixed(2)) }
       })
       .filter((item) => Number(item.quantity || 0) > 0))
@@ -1186,11 +1224,14 @@ export default function CanteenQrPricePage() {
         .qr-ref-product-topline{display:flex;justify-content:flex-start;align-items:flex-start;gap:12px}
         .qr-ref-product-copy h3{margin:0;font-size:12px;line-height:1.02;font-weight:900;color:var(--app-text, #f8fafc);flex:1;min-width:0;max-width:none;padding-right:4px;overflow-wrap:anywhere;letter-spacing:-.03em}
         .qr-ref-product-copy p{margin:4px 0 0;font-size:12px;line-height:1.45;color:var(--app-text-secondary, #d4d4d4);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .qr-ref-stock-pill{margin-top:8px;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:color-mix(in srgb, var(--theme-accent, #ff6a00) 14%, transparent);color:var(--app-text, #f8fafc);font-size:11px;font-weight:800;border:1px solid color-mix(in srgb, var(--theme-accent, #ff6a00) 24%, var(--app-border, rgba(255,255,255,.08)))}
+        .qr-ref-stock-pill.is-empty{background:rgba(239,68,68,.12);color:#fca5a5;border-color:rgba(239,68,68,.28)}
         .qr-ref-price-pill{display:inline-flex;align-items:center;justify-content:center;padding:4px 7px;border-radius:999px;background:var(--app-surface-elevated, rgba(7,10,18,.96));color:var(--app-text, #fff);font-size:10px;font-weight:900;white-space:nowrap;flex-shrink:0;max-width:100%;border:1px solid var(--app-border, rgba(255,255,255,.08))}
         .qr-ref-product-footer{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:10px}
         .qr-ref-product-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap}
         .qr-ref-detail-link{border:0;background:none;padding:0;color:var(--theme-link, #ffcb54);font-size:12px;font-weight:900;justify-self:start;text-align:left}
         .qr-ref-round-cta{height:32px;border:0;border-radius:999px;background:linear-gradient(180deg,color-mix(in srgb, var(--theme-accent, #ff6a00) 76%, white), var(--theme-accent, #ff6a00));color:var(--theme-accent-contrast, #fff);font-size:11px;line-height:1;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:0 12px;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+        .qr-ref-round-cta:disabled,.qr-ref-primary:disabled,.qr-ref-qty button:disabled{cursor:not-allowed;opacity:.55;box-shadow:none}
         .qr-ref-add-btn{min-width:100%}
         .qr-ref-ghost,.qr-ref-primary,.qr-ref-full{border:0;border-radius:13px;padding:9px 12px;font-size:11px;font-weight:900}
         .qr-ref-ghost{background:var(--app-surface-elevated, #243047);color:var(--app-text, #e2e8f0)}
@@ -1476,12 +1517,22 @@ export default function CanteenQrPricePage() {
                     <div className="qr-ref-cart-meta">
                       <h3>{item.productName}</h3>
                       <p>{formatMoney(item.totalPrice)}</p>
+                      <div className={`qr-ref-stock-pill${isProductOutOfStock(productById.get(String(item.productId || ''))) ? ' is-empty' : ''}`} style={{ marginTop: 6 }}>
+                        {getProductStockLabel(productById.get(String(item.productId || '')))}
+                      </div>
                       <button type="button" onClick={() => removeCartItem(item.productId)}>Sil</button>
                     </div>
                     <div className="qr-ref-qty">
                       <button type="button" onClick={() => updateCartQuantity(item.productId, -1)}>−</button>
                       <strong>{item.quantity}</strong>
-                      <button type="button" onClick={() => updateCartQuantity(item.productId, 1)}>+</button>
+                      <button
+                        type="button"
+                        disabled={(() => {
+                          const product = productById.get(String(item.productId || ''))
+                          return product?.stockTrackingEnabled === true && Number(item.quantity || 0) >= getProductAvailableStock(product)
+                        })()}
+                        onClick={() => updateCartQuantity(item.productId, 1)}
+                      >+</button>
                     </div>
                   </div>
                 ))}
@@ -1687,12 +1738,21 @@ export default function CanteenQrPricePage() {
                   <strong>{selectedProduct.branchName || 'Mağaza Ürünü'}</strong>
                   <strong>{formatMoney(selectedProduct.price)}</strong>
                 </div>
+                <div className={`qr-ref-stock-pill${isProductOutOfStock(selectedProduct) ? ' is-empty' : ''}`}>{getProductStockLabel(selectedProduct)}</div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button type="button" className="qr-ref-ghost" onClick={() => toggleFavorite(selectedProduct)}>
                     {favoriteIds.includes(String(selectedProduct.id)) ? 'Favorilerden Çıkar' : 'Favoriye Ekle'}
                   </button>
-                  <button type="button" className="qr-ref-primary" onClick={() => { addToCart(selectedProduct); setSelectedProduct(null) }}>
-                    Sepete Ekle
+                  <button
+                    type="button"
+                    className="qr-ref-primary"
+                    disabled={isProductOutOfStock(selectedProduct)}
+                    onClick={() => {
+                      const added = addToCart(selectedProduct)
+                      if (added) setSelectedProduct(null)
+                    }}
+                  >
+                    {isProductOutOfStock(selectedProduct) ? 'Stokta Yok' : 'Sepete Ekle'}
                   </button>
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import useVirtualProductGrid from '../../hooks/useVirtualProductGrid.js'
+import { diffPerfCounter, getPerfNow, incrementPerfCounter, isProductImagesDisabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../../lib/perfDebug.js'
 import { Barcode, Search } from 'lucide-react'
 
 const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
@@ -34,6 +35,7 @@ const CashierCategoryRail = memo(function CashierCategoryRail({
   activeCategoryId,
   onSelectCategory
 }) {
+  incrementPerfCounter('sidebarRenders', 'CanteenCashierCategoryRail')
   return (
     <div className="kasaCategoryColumn kasaCategoryRail">
       {categories.map((category) => {
@@ -79,23 +81,26 @@ const CashierProductCard = memo(function CashierProductCard({
   measureRef = null
 }) {
   const hasImage = String(product?.imageUrl || '').trim().length > 0
+  const disableImages = isProductImagesDisabled()
+  const productId = normalizeId(product?.id || product?._id)
   const handleClick = useCallback(() => onAdd(product), [onAdd, product])
   const handleImageError = useCallback((event) => {
     event.currentTarget.style.display = 'none'
     const placeholder = event.currentTarget.nextElementSibling
     if (placeholder) placeholder.style.display = 'grid'
   }, [])
+  incrementPerfCounter('cashierProductCardRenders', productId || 'unknown')
 
   return (
     <button
       ref={measureRef}
       type="button"
       className="card kasaProductCard"
-      data-has-image={hasImage ? 'true' : 'false'}
+      data-has-image={hasImage && !disableImages ? 'true' : 'false'}
       onClick={handleClick}
       style={{ ...style, cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6 }}
     >
-      {hasImage ? (
+      {hasImage && !disableImages ? (
         <img
           className="kasaProductCardImage"
           src={String(product.imageUrl)}
@@ -193,6 +198,10 @@ export default function CanteenCashierPage() {
   const scanConfirmTimerRef = useRef(null)
   const scanRestoreRef = useRef(null)
   const scanBarcodeRef = useRef(null)
+  const productsApiCallCountRef = useRef(0)
+  const categoryPerfRef = useRef(null)
+  const cartRenderSnapshotRef = useRef({})
+  const lastCartSignatureRef = useRef('')
   const [selectedBranchId, setSelectedBranchId] = useState(() => {
     try {
       return String(localStorage.getItem('selectedBranchId_canteen') || '')
@@ -202,6 +211,8 @@ export default function CanteenCashierPage() {
   })
 
   const [branchModalOpen, setBranchModalOpen] = useState(false)
+
+  incrementPerfCounter('pageRenders', 'CanteenCashierPage')
 
   const softProductCardStyle = useMemo(() => {
     const borderColor = theme.border
@@ -247,6 +258,12 @@ export default function CanteenCashierPage() {
 
   const loadProducts = async (options = {}) => {
     const background = options?.background === true
+    productsApiCallCountRef.current += 1
+    logPerf('CanteenCashierPage', 'products-request', {
+      requestCount: productsApiCallCountRef.current,
+      background,
+      activeCategoryId: String(activeCategoryId || '')
+    })
     if (!background) setLoadingProducts(true)
     if (!background) setError('')
     const qs = allowedIds.length > 0 ? `?branchIds=${encodeURIComponent(allowedIds.join(','))}` : ''
@@ -369,7 +386,7 @@ export default function CanteenCashierPage() {
 
   const filteredProducts = useMemo(() => {
     const nq = normalize(q)
-    return products.filter((product) => {
+    const nextProducts = products.filter((product) => {
       const matchesCategory = !String(activeCategoryId || '').trim()
         ? true
         : activeCategoryId === 'uncategorized'
@@ -379,6 +396,13 @@ export default function CanteenCashierPage() {
       if (!nq) return true
       return [product?.name, product?.categoryName, product?.barcode].some((value) => normalize(value).includes(nq))
     })
+    logPerf('CanteenCashierPage', 'filter-result', {
+      activeCategoryId: String(activeCategoryId || ''),
+      searchQuery: String(q || ''),
+      totalProducts: products.length,
+      filteredCount: nextProducts.length
+    })
+    return nextProducts
   }, [activeCategoryId, products, q])
 
   const {
@@ -389,10 +413,12 @@ export default function CanteenCashierPage() {
     visibleItems: visibleProducts,
     topSpacer: topProductSpacer,
     bottomSpacer: bottomProductSpacer,
-    isVirtualized: productsVirtualized
+    isVirtualized: productsVirtualized,
+    debugState: productGridDebug
   } = useVirtualProductGrid({
     items: filteredProducts,
     enabled: isMobilePortrait,
+    debugKey: 'CanteenCashierPage',
     resetDeps: [activeCategoryId, q, selectedBranchId]
   })
 
@@ -407,16 +433,61 @@ export default function CanteenCashierPage() {
   }, [allowedBranches])
 
   const handleCategorySelect = useCallback((categoryId) => {
+    categoryPerfRef.current = {
+      categoryId: String(categoryId || ''),
+      startedAt: getPerfNow(),
+      apiRequestCountBefore: productsApiCallCountRef.current
+    }
+    markPerfStart('CanteenCashierPage', 'category-change', {
+      categoryId: String(categoryId || ''),
+      previousCategoryId: String(activeCategoryId || '')
+    })
     startTransition(() => {
       setActiveCategoryId(String(categoryId || ''))
     })
-  }, [])
+  }, [activeCategoryId])
 
   const handleQueryChange = useCallback((value) => {
     startTransition(() => {
       setQ(value)
     })
   }, [])
+
+  useEffect(() => {
+    if (!categoryPerfRef.current) return
+    const renderedDomCount = productScrollRef.current
+      ? productScrollRef.current.querySelectorAll('.kasaProductCard').length
+      : 0
+    const elapsedMs = markPerfEnd('CanteenCashierPage', 'category-change', {
+      categoryId: String(activeCategoryId || ''),
+      filteredCount: filteredProducts.length,
+      visibleCount: visibleProducts.length,
+      renderedDomCount,
+      apiRequestsDuringChange: productsApiCallCountRef.current - Number(categoryPerfRef.current.apiRequestCountBefore || 0)
+    })
+    logPerf('CanteenCashierPage', 'category-change-summary', {
+      elapsedMs,
+      activeCategoryId: String(activeCategoryId || ''),
+      filteredCount: filteredProducts.length,
+      visibleCount: visibleProducts.length,
+      renderedDomCount
+    })
+    categoryPerfRef.current = null
+  }, [activeCategoryId, filteredProducts.length, productScrollRef, visibleProducts.length])
+
+  useEffect(() => {
+    if (!isMobilePortrait) return
+    const frame = requestAnimationFrame(() => {
+      const renderedDomCount = productScrollRef.current
+        ? productScrollRef.current.querySelectorAll('.kasaProductCard').length
+        : 0
+      logPerf('CanteenCashierPage', 'virtual-grid-dom', {
+        ...productGridDebug,
+        renderedDomCount
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isMobilePortrait, productGridDebug, productScrollRef])
 
   useEffect(() => {
     const branchId = String(selectedBranchId || '').trim()
@@ -506,6 +577,31 @@ export default function CanteenCashierPage() {
       localStorage.setItem(CASHIER_CART_STORAGE_KEY, JSON.stringify(next))
     } catch {}
   }, [cart, selectedBranchId])
+
+  useEffect(() => {
+    const nextSignature = JSON.stringify(
+      cart.map((item) => ({
+        id: String(item?.productId || ''),
+        qty: Number(item?.qty || 0)
+      }))
+    )
+    if (!lastCartSignatureRef.current) {
+      lastCartSignatureRef.current = nextSignature
+      cartRenderSnapshotRef.current = snapshotPerfCounter('cashierProductCardRenders')
+      return
+    }
+    if (lastCartSignatureRef.current === nextSignature) return
+    const delta = diffPerfCounter('cashierProductCardRenders', cartRenderSnapshotRef.current)
+    const visibleIds = new Set(visibleProducts.map((item) => normalizeId(item?.id || item?._id)))
+    const affectedVisibleCards = delta.changed.filter((entry) => visibleIds.has(normalizeId(entry.key)))
+    logPerf('CanteenCashierPage', 'cart-change-rerenders', {
+      visibleCardRerenderCount: affectedVisibleCards.length,
+      visibleCardIds: affectedVisibleCards.map((entry) => entry.key),
+      totalChangedCards: delta.changed.length
+    })
+    lastCartSignatureRef.current = nextSignature
+    cartRenderSnapshotRef.current = delta.current
+  }, [cart, visibleProducts])
 
   const total = useMemo(() => {
     return cart.reduce((sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0), 0)
@@ -1016,7 +1112,6 @@ export default function CanteenCashierPage() {
             <div
               ref={productScrollRef}
               className="kasaProductGridScroll kasaProductVirtualScroll"
-              onScroll={handleProductScroll}
             >
               {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}
               <div ref={productGridMeasureRef} className="kasaProductGrid">

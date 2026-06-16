@@ -21,6 +21,7 @@ import { buildCartRows } from '../lib/cartItemRows.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
+import { diffPerfCounter, getPerfNow, incrementPerfCounter, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
 
 export default function WalkInPosPage() {
   const nav = useNavigate()
@@ -89,6 +90,10 @@ export default function WalkInPosPage() {
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
   const [, setLockTick] = useState(0)
+  const itemsApiCallCountRef = useRef(0)
+  const categoryPerfRef = useRef(null)
+  const cartRenderSnapshotRef = useRef({})
+  const lastCartSignatureRef = useRef('')
 
   const qtyInputRefs = useRef(new Map())
   const activeQtyRowKeyRef = useRef(null)
@@ -99,6 +104,8 @@ export default function WalkInPosPage() {
   const qtyInflightRef = useRef(new Set())
   const qtyCooldownUntilRef = useRef(new Map())
   const qtyLastToastAtRef = useRef(new Map())
+
+  incrementPerfCounter('pageRenders', 'WalkInPosPage')
 
   useEffect(() => {
     qtyDraftByRowRef.current = qtyDraftByRow || {}
@@ -390,6 +397,12 @@ export default function WalkInPosPage() {
     setActiveCategory(categories[0]?.id || '')
   }
   const loadItems = async () => {
+    itemsApiCallCountRef.current += 1
+    logPerf('WalkInPosPage', 'menu-items-request', {
+      requestCount: itemsApiCallCountRef.current,
+      activeCategory: String(activeCategory || ''),
+      reason: 'initial-load'
+    })
     const res = await api('/api/tenant/menu-items?active=true')
     if (res?.success === false) {
       setItems([])
@@ -410,15 +423,31 @@ export default function WalkInPosPage() {
 
   const filteredItems = useMemo(() => {
     const activeId = String(activeCategory || '').trim()
-    if (!activeId) return items
-    return (items || []).filter((item) => String(item?.categoryId || '') === activeId)
+    const nextItems = !activeId
+      ? items
+      : (items || []).filter((item) => String(item?.categoryId || '') === activeId)
+    logPerf('WalkInPosPage', 'filter-result', {
+      activeCategory: activeId,
+      totalProducts: (items || []).length,
+      filteredCount: nextItems.length
+    })
+    return nextItems
   }, [activeCategory, items])
 
   const handleCategorySelect = useCallback((categoryId) => {
+    categoryPerfRef.current = {
+      categoryId: String(categoryId || ''),
+      startedAt: getPerfNow(),
+      apiRequestCountBefore: itemsApiCallCountRef.current
+    }
+    markPerfStart('WalkInPosPage', 'category-change', {
+      categoryId: String(categoryId || ''),
+      previousCategoryId: String(activeCategory || '')
+    })
     startTransition(() => {
       setActiveCategory(String(categoryId || ''))
     })
-  }, [])
+  }, [activeCategory])
 
   useEffect(() => {
     if (!isOrderView) return
@@ -515,9 +544,11 @@ export default function WalkInPosPage() {
     }
   }
 
+  const currentOrderId = selectedOrderId || getOrderId(order)
+
   const addItem = useCallback(async (menuItem) => {
     setError('')
-    const orderId = selectedOrderId || getOrderId(order)
+    const orderId = currentOrderId
     if (!orderId) {
       toast.error('Sipariş bulunamadı')
       setError('Sipariş bulunamadı')
@@ -552,7 +583,7 @@ export default function WalkInPosPage() {
       setOrder(fresh)
       setNote(fresh.note || '')
     }
-  }, [order, selectedOrderId])
+  }, [currentOrderId])
 
   const {
     containerRef: productScrollRef,
@@ -562,12 +593,78 @@ export default function WalkInPosPage() {
     visibleItems: visibleMenuItems,
     topSpacer: topProductSpacer,
     bottomSpacer: bottomProductSpacer,
-    isVirtualized: productsVirtualized
+    isVirtualized: productsVirtualized,
+    debugState: productGridDebug
   } = useVirtualProductGrid({
     items: filteredItems,
     enabled: isMobilePortrait,
+    debugKey: 'WalkInPosPage',
     resetDeps: [activeCategory, selectedOrderId]
   })
+
+  useEffect(() => {
+    if (!categoryPerfRef.current) return
+    const renderedDomCount = productScrollRef.current
+      ? productScrollRef.current.querySelectorAll('.productCard').length
+      : 0
+    const elapsedMs = markPerfEnd('WalkInPosPage', 'category-change', {
+      categoryId: String(activeCategory || ''),
+      filteredCount: filteredItems.length,
+      visibleCount: visibleMenuItems.length,
+      renderedDomCount,
+      apiRequestsDuringChange: itemsApiCallCountRef.current - Number(categoryPerfRef.current.apiRequestCountBefore || 0)
+    })
+    logPerf('WalkInPosPage', 'category-change-summary', {
+      elapsedMs,
+      activeCategory: String(activeCategory || ''),
+      filteredCount: filteredItems.length,
+      visibleCount: visibleMenuItems.length,
+      renderedDomCount
+    })
+    categoryPerfRef.current = null
+  }, [activeCategory, filteredItems.length, productScrollRef, visibleMenuItems.length])
+
+  useEffect(() => {
+    if (!isMobilePortrait) return
+    const frame = requestAnimationFrame(() => {
+      const renderedDomCount = productScrollRef.current
+        ? productScrollRef.current.querySelectorAll('.productCard').length
+        : 0
+      logPerf('WalkInPosPage', 'virtual-grid-dom', {
+        ...productGridDebug,
+        renderedDomCount
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isMobilePortrait, productGridDebug, productScrollRef])
+
+  useEffect(() => {
+    const nextSignature = JSON.stringify(
+      Array.isArray(order?.items)
+        ? order.items.map((item) => ({
+            id: String(item?.menuItemId || item?.itemId || item?._id || ''),
+            qty: Number(item?.qty || 0),
+            status: String(item?.status || '')
+          }))
+        : []
+    )
+    if (!lastCartSignatureRef.current) {
+      lastCartSignatureRef.current = nextSignature
+      cartRenderSnapshotRef.current = snapshotPerfCounter('productCardRenders')
+      return
+    }
+    if (lastCartSignatureRef.current === nextSignature) return
+    const delta = diffPerfCounter('productCardRenders', cartRenderSnapshotRef.current)
+    const visibleIds = new Set(visibleMenuItems.map((item) => String(item?.id || item?._id || '')))
+    const affectedVisibleCards = delta.changed.filter((entry) => visibleIds.has(String(entry.key || '')))
+    logPerf('WalkInPosPage', 'cart-change-rerenders', {
+      visibleCardRerenderCount: affectedVisibleCards.length,
+      visibleCardIds: affectedVisibleCards.map((entry) => entry.key),
+      totalChangedCards: delta.changed.length
+    })
+    lastCartSignatureRef.current = nextSignature
+    cartRenderSnapshotRef.current = delta.current
+  }, [order?.items, visibleMenuItems])
 
   const openReceiptPreview = async () => {
     const orderId = getOrderId(order)
@@ -1334,7 +1431,6 @@ export default function WalkInPosPage() {
                 ref={productScrollRef}
                 className="salePanelScroll saleProductsVirtualScroll"
                 style={{ paddingTop: 10 }}
-                onScroll={handleProductScroll}
               >
                 {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}
                 <div ref={productGridMeasureRef} className="posItemsGrid">
@@ -1479,7 +1575,6 @@ export default function WalkInPosPage() {
                           className="sale-cart-line__info"
                           style={{ ...(isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : {}) }}
                         >
-                          <ProductImage product={it} alt={it?.nameSnapshot} width={72} height={72} style={{ width: 72, minWidth: 72, height: 72, objectFit: 'cover', borderRadius: 10 }} />
                           <div className="sale-cart-line__meta">
                             {it?.status === 'sent' && (
                               <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
@@ -1496,8 +1591,8 @@ export default function WalkInPosPage() {
                                 İptal
                               </span>
                             )}
-                            <div style={{ fontWeight: 600 }}>{it?.nameSnapshot}</div>
-                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detailText}</div>
+                            <div className="sale-cart-line__title">{it?.nameSnapshot}</div>
+                            <div className="sale-cart-line__detail">{detailText}</div>
                             {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
                           </div>
                         </div>

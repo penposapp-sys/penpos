@@ -1,10 +1,12 @@
-import React, { memo, useCallback } from 'react'
+import React, { memo, useCallback, useEffect, useMemo } from 'react'
 import ProductImage from './ProductImage.jsx'
+import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
 function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
   const price = item?.price
   const isWeightBased = !!item?.isWeightBased
   const name = item?.name
+  const productId = useMemo(() => String(item?.id || item?._id || ''), [item])
   const handleClick = useCallback(() => {
     if (disabled) return
     if (typeof onClick === 'function') onClick(item)
@@ -15,6 +17,13 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
     e.preventDefault()
     if (typeof onClick === 'function') onClick(item)
   }, [disabled, item, onClick])
+
+  useEffect(() => {
+    const renderCount = incrementPerfCounter('productCardRenders', productId || 'unknown')
+    if (renderCount > 0 && renderCount <= 2) {
+      logPerf('ProductCard', 'render', { productId, renderCount })
+    }
+  })
 
   return (
     <div
@@ -50,6 +59,7 @@ export default memo(ProductCard, (prev, next) => {
   const nextItem = next?.item || {}
   return (
     prev.disabled === next.disabled &&
+    prev.onClick === next.onClick &&
     prev.measureRef === next.measureRef &&
     String(prevItem?.id || prevItem?._id || '') === String(nextItem?.id || nextItem?._id || '') &&
     String(prevItem?.name || '') === String(nextItem?.name || '') &&

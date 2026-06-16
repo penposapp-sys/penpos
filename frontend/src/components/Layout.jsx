@@ -72,16 +72,20 @@ export default function Layout() {
     const enabled = !!(isMobilePortrait && (
       pathname.startsWith('/kermes/app/pos') ||
       pathname.startsWith('/kermes/app/walkin') ||
-      pathname.startsWith('/kermes/app/delivery')
+      pathname.startsWith('/kermes/app/delivery') ||
+      pathname.startsWith('/canteen/kasa')
     ))
 
     try {
       if (enabled) document.body.classList.add('sales-mobile-scroll')
       else document.body.classList.remove('sales-mobile-scroll')
+      if (enabled) document.body.classList.add('mobile-sales-mode')
+      else document.body.classList.remove('mobile-sales-mode')
     } catch {}
 
     return () => {
       try { document.body.classList.remove('sales-mobile-scroll') } catch {}
+      try { document.body.classList.remove('mobile-sales-mode') } catch {}
     }
   }, [isMobilePortrait, pathname])
 

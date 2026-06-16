@@ -84,6 +84,18 @@ export default function CanteenLayout() {
   }, [isMobilePortrait])
 
   useEffect(() => {
+    const enabled = !!(isMobilePortrait && pathname.startsWith('/canteen/kasa'))
+    try {
+      if (enabled) document.body.classList.add('mobile-sales-mode')
+      else document.body.classList.remove('mobile-sales-mode')
+    } catch {}
+
+    return () => {
+      try { document.body.classList.remove('mobile-sales-mode') } catch {}
+    }
+  }, [isMobilePortrait, pathname])
+
+  useEffect(() => {
     const run = async () => {
       const token = localStorage.getItem(tokenKey)
       if (!token) {
