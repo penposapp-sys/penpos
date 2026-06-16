@@ -2394,13 +2394,26 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .saleStandard3Col {
+  --pos-font-base: 13px;
+  --pos-font-title: 14px;
+  --pos-font-meta: 11px;
+  --pos-font-badge: 10px;
+  --pos-font-button: 13px;
   display: grid;
-  grid-template-columns: 220px 1fr 380px;
+  grid-template-columns: 170px minmax(520px, 1fr) minmax(420px, 460px);
   gap: 12px;
   align-items: stretch;
-  min-height: 100%;
-  height: auto;
-  overflow: visible;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.saleStandard3Col .btn {
+  font-size: var(--pos-font-button);
+}
+
+.saleStandard3Col .btn.btn--xs {
+  font-size: 12px;
 }
 
 .saleStandard2Col {
@@ -2418,6 +2431,78 @@ body.modal-open .qr-menu .menu-row:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.saleCategoryPanel,
+.saleProductsPanel,
+.saleCartPanelShell {
+  min-height: 0;
+  height: 100%;
+}
+
+.saleProductsMobileIntro {
+  display: none;
+}
+
+.saleProductsMobileIntro--empty {
+  display: none;
+}
+
+.saleProductsMobileIntroRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.saleProductsMobileIntroBack {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.saleProductsMobileBackBtn {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.saleProductsMobileIntroMeta {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.saleProductsMobileIntroHeader {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.saleCartPanelShell {
+  position: relative;
+  overflow: hidden;
+}
+
+.saleCartPanelContent {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.saleCartPanelContent > * {
+  min-width: 0;
 }
 
 .salePanel > * {
@@ -2445,64 +2530,143 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .saleCartList {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding-right: 6px;
+  padding-bottom: 12px;
+  scroll-padding-bottom: 148px;
+  overscroll-behavior: contain;
 }
 
 .sale-cart-line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(130px, 1fr) auto auto 70px;
+  grid-template-areas: "info detail actions price";
   align-items: center;
-  gap: 10px 12px;
+  min-height: 42px;
+  gap: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: none;
+  overflow: hidden;
 }
 
 .sale-cart-line__info {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   min-width: 0;
   flex: 1 1 auto;
+  grid-area: info;
 }
 
 .sale-cart-line__meta {
   display: grid;
-  gap: 3px;
+  gap: 1px;
   min-width: 0;
   flex: 1 1 auto;
 }
 
+.sale-cart-line-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .sale-cart-line__title {
   font-weight: 700;
-  line-height: 1.2;
+  font-size: var(--pos-font-base);
+  line-height: 1.15;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   overflow-wrap: anywhere;
 }
 
 .sale-cart-line__detail {
-  font-size: 12px;
+  font-size: var(--pos-font-meta);
   color: var(--muted);
+  white-space: nowrap;
+  grid-area: detail;
+  justify-self: start;
+  min-width: 0;
+}
+
+.sale-cart-line__note {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sale-cart-line-status {
+  margin: 0 !important;
+  padding: 1px 5px !important;
+  font-size: var(--pos-font-badge) !important;
+  line-height: 1.1 !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .sale-cart-line__actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  grid-area: actions;
+  overflow: hidden;
+}
+
+.sale-cart-line__action-btn {
+  width: 38px;
+  min-width: 38px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.sale-cart-line__actions .input {
+  width: 56px !important;
+  min-width: 56px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 6px;
+  font-size: 12px;
+  text-align: center;
+  flex: 0 0 auto;
 }
 
 .sale-cart-line__price {
-  font-weight: 600;
-  flex: 0 0 auto;
+  width: 70px;
+  font-weight: 700;
+  font-size: var(--pos-font-base);
   white-space: nowrap;
+  align-self: center;
+  grid-area: price;
+  justify-self: end;
+  text-align: right;
+  overflow: hidden;
 }
 
 .order-cart-scroll {
@@ -2517,6 +2681,68 @@ body.modal-open .qr-menu .menu-row:hover {
   width: 0;
   height: 0;
   display: none;
+}
+
+@media (min-width: 769px) {
+  .saleStandard3Col {
+    overflow: visible;
+  }
+
+  .saleCartPanelShell {
+    position: sticky;
+    top: 120px;
+    align-self: start;
+    height: calc(100dvh - 150px);
+    max-height: calc(100dvh - 150px);
+    overflow: hidden;
+  }
+
+  .saleCartPanelContent {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .saleCartPanelShell .order-cart-scroll {
+    max-height: none;
+  }
+
+  .saleCartPanelShell .saleCartList {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .saleCartPanelShell .saleCartFooter {
+    flex-shrink: 0;
+    margin-top: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--panel);
+  }
+
+  .sale-cart-line {
+    grid-template-columns: minmax(0, 1fr) auto auto 70px;
+    column-gap: 4px;
+  }
+
+  .sale-cart-line-main {
+    flex-wrap: nowrap;
+  }
+
+  .sale-cart-line__title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sale-cart-line__detail {
+    font-size: var(--pos-font-meta);
+    white-space: nowrap;
+  }
 }
 
 .delivery-orders-page .delivery-detail-shell {
@@ -2732,14 +2958,91 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .saleCartList--padActions {
-  padding-bottom: 72px;
+  padding-bottom: 148px;
 }
 
 .saleCartFooter {
   flex: 0 0 auto;
   min-height: 0;
-  padding-top: 10px;
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  padding-top: 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.saleCartFooterInner {
+  display: grid;
+  gap: 8px;
+}
+
+.saleCartFooterNote {
+  display: grid;
+  gap: 4px;
+}
+
+.saleCartFooterLabel {
+  font-size: var(--pos-font-base);
+  color: var(--muted);
+}
+
+.saleCartFooterTextarea {
+  min-height: 70px;
+  max-height: 100px;
+  resize: vertical;
+}
+
+.saleCartFooterSummary {
+  display: grid;
+  gap: 4px;
+}
+
+.saleCartFooterSummaryMain {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.saleCartFooterSummaryMeta {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-size: var(--pos-font-meta);
+  color: var(--muted);
+  text-align: right;
+}
+
+.saleCartFooterActions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 4px;
+}
+
+.saleCartFooterActionBtn {
+  min-height: 35px;
+  padding: 0 10px;
+  font-size: var(--pos-font-button);
+  line-height: 1.15;
+  border-radius: 16px;
+  white-space: normal;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow-wrap: anywhere;
+}
+
+.saleOrderNoteModalTextarea {
+  min-height: 120px;
+  max-height: 220px;
+  resize: vertical;
+  font-size: var(--pos-font-base);
+  line-height: 1.35;
 }
 
 .productCard {
@@ -2833,21 +3136,87 @@ body.modal-open .qr-menu .menu-row:hover {
 
 @media (max-width: 767px) {
   .sale-cart-line {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "info price"
+      "detail actions";
+    align-items: center;
+    gap: 4px 6px;
+    padding: 6px 8px;
   }
 
   .sale-cart-line__info {
     width: 100%;
   }
 
+  .sale-cart-line-main {
+    gap: 3px 5px;
+  }
+
   .sale-cart-line__actions {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: flex-end;
+    gap: 3px;
+    flex-wrap: wrap;
   }
 
   .sale-cart-line__price {
     margin-left: auto;
+    align-self: start;
+  }
+
+  .sale-cart-line__action-btn {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .sale-cart-line__actions .input {
+    width: auto !important;
+    min-width: 0;
+    height: auto;
+    min-height: 32px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .saleCartFooter {
+    padding-top: 8px;
+  }
+
+  .saleCartFooterInner {
+    gap: 6px;
+  }
+
+  .saleCartFooterTextarea {
+    min-height: 44px;
+    max-height: 56px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .saleCartFooterSummaryMain {
+    font-size: 13px;
+  }
+
+  .saleCartFooterSummaryMeta {
+    font-size: 10px;
+    gap: 1px;
+  }
+
+  .saleCartFooterActions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .saleCartFooterActionBtn {
+    min-height: 34px;
+    padding: 0 6px;
+    font-size: var(--pos-font-button);
+    line-height: 1.1;
   }
 
   .kitchenOrdersGrid {
@@ -4644,18 +5013,75 @@ textarea::placeholder {
   }
 
   body.sales-mobile-scroll .saleStandard3Col {
-    grid-template-columns: 96px 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
     grid-template-areas:
-      "saleCat saleProd"
-      "saleCart saleCart";
+      "saleInfo"
+      "saleCat"
+      "saleProd"
+      "saleCart";
+    gap: 5px;
     min-height: 0;
     height: 100%;
     overflow: hidden;
   }
-  body.sales-mobile-scroll .saleStandard3Col > :nth-child(1) { grid-area: saleCat }
-  body.sales-mobile-scroll .saleStandard3Col > :nth-child(2) { grid-area: saleProd }
-  body.sales-mobile-scroll .saleStandard3Col > :nth-child(3) { grid-area: saleCart }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(1) { grid-area: saleInfo }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(2) { grid-area: saleCat }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(3) { grid-area: saleProd }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(4) { grid-area: saleCart }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(1) {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(2),
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(3),
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(4) {
+    margin-left: 0;
+    padding-left: 0;
+  }
+  body.sales-mobile-scroll .saleProductsMobileIntro {
+    display: block;
+    min-height: 0;
+    padding: 8px 12px;
+  }
+  body.sales-mobile-scroll .saleProductsPanelHeader {
+    display: none !important;
+  }
+  body.sales-mobile-scroll .saleCategoryPanel {
+    height: auto;
+    min-height: 0;
+  }
+  body.sales-mobile-scroll .saleCategoryPanelTitle {
+    display: none;
+  }
+  body.sales-mobile-scroll .saleCategoryPanelScroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-top: 0 !important;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+  body.sales-mobile-scroll .saleCategoryButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: max-content;
+    margin-bottom: 0 !important;
+    padding: 7px 12px;
+    border-radius: 999px;
+    justify-content: center;
+  }
+  body.sales-mobile-scroll .saleProductsPanel {
+    max-height: none;
+    min-height: 0;
+    height: auto;
+    align-self: start;
+  }
+  body.sales-mobile-scroll .saleCartPanelShell {
+    min-height: 0;
+    height: 100%;
+  }
 
   body.sales-mobile-scroll .salePanel {
     min-height: 0;
@@ -4670,11 +5096,13 @@ textarea::placeholder {
     padding-right: 0;
   }
   body.sales-mobile-scroll .salePanelScroll.saleProductsVirtualScroll {
-    overflow-y: auto;
+    overflow-y: visible;
     overflow-x: hidden;
-    flex: 1;
+    flex: 0 0 auto;
     min-height: 0;
+    max-height: none;
     padding-right: 0;
+    padding-top: 6px !important;
   }
   body.mobile-sales-mode .kasaProductGridScroll.kasaProductVirtualScroll {
     overflow-y: auto;
@@ -4687,17 +5115,24 @@ textarea::placeholder {
     flex: 1 1 auto;
     min-height: 0;
     padding-right: 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    scroll-padding-bottom: 136px;
   }
-  body.sales-mobile-scroll .saleCartList--padActions { padding-bottom: 0 }
+  body.sales-mobile-scroll .saleCartList--padActions {
+    padding-bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+  }
   body.sales-mobile-scroll .saleCartFooter {
     flex-shrink: 0;
     background: var(--panel);
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
   }
 
   body.sales-mobile-scroll .salePanel .btn.btn--full.btn--left {
     background: #ffffff;
     border-color: var(--border);
-    padding: 8px 8px;
+    padding: 7px 10px;
     font-size: 12px;
     justify-content: center;
     text-align: center;
@@ -4707,12 +5142,30 @@ textarea::placeholder {
     border-color: #d1d5db;
     font-weight: 800;
   }
+  body.sales-mobile-scroll .saleStandard3Col > :nth-child(1) .salePanelScroll {
+    padding-top: 0 !important;
+  }
 
   body.sales-mobile-scroll .posItemsGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px;
   }
-  body.sales-mobile-scroll .productCard { min-height: 84px }
+  body.sales-mobile-scroll .productCard {
+    min-height: 78px;
+    height: 78px;
+    aspect-ratio: auto;
+  }
+  body.sales-mobile-scroll .productCard__content {
+    padding: 6px 7px;
+    gap: 2px;
+  }
+  body.sales-mobile-scroll .productCard__name {
+    font-size: 11px;
+    font-weight: 700;
+  }
+  body.sales-mobile-scroll .productCard__price {
+    font-size: 11px;
+  }
 
   .saleProductsVirtualScroll,
   .kasaProductVirtualScroll {

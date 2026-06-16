@@ -70,8 +70,10 @@ export default function PosPage() {
   const [splitSelection, setSplitSelection] = useState({})
   const [splitTargetTableId, setSplitTargetTableId] = useState('')
   const [noteModalOpen, setNoteModalOpen] = useState(false)
+  const [orderNoteModalOpen, setOrderNoteModalOpen] = useState(false)
   const [selectedItemForNote, setSelectedItemForNote] = useState(null)
   const [itemNote, setItemNoteText] = useState('')
+  const [orderNoteDraft, setOrderNoteDraft] = useState('')
   const [weightModalOpen, setWeightModalOpen] = useState(false)
   const [pendingWeightItem, setPendingWeightItem] = useState(null)
   const [weightModalValue, setWeightModalValue] = useState('')
@@ -95,10 +97,6 @@ export default function PosPage() {
   const categoryPerfRef = useRef(null)
   const cartRenderSnapshotRef = useRef({})
   const lastCartSignatureRef = useRef('')
-
-  const orderNoteRef = useRef(null)
-  const orderNoteFocusedRef = useRef(false)
-  const orderNoteSelectionRef = useRef({ start: null, end: null })
 
   const qtyInputRefs = useRef(new Map())
   const activeQtyRowKeyRef = useRef(null)
@@ -253,21 +251,6 @@ export default function PosPage() {
       } catch {}
     }
   }, [])
-
-  useEffect(() => {
-    if (!orderNoteFocusedRef.current) return
-    const el = orderNoteRef.current
-    if (!el) return
-    if (document.activeElement !== el) {
-      el.focus()
-    }
-    const { start, end } = orderNoteSelectionRef.current || {}
-    if (typeof start === 'number' && typeof end === 'number') {
-      try {
-        el.setSelectionRange(start, end)
-      } catch {}
-    }
-  }, [note])
 
   useEffect(() => {
     const key = activeQtyRowKeyRef.current
@@ -923,17 +906,31 @@ export default function PosPage() {
       setNote(fresh.note || '')
     }
   }
-  const saveNote = async () => {
+  const saveNote = async (nextNote = note) => {
     const orderId = getOrderId(order)
     if (!orderId) {
       toast.error('Sipariş bulunamadı')
       setError('Sipariş bulunamadı')
       return
     }
-    const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/note`, { method: 'PUT', body: JSON.stringify({ note }), signal, silent: true }))
+    const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/note`, { method: 'PUT', body: JSON.stringify({ note: nextNote }), signal, silent: true }))
     const fresh = pickOrder(res)
     if (fresh) {
       setNote(fresh.note || '')
+      return true
+    }
+    return false
+  }
+
+  const openOrderNoteModal = () => {
+    setOrderNoteDraft(String(note || ''))
+    setOrderNoteModalOpen(true)
+  }
+
+  const submitOrderNote = async () => {
+    const ok = await saveNote(orderNoteDraft)
+    if (ok) {
+      setOrderNoteModalOpen(false)
     }
   }
 
@@ -1403,7 +1400,7 @@ export default function PosPage() {
   }
 
   const CartPanel = ({ inDrawer = false } = {}) => (
-    <>
+    <div className={`saleCartPanelContent${inDrawer ? ' saleCartPanelContent--drawer' : ''}`}>
       <div className="saleCartHeader" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>Sepet</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1522,31 +1519,32 @@ export default function PosPage() {
                   style={{ ...(isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : {}) }}
                 >
                   <div className="sale-cart-line__meta">
-                    {it?.status === 'sent' && (
-                      <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
-                        Hazırlanıyor
-                      </span>
-                    )}
-                    {it?.status === 'completed' && (
-                      <span className="page-pill" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857', marginBottom: 4, display: 'inline-block' }}>
-                        Hazır
-                      </span>
-                    )}
-                    {it?.status === 'cancelled' && (
-                      <span className="page-pill" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c', marginBottom: 4, display: 'inline-block' }}>
-                        İptal
-                      </span>
-                    )}
-                    <div className="sale-cart-line__title">{it?.nameSnapshot}</div>
-                    <div className="sale-cart-line__detail">{detailText}</div>
-                    {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
+                    <div className="sale-cart-line-main">
+                      <div className="sale-cart-line__title">{it?.nameSnapshot}</div>
+                      {it?.status === 'sent' && (
+                        <span className="page-pill sale-cart-line-status" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}>
+                          Hazırlanıyor
+                        </span>
+                      )}
+                      {it?.status === 'completed' && (
+                        <span className="page-pill sale-cart-line-status" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857' }}>
+                          Hazır
+                        </span>
+                      )}
+                      {it?.status === 'cancelled' && (
+                        <span className="page-pill sale-cart-line-status" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }}>
+                          İptal
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <div className="sale-cart-line__detail">{detailText}</div>
                 <div className="sale-cart-line__actions">
                   {isOpen && (
                     <>
                       <button
-                        className="btn"
+                        className="btn sale-cart-line__action-btn"
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('Ayrı moda geç')
@@ -1566,7 +1564,7 @@ export default function PosPage() {
                         -
                       </button>
                       <button
-                        className="btn"
+                        className="btn sale-cart-line__action-btn"
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('Ayrı moda geç')
@@ -1585,7 +1583,7 @@ export default function PosPage() {
                       >
                         +
                       </button>
-                      <button className="btn" onClick={() => openItemNoteModal(row.itemId, row.note)} disabled={disableBase}>
+                      <button className="btn sale-cart-line__action-btn" onClick={() => openItemNoteModal(row.itemId, row.note)} disabled={disableBase}>
                         Not
                       </button>
                       {!isGrouped && (
@@ -1630,7 +1628,7 @@ export default function PosPage() {
                   {isSent && (
                     <>
                       <button
-                        className="btn"
+                        className="btn sale-cart-line__action-btn"
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('Not için Ayrı moduna geç')
@@ -1645,7 +1643,7 @@ export default function PosPage() {
                         Not
                       </button>
                       <button
-                        className="btn"
+                        className="btn sale-cart-line__action-btn"
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('Hazır için Ayrı moduna geç')
@@ -1660,7 +1658,7 @@ export default function PosPage() {
                         Hazır
                       </button>
                       <button
-                        className="btn"
+                        className="btn sale-cart-line__action-btn"
                         onClick={() => {
                           if (isMultiGroup) {
                             toast.info('İptal için Ayrı moduna geç')
@@ -1676,8 +1674,8 @@ export default function PosPage() {
                       </button>
                     </>
                   )}
-                  <div className="sale-cart-line__price" style={{ whiteSpace: 'nowrap' }}>{row.subtotal} TL</div>
                 </div>
+                <div className="sale-cart-line__price" style={{ whiteSpace: 'nowrap' }}>{row.subtotal} TL</div>
               </div>
             )
           }
@@ -1705,41 +1703,28 @@ export default function PosPage() {
 
       {order && (
         <div className="saleCartFooter">
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
-              <textarea
-                className="input"
-                rows="3"
-                value={note}
-                ref={orderNoteRef}
-                onFocus={() => { orderNoteFocusedRef.current = true }}
-                onBlur={() => { orderNoteFocusedRef.current = false; saveNote() }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  orderNoteSelectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
-                  setNote(e.target.value)
-                }}
-              />
-            </label>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-              <div>Kalan</div>
-              <div style={{ textAlign: 'right' }}>
+          <div className="saleCartFooterInner">
+            <div className="saleCartFooterSummary">
+              <div className="saleCartFooterSummaryMain">
+                <div>Kalan</div>
                 <div>{balanceDue.toFixed(2)} TL</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Brüt: {grossTotal.toFixed(2)} TL</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>İndirim: %{discountPercent || 0} ({discountTotal.toFixed(2)} TL)</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Net: {netTotal.toFixed(2)} TL</div>
+              </div>
+              <div className="saleCartFooterSummaryMeta">
+                <div>Brüt: {grossTotal.toFixed(2)} TL</div>
+                <div>İndirim: %{discountPercent || 0} ({discountTotal.toFixed(2)} TL)</div>
+                <div>Net: {netTotal.toFixed(2)} TL</div>
                 {paidTotal > 0 && (
-                  <div style={{ fontSize: 12, color: '#22c55e' }}>Ödenen: {paidTotal.toFixed(2)} TL</div>
+                  <div style={{ color: '#22c55e' }}>Ödenen: {paidTotal.toFixed(2)} TL</div>
                 )}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="saleCartFooterActions">
+              <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
+                Sipariş Notu
+              </button>
               <button
-                className="btn"
+                className="btn saleCartFooterActionBtn"
                 onClick={sendKitchen}
                 disabled={
                   busy ||
@@ -1751,44 +1736,64 @@ export default function PosPage() {
                 Mutfağa Gönder ({servingTypeLabelTR(servingType) || '-'})
               </button>
               <button
-                className="btn"
+                className="btn saleCartFooterActionBtn"
                 onClick={openPaymentModal}
                 disabled={!getOrderId(order)}
               >Ödeme Al</button>
-              <button className="btn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
-              <button className="btn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
-              <button className="btn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
-              <button className="btn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-              <button className="btn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+              <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
+              <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
+              <button className="btn saleCartFooterActionBtn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
+              <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+              <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="saleStandard3Col vhFit">
+        <div className="card saleProductsMobileIntro">
+          <div className="saleProductsMobileIntroRow">
+            {(tableName || tableId || location.state?.fromTables) && (
+              <div className="saleProductsMobileIntroBack">
+                <button className="btn saleProductsMobileBackBtn" type="button" onClick={backToTables} aria-label="Masalara dön">
+                  ←
+                </button>
+              </div>
+            )}
+            <div className="saleProductsMobileIntroMeta">
+              {tableName ? `Masa: ${tableName}` : 'Masasız Satış'}
+              {order?.orderNo ? ` • Sipariş ${order.orderNo}` : ' • Sipariş —'}
+              {order?.createdByName ? ` • Alan: ${order.createdByName}` : ''}
+              {mergedBadge ? ' • Birleşik' : ''}
+            </div>
+          </div>
+        </div>
+
         <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={handleCategorySelect} />
 
-        <div className="card salePanel">
-          {(tableName || tableId || location.state?.fromTables) && (
-            <div style={{ marginBottom: 10 }}>
-              <button className="btn" type="button" onClick={backToTables}>
-                Masalara Dön
-              </button>
+        <div className="card salePanel saleProductsPanel">
+          <div className="saleProductsPanelHeader">
+            {(tableName || tableId || location.state?.fromTables) && (
+              <div style={{ marginBottom: 10 }}>
+                <button className="btn" type="button" onClick={backToTables}>
+                  Masalara Dön
+                </button>
+              </div>
+            )}
+            <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted)' }}>
+              {tableName ? `Masa: ${tableName}` : 'Masasız Satış'}
+              {order?.orderNo ? ` • Sipariş ${order.orderNo}` : ' • Sipariş —'}
+              {order?.createdByName ? ` • Alan: ${order.createdByName}` : ''}
+              {mergedBadge ? ' • Birleşik' : ''}
             </div>
-          )}
-          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted)' }}>
-            {tableName ? `Masa: ${tableName}` : 'Masasız Satış'}
-            {order?.orderNo ? ` • Sipariş ${order.orderNo}` : ' • Sipariş —'}
-            {order?.createdByName ? ` • Alan: ${order.createdByName}` : ''}
-            {mergedBadge ? ' • Birleşik' : ''}
-          </div>
-          <div style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontWeight: 800 }}>Ürünler</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{filteredItems.length} ürün</div>
+            <div style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontWeight: 800 }}>Ürünler</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{filteredItems.length} ürün</div>
+            </div>
           </div>
           <div
             ref={productScrollRef}
@@ -1810,7 +1815,7 @@ export default function PosPage() {
           </div>
         </div>
 
-        <div className="card salePanel">
+        <div className="card salePanel saleCartPanelShell">
           <CartPanel />
         </div>
       </div>
@@ -2126,6 +2131,25 @@ export default function PosPage() {
       onSubmit={submitItemCancel}
       autoFocus={false}
     />
+    <Modal open={orderNoteModalOpen} onClose={() => setOrderNoteModalOpen(false)} title="Sipariş Notu" dialogStyle={{ width: 'min(560px, calc(100vw - 32px))' }}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <textarea
+          className="input saleOrderNoteModalTextarea"
+          rows="4"
+          value={orderNoteDraft}
+          onChange={(e) => setOrderNoteDraft(e.target.value)}
+          placeholder="Sipariş notu..."
+        />
+        <div className="app-modal-footer" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" type="button" onClick={() => setOrderNoteModalOpen(false)}>
+            Vazgeç
+          </button>
+          <button className="btn" type="button" onClick={submitOrderNote} disabled={!getOrderId(order)}>
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </Modal>
     <ConfirmModal
       open={orderCancelConfirmOpen}
       onClose={() => setOrderCancelConfirmOpen(false)}

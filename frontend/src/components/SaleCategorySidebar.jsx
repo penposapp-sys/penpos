@@ -22,13 +22,13 @@ function SaleCategorySidebar({
   })
 
   return (
-    <div className="card salePanel">
-      <div style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', fontWeight: 800 }}>{title}</div>
-      <div className="salePanelScroll" style={{ paddingTop: 10 }}>
+    <div className="card salePanel saleCategoryPanel">
+      <div className="saleCategoryPanelTitle" style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', fontWeight: 800 }}>{title}</div>
+      <div className="salePanelScroll saleCategoryPanelScroll" style={{ paddingTop: 10 }}>
         {categories.map(c => (
           <button
             key={c.id}
-            className="btn btn--full btn--left"
+            className="btn btn--full btn--left saleCategoryButton"
             type="button"
             onClick={() => handleSelect(c.id)}
             aria-pressed={String(activeCategoryId) === String(c.id)}

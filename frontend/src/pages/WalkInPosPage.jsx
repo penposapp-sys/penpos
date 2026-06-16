@@ -69,8 +69,10 @@ export default function WalkInPosPage() {
   const [veresiyeBranchError, setVeresiyeBranchError] = useState('')
   
   const [noteModalOpen, setNoteModalOpen] = useState(false)
+  const [orderNoteModalOpen, setOrderNoteModalOpen] = useState(false)
   const [selectedItemForNote, setSelectedItemForNote] = useState(null)
   const [itemNote, setItemNoteText] = useState('')
+  const [orderNoteDraft, setOrderNoteDraft] = useState('')
   const [weightModalOpen, setWeightModalOpen] = useState(false)
   const [pendingWeightItem, setPendingWeightItem] = useState(null)
   const [weightModalValue, setWeightModalValue] = useState('')
@@ -797,7 +799,7 @@ export default function WalkInPosPage() {
     }
     setCancelModalOpen(false)
   }
-  const saveNote = async () => {
+  const saveNote = async (nextNote = note) => {
     const orderId = selectedOrderId || getOrderId(order)
     if (!orderId) {
       toast.error('Sipariş bulunamadı')
@@ -805,13 +807,25 @@ export default function WalkInPosPage() {
       return
     }
     const res = await safeAction(
-      (signal) => api(`/api/pos/orders/${orderId}/note`, { method: 'PUT', data: { note }, signal, silent: true }),
+      (signal) => api(`/api/pos/orders/${orderId}/note`, { method: 'PUT', data: { note: nextNote }, signal, silent: true }),
       { reload: false }
     )
     const fresh = pickOrder(res)
     if (fresh) {
       setNote(fresh.note || '')
+      return true
     }
+    return false
+  }
+
+  const openOrderNoteModal = () => {
+    setOrderNoteDraft(String(note || ''))
+    setOrderNoteModalOpen(true)
+  }
+
+  const submitOrderNote = async () => {
+    const ok = await saveNote(orderNoteDraft)
+    if (ok) setOrderNoteModalOpen(false)
   }
 
   const cancelOrder = async () => {
@@ -1417,10 +1431,12 @@ export default function WalkInPosPage() {
 
       <div style={{ flex: 1, minHeight: 0, overflow: isMobilePortrait ? 'visible' : 'hidden' }}>
         <div className="saleStandard3Col" style={{ minHeight: 0 }}>
+          <div className="card saleProductsMobileIntro saleProductsMobileIntro--empty" aria-hidden="true" />
+
           <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={handleCategorySelect} />
 
-          <div className="card salePanel">
-            <div style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div className="card salePanel saleProductsPanel">
+            <div className="saleProductsPanelHeader" style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
               <div style={{ fontWeight: 800 }}>Ürünler</div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>{filteredItems.length} ürün</div>
             </div>
@@ -1443,7 +1459,7 @@ export default function WalkInPosPage() {
             )}
           </div>
 
-          <div ref={cartAnchorRef} className="card salePanel" style={{ minHeight: 0 }}>
+          <div ref={cartAnchorRef} className="card salePanel saleCartPanelShell" style={{ minHeight: 0 }}>
               <div className="saleCartHeader" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>Sepet</h3>
                 <div />
@@ -1576,31 +1592,32 @@ export default function WalkInPosPage() {
                           style={{ ...(isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : {}) }}
                         >
                           <div className="sale-cart-line__meta">
-                            {it?.status === 'sent' && (
-                              <span className="page-pill" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8', marginBottom: 4, display: 'inline-block' }}>
-                                Hazırlanıyor
-                              </span>
-                            )}
-                            {it?.status === 'completed' && (
-                              <span className="page-pill" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857', marginBottom: 4, display: 'inline-block' }}>
-                                Hazır
-                              </span>
-                            )}
-                            {it?.status === 'cancelled' && (
-                              <span className="page-pill" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c', marginBottom: 4, display: 'inline-block' }}>
-                                İptal
-                              </span>
-                            )}
-                            <div className="sale-cart-line__title">{it?.nameSnapshot}</div>
-                            <div className="sale-cart-line__detail">{detailText}</div>
-                            {!!row.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.note}</div>}
+                            <div className="sale-cart-line-main">
+                              <div className="sale-cart-line__title">{it?.nameSnapshot}</div>
+                              {it?.status === 'sent' && (
+                                <span className="page-pill sale-cart-line-status" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}>
+                                  Hazırlanıyor
+                                </span>
+                              )}
+                              {it?.status === 'completed' && (
+                                <span className="page-pill sale-cart-line-status" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857' }}>
+                                  Hazır
+                                </span>
+                              )}
+                              {it?.status === 'cancelled' && (
+                                <span className="page-pill sale-cart-line-status" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }}>
+                                  İptal
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
+                        <div className="sale-cart-line__detail">{detailText}</div>
                         <div className="sale-cart-line__actions">
                           {isOpen && (
                             <>
                               <button
-                                className="btn"
+                                className="btn sale-cart-line__action-btn"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1620,7 +1637,7 @@ export default function WalkInPosPage() {
                                 -
                               </button>
                               <button
-                                className="btn"
+                                className="btn sale-cart-line__action-btn"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1640,7 +1657,7 @@ export default function WalkInPosPage() {
                                 +
                               </button>
                               <button
-                                className="btn"
+                                className="btn sale-cart-line__action-btn"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1695,7 +1712,7 @@ export default function WalkInPosPage() {
                           {isSent && (
                             <>
                               <button
-                                className="btn"
+                                className="btn sale-cart-line__action-btn"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1709,7 +1726,7 @@ export default function WalkInPosPage() {
                                 Not
                               </button>
                               <button
-                                className="btn"
+                                className="btn sale-cart-line__action-btn"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1754,14 +1771,25 @@ export default function WalkInPosPage() {
               </div>
 
               {order && (
-                <div className="saleCartFooter" style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                    <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceLabel}</div>
-                    <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceValue.toFixed(2)} TL</div>
+                <div className="saleCartFooter">
+                  <div className="saleCartFooterInner">
+                  <div className="saleCartFooterSummary">
+                    <div className="saleCartFooterSummaryMain">
+                      <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceLabel}</div>
+                      <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceValue.toFixed(2)} TL</div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="saleCartFooterActions">
                     <button
-                      className="btn"
+                      className="btn saleCartFooterActionBtn"
+                      type="button"
+                      onClick={openOrderNoteModal}
+                      disabled={!getOrderId(order)}
+                    >
+                      Sipariş Notu
+                    </button>
+                    <button
+                      className="btn saleCartFooterActionBtn"
                       onClick={sendKitchen}
                       disabled={
                         busy ||
@@ -1773,14 +1801,15 @@ export default function WalkInPosPage() {
                       {effectiveKitchenEnabled === false ? 'Onayla (Mutfak Kapalı)' : 'Mutfağa Gönder'}
                     </button>
                     <button
-                      className="btn"
+                      className="btn saleCartFooterActionBtn"
                       onClick={openPaymentModal}
                       disabled={!getOrderId(order)}
                     >Ödeme Al</button>
-                    <button className="btn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
+                    <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
 
-                    <button className="btn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-                    <button className="btn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+                    <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+                    <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+                  </div>
                   </div>
                 </div>
               )}
@@ -2063,6 +2092,25 @@ export default function WalkInPosPage() {
       onSubmit={submitItemCancel}
       autoFocus={false}
     />
+    <Modal open={orderNoteModalOpen} onClose={() => setOrderNoteModalOpen(false)} title="Sipariş Notu" dialogStyle={{ width: 'min(560px, calc(100vw - 32px))' }}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <textarea
+          className="input saleOrderNoteModalTextarea"
+          rows="4"
+          value={orderNoteDraft}
+          onChange={(e) => setOrderNoteDraft(e.target.value)}
+          placeholder="Sipariş notu..."
+        />
+        <div className="app-modal-footer" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" type="button" onClick={() => setOrderNoteModalOpen(false)}>
+            Vazgeç
+          </button>
+          <button className="btn" type="button" onClick={submitOrderNote} disabled={!getOrderId(order)}>
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </Modal>
     <ConfirmModal
       open={orderCancelConfirmOpen}
       onClose={() => setOrderCancelConfirmOpen(false)}
