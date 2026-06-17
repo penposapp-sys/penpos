@@ -7,9 +7,14 @@
     "dev": "vite",
     "dev:lan": "vite --host 0.0.0.0 --mode lan",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
     "lucide-react": "^0.542.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
