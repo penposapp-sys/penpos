@@ -89,7 +89,13 @@ export const createServer = () => {
   }
   app.use(express.json())
   app.use('/public', express.static(path.join(__dirname, '..', 'public')))
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.includes(`${path.sep}uploads${path.sep}products${path.sep}`)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000')
+      }
+    }
+  }))
   app.use((req, res, next) => {
     const id = randomUUID()
     req.requestId = id

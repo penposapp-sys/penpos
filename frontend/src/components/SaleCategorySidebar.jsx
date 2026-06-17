@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect } from 'react'
+import React, { memo, useCallback, useEffect, useRef } from 'react'
 import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
 function SaleCategorySidebar({
@@ -7,7 +7,61 @@ function SaleCategorySidebar({
   activeCategoryId,
   onSelect
 }) {
+  const scrollRef = useRef(null)
+  const dragState = useRef({
+    isDown: false,
+    startX: 0,
+    scrollLeft: 0,
+    moved: false
+  })
   const handleSelect = useCallback((categoryId) => onSelect?.(categoryId), [onSelect])
+
+  const handleWheel = useCallback((event) => {
+    const el = scrollRef.current
+    if (!el) return
+    const canScrollX = el.scrollWidth > el.clientWidth + 2
+    if (!canScrollX) return
+    if (Math.abs(event.deltaX) > 0) return
+    if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
+    el.scrollLeft += event.deltaY
+  }, [])
+
+  const handleMouseDown = useCallback((event) => {
+    const el = scrollRef.current
+    if (!el) return
+
+    dragState.current.isDown = true
+    dragState.current.startX = event.pageX - el.offsetLeft
+    dragState.current.scrollLeft = el.scrollLeft
+    dragState.current.moved = false
+  }, [])
+
+  const handleMouseMove = useCallback((event) => {
+    const el = scrollRef.current
+    const state = dragState.current
+    if (!el || !state.isDown) return
+
+    const x = event.pageX - el.offsetLeft
+    const walk = x - state.startX
+
+    if (Math.abs(walk) > 5) state.moved = true
+
+    el.scrollLeft = state.scrollLeft - walk
+  }, [])
+
+  const stopDragging = useCallback(() => {
+    dragState.current.isDown = false
+  }, [])
+
+  const handleCategoryClick = useCallback((event, categoryId) => {
+    if (dragState.current.moved) {
+      event.preventDefault()
+      event.stopPropagation()
+      dragState.current.moved = false
+      return
+    }
+    handleSelect(categoryId)
+  }, [handleSelect])
 
   useEffect(() => {
     const renderCount = incrementPerfCounter('sidebarRenders', title || 'categories')
@@ -24,13 +78,22 @@ function SaleCategorySidebar({
   return (
     <div className="card salePanel saleCategoryPanel">
       <div className="saleCategoryPanelTitle" style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', fontWeight: 800 }}>{title}</div>
-      <div className="salePanelScroll saleCategoryPanelScroll" style={{ paddingTop: 10 }}>
+      <div
+        ref={scrollRef}
+        className="salePanelScroll saleCategoryPanelScroll category-scroll sale-category-scroll"
+        style={{ paddingTop: 10 }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={stopDragging}
+        onMouseLeave={stopDragging}
+        onWheel={handleWheel}
+      >
         {categories.map(c => (
           <button
             key={c.id}
-            className="btn btn--full btn--left saleCategoryButton"
+            className="btn btn--full btn--left saleCategoryButton sale-category-chip"
             type="button"
-            onClick={() => handleSelect(c.id)}
+            onClick={(event) => handleCategoryClick(event, c.id)}
             aria-pressed={String(activeCategoryId) === String(c.id)}
             style={{
               marginBottom: 8,

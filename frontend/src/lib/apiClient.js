@@ -66,7 +66,7 @@ const normalizeForAllowlist = (path) => {
 }
 
 const envBase = normalizeBaseUrl(import.meta.env.VITE_API_URL) || ''
-const base = import.meta.env.DEV ? forcePort4000(envBase) : envBase
+const base = import.meta.env.DEV ? forcePort4000(envBase || 'http://localhost:4000') : envBase
 
 
 if (import.meta.env.DEV) {

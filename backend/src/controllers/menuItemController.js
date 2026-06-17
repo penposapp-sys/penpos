@@ -1,4 +1,12 @@
-import { listMenuItems, getMenuItemService, createMenuItemService, updateMenuItemService, deleteMenuItemService } from '../services/menuItemService.js'
+import {
+  listMenuItems,
+  getMenuItemService,
+  createMenuItemService,
+  updateMenuItemService,
+  deleteMenuItemService,
+  uploadMenuItemImageService,
+  removeMenuItemImageService
+} from '../services/menuItemService.js'
 import { sendError } from '../utils/errors.js'
 
 export const list = async (req, res) => {
@@ -54,6 +62,24 @@ export const remove = async (req, res) => {
   try {
     const result = await deleteMenuItemService(req.user.tenantId, req.user.id, req.params.id)
     res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const uploadImage = async (req, res) => {
+  try {
+    const item = await uploadMenuItemImageService(req.user.tenantId, req.params.id, req.file)
+    res.json({ item })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const removeImage = async (req, res) => {
+  try {
+    const item = await removeMenuItemImageService(req.user.tenantId, req.params.id)
+    res.json({ item })
   } catch (err) {
     sendError(res, err)
   }

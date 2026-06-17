@@ -23,9 +23,17 @@ const normalizePortal = (portal) => {
   return p
 }
 
-const buildResetPasswordUrl = (token) => {
-  const baseUrl = String(process.env.APP_URL || 'https://penpos.cloud').trim().replace(/\/+$/, '')
-  return `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`
+const getFrontendBaseUrl = () => {
+  const raw = String(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.APP_URL || 'https://penpos.cloud').trim()
+  return raw.replace(/\/+$/, '')
+}
+
+const buildResetPasswordUrl = (token, portal) => {
+  const baseUrl = getFrontendBaseUrl()
+  const params = new URLSearchParams({ token: String(token || '') })
+  const normalizedPortal = normalizePortal(portal)
+  if (normalizedPortal) params.set('portal', normalizedPortal)
+  return `${baseUrl}/reset-password?${params.toString()}`
 }
 
 const hashResetToken = (token) => crypto.createHash('sha256').update(String(token || '')).digest('hex')
@@ -277,11 +285,18 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
 
 export const forgotPassword = async (email, portal) => {
   const normalizedEmail = normalizeEmail(email)
+  const normalizedPortal = normalizePortal(portal)
   if (!normalizedEmail) throw error('invalid_email', 'Lütfen geçerli bir e-posta adresi girin.', 400)
 
-  const filter = resolveForgotFilter(portal)
+  const filter = resolveForgotFilter(normalizedPortal)
   const user = await findByEmail(normalizedEmail, filter)
   if (!user || !user.isActive || user.isDeleted || user.status !== 'active') {
+    try {
+      info('[AUTH_FORGOT_PASSWORD_USER_NOT_FOUND]', {
+        email: normalizedEmail,
+        portal: normalizedPortal || null
+      })
+    } catch {}
     return { success: true, message: 'Eğer bu e-posta sistemde kayıtlıysa şifre sıfırlama bağlantısı gönderildi.' }
   }
 
@@ -295,7 +310,7 @@ export const forgotPassword = async (email, portal) => {
   user.resetPasswordExpires = expiresAt
   await user.save()
 
-  const resetUrl = buildResetPasswordUrl(rawToken)
+  const resetUrl = buildResetPasswordUrl(rawToken, normalizedPortal)
   const mail = buildResetPasswordMail({ name: user.name, resetUrl })
   try {
     await sendMail({
@@ -308,6 +323,16 @@ export const forgotPassword = async (email, portal) => {
     user.resetPasswordToken = previousResetPasswordToken
     user.resetPasswordExpires = previousResetPasswordExpires
     await user.save().catch(() => {})
+    try {
+      logError('[AUTH_FORGOT_PASSWORD_SEND_ERROR]', {
+        email: normalizedEmail,
+        portal: normalizedPortal || null,
+        userId: String(user?._id || user?.id || ''),
+        code: String(err?.code || err?.payload?.error || ''),
+        message: String(err?.message || '')
+      }, err?.stack || err)
+    } catch {}
+    if (err?.status) throw err
 
     throw error(
       'password_reset_unavailable',

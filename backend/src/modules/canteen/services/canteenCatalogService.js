@@ -1,6 +1,7 @@
 import { error } from '../../../utils/errors.js'
 import * as catRepo from '../repositories/canteenCategoryRepository.js'
 import * as prodRepo from '../repositories/canteenProductRepository.js'
+import { deleteProductImageFile, replaceProductImageFile } from '../../../utils/productImageStorage.js'
 
 const normalizeName = (name) => String(name || '').trim()
 const normalizeKey = (name) => normalizeName(name).toLowerCase()
@@ -261,7 +262,54 @@ export const searchProducts = async (tenantId, branchId, input) => {
 }
 
 export const removeProduct = async (tenantId, branchId, id) => {
+  const current = await prodRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Urun bulunamadi', 404)
   const deleted = await prodRepo.softDeleteByIdAndScope(id, tenantId, branchId)
   if (!deleted) throw error('not_found', 'Urun bulunamadi', 404)
+  await deleteProductImageFile(current.imageUrl)
   return { success: true }
+}
+
+export const uploadProductImage = async (tenantId, branchId, id, file) => {
+  const current = await prodRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Urun bulunamadi', 404)
+
+  const saved = await replaceProductImageFile(current.imageUrl, file)
+  const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, { imageUrl: saved.imageUrl })
+  if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
+
+  return {
+    id: updated.id,
+    name: updated.name,
+    barcode: updated.barcode || '',
+    stockTrackingEnabled: updated.stockTrackingEnabled === true,
+    stockQty: Number(updated.stockQty || 0),
+    price: Number(updated.price || 0),
+    costPrice: Number(updated.costPrice || 0),
+    vatRate: Number(updated.vatRate || 0),
+    categoryId: updated.categoryId ? String(updated.categoryId) : null,
+    imageUrl: String(updated.imageUrl || '')
+  }
+}
+
+export const removeProductImage = async (tenantId, branchId, id) => {
+  const current = await prodRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Urun bulunamadi', 404)
+
+  await deleteProductImageFile(current.imageUrl)
+  const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, { imageUrl: '' })
+  if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
+
+  return {
+    id: updated.id,
+    name: updated.name,
+    barcode: updated.barcode || '',
+    stockTrackingEnabled: updated.stockTrackingEnabled === true,
+    stockQty: Number(updated.stockQty || 0),
+    price: Number(updated.price || 0),
+    costPrice: Number(updated.costPrice || 0),
+    vatRate: Number(updated.vatRate || 0),
+    categoryId: updated.categoryId ? String(updated.categoryId) : null,
+    imageUrl: String(updated.imageUrl || '')
+  }
 }

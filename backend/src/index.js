@@ -5,6 +5,7 @@ import mongoose from 'mongoose'
 import * as logger from './utils/logger.js'
 import dotenv from 'dotenv'
 import os from 'os'
+import { startProductImageCleanupScheduler } from './services/productImageCleanupService.js'
 
 dotenv.config()
 
@@ -43,6 +44,7 @@ const start = async () => {
     logger.info(`[SERVER] Health: http://127.0.0.1:${PORT}/api/health`)
     if (lanIp) logger.info(`[SERVER] Health (LAN): http://${lanIp}:${PORT}/api/health`)
   })
+  startProductImageCleanupScheduler()
 
   const shutdown = async (code = 1) => {
     try {

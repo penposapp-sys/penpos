@@ -567,6 +567,87 @@ export default function ProductCatalogStyles() {
         height: 100%;
         object-fit: cover;
       }
+      .product-image-upload {
+        display: grid;
+        gap: 12px;
+        border: 1px solid var(--app-border);
+        border-radius: 24px;
+        background: var(--app-surface);
+        padding: 14px;
+      }
+      .product-image-upload.is-drag-active {
+        border-color: #d79416;
+        box-shadow: 0 0 0 3px rgba(215, 148, 22, 0.12);
+      }
+      .product-image-upload__head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .product-image-upload__label {
+        font-weight: 950;
+        color: var(--app-text);
+      }
+      .product-image-upload__hint,
+      .product-image-upload__size {
+        color: var(--app-text-soft, var(--app-text-secondary));
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .product-image-upload__dropzone {
+        display: grid;
+        gap: 12px;
+        justify-items: center;
+        text-align: center;
+        border: 2px dashed var(--app-border);
+        border-radius: 22px;
+        padding: 18px;
+        background: linear-gradient(180deg, var(--app-surface-2, var(--app-surface-soft)), var(--app-surface));
+        cursor: pointer;
+      }
+      .product-image-upload__preview {
+        width: min(220px, 100%);
+        aspect-ratio: 1;
+        border-radius: 24px;
+        overflow: hidden;
+        background: var(--app-surface);
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+      }
+      .product-image-upload__preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .product-image-upload__copy {
+        display: grid;
+        gap: 6px;
+      }
+      .product-image-upload__copy strong {
+        color: var(--app-text);
+        font-size: 14px;
+      }
+      .product-image-upload__copy span {
+        color: var(--app-text-soft, var(--app-text-secondary));
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .product-image-upload__actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .product-image-upload__actions label.product-secondary-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .product-image-upload__error {
+        color: #b42318;
+        font-weight: 900;
+        font-size: 12px;
+      }
       .product-modal-footer-row {
         position: sticky;
         bottom: 0;

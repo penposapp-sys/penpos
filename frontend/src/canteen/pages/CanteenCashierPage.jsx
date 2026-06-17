@@ -7,6 +7,7 @@ import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import useVirtualProductGrid from '../../hooks/useVirtualProductGrid.js'
 import { diffPerfCounter, getPerfNow, incrementPerfCounter, isProductImagesDisabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../../lib/perfDebug.js'
+import { resolveProductImageUrl } from '../../lib/productImage.js'
 import { Barcode, Search } from 'lucide-react'
 
 const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
@@ -50,7 +51,7 @@ const CashierCategoryRail = memo(function CashierCategoryRail({
           >
             <img
               className="kasaCategoryCardImage"
-              src={String(category.imageUrl || IMAGE_PLACEHOLDER)}
+              src={resolveProductImageUrl({ imageUrl: category.imageUrl || IMAGE_PLACEHOLDER })}
               alt={category.name}
               loading="lazy"
               decoding="async"
@@ -103,7 +104,7 @@ const CashierProductCard = memo(function CashierProductCard({
       {hasImage && !disableImages ? (
         <img
           className="kasaProductCardImage"
-          src={String(product.imageUrl)}
+          src={resolveProductImageUrl({ imageUrl: product.imageUrl })}
           alt={product.name}
           loading="lazy"
           decoding="async"

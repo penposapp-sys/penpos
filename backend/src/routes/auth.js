@@ -33,6 +33,16 @@ router.post('/forgot-password', async (req, res) => {
     const result = await forgotPassword(email, portal)
     res.json(result)
   } catch (err) {
+    try {
+      const { email, portal } = req.body || {}
+      logError('[AUTH_FORGOT_PASSWORD_ROUTE_ERROR]', {
+        requestId: req.requestId || null,
+        email: String(email || '').trim().toLowerCase(),
+        portal: String(portal || '').trim().toLowerCase(),
+        code: String(err?.code || err?.payload?.error || ''),
+        msg: String(err?.message || 'Internal error')
+      }, err?.stack || err)
+    } catch {}
     sendError(res, err)
   }
 })

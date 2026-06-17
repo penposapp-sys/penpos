@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
+import ProductImage from '../components/ProductImage.jsx'
+import ProductImageUploadField from '../components/ProductImageUploadField.jsx'
 import BranchAccessField from '../components/settings/BranchAccessField.jsx'
 import ProductCatalogStyles from './ProductCatalogStyles.jsx'
 import {
@@ -56,6 +58,10 @@ export default function ProductItemSettingsPage() {
   const [categories, setCategories] = useState([])
   const [branches, setBranches] = useState([])
   const [form, setForm] = useState(null)
+  const [imageFile, setImageFile] = useState(null)
+  const [imageError, setImageError] = useState('')
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('')
+  const [removingImage, setRemovingImage] = useState(false)
   const initialSection = searchParams.get('section') || 'general'
   const [openSection, setOpenSection] = useState(initialSection)
 
@@ -94,8 +100,56 @@ export default function ProductItemSettingsPage() {
     return categories.find((entry) => String(entry.id) === String(form?.categoryId || item?.categoryId || ''))?.name || '-'
   }, [categories, form?.categoryId, item?.categoryId])
 
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl('')
+      return undefined
+    }
+    const nextUrl = URL.createObjectURL(imageFile)
+    setImagePreviewUrl(nextUrl)
+    return () => URL.revokeObjectURL(nextUrl)
+  }, [imageFile])
+
+  const uploadSelectedImage = async () => {
+    if (!imageFile) return null
+    const formData = new FormData()
+    formData.append('file', imageFile)
+    return api(`/api/tenant/menu-items/${itemId}/image`, {
+      method: 'POST',
+      body: formData,
+      skipBranchHeader: true
+    })
+  }
+
+  const removeExistingImage = async () => {
+    setRemovingImage(true)
+    setError('')
+    setSuccess('')
+    try {
+      const response = await api(`/api/tenant/menu-items/${itemId}/image`, {
+        method: 'DELETE',
+        skipBranchHeader: true
+      })
+      const nextItem = response?.item || null
+      setItem(nextItem)
+      setForm(inflateProductForm(nextItem || {}))
+      setImageFile(null)
+      setImageError('')
+      window.dispatchEvent(new CustomEvent('menu_item_updated', { detail: { item: nextItem || null } }))
+      setSuccess('Ürün görseli kaldırıldı.')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setRemovingImage(false)
+    }
+  }
+
   const onSave = async () => {
     if (!form) return
+    if (imageError) {
+      setError(imageError)
+      return
+    }
     if (!String(form.name || '').trim()) {
       setError('Ürün adı zorunlu.')
       return
@@ -113,9 +167,16 @@ export default function ProductItemSettingsPage() {
         body: JSON.stringify(buildProductPayload(form)),
         skipBranchHeader: true
       })
-      setItem(response?.item || null)
-      setForm(inflateProductForm(response?.item || {}))
-      window.dispatchEvent(new CustomEvent('menu_item_updated', { detail: { item: response?.item || null } }))
+      let nextItem = response?.item || null
+      if (imageFile) {
+        const uploadResponse = await uploadSelectedImage()
+        nextItem = uploadResponse?.item || nextItem
+        setImageFile(null)
+      }
+      setItem(nextItem)
+      setForm(inflateProductForm(nextItem || {}))
+      setImageError('')
+      window.dispatchEvent(new CustomEvent('menu_item_updated', { detail: { item: nextItem || null } }))
       setSuccess('Ürün ayarları kaydedildi.')
     } catch (err) {
       setError(err.message)
@@ -163,17 +224,28 @@ export default function ProductItemSettingsPage() {
     if (sectionKey === 'image') {
       return (
         <div className="product-form-grid cols-2">
-          <div className="product-form-grid">
-            <Field label="Resim URL"><input className="product-input" value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} /></Field>
-            <Field label="QR Menü Resim URL"><input className="product-input" value={form.qrImageUrl} onChange={(event) => setForm({ ...form, qrImageUrl: event.target.value })} /></Field>
-          </div>
+          <ProductImageUploadField
+            currentImageUrl={form.imageUrl}
+            file={imageFile}
+            error={imageError}
+            disabled={saving || removingImage}
+            onFileChange={(nextFile, validationMessage) => {
+              setImageError(validationMessage || '')
+              setImageFile(validationMessage ? null : nextFile)
+            }}
+            onClearFile={() => {
+              setImageFile(null)
+              setImageError('')
+            }}
+            onRemoveExisting={removeExistingImage}
+          />
           <div className="product-preview">
             <div>
               <div className="product-preview-thumb">
-                {form.imageUrl || form.qrImageUrl ? <img src={form.imageUrl || form.qrImageUrl} alt={form.name || 'Ürün'} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontWeight: 900, color: '#b7791f' }}>{String(form.name || 'Ü').slice(0, 2).toUpperCase()}</div>}
+                {form.imageUrl || imagePreviewUrl ? <ProductImage product={form} src={imagePreviewUrl || form.imageUrl} alt={form.name || 'Ürün'} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontWeight: 900, color: '#b7791f' }}>{String(form.name || 'Ü').slice(0, 2).toUpperCase()}</div>}
               </div>
               <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>Görsel Önizleme</div>
-              <div style={{ color: 'var(--app-text)', marginTop: 6, fontWeight: 700 }}>Dosya yükleme zorunlu değil. URL mantığı korunuyor.</div>
+              <div style={{ color: 'var(--app-text)', marginTop: 6, fontWeight: 700 }}>Eski URL kayıtları korunur, yeni yüklemeler dosya olarak saklanır.</div>
             </div>
           </div>
         </div>
@@ -305,7 +377,7 @@ export default function ProductItemSettingsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                   <button className="product-secondary-btn" onClick={() => navigate('/kermes/settings/catalog/items')}>← Geri</button>
                   <div className="product-thumb">
-                    {form.imageUrl ? <img src={form.imageUrl} alt={form.name} /> : <span>{String(form.name || 'Ü').slice(0, 2).toUpperCase()}</span>}
+                    {form.imageUrl ? <ProductImage product={form} alt={form.name} /> : <span>{String(form.name || 'Ü').slice(0, 2).toUpperCase()}</span>}
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 30, lineHeight: 1, fontWeight: 950 }}>{form.name || 'Ürün Ayarları'}</div>

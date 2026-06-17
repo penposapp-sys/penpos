@@ -49,7 +49,9 @@ export const sendError = (res, err) => {
   }
   let payload
   if (status >= 500) {
-    payload = { error: 'internal_error', message: 'Internal server error' }
+    payload = err?.expose
+      ? (err.payload || { error: 'internal_error', message: err.message || 'Internal error' })
+      : { error: 'internal_error', message: 'Internal server error' }
   } else {
     payload = err.payload || { error: 'internal_error', message: err.message || 'Internal error' }
   }

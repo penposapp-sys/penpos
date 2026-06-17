@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../components/Modal.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
+import ProductImage from '../components/ProductImage.jsx'
+import ProductImageUploadField from '../components/ProductImageUploadField.jsx'
 import BranchAccessField from '../components/settings/BranchAccessField.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../lib/apiClient.js'
@@ -302,6 +304,8 @@ export default function MenuItemsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [createForm, setCreateForm] = useState(createEmptyProductForm())
+  const [createImageFile, setCreateImageFile] = useState(null)
+  const [createImageError, setCreateImageError] = useState('')
   const [categoryName, setCategoryName] = useState('')
   const [draftCategories, setDraftCategories] = useState([])
   const [submitting, setSubmitting] = useState(false)
@@ -442,7 +446,17 @@ export default function MenuItemsPage() {
         body: JSON.stringify(buildProductPayload(form)),
         skipBranchHeader: true
       })
-      const createdItem = response?.item || null
+      let createdItem = response?.item || null
+      if (createdItem?.id && createImageFile) {
+        const formData = new FormData()
+        formData.append('file', createImageFile)
+        const uploadResponse = await api(`/api/tenant/menu-items/${createdItem.id}/image`, {
+          method: 'POST',
+          body: formData,
+          skipBranchHeader: true
+        })
+        createdItem = uploadResponse?.item || createdItem
+      }
       await loadData()
       return createdItem
     } catch (err) {
@@ -693,7 +707,7 @@ export default function MenuItemsPage() {
             </details>
           </div>
           <div className="product-thumb product-thumb--card">
-            {item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : thumbText}
+            {item.imageUrl ? <ProductImage product={item} alt={item.name} /> : thumbText}
           </div>
           <div style={{ textAlign: 'center' }}>
             <div className="product-card-title">{item.name}</div>
@@ -715,7 +729,7 @@ export default function MenuItemsPage() {
         <div className="product-list-row-wrap scrollbar-hidden">
           <div className="product-card-list">
             <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} />
-            <div className="product-thumb">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : thumbText}</div>
+            <div className="product-thumb">{item.imageUrl ? <ProductImage product={item} alt={item.name} /> : thumbText}</div>
             <div className="product-name-cell">
               <div className="product-name-text">{item.name}</div>
               <div className="product-name-subtext">{category?.name || '-'}</div>
@@ -851,7 +865,22 @@ export default function MenuItemsPage() {
             </select>
           </Field>
           <Field label="Ürün Fiyatı"><input className="product-input" type="number" min="0" step="0.01" value={createForm.price} onChange={(event) => setCreateForm({ ...createForm, price: event.target.value })} /></Field>
-          <Field label="Görsel URL"><input className="product-input" value={createForm.imageUrl} onChange={(event) => setCreateForm({ ...createForm, imageUrl: event.target.value })} /></Field>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <ProductImageUploadField
+              currentImageUrl=""
+              file={createImageFile}
+              error={createImageError}
+              disabled={submitting}
+              onFileChange={(nextFile, validationMessage) => {
+                setCreateImageError(validationMessage || '')
+                setCreateImageFile(validationMessage ? null : nextFile)
+              }}
+              onClearFile={() => {
+                setCreateImageFile(null)
+                setCreateImageError('')
+              }}
+            />
+          </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <Field label="Açıklama"><textarea className="product-textarea" value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} /></Field>
           </div>
@@ -872,10 +901,16 @@ export default function MenuItemsPage() {
         <div className="product-modal-footer-row">
           <button type="button" className="product-secondary-btn" onClick={() => setCreateOpen(false)}>İptal</button>
           <button type="button" className="product-dark-btn" disabled={submitting} onClick={async () => {
+            if (createImageError) {
+              setError(createImageError)
+              return
+            }
             const createdItem = await createProduct(createForm)
             if (!createdItem?.id) return
             setCreateOpen(false)
             setCreateForm(createEmptyProductForm(sortedCategories[0]?.id || ''))
+            setCreateImageFile(null)
+            setCreateImageError('')
             navigate(`/kermes/settings/catalog/items/${createdItem.id}`)
           }}>{submitting ? 'Kaydediliyor...' : 'Kaydet'}</button>
         </div>

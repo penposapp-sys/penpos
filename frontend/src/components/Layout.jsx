@@ -267,6 +267,19 @@ export default function Layout() {
   )
 
   useEffect(() => {
+    if (isMobilePortrait || !isDesktopSalesRoute) return undefined
+
+    const updateDesktopCollapse = () => {
+      const shouldCollapse = window.innerWidth <= 1500
+      setDesktopCollapsed((prev) => (prev === shouldCollapse ? prev : shouldCollapse))
+    }
+
+    updateDesktopCollapse()
+    window.addEventListener('resize', updateDesktopCollapse)
+    return () => window.removeEventListener('resize', updateDesktopCollapse)
+  }, [isDesktopSalesRoute, isMobilePortrait])
+
+  useEffect(() => {
     if (isSettingsRoute || !topbarRef.current) {
       setTopbarHeight(0)
       return undefined

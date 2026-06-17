@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import ProductImage from '../components/ProductImage.jsx'
 import { api } from '../lib/apiClient.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
@@ -40,7 +41,7 @@ function ProductCard({ item, onOpen }) {
   return (
     <button type="button" className="digital-public-menu-card digital-public-menu-card--product" onClick={() => onOpen(item)}>
       {!!item.imageUrl ? (
-        <img className="digital-public-menu-card-image" src={item.imageUrl} alt={item.name} />
+        <ProductImage className="digital-public-menu-card-image" product={item} alt={item.name} />
       ) : (
         <div className="digital-public-menu-card-image digital-public-menu-card-image--placeholder" aria-hidden="true">🍽</div>
       )}
@@ -226,7 +227,7 @@ export default function PublicMenuPage() {
               </div>
               <button type="button" className="digital-public-menu-hero-thumb" onClick={() => setDetail(featuredItem)}>
                 {!!featuredItem.imageUrl ? (
-                  <img src={featuredItem.imageUrl} alt={featuredItem.name} />
+                  <ProductImage product={featuredItem} alt={featuredItem.name} />
                 ) : (
                   <div className="digital-public-menu-hero-placeholder" aria-hidden="true">🍽</div>
                 )}
@@ -313,7 +314,7 @@ export default function PublicMenuPage() {
           <div className="digital-public-menu-modal" onClick={(event) => event.stopPropagation()}>
             <div className="digital-public-menu-modal-image-wrap">
               {!!detail.imageUrl ? (
-                <img className="digital-public-menu-modal-image" src={detail.imageUrl} alt={detail.name} />
+                <ProductImage className="digital-public-menu-modal-image" product={detail} alt={detail.name} />
               ) : (
                 <div className="digital-public-menu-modal-image digital-public-menu-modal-image--placeholder" aria-hidden="true">IMG</div>
               )}

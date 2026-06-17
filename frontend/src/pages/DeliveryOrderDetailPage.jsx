@@ -17,6 +17,7 @@ import SaleCartLine from '../components/SaleCartLine.jsx'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { ServingType } from '../utils/servingType.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
+import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalItemStatus } from '../lib/kitchenItemStatus.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 
 export default function DeliveryOrderDetailPage() {
@@ -32,6 +33,10 @@ export default function DeliveryOrderDetailPage() {
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const canManageDelivery = hasPerm('manage_delivery')
+  const cartActionLabel = (kind) => {
+    if (kind === 'cancel') return 'İptal'
+    return 'Not'
+  }
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
@@ -1360,15 +1365,22 @@ export default function DeliveryOrderDetailPage() {
               <div className="card salePanel saleCartPanelShell delivery-cart-panel delivery-detail-summary" style={{ gap: 10 }}>
                 <div className="saleCartPanelContent">
                 <div className="saleCartHeader delivery-detail-section-head" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn--toggle delivery-detail-btn delivery-detail-btn--small" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
-                      Toplu
-                    </button>
-                    <button className="btn btn--toggle delivery-detail-btn delivery-detail-btn--small" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
-                      Ayrı
-                    </button>
+                  <div className="saleCartModeRow saleCartModeRow--delivery">
+                    <div className="saleCartModeRowInner">
+                      <div className="saleCartModeGroup saleCartModeGroup--compact">
+                        <button className="btn btn--toggle delivery-detail-btn delivery-detail-btn--small saleCartModeBtn" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
+                          Toplu
+                        </button>
+                        <button className="btn btn--toggle delivery-detail-btn delivery-detail-btn--small saleCartModeBtn" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
+                          Ayrı
+                        </button>
+                      </div>
+                      <div className="saleCartModeDivider" aria-hidden="true" />
+                      <div className="saleCartModeGroup saleCartModeGroup--service">
+                        <span className="page-pill saleCartModeChip">Paket</span>
+                      </div>
+                    </div>
                   </div>
-                  <span className="page-pill">Paket</span>
                 </div>
                 {canSendToKitchen && tab !== 'delivered' && (
                   <div className="saleCartMobileActionBar">
@@ -1377,13 +1389,13 @@ export default function DeliveryOrderDetailPage() {
                     </button>
                   </div>
                 )}
-                <div className="saleCartList order-cart-scroll scrollbar-hidden" style={{ marginTop: 8 }}>
+                <div className="saleCartList saleCartList--offset order-cart-scroll scrollbar-hidden">
                 <div style={{ display: 'grid', gap: 8 }}>
                   {(() => {
                     const raw = Array.isArray(order?.items) ? order.items : []
                     const openItems = raw.filter(it => it?.status === 'open')
-                    const sentItems = raw.filter(it => it?.status === 'sent' || it?.status === 'preparing')
-                    const otherItems = raw.filter(it => it?.status === 'completed' || it?.status === 'cancelled')
+                    const sentItems = raw.filter(it => isKitchenActiveItemStatus(it?.status))
+                    const otherItems = raw.filter(it => isKitchenTerminalItemStatus(it?.status))
 
                     const setItemQtyById = async (rowKey, itemId, nextQty) => {
                       const orderId = getOrderId(order)
@@ -1399,6 +1411,7 @@ export default function DeliveryOrderDetailPage() {
                       const it = row.repr
                       const isOpen = opts.type === 'open'
                       const isSent = opts.type === 'sent'
+                      const isTerminal = opts.type === 'other'
                       const isGrouped = opts.grouped === true
                       const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
                       const disableBase = tab === 'delivered' || busy || it?.status === 'completed' || it?.status === 'cancelled'
@@ -1408,20 +1421,13 @@ export default function DeliveryOrderDetailPage() {
                       const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
                       const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
 
-                      const itemStatusMeta = {
-                        open: { label: 'Bekliyor', bg: 'var(--app-surface-soft, var(--panelElevated))', border: 'var(--app-border, var(--border))', color: 'var(--app-text-secondary, var(--text-secondary))' },
-                        sent: { label: 'Hazırlanıyor', bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8' },
-                        preparing: { label: 'Hazırlanıyor', bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8' },
-                        completed: { label: 'Hazır', bg: '#ecfdf5', border: '#6ee7b7', color: '#047857' },
-                        cancelled: { label: 'İptal', bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
-                      }
-                      const m = itemStatusMeta[String(it?.status || '')] || null
+                      const m = getKitchenItemStatusMeta(it?.status, { compact: true })
                       const detailText = `${it?.priceSnapshot} TL • x${displayQty}`
 
                       return (
                         <SaleCartLine
                           key={row.key}
-                          className="delivery-detail-cart-line"
+                          className={`delivery-detail-cart-line${isTerminal ? ' sale-cart-line--terminal' : ''}`}
                           style={{ opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1 }}
                           title={it?.nameSnapshot}
                           badge={m ? (
@@ -1440,9 +1446,9 @@ export default function DeliveryOrderDetailPage() {
                               ) : null}
                               {(isOpen || isSent) ? (
                                 <>
-                                  <button className="btn sale-cart-line__action-btn" onClick={() => openItemNoteModal(row.itemId, row.note)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>Not</button>
+                                  <button className="btn sale-cart-line__action-btn sale-cart-line__action-btn--note" onClick={() => openItemNoteModal(row.itemId, row.note)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>{cartActionLabel('note')}</button>
                                   {isSent && (
-                                    <button className="btn sale-cart-line__action-btn" onClick={() => openItemCancelModal(row.itemId)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>İptal</button>
+                                    <button className="btn sale-cart-line__action-btn sale-cart-line__action-btn--cancel" onClick={() => openItemCancelModal(row.itemId)} disabled={disableBase || isMultiGroup} title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}>{cartActionLabel('cancel')}</button>
                                   )}
                                   {!isGrouped && (
                                     <input
@@ -1521,9 +1527,9 @@ export default function DeliveryOrderDetailPage() {
                     return (
                       <>
                         {openRender.map(r => renderLine(r, { type: 'open', grouped: cartViewMode === 'grouped' }))}
-                        {sentItems.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mutfağa Gönderilenler</div>}
+                        {sentItems.length > 0 && <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Mutfağa Gönderilenler</div>}
                         {buildCartRows(sentItems, cartViewMode, 's').map(r => renderLine(r, { type: 'sent', grouped: cartViewMode === 'grouped' }))}
-                        {otherItems.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>}
+                        {otherItems.length > 0 && <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>}
                         {otherRender.map(r => renderLine(r, { type: 'other', grouped: cartViewMode === 'grouped' }))}
                       </>
                     )

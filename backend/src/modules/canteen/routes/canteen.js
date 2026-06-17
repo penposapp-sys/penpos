@@ -32,13 +32,13 @@ const router = Router()
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }
+  limits: { fileSize: 1024 * 1024 }
 })
 
 const uploadSingleFile = (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (!err) return next()
-    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Dosya çok büyük (max 5MB)', 400))
+    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Görsel boyutu en fazla 1 MB olabilir.', 400))
     return next(error('invalid_upload', 'Dosya yükleme hatası', 400))
   })
 }
@@ -93,6 +93,8 @@ router.get('/catalog/products', canteenBranchListGuard, requireRole(['tenant_adm
 // Alias: products list should be accessible from POS / product view / settings
 router.post('/catalog/products', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createProduct)
 router.put('/catalog/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateProduct)
+router.post('/catalog/products/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), uploadSingleFile, catalogCtrl.uploadProductImage)
+router.delete('/catalog/products/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProductImage)
 router.delete('/catalog/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProduct)
 
 // Products (alias) - Branch dependent
@@ -154,6 +156,8 @@ router.get(
 )
 router.post('/products', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createProduct)
 router.put('/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateProduct)
+router.post('/products/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), uploadSingleFile, catalogCtrl.uploadProductImage)
+router.delete('/products/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProductImage)
 router.delete('/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProduct)
 
 router.post('/sales', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_POS_ACCESS]), salesCtrl.create)

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { resolveProductImageUrl } from '../../lib/productImage.js'
 
 export const PRODUCT_PLACEHOLDER = '/images/no-product.svg'
 export const LOGO_PLACEHOLDER = '/images/default-logo.svg'
@@ -59,7 +60,7 @@ function PreviewProductCard({ product, colors }) {
       }}
     >
       <img
-        src={product.imageUrl || PRODUCT_PLACEHOLDER}
+        src={resolveProductImageUrl({ imageUrl: product.imageUrl || PRODUCT_PLACEHOLDER })}
         onError={(event) => {
           event.currentTarget.src = PRODUCT_PLACEHOLDER
         }}
@@ -148,7 +149,7 @@ export default function CanteenQrPreview({
               }}
             >
               <img
-                src={logoUrl || LOGO_PLACEHOLDER}
+                src={resolveProductImageUrl({ imageUrl: logoUrl || LOGO_PLACEHOLDER })}
                 onError={(event) => {
                   event.currentTarget.src = LOGO_PLACEHOLDER
                 }}

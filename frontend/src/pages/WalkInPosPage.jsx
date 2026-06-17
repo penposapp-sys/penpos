@@ -15,9 +15,11 @@ import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 import ProductCard from '../components/ProductCard.jsx'
 import ProductImage from '../components/ProductImage.jsx'
-import { ServingType, normalizeServingType } from '../utils/servingType.js'
+import SaleCartLine from '../components/SaleCartLine.jsx'
+import { ServingType, normalizeServingType, servingTypeLabelTR } from '../utils/servingType.js'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
+import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalItemStatus } from '../lib/kitchenItemStatus.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
@@ -87,6 +89,22 @@ export default function WalkInPosPage() {
   const qtyDraftByRowRef = useRef({})
   const [cartViewMode, setCartViewMode] = useState('grouped')
   const [servingType, setServingType] = useState(ServingType.PLATE)
+  const cartActionLabel = (kind) => {
+    if (kind === 'cancel') return 'İptal'
+    return 'Not'
+  }
+  const servingTypeToggleLabel = (type) => {
+    if (!isMobilePortrait) {
+      if (type === ServingType.TRAY) return 'TEPSİ'
+      if (type === ServingType.PLATE) return 'TABAK'
+      if (type === ServingType.PACKAGE) return 'PAKET'
+      return servingTypeLabelTR(type) || '-'
+    }
+    if (type === ServingType.TRAY) return 'TEPSİ'
+    if (type === ServingType.PLATE) return 'TABAK'
+    if (type === ServingType.PACKAGE) return 'PAKET'
+    return servingTypeLabelTR(type) || '-'
+  }
 
   const [payMethods, setPayMethods] = useState([])
   const inflightRef = useRef(new Map())
@@ -1468,29 +1486,32 @@ export default function WalkInPosPage() {
 
               {error && <div style={{ color: '#ef4444', marginTop: 8 }}>{error}</div>}
 
-              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
-                    Toplu
-                  </button>
-                  <button className="btn btn--xs btn--toggle" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
-                    Ayrı
-                  </button>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn--xs btn--toggle" onClick={() => setServingType(ServingType.TRAY)} disabled={busy} aria-pressed={servingType === ServingType.TRAY}>
-                    TEPSİDE
-                  </button>
-                  <button className="btn btn--xs btn--toggle" onClick={() => setServingType(ServingType.PLATE)} disabled={busy} aria-pressed={servingType === ServingType.PLATE}>
-                    TABAKTA
-                  </button>
-                  <button className="btn btn--xs btn--toggle" onClick={() => setServingType(ServingType.PACKAGE)} disabled={busy} aria-pressed={servingType === ServingType.PACKAGE}>
-                    PAKET
-                  </button>
+              <div className="saleCartModeRow" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <div className="saleCartModeRowInner">
+                  <div className="saleCartModeGroup saleCartModeGroup--compact">
+                    <button className="btn btn--xs btn--toggle saleCartModeBtn" onClick={() => setCartViewMode('grouped')} disabled={busy} aria-pressed={cartViewMode === 'grouped'}>
+                      Toplu
+                    </button>
+                    <button className="btn btn--xs btn--toggle saleCartModeBtn" onClick={() => setCartViewMode('separate')} disabled={busy} aria-pressed={cartViewMode === 'separate'}>
+                      Ayrı
+                    </button>
+                  </div>
+                  <div className="saleCartModeDivider" aria-hidden="true" />
+                  <div className="saleCartModeGroup saleCartModeGroup--service">
+                    <button className="btn btn--xs btn--toggle saleCartModeBtn" onClick={() => setServingType(ServingType.TRAY)} disabled={busy} aria-pressed={servingType === ServingType.TRAY}>
+                      {servingTypeToggleLabel(ServingType.TRAY)}
+                    </button>
+                    <button className="btn btn--xs btn--toggle saleCartModeBtn" onClick={() => setServingType(ServingType.PLATE)} disabled={busy} aria-pressed={servingType === ServingType.PLATE}>
+                      {servingTypeToggleLabel(ServingType.PLATE)}
+                    </button>
+                    <button className="btn btn--xs btn--toggle saleCartModeBtn" onClick={() => setServingType(ServingType.PACKAGE)} disabled={busy} aria-pressed={servingType === ServingType.PACKAGE}>
+                      {servingTypeToggleLabel(ServingType.PACKAGE)}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+              <div className="saleCartSubRow" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar’a Düşsün</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
@@ -1545,10 +1566,10 @@ export default function WalkInPosPage() {
                   const raw = Array.isArray(order?.items) ? order.items : []
                   const openItems = raw.filter(it => it?.status === 'open')
                   const canShowPrep = effectiveKitchenEnabled !== false
-                  const prepItems = raw.filter(it => it?.status === 'sent' || it?.status === 'preparing')
+                  const prepItems = raw.filter(it => isKitchenActiveItemStatus(it?.status))
                   const sentItems = canShowPrep ? prepItems : []
                   const approvedItems = canShowPrep ? [] : prepItems
-                  const otherItems = raw.filter(it => it?.status === 'completed' || it?.status === 'cancelled')
+                  const otherItems = raw.filter(it => isKitchenTerminalItemStatus(it?.status))
 
                   const otherRender = buildCartRows(otherItems, cartViewMode, 'o')
                   const openRender = buildCartRows(openItems, cartViewMode, 'g')
@@ -1577,6 +1598,7 @@ export default function WalkInPosPage() {
                   const it = row.repr
                   const isOpen = opts.type === 'open'
                   const isSent = opts.type === 'sent'
+                  const isTerminal = opts.type === 'other'
                   const isGrouped = opts.grouped === true
                   const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
                   const isWeightBased = !!it?.isWeightBased
@@ -1596,48 +1618,32 @@ export default function WalkInPosPage() {
                   const detailText = isWeightBased
                     ? `${it?.priceSnapshot} TL/KG • ${weightGrams} gr`
                     : `${it?.priceSnapshot} TL • x${displayQty}`
+                  const badge = getKitchenItemStatusMeta(it?.status, { compact: true })
+
                   return (
-                      <div
-                        key={row.key}
-                        className="sale-cart-line"
-                        style={{
-                          opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
-                        }}
-                      >
-                        <div
-                          onClick={() => {
-                            if (isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId })
-                          }}
-                          className="sale-cart-line__info"
-                          style={{ ...(isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : {}) }}
-                        >
-                          <div className="sale-cart-line__meta">
-                            <div className="sale-cart-line-main">
-                              <div className="sale-cart-line__title">{it?.nameSnapshot}</div>
-                              {it?.status === 'sent' && (
-                                <span className="page-pill sale-cart-line-status" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}>
-                                  Hazırlanıyor
-                                </span>
-                              )}
-                              {it?.status === 'completed' && (
-                                <span className="page-pill sale-cart-line-status" style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857' }}>
-                                  Hazır
-                                </span>
-                              )}
-                              {it?.status === 'cancelled' && (
-                                <span className="page-pill sale-cart-line-status" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }}>
-                                  İptal
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="sale-cart-line__detail">{detailText}</div>
-                        <div className="sale-cart-line__actions">
+                    <SaleCartLine
+                      key={row.key}
+                      className={`walkin-cart-line${isTerminal ? ' sale-cart-line--terminal' : ''}`}
+                      style={{
+                        opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
+                      }}
+                      onInfoClick={() => {
+                        if (isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId })
+                      }}
+                      infoStyle={isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
+                      title={it?.nameSnapshot}
+                      badge={badge ? (
+                        <span className="page-pill sale-cart-line-status" style={{ background: badge.bg, borderColor: badge.border, color: badge.color }}>
+                          {badge.label}
+                        </span>
+                      ) : null}
+                      detail={detailText}
+                      actions={(
+                        <>
                           {isOpen && (
                             <>
                               <button
-                                className="btn sale-cart-line__action-btn"
+                                className="btn sale-cart-line__action-btn sale-cart-line__action-btn--note"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1657,7 +1663,7 @@ export default function WalkInPosPage() {
                                 -
                               </button>
                               <button
-                                className="btn sale-cart-line__action-btn"
+                                className="btn sale-cart-line__action-btn sale-cart-line__action-btn--note"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1677,7 +1683,7 @@ export default function WalkInPosPage() {
                                 +
                               </button>
                               <button
-                                className="btn sale-cart-line__action-btn"
+                                className="btn sale-cart-line__action-btn sale-cart-line__action-btn--cancel"
                                 onClick={() => {
                                   if (isMultiGroup) {
                                     toast.info('Bu işlem için Ayrı moduna geç')
@@ -1688,7 +1694,7 @@ export default function WalkInPosPage() {
                                 disabled={disableBase || isMultiGroup || isNoteLocked}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               >
-                                Not
+                                {cartActionLabel('note')}
                               </button>
                               {!isGrouped && (
                                 <input
@@ -1743,7 +1749,7 @@ export default function WalkInPosPage() {
                                 disabled={disableBase || isNoteLocked || isMultiGroup}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               >
-                                Not
+                                {cartActionLabel('note')}
                               </button>
                               <button
                                 className="btn sale-cart-line__action-btn"
@@ -1759,29 +1765,30 @@ export default function WalkInPosPage() {
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                                 style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' }}
                               >
-                                İptal
+                                {cartActionLabel('cancel')}
                               </button>
                             </>
                           )}
-                          <div className="sale-cart-line__price">{row.subtotal} TL</div>
-                        </div>
-                      </div>
-                    )
+                        </>
+                      )}
+                      price={`${row.subtotal} TL`}
+                    />
+                  )
                   }
 
                   return (
                     <>
                       {openRender.map(r => renderLine(r, { type: 'open', grouped: cartViewMode === 'grouped' }))}
                       {sentItems.length > 0 && (
-                        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar</div>
+                        <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar</div>
                       )}
                       {sentRender.map(r => renderLine(r, { type: 'sent', grouped: cartViewMode === 'grouped' }))}
 
                       {approvedItems.length > 0 && (
-                        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>Onaylanan Ürünler</div>
+                        <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Onaylanan Ürünler</div>
                       )}
                       {approvedRender.map(r => renderLine(r, { type: 'sent', grouped: cartViewMode === 'grouped' }))}
-                      {otherItems.length > 0 && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>}
+                      {otherItems.length > 0 && <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>}
                       {otherRender.map(r => renderLine(r, { type: 'other', grouped: cartViewMode === 'grouped' }))}
                     </>
                   )

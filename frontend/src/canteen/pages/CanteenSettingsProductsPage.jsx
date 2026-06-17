@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import ProductImageUploadField from '../../components/ProductImageUploadField.jsx'
 import { api } from '../../lib/apiClient.js'
+import { resolveProductImageUrl } from '../../lib/productImage.js'
 import { toast } from '../../lib/toast.js'
 import Modal from '../../components/Modal.jsx'
 import CanteenBulkProductsExcelCard from '../components/CanteenBulkProductsExcelCard.jsx'
@@ -63,6 +65,8 @@ export default function CanteenSettingsProductsPage() {
   const [buyPrice, setBuyPrice] = useState('')
   const [sellPrice, setSellPrice] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [imageFile, setImageFile] = useState(null)
+  const [imageError, setImageError] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [stockTrackingEnabled, setStockTrackingEnabled] = useState(false)
   const [stockQty, setStockQty] = useState('')
@@ -77,6 +81,8 @@ export default function CanteenSettingsProductsPage() {
   const [editBuyPrice, setEditBuyPrice] = useState('')
   const [editSellPrice, setEditSellPrice] = useState('')
   const [editImageUrl, setEditImageUrl] = useState('')
+  const [editImageFile, setEditImageFile] = useState(null)
+  const [editImageError, setEditImageError] = useState('')
   const [editCategoryId, setEditCategoryId] = useState('')
   const [editStockTrackingEnabled, setEditStockTrackingEnabled] = useState(false)
   const [editStockQty, setEditStockQty] = useState('')
@@ -195,14 +201,32 @@ export default function CanteenSettingsProductsPage() {
     setBuyPrice('')
     setSellPrice('')
     setImageUrl('')
+    setImageFile(null)
+    setImageError('')
     setCategoryId('')
     setStockTrackingEnabled(false)
     setStockQty('')
   }
 
+  const uploadProductImage = async (productId, file, branchId) => {
+    if (!productId || !file || !branchId) return null
+    const formData = new FormData()
+    formData.append('file', file)
+    return api(`/api/canteen/products/${encodeURIComponent(productId)}/image?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'POST',
+      body: formData,
+      silent: true
+    })
+  }
+
   const create = async (event) => {
     event.preventDefault()
     if (!canManage) return
+    if (imageError) {
+      setError(imageError)
+      toast.error(imageError)
+      return
+    }
 
     const branchId = String(selectedBranchId || '').trim()
     if (!branchId) {
@@ -257,6 +281,13 @@ export default function CanteenSettingsProductsPage() {
       return
     }
 
+    if (response?.product?.id && imageFile) {
+      const uploadResponse = await uploadProductImage(response.product.id, imageFile, branchId)
+      if (!uploadResponse?.ok) {
+        toast.error(uploadResponse?.message || 'Görsel yüklenemedi')
+      }
+    }
+
     resetCreateForm()
     load(branchId)
     toast.success('Ürün eklendi')
@@ -269,6 +300,8 @@ export default function CanteenSettingsProductsPage() {
     setEditBuyPrice(String(item?.costPrice ?? ''))
     setEditSellPrice(String(item?.price ?? ''))
     setEditImageUrl(String(item?.imageUrl || ''))
+    setEditImageFile(null)
+    setEditImageError('')
     setEditCategoryId(String(item?.categoryId || ''))
     setEditStockTrackingEnabled(item?.stockTrackingEnabled === true)
     setEditStockQty(String(item?.stockQty ?? ''))
@@ -277,6 +310,10 @@ export default function CanteenSettingsProductsPage() {
 
   const submitEdit = async () => {
     if (!canManage) return
+    if (editImageError) {
+      toast.error(editImageError)
+      return
+    }
     const branchId = String(selectedBranchId || '').trim()
     const id = String(editId || '').trim()
     if (!branchId || !id) return
@@ -312,9 +349,35 @@ export default function CanteenSettingsProductsPage() {
       return
     }
 
+    if (editImageFile) {
+      const uploadResponse = await uploadProductImage(id, editImageFile, branchId)
+      if (!uploadResponse?.ok) {
+        toast.error(uploadResponse?.message || 'Görsel yüklenemedi')
+        return
+      }
+    }
+
     toast.success('Ürün güncellendi')
     setEditOpen(false)
     load(branchId)
+  }
+
+  const removeEditImage = async () => {
+    const branchId = String(selectedBranchId || '').trim()
+    const id = String(editId || '').trim()
+    if (!branchId || !id) return
+    const response = await api(`/api/canteen/products/${encodeURIComponent(id)}/image?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'DELETE',
+      silent: true
+    })
+    if (!response?.ok) {
+      toast.error(response?.message || 'Görsel kaldırılamadı')
+      return
+    }
+    setEditImageUrl('')
+    setEditImageFile(null)
+    setEditImageError('')
+    toast.success('Görsel kaldırıldı')
   }
 
   const remove = async (id) => {
@@ -525,8 +588,21 @@ export default function CanteenSettingsProductsPage() {
               </select>
             </label>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Resim URL</div>
-              <input className="input" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} disabled={!canManage} placeholder="https://..." />
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel Yükle</div>
+              <ProductImageUploadField
+                currentImageUrl=""
+                file={imageFile}
+                error={imageError}
+                disabled={!canManage}
+                onFileChange={(nextFile, validationMessage) => {
+                  setImageError(validationMessage || '')
+                  setImageFile(validationMessage ? null : nextFile)
+                }}
+                onClearFile={() => {
+                  setImageFile(null)
+                  setImageError('')
+                }}
+              />
             </label>
             <button className="btn btn--primary btn--full" type="submit" disabled={!isCreateFormValid}>Ekle</button>
           </div>
@@ -570,7 +646,7 @@ export default function CanteenSettingsProductsPage() {
             <div key={item.id} className="products-row-card" style={{ display: 'grid', gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : '1fr auto', gap: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 12, alignItems: 'center' }}>
               <div className="products-row-main" style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
                 <img
-                  src={item.imageUrl || PRODUCT_PLACEHOLDER}
+                  src={resolveProductImageUrl({ imageUrl: item.imageUrl || PRODUCT_PLACEHOLDER })}
                   onError={(event) => { event.currentTarget.src = PRODUCT_PLACEHOLDER }}
                   alt={item.name}
                   style={{ width: 54, height: 54, borderRadius: 16, objectFit: 'cover', background: '#f8fafc', flexShrink: 0 }}
@@ -621,8 +697,22 @@ export default function CanteenSettingsProductsPage() {
             </select>
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Resim URL</div>
-            <input className="input" value={editImageUrl} onChange={(event) => setEditImageUrl(event.target.value)} disabled={!canManage} placeholder="https://..." />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel Yükle</div>
+            <ProductImageUploadField
+              currentImageUrl={editImageUrl}
+              file={editImageFile}
+              error={editImageError}
+              disabled={!canManage}
+              onFileChange={(nextFile, validationMessage) => {
+                setEditImageError(validationMessage || '')
+                setEditImageFile(validationMessage ? null : nextFile)
+              }}
+              onClearFile={() => {
+                setEditImageFile(null)
+                setEditImageError('')
+              }}
+              onRemoveExisting={removeEditImage}
+            />
           </label>
           <div className="stackRow" style={{ justifyContent: 'space-between' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

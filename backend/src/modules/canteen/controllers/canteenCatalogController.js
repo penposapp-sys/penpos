@@ -73,6 +73,24 @@ export const removeProduct = async (req, res) => {
   }
 }
 
+export const uploadProductImage = async (req, res) => {
+  try {
+    const product = await service.uploadProductImage(req.user.tenantId, req.canteenBranchId, req.params.id, req.file)
+    res.json({ success: true, product })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const removeProductImage = async (req, res) => {
+  try {
+    const product = await service.removeProductImage(req.user.tenantId, req.canteenBranchId, req.params.id)
+    res.json({ success: true, product })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const getProductByBarcode = async (req, res) => {
   try {
     const product = await service.getProductByBarcode(req.user.tenantId, req.canteenBranchId, req.params.barcode)

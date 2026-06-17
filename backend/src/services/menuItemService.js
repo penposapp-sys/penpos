@@ -5,6 +5,7 @@ import MenuItem from '../models/MenuItem.js'
 import Branch from '../models/Branch.js'
 import { getTenantPlan, ensureNotExpired } from './planService.js'
 import { documentBranchIds, normalizeVisibilityPayload } from '../utils/branchVisibility.js'
+import { deleteProductImageFile, replaceProductImageFile } from '../utils/productImageStorage.js'
 
 const validateBranchIds = async (tenantId, branchIds) => {
   if (!Array.isArray(branchIds) || branchIds.length === 0) return []
@@ -175,6 +176,29 @@ export const deleteMenuItemService = async (tenantId, actorUserId, id) => {
   const i = await findByIdAndTenant(id, tenantId)
   if (!i) throw error('not_found', 'Item not found', 404)
   await deleteByIdAndTenant(id, tenantId)
+  await deleteProductImageFile(i.imageUrl)
   await (await import('./auditService.js')).log(tenantId, actorUserId, 'urun_silindi', 'MenuItem', i.id, { name: i.name || '' })
   return { id: i.id, deleted: true }
+}
+
+export const uploadMenuItemImageService = async (tenantId, id, file) => {
+  const item = await findByIdAndTenant(id, tenantId)
+  if (!item || item.isDeleted === true || item.status === 'deleted') {
+    throw error('not_found', 'Item not found', 404)
+  }
+
+  const saved = await replaceProductImageFile(item.imageUrl, file)
+  const updated = await updateById(id, { imageUrl: saved.imageUrl })
+  return toMenuItemDto(updated)
+}
+
+export const removeMenuItemImageService = async (tenantId, id) => {
+  const item = await findByIdAndTenant(id, tenantId)
+  if (!item || item.isDeleted === true || item.status === 'deleted') {
+    throw error('not_found', 'Item not found', 404)
+  }
+
+  await deleteProductImageFile(item.imageUrl)
+  const updated = await updateById(id, { imageUrl: '' })
+  return toMenuItemDto(updated)
 }
