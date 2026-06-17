@@ -94,6 +94,7 @@ export default function PosPage() {
   const branchReadyRef = useRef(false)
   const orderRef = useRef(null)
   const tableIdRef = useRef(null)
+  const currentOrderIdRef = useRef(null)
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
   const [, setLockTick] = useState(0)
@@ -615,6 +616,10 @@ export default function PosPage() {
   }, [tableId])
 
   useEffect(() => {
+    currentOrderIdRef.current = getOrderId(order)
+  }, [order])
+
+  useEffect(() => {
     return () => {
       const tId = tableIdRef.current || orderRef.current?.tableId || null
       const o = orderRef.current
@@ -661,7 +666,7 @@ export default function PosPage() {
 
   const addItem = useCallback(async (menuItem) => {
     setError('')
-    const orderId = currentOrderId
+    const orderId = currentOrderIdRef.current
     if (!orderId) {
       toast.error('Sipariş bulunamadı')
       setError('Sipariş bulunamadı')
@@ -696,7 +701,7 @@ export default function PosPage() {
       setOrder(fresh)
       setNote(fresh.note || '')
     }
-  }, [currentOrderId])
+  }, [])
 
   const {
     containerRef: productScrollRef,

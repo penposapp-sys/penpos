@@ -112,6 +112,7 @@ export default function WalkInPosPage() {
   const [payMethods, setPayMethods] = useState([])
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
+  const currentOrderIdRef = useRef(null)
   const [, setLockTick] = useState(0)
   const itemsApiCallCountRef = useRef(0)
   const categoryPerfRef = useRef(null)
@@ -569,9 +570,13 @@ export default function WalkInPosPage() {
 
   const currentOrderId = selectedOrderId || getOrderId(order)
 
+  useEffect(() => {
+    currentOrderIdRef.current = selectedOrderId || getOrderId(order)
+  }, [order, selectedOrderId])
+
   const addItem = useCallback(async (menuItem) => {
     setError('')
-    const orderId = currentOrderId
+    const orderId = currentOrderIdRef.current
     if (!orderId) {
       toast.error('Sipariş bulunamadı')
       setError('Sipariş bulunamadı')
@@ -606,7 +611,7 @@ export default function WalkInPosPage() {
       setOrder(fresh)
       setNote(fresh.note || '')
     }
-  }, [currentOrderId])
+  }, [])
 
   const {
     containerRef: productScrollRef,

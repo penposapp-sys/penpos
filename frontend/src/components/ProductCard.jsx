@@ -26,15 +26,15 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null, showI
   }, [productId])
 
   return (
-    <div
+    <button
       ref={measureRef}
       className="card productCard productCard--photo"
       data-has-image={showImage ? 'true' : 'false'}
       data-disabled={disabled ? 'true' : 'false'}
       onClick={handleClick}
-      role="button"
-      tabIndex={disabled ? -1 : 0}
+      type="button"
       aria-disabled={disabled ? 'true' : 'false'}
+      disabled={disabled}
       onKeyDown={handleKeyDown}
     >
       {showImage ? (
@@ -55,7 +55,7 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null, showI
         <div className="productCard__name">{name}</div>
         <div className="productCard__price">{price} TL{isWeightBased ? '/KG' : ''}</div>
       </div>
-    </div>
+    </button>
   )
 }
 

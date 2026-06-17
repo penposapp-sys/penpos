@@ -64,15 +64,6 @@ function SaleCategorySidebar({
     moveDragging(getClientX(event))
   }, [moveDragging])
 
-  const handleTouchStart = useCallback((event) => {
-    startDragging(getClientX(event))
-  }, [startDragging])
-
-  const handleTouchMove = useCallback((event) => {
-    const moved = moveDragging(getClientX(event))
-    if (moved) event.preventDefault()
-  }, [moveDragging])
-
   const stopDragging = useCallback(() => {
     dragState.current.isDown = false
   }, [])
@@ -110,10 +101,6 @@ function SaleCategorySidebar({
         onMouseMove={handleMouseMove}
         onMouseUp={stopDragging}
         onMouseLeave={stopDragging}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={stopDragging}
-        onTouchCancel={stopDragging}
         onWheel={handleWheel}
       >
         {categories.map(c => (

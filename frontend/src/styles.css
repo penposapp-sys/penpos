@@ -3683,6 +3683,11 @@ body.modal-open .qr-menu .menu-row:hover {
   background: #f3f4f6;
   aspect-ratio: 16 / 9;
   padding: 0;
+  border: 1px solid var(--app-border, var(--border));
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: manipulation;
 }
 
 .productCard__img {
@@ -3765,6 +3770,12 @@ body.modal-open .qr-menu .menu-row:hover {
 .productCard[data-has-image="false"] .productCard__name,
 .productCard[data-has-image="false"] .productCard__price {
   color: var(--app-text, var(--text));
+}
+
+.saleCategoryButton,
+.kasaProductCard,
+.kasaCategoryCard {
+  touch-action: manipulation;
 }
 
 .tablesGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px }
