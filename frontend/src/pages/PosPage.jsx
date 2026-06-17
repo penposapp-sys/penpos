@@ -38,6 +38,8 @@ export default function PosPage() {
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
   const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
   const returnToOpenTablesAfterOrder = getSetting('order.returnToOpenTablesAfterOrder', false) === true
+  const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
+  const showProductImages = !isMobilePortrait || showMobileProductImages
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const [categories, setCategories] = useState([])
@@ -1851,6 +1853,7 @@ export default function PosPage() {
                   item={i}
                   onClick={addItem}
                   measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null}
+                  showImage={showProductImages}
                 />
               ))}
             </div>

@@ -2,7 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo } from 'react'
 import ProductImage from './ProductImage.jsx'
 import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
-function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
+function ProductCard({ item, disabled = false, onClick, measureRef = null, showImage = true }) {
   const price = item?.price
   const isWeightBased = !!item?.isWeightBased
   const name = item?.name
@@ -29,6 +29,7 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
     <div
       ref={measureRef}
       className="card productCard productCard--photo"
+      data-has-image={showImage ? 'true' : 'false'}
       data-disabled={disabled ? 'true' : 'false'}
       onClick={handleClick}
       role="button"
@@ -36,16 +37,20 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
       aria-disabled={disabled ? 'true' : 'false'}
       onKeyDown={handleKeyDown}
     >
-      <ProductImage
-        className="productCard__img"
-        product={item}
-        alt={String(name || '')}
-        width={96}
-        height={96}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        loading="lazy"
-      />
-      <div className="productCard__overlay" />
+      {showImage ? (
+        <>
+          <ProductImage
+            className="productCard__img"
+            product={item}
+            alt={String(name || '')}
+            width={96}
+            height={96}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            loading="lazy"
+          />
+          <div className="productCard__overlay" />
+        </>
+      ) : null}
       <div className="productCard__content">
         <div className="productCard__name">{name}</div>
         <div className="productCard__price">{price} TL{isWeightBased ? '/KG' : ''}</div>
@@ -61,6 +66,7 @@ export default memo(ProductCard, (prev, next) => {
     prev.disabled === next.disabled &&
     prev.onClick === next.onClick &&
     prev.measureRef === next.measureRef &&
+    prev.showImage === next.showImage &&
     String(prevItem?.id || prevItem?._id || '') === String(nextItem?.id || nextItem?._id || '') &&
     String(prevItem?.name || '') === String(nextItem?.name || '') &&
     String(prevItem?.imageUrl || '') === String(nextItem?.imageUrl || '') &&

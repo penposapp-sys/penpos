@@ -1,6 +1,12 @@
 import React, { memo, useCallback, useEffect, useRef } from 'react'
 import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
+function getClientX(event) {
+  if (typeof event?.clientX === 'number') return event.clientX
+  const touch = event?.touches?.[0] || event?.changedTouches?.[0]
+  return typeof touch?.clientX === 'number' ? touch.clientX : null
+}
+
 function SaleCategorySidebar({
   title = 'Kategoriler',
   categories = [],
@@ -16,6 +22,30 @@ function SaleCategorySidebar({
   })
   const handleSelect = useCallback((categoryId) => onSelect?.(categoryId), [onSelect])
 
+  const startDragging = useCallback((clientX) => {
+    const el = scrollRef.current
+    if (!el || typeof clientX !== 'number') return
+
+    dragState.current.isDown = true
+    dragState.current.startX = clientX - el.getBoundingClientRect().left
+    dragState.current.scrollLeft = el.scrollLeft
+    dragState.current.moved = false
+  }, [])
+
+  const moveDragging = useCallback((clientX) => {
+    const el = scrollRef.current
+    const state = dragState.current
+    if (!el || !state.isDown || typeof clientX !== 'number') return false
+
+    const x = clientX - el.getBoundingClientRect().left
+    const walk = x - state.startX
+
+    if (Math.abs(walk) > 5) state.moved = true
+
+    el.scrollLeft = state.scrollLeft - walk
+    return state.moved
+  }, [])
+
   const handleWheel = useCallback((event) => {
     const el = scrollRef.current
     if (!el) return
@@ -27,27 +57,21 @@ function SaleCategorySidebar({
   }, [])
 
   const handleMouseDown = useCallback((event) => {
-    const el = scrollRef.current
-    if (!el) return
-
-    dragState.current.isDown = true
-    dragState.current.startX = event.pageX - el.offsetLeft
-    dragState.current.scrollLeft = el.scrollLeft
-    dragState.current.moved = false
-  }, [])
+    startDragging(getClientX(event))
+  }, [startDragging])
 
   const handleMouseMove = useCallback((event) => {
-    const el = scrollRef.current
-    const state = dragState.current
-    if (!el || !state.isDown) return
+    moveDragging(getClientX(event))
+  }, [moveDragging])
 
-    const x = event.pageX - el.offsetLeft
-    const walk = x - state.startX
+  const handleTouchStart = useCallback((event) => {
+    startDragging(getClientX(event))
+  }, [startDragging])
 
-    if (Math.abs(walk) > 5) state.moved = true
-
-    el.scrollLeft = state.scrollLeft - walk
-  }, [])
+  const handleTouchMove = useCallback((event) => {
+    const moved = moveDragging(getClientX(event))
+    if (moved) event.preventDefault()
+  }, [moveDragging])
 
   const stopDragging = useCallback(() => {
     dragState.current.isDown = false
@@ -86,6 +110,10 @@ function SaleCategorySidebar({
         onMouseMove={handleMouseMove}
         onMouseUp={stopDragging}
         onMouseLeave={stopDragging}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={stopDragging}
+        onTouchCancel={stopDragging}
         onWheel={handleWheel}
       >
         {categories.map(c => (

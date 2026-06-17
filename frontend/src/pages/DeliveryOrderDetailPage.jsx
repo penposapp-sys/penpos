@@ -30,6 +30,8 @@ export default function DeliveryOrderDetailPage() {
   const canCreateVeresiye = hasPerm('create_veresiye')
   const { getSetting } = useBusinessSettings()
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
+  const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
+  const showProductImages = !isMobilePortrait || showMobileProductImages
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const canManageDelivery = hasPerm('manage_delivery')
@@ -1356,6 +1358,7 @@ export default function DeliveryOrderDetailPage() {
                         item={i}
                         disabled={tab === 'delivered'}
                         onClick={() => addItem(i.id)}
+                        showImage={showProductImages}
                       />
                     ))}
                   </div>

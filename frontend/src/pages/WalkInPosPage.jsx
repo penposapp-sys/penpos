@@ -40,6 +40,8 @@ export default function WalkInPosPage() {
   const { getSetting } = useBusinessSettings()
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
   const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
+  const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
+  const showProductImages = !isMobilePortrait || showMobileProductImages
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const [categories, setCategories] = useState([])
@@ -1472,7 +1474,7 @@ export default function WalkInPosPage() {
                 {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}
                 <div ref={productGridMeasureRef} className="posItemsGrid">
                   {visibleMenuItems.map((i, index) => (
-                  <ProductCard key={i.id} item={i} onClick={addItem} measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null} />
+                  <ProductCard key={i.id} item={i} onClick={addItem} measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null} showImage={showProductImages} />
                   ))}
                 </div>
                 {productsVirtualized ? <div style={{ height: bottomProductSpacer }} aria-hidden="true" /> : null}

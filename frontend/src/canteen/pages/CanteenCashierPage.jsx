@@ -2,6 +2,7 @@ import React, { memo, startTransition, useCallback, useEffect, useMemo, useRef, 
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
+import { useBusinessSettings } from '../../context/BusinessSettingsContext.jsx'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
@@ -34,7 +35,8 @@ const normalizePaymentType = (method = {}) => {
 const CashierCategoryRail = memo(function CashierCategoryRail({
   categories,
   activeCategoryId,
-  onSelectCategory
+  onSelectCategory,
+  showImages = true
 }) {
   incrementPerfCounter('sidebarRenders', 'CanteenCashierCategoryRail')
   return (
@@ -47,18 +49,21 @@ const CashierCategoryRail = memo(function CashierCategoryRail({
             type="button"
             className="kasaCategoryCard"
             data-active={isActive ? 'true' : 'false'}
+            data-has-image={showImages ? 'true' : 'false'}
             onClick={() => onSelectCategory(String(category.id))}
           >
-            <img
-              className="kasaCategoryCardImage"
-              src={resolveProductImageUrl({ imageUrl: category.imageUrl || IMAGE_PLACEHOLDER })}
-              alt={category.name}
-              loading="lazy"
-              decoding="async"
-              width="92"
-              height="92"
-              onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
-            />
+            {showImages ? (
+              <img
+                className="kasaCategoryCardImage"
+                src={resolveProductImageUrl({ imageUrl: category.imageUrl || IMAGE_PLACEHOLDER })}
+                alt={category.name}
+                loading="lazy"
+                decoding="async"
+                width="92"
+                height="92"
+                onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
+              />
+            ) : null}
             <div className="kasaCategoryCardBody">
               <span>{category.name}</span>
             </div>
@@ -79,7 +84,8 @@ const CashierProductCard = memo(function CashierProductCard({
   style,
   themeText,
   accentText,
-  measureRef = null
+  measureRef = null,
+  showImage = true
 }) {
   const hasImage = String(product?.imageUrl || '').trim().length > 0
   const disableImages = isProductImagesDisabled()
@@ -97,11 +103,11 @@ const CashierProductCard = memo(function CashierProductCard({
       ref={measureRef}
       type="button"
       className="card kasaProductCard"
-      data-has-image={hasImage && !disableImages ? 'true' : 'false'}
+      data-has-image={showImage && hasImage && !disableImages ? 'true' : 'false'}
       onClick={handleClick}
       style={{ ...style, cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 6 }}
     >
-      {hasImage && !disableImages ? (
+      {showImage && hasImage && !disableImages ? (
         <img
           className="kasaProductCardImage"
           src={resolveProductImageUrl({ imageUrl: product.imageUrl })}
@@ -143,6 +149,7 @@ const CashierProductCard = memo(function CashierProductCard({
     prev.themeText === next.themeText &&
     prev.accentText === next.accentText &&
     prev.measureRef === next.measureRef &&
+    prev.showImage === next.showImage &&
     prev.branchName === next.branchName &&
     normalizeId(prevProduct.id || prevProduct._id) === normalizeId(nextProduct.id || nextProduct._id) &&
     String(prevProduct.name || '') === String(nextProduct.name || '') &&
@@ -155,10 +162,13 @@ const CashierProductCard = memo(function CashierProductCard({
 })
 
 export default function CanteenCashierPage() {
+  const { getSetting } = useBusinessSettings()
   const perfDebugEnabled = isPerfDebugEnabled()
   const { me, session } = useOutletContext()
   const { theme, themeKey } = useTheme()
   const { isMobilePortrait } = useResponsiveFlags()
+  const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
+  const showProductImages = !isMobilePortrait || showMobileProductImages
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [q, setQ] = useState('')
@@ -1111,6 +1121,7 @@ export default function CanteenCashierPage() {
               categories={categories}
               activeCategoryId={activeCategoryId}
               onSelectCategory={handleCategorySelect}
+              showImages={showProductImages}
             />
             <div
               ref={productScrollRef}
@@ -1128,6 +1139,7 @@ export default function CanteenCashierPage() {
                     themeText={theme.text}
                     accentText={theme.accentText}
                     measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null}
+                    showImage={showProductImages}
                   />
                 ))}
                 {!loadingProducts && visibleProducts.length === 0 && <div style={{ color: 'var(--app-text-secondary, var(--muted))' }}>Ürün yok</div>}
