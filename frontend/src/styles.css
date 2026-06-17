@@ -5970,7 +5970,6 @@ textarea::placeholder {
     overscroll-behavior-x: contain;
     touch-action: pan-x;
     pointer-events: auto;
-    scroll-behavior: smooth;
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
@@ -5995,10 +5994,10 @@ textarea::placeholder {
     white-space: nowrap;
   }
   body.sales-mobile-scroll .saleProductsPanel {
-    max-height: none;
+    max-height: calc(100dvh - 280px);
     min-height: 0;
-    height: auto;
-    align-self: start;
+    height: 100%;
+    align-self: stretch;
   }
   body.sales-mobile-scroll .saleCartPanelShell {
     min-height: 0;
@@ -6031,18 +6030,22 @@ textarea::placeholder {
     padding-right: 0;
   }
   body.sales-mobile-scroll .salePanelScroll.saleProductsVirtualScroll {
-    overflow-y: visible;
+    overflow-y: auto;
     overflow-x: hidden;
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     min-height: 0;
-    max-height: none;
+    max-height: 100%;
     padding-right: 0;
     padding-top: 6px !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   body.mobile-sales-mode .kasaProductGridScroll.kasaProductVirtualScroll {
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   body.sales-mobile-scroll .saleCartList {
     overflow-y: auto;
@@ -6156,10 +6159,10 @@ textarea::placeholder {
 
   .saleProductsVirtualScroll,
   .kasaProductVirtualScroll {
-    transform: translateZ(0);
-    will-change: transform;
-    backface-visibility: hidden;
-    contain: strict;
+    transform: none;
+    will-change: auto;
+    backface-visibility: visible;
+    contain: layout paint style;
   }
 
   body.sales-mobile-scroll .saleProductsVirtualScroll .productCard,
