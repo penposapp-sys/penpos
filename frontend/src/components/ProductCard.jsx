@@ -23,7 +23,7 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null }) {
     if (renderCount > 0 && renderCount <= 2) {
       logPerf('ProductCard', 'render', { productId, renderCount })
     }
-  })
+  }, [productId])
 
   return (
     <div

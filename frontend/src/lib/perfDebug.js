@@ -1,5 +1,6 @@
 const PERF_DEBUG_KEY = 'penposPerfDebug'
 const DISABLE_IMAGES_KEY = 'penposDisableProductImages'
+const flagCache = new Map()
 
 function readFlag(key) {
   try {
@@ -9,12 +10,39 @@ function readFlag(key) {
   }
 }
 
+function readCachedFlag(key) {
+  if (flagCache.has(key)) return flagCache.get(key) === true
+  const nextValue = readFlag(key)
+  flagCache.set(key, nextValue)
+  return nextValue
+}
+
+function refreshCachedFlags() {
+  flagCache.set(PERF_DEBUG_KEY, readFlag(PERF_DEBUG_KEY))
+  flagCache.set(DISABLE_IMAGES_KEY, readFlag(DISABLE_IMAGES_KEY))
+}
+
+try {
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('storage', (event) => {
+      const changedKey = String(event?.key || '')
+      if (!changedKey || changedKey === PERF_DEBUG_KEY || changedKey === DISABLE_IMAGES_KEY) {
+        refreshCachedFlags()
+      }
+    })
+    window.addEventListener('focus', refreshCachedFlags)
+    document?.addEventListener?.('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refreshCachedFlags()
+    })
+  }
+} catch {}
+
 export function isPerfDebugEnabled() {
-  return readFlag(PERF_DEBUG_KEY)
+  return readCachedFlag(PERF_DEBUG_KEY)
 }
 
 export function isProductImagesDisabled() {
-  return readFlag(DISABLE_IMAGES_KEY)
+  return readCachedFlag(DISABLE_IMAGES_KEY)
 }
 
 export function getPerfNow() {

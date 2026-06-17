@@ -23,9 +23,10 @@ import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalI
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
-import { diffPerfCounter, getPerfNow, incrementPerfCounter, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
+import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
 
 export default function PosPage() {
+  const perfDebugEnabled = isPerfDebugEnabled()
   const nav = useNavigate()
   const location = useLocation()
   const { user, allowedBranchIds } = useAuth()
@@ -713,6 +714,7 @@ export default function PosPage() {
   })
 
   useEffect(() => {
+    if (!perfDebugEnabled) return
     if (!categoryPerfRef.current) return
     const renderedDomCount = productScrollRef.current
       ? productScrollRef.current.querySelectorAll('.productCard').length
@@ -732,10 +734,10 @@ export default function PosPage() {
       renderedDomCount
     })
     categoryPerfRef.current = null
-  }, [activeCategory, filteredItems.length, productScrollRef, visibleMenuItems.length])
+  }, [activeCategory, filteredItems.length, perfDebugEnabled, productScrollRef, visibleMenuItems.length])
 
   useEffect(() => {
-    if (!isMobilePortrait) return
+    if (!isMobilePortrait || !perfDebugEnabled || !productGridDebug) return
     const frame = requestAnimationFrame(() => {
       const renderedDomCount = productScrollRef.current
         ? productScrollRef.current.querySelectorAll('.productCard').length
@@ -746,10 +748,10 @@ export default function PosPage() {
       })
     })
     return () => cancelAnimationFrame(frame)
-  }, [isMobilePortrait, productGridDebug, productScrollRef])
+  }, [isMobilePortrait, perfDebugEnabled, productGridDebug, productScrollRef])
 
   useEffect(() => {
-    if (!isMobilePortrait) return
+    if (!isMobilePortrait || !perfDebugEnabled || !productGridDebug) return
     const frame = requestAnimationFrame(() => {
       const renderedDomCount = productScrollRef.current
         ? productScrollRef.current.querySelectorAll('.productCard').length
@@ -757,9 +759,10 @@ export default function PosPage() {
       logPerf('PosPage', 'virtual-grid-window', { ...productGridDebug, renderedDomCount })
     })
     return () => cancelAnimationFrame(frame)
-  }, [isMobilePortrait, productGridDebug, productScrollRef, topProductSpacer, bottomProductSpacer])
+  }, [isMobilePortrait, perfDebugEnabled, productGridDebug, productScrollRef, topProductSpacer, bottomProductSpacer])
 
   useEffect(() => {
+    if (!perfDebugEnabled) return
     const nextSignature = JSON.stringify(
       Array.isArray(order?.items)
         ? order.items.map((item) => ({
@@ -785,7 +788,7 @@ export default function PosPage() {
     })
     lastCartSignatureRef.current = nextSignature
     cartRenderSnapshotRef.current = delta.current
-  }, [order?.items, visibleMenuItems])
+  }, [order?.items, perfDebugEnabled, visibleMenuItems])
 
   const openReceiptPreview = async () => {
     const orderId = getOrderId(order)

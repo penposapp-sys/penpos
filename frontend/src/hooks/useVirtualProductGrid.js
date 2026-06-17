@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
+import { incrementPerfCounter, isPerfDebugEnabled, logPerf } from '../lib/perfDebug.js'
 
 const DEFAULT_MIN_CARD_WIDTH = 116
 const DEFAULT_GRID_GAP = 8
@@ -16,6 +16,7 @@ export function useVirtualProductGrid({
   bufferRows = DEFAULT_BUFFER_ROWS,
   resetDeps = []
 }) {
+  const perfDebugEnabled = isPerfDebugEnabled()
   const containerRef = useRef(null)
   const gridMeasureRef = useRef(null)
   const cardMeasureRef = useRef(null)
@@ -147,22 +148,25 @@ export function useVirtualProductGrid({
     return items.slice(virtual.startIndex, virtual.endIndex)
   }, [enabled, items, virtual])
 
-  const debugState = useMemo(() => ({
-    debugKey,
-    totalProducts: items.length,
-    visibleCount: visibleItems.length,
-    startIndex: virtual?.startIndex ?? 0,
-    endIndex: virtual?.endIndex ?? items.length,
-    columns: virtual?.columns ?? 1,
-    totalRows: virtual?.totalRows ?? Math.ceil(items.length || 0),
-    scrollEventCount: scrollEventCountRef.current,
-    scrollStateUpdateCount: scrollStateUpdateCountRef.current
-  }), [debugKey, items.length, visibleItems.length, virtual])
+  const debugState = useMemo(() => {
+    if (!perfDebugEnabled) return null
+    return {
+      debugKey,
+      totalProducts: items.length,
+      visibleCount: visibleItems.length,
+      startIndex: virtual?.startIndex ?? 0,
+      endIndex: virtual?.endIndex ?? items.length,
+      columns: virtual?.columns ?? 1,
+      totalRows: virtual?.totalRows ?? Math.ceil(items.length || 0),
+      scrollEventCount: scrollEventCountRef.current,
+      scrollStateUpdateCount: scrollStateUpdateCountRef.current
+    }
+  }, [debugKey, items.length, perfDebugEnabled, visibleItems.length, virtual])
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !perfDebugEnabled || !debugState) return
     logPerf(`VirtualGrid:${debugKey}`, 'window', debugState)
-  }, [debugKey, debugState, enabled])
+  }, [debugKey, debugState, enabled, perfDebugEnabled])
 
   return {
     containerRef,

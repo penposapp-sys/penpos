@@ -73,7 +73,7 @@ function SaleCategorySidebar({
         activeCategoryId: String(activeCategoryId || '')
       })
     }
-  })
+  }, [activeCategoryId, categories.length, title])
 
   return (
     <div className="card salePanel saleCategoryPanel">

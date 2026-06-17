@@ -23,9 +23,10 @@ import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalI
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
-import { diffPerfCounter, getPerfNow, incrementPerfCounter, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
+import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
 
 export default function WalkInPosPage() {
+  const perfDebugEnabled = isPerfDebugEnabled()
   const nav = useNavigate()
   const location = useLocation()
   const params = useParams()
@@ -623,6 +624,7 @@ export default function WalkInPosPage() {
   })
 
   useEffect(() => {
+    if (!perfDebugEnabled) return
     if (!categoryPerfRef.current) return
     const renderedDomCount = productScrollRef.current
       ? productScrollRef.current.querySelectorAll('.productCard').length
@@ -642,10 +644,10 @@ export default function WalkInPosPage() {
       renderedDomCount
     })
     categoryPerfRef.current = null
-  }, [activeCategory, filteredItems.length, productScrollRef, visibleMenuItems.length])
+  }, [activeCategory, filteredItems.length, perfDebugEnabled, productScrollRef, visibleMenuItems.length])
 
   useEffect(() => {
-    if (!isMobilePortrait) return
+    if (!isMobilePortrait || !perfDebugEnabled || !productGridDebug) return
     const frame = requestAnimationFrame(() => {
       const renderedDomCount = productScrollRef.current
         ? productScrollRef.current.querySelectorAll('.productCard').length
@@ -656,9 +658,10 @@ export default function WalkInPosPage() {
       })
     })
     return () => cancelAnimationFrame(frame)
-  }, [isMobilePortrait, productGridDebug, productScrollRef])
+  }, [isMobilePortrait, perfDebugEnabled, productGridDebug, productScrollRef])
 
   useEffect(() => {
+    if (!perfDebugEnabled) return
     const nextSignature = JSON.stringify(
       Array.isArray(order?.items)
         ? order.items.map((item) => ({
@@ -684,7 +687,7 @@ export default function WalkInPosPage() {
     })
     lastCartSignatureRef.current = nextSignature
     cartRenderSnapshotRef.current = delta.current
-  }, [order?.items, visibleMenuItems])
+  }, [order?.items, perfDebugEnabled, visibleMenuItems])
 
   const openReceiptPreview = async () => {
     const orderId = getOrderId(order)

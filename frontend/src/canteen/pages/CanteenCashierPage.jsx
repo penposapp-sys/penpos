@@ -6,7 +6,7 @@ import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import useVirtualProductGrid from '../../hooks/useVirtualProductGrid.js'
-import { diffPerfCounter, getPerfNow, incrementPerfCounter, isProductImagesDisabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../../lib/perfDebug.js'
+import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, isProductImagesDisabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../../lib/perfDebug.js'
 import { resolveProductImageUrl } from '../../lib/productImage.js'
 import { Barcode, Search } from 'lucide-react'
 
@@ -155,6 +155,7 @@ const CashierProductCard = memo(function CashierProductCard({
 })
 
 export default function CanteenCashierPage() {
+  const perfDebugEnabled = isPerfDebugEnabled()
   const { me, session } = useOutletContext()
   const { theme, themeKey } = useTheme()
   const { isMobilePortrait } = useResponsiveFlags()
@@ -455,6 +456,7 @@ export default function CanteenCashierPage() {
   }, [])
 
   useEffect(() => {
+    if (!perfDebugEnabled) return
     if (!categoryPerfRef.current) return
     const renderedDomCount = productScrollRef.current
       ? productScrollRef.current.querySelectorAll('.kasaProductCard').length
@@ -474,10 +476,10 @@ export default function CanteenCashierPage() {
       renderedDomCount
     })
     categoryPerfRef.current = null
-  }, [activeCategoryId, filteredProducts.length, productScrollRef, visibleProducts.length])
+  }, [activeCategoryId, filteredProducts.length, perfDebugEnabled, productScrollRef, visibleProducts.length])
 
   useEffect(() => {
-    if (!isMobilePortrait) return
+    if (!isMobilePortrait || !perfDebugEnabled || !productGridDebug) return
     const frame = requestAnimationFrame(() => {
       const renderedDomCount = productScrollRef.current
         ? productScrollRef.current.querySelectorAll('.kasaProductCard').length
@@ -488,7 +490,7 @@ export default function CanteenCashierPage() {
       })
     })
     return () => cancelAnimationFrame(frame)
-  }, [isMobilePortrait, productGridDebug, productScrollRef])
+  }, [isMobilePortrait, perfDebugEnabled, productGridDebug, productScrollRef])
 
   useEffect(() => {
     const branchId = String(selectedBranchId || '').trim()
