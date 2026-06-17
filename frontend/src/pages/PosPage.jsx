@@ -12,8 +12,8 @@ import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import { useSafeOrderActions } from '../lib/useSafeOrderActions.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
+import SalesProductGrid from '../components/SalesProductGrid.jsx'
 import { trStatusLabel } from '../i18n/tr.js'
-import ProductCard from '../components/ProductCard.jsx'
 import ProductImage from '../components/ProductImage.jsx'
 import { ServingType, normalizeServingType, servingTypeLabelTR } from '../utils/servingType.js'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
@@ -95,6 +95,7 @@ export default function PosPage() {
   const orderRef = useRef(null)
   const tableIdRef = useRef(null)
   const currentOrderIdRef = useRef(null)
+  const optimisticItemSeqRef = useRef(0)
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
   const [, setLockTick] = useState(0)
@@ -619,6 +620,85 @@ export default function PosPage() {
     currentOrderIdRef.current = getOrderId(order)
   }, [order])
 
+  const addOptimisticOrderItem = useCallback((menuItem) => {
+    const product = (menuItem && typeof menuItem === 'object') ? menuItem : null
+    const menuItemId = String(product?.id || product?.menuItemId || '')
+    if (!menuItemId) return null
+    const tempId = `tmp:${menuItemId}:${Date.now()}:${optimisticItemSeqRef.current++}`
+    const unitPrice = Number(product?.price || 0)
+    setOrder((prev) => {
+      if (!prev) return prev
+      const nextItems = Array.isArray(prev.items) ? [...prev.items] : []
+      nextItems.push({
+        _id: tempId,
+        id: tempId,
+        itemId: tempId,
+        menuItemId,
+        nameSnapshot: String(product?.name || 'Ürün'),
+        qty: 1,
+        subtotal: unitPrice,
+        status: 'open',
+        note: '',
+        isWeightBased: !!product?.isWeightBased
+      })
+      const prevGross = Number(prev?.total ?? prev?.totals?.total ?? prev?.totals?.grandTotal ?? 0)
+      const prevDiscountPercent = Number(prev?.discountPercent ?? 0)
+      const prevPaid = Number(prev?.paidTotal ?? prev?.totals?.paidTotal ?? 0)
+      const nextGross = prevGross + unitPrice
+      const nextDiscountTotal = Number(prev?.discountTotal ?? prev?.totals?.discountTotal ?? ((nextGross * prevDiscountPercent) / 100))
+      const nextNet = Math.max(0, nextGross - nextDiscountTotal)
+      return {
+        ...prev,
+        items: nextItems,
+        total: nextGross,
+        netTotal: nextNet,
+        balanceDue: Math.max(0, nextNet - prevPaid),
+        totals: {
+          ...(prev?.totals || {}),
+          total: nextGross,
+          grandTotal: nextGross,
+          netTotal: nextNet,
+          paidTotal: prevPaid,
+          balanceDue: Math.max(0, nextNet - prevPaid)
+        }
+      }
+    })
+    return tempId
+  }, [])
+
+  const removeOptimisticOrderItem = useCallback((tempId) => {
+    if (!tempId) return
+    setOrder((prev) => {
+      if (!prev) return prev
+      const prevItems = Array.isArray(prev.items) ? prev.items : []
+      const removed = prevItems.find((item) => String(item?._id || item?.id || item?.itemId || '') === String(tempId))
+      if (!removed) return prev
+      const unitPrice = Number(removed?.subtotal || 0)
+      const nextItems = prevItems.filter((item) => String(item?._id || item?.id || item?.itemId || '') !== String(tempId))
+      const prevGross = Number(prev?.total ?? prev?.totals?.total ?? prev?.totals?.grandTotal ?? 0)
+      const prevDiscountPercent = Number(prev?.discountPercent ?? 0)
+      const prevPaid = Number(prev?.paidTotal ?? prev?.totals?.paidTotal ?? 0)
+      const nextGross = Math.max(0, prevGross - unitPrice)
+      const nextDiscountTotal = Number(prev?.discountTotal ?? prev?.totals?.discountTotal ?? ((nextGross * prevDiscountPercent) / 100))
+      const nextNet = Math.max(0, nextGross - nextDiscountTotal)
+      return {
+        ...prev,
+        items: nextItems,
+        total: nextGross,
+        netTotal: nextNet,
+        balanceDue: Math.max(0, nextNet - prevPaid),
+        totals: {
+          ...(prev?.totals || {}),
+          total: nextGross,
+          grandTotal: nextGross,
+          netTotal: nextNet,
+          paidTotal: prevPaid,
+          balanceDue: Math.max(0, nextNet - prevPaid)
+        }
+      }
+    })
+  }, [])
+
   useEffect(() => {
     return () => {
       const tId = tableIdRef.current || orderRef.current?.tableId || null
@@ -678,6 +758,7 @@ export default function PosPage() {
       setWeightModalOpen(true)
       return
     }
+    const optimisticTempId = addOptimisticOrderItem(menuItem)
     const lockKey = `${orderId}:${menuItemId}:add`
     if (isDebounced(lockKey, 200)) return
     const result = await withLock(lockKey, () => api(`/api/pos/orders/${orderId}/items`, {
@@ -689,10 +770,12 @@ export default function PosPage() {
       const code = result?.data?.code || result?.code || result?.data?.error || result?.error || ''
       const message = String(result?.data?.message || result?.message || '')
       if (menuItem && (code === 'invalid_weight' || /gram/i.test(message))) {
+        removeOptimisticOrderItem(optimisticTempId)
         setPendingWeightItem(menuItem)
         setWeightModalOpen(true)
         return
       }
+      removeOptimisticOrderItem(optimisticTempId)
       toast.error(message || 'İşlem başarısız')
       return
     }
@@ -701,7 +784,7 @@ export default function PosPage() {
       setOrder(fresh)
       setNote(fresh.note || '')
     }
-  }, [])
+  }, [addOptimisticOrderItem, removeOptimisticOrderItem])
 
   const {
     containerRef: productScrollRef,
@@ -1852,15 +1935,13 @@ export default function PosPage() {
           >
             {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}
             <div ref={productGridMeasureRef} className="posItemsGrid">
-              {visibleMenuItems.map((i, index) => (
-                <ProductCard
-                  key={i.id}
-                  item={i}
-                  onClick={addItem}
-                  measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null}
-                  showImage={showProductImages}
-                />
-              ))}
+              <SalesProductGrid
+                visibleItems={visibleMenuItems}
+                onItemClick={addItem}
+                isMobilePortrait={isMobilePortrait}
+                productCardMeasureRef={productCardMeasureRef}
+                showProductImages={showProductImages}
+              />
             </div>
             {productsVirtualized ? <div style={{ height: bottomProductSpacer }} aria-hidden="true" /> : null}
           </div>

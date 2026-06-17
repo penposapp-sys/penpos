@@ -2598,7 +2598,7 @@ body.modal-open .qr-menu .menu-row:hover {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  contain: layout paint style;
+  contain: none;
 }
 
 .saleCartHeader {
@@ -3772,10 +3772,13 @@ body.modal-open .qr-menu .menu-row:hover {
   color: var(--app-text, var(--text));
 }
 
-.saleCategoryButton,
 .kasaProductCard,
 .kasaCategoryCard {
   touch-action: manipulation;
+}
+
+.saleCategoryButton {
+  touch-action: auto;
 }
 
 .tablesGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px }
@@ -4061,6 +4064,17 @@ body.modal-open .qr-menu .menu-row:hover {
     flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: center !important;
+  }
+
+  body.mobile-ui .sale-cart-line__action-btn:not(.sale-cart-line__action-btn--note):not(.sale-cart-line__action-btn--ready):not(.sale-cart-line__action-btn--cancel) {
+    min-width: 33px !important;
+    width: 33px !important;
+    min-height: 33px !important;
+    height: 33px !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    border-radius: 10px !important;
   }
 
   body.mobile-ui .sale-cart-line__action-btn--note {
@@ -5915,6 +5929,14 @@ textarea::placeholder {
     height: 100%;
   }
 
+  body.sales-mobile-scroll .pageShell.pos-layout,
+  body.sales-mobile-scroll .pageShell.walkin-layout,
+  body.mobile-sales-mode .pageShell {
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
   body.sales-mobile-scroll .saleStandard3Col {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto minmax(0, 1fr);
@@ -5995,8 +6017,8 @@ textarea::placeholder {
   }
   body.sales-mobile-scroll .saleCategoryButton {
     flex: 0 0 auto;
-    width: auto;
-    min-width: max-content;
+    width: max-content !important;
+    min-width: max-content !important;
     max-width: none;
     margin-bottom: 0 !important;
     padding: 7px 12px;
@@ -6012,7 +6034,7 @@ textarea::placeholder {
   }
   body.sales-mobile-scroll .saleCartPanelShell {
     min-height: 0;
-    height: auto;
+    height: 100%;
     max-height: calc(100dvh - 220px);
     overflow: hidden;
   }
@@ -6039,6 +6061,9 @@ textarea::placeholder {
     flex: 1 1 auto;
     min-height: 0;
     padding-right: 0;
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
   body.sales-mobile-scroll .salePanelScroll.saleProductsVirtualScroll {
     overflow-y: auto;
@@ -6048,15 +6073,17 @@ textarea::placeholder {
     max-height: 100%;
     padding-right: 0;
     padding-top: 6px !important;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: auto;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
   body.mobile-sales-mode .kasaProductGridScroll.kasaProductVirtualScroll {
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: auto;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
   body.sales-mobile-scroll .saleCartList {
     overflow-y: auto;
@@ -6066,8 +6093,9 @@ textarea::placeholder {
     padding-right: 0;
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     scroll-padding-bottom: 112px;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: auto;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
   body.sales-mobile-scroll .saleCartList--padActions {
     padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
@@ -6173,7 +6201,7 @@ textarea::placeholder {
     transform: none;
     will-change: auto;
     backface-visibility: visible;
-    contain: layout paint style;
+    contain: none;
   }
 
   body.sales-mobile-scroll .saleProductsVirtualScroll .productCard,
@@ -6183,6 +6211,13 @@ textarea::placeholder {
   body.mobile-sales-mode .stickyBottom,
   body.mobile-sales-mode .kasaBottomBar {
     backdrop-filter: none;
+  }
+  body.sales-mobile-scroll .productCard,
+  body.mobile-sales-mode .kasaProductCard,
+  body.mobile-sales-mode .kasaCategoryCard {
+    content-visibility: visible !important;
+    contain: none !important;
+    contain-intrinsic-size: auto !important;
   }
   body.mobile-sales-mode .kasaBottomBar {
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));

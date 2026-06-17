@@ -1,11 +1,5 @@
-import React, { memo, useCallback, useEffect, useRef } from 'react'
+import React, { memo, useCallback, useEffect } from 'react'
 import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
-
-function getClientX(event) {
-  if (typeof event?.clientX === 'number') return event.clientX
-  const touch = event?.touches?.[0] || event?.changedTouches?.[0]
-  return typeof touch?.clientX === 'number' ? touch.clientX : null
-}
 
 function SaleCategorySidebar({
   title = 'Kategoriler',
@@ -13,70 +7,7 @@ function SaleCategorySidebar({
   activeCategoryId,
   onSelect
 }) {
-  const scrollRef = useRef(null)
-  const dragState = useRef({
-    isDown: false,
-    startX: 0,
-    scrollLeft: 0,
-    moved: false
-  })
   const handleSelect = useCallback((categoryId) => onSelect?.(categoryId), [onSelect])
-
-  const startDragging = useCallback((clientX) => {
-    const el = scrollRef.current
-    if (!el || typeof clientX !== 'number') return
-
-    dragState.current.isDown = true
-    dragState.current.startX = clientX - el.getBoundingClientRect().left
-    dragState.current.scrollLeft = el.scrollLeft
-    dragState.current.moved = false
-  }, [])
-
-  const moveDragging = useCallback((clientX) => {
-    const el = scrollRef.current
-    const state = dragState.current
-    if (!el || !state.isDown || typeof clientX !== 'number') return false
-
-    const x = clientX - el.getBoundingClientRect().left
-    const walk = x - state.startX
-
-    if (Math.abs(walk) > 5) state.moved = true
-
-    el.scrollLeft = state.scrollLeft - walk
-    return state.moved
-  }, [])
-
-  const handleWheel = useCallback((event) => {
-    const el = scrollRef.current
-    if (!el) return
-    const canScrollX = el.scrollWidth > el.clientWidth + 2
-    if (!canScrollX) return
-    if (Math.abs(event.deltaX) > 0) return
-    if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
-    el.scrollLeft += event.deltaY
-  }, [])
-
-  const handleMouseDown = useCallback((event) => {
-    startDragging(getClientX(event))
-  }, [startDragging])
-
-  const handleMouseMove = useCallback((event) => {
-    moveDragging(getClientX(event))
-  }, [moveDragging])
-
-  const stopDragging = useCallback(() => {
-    dragState.current.isDown = false
-  }, [])
-
-  const handleCategoryClick = useCallback((event, categoryId) => {
-    if (dragState.current.moved) {
-      event.preventDefault()
-      event.stopPropagation()
-      dragState.current.moved = false
-      return
-    }
-    handleSelect(categoryId)
-  }, [handleSelect])
 
   useEffect(() => {
     const renderCount = incrementPerfCounter('sidebarRenders', title || 'categories')
@@ -94,29 +25,39 @@ function SaleCategorySidebar({
     <div className="card salePanel saleCategoryPanel">
       <div className="saleCategoryPanelTitle" style={{ paddingBottom: 8, borderBottom: '1px solid var(--border)', fontWeight: 800 }}>{title}</div>
       <div
-        ref={scrollRef}
-        className="salePanelScroll saleCategoryPanelScroll category-scroll sale-category-scroll"
-        style={{ paddingTop: 10 }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={stopDragging}
-        onMouseLeave={stopDragging}
-        onWheel={handleWheel}
+        className="saleCategoryPanelScroll category-scroll sale-category-scroll"
+        style={{
+          paddingTop: 10,
+          display: 'flex',
+          flexWrap: 'nowrap',
+          alignItems: 'stretch',
+          gap: 8,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        }}
       >
         {categories.map(c => (
           <button
             key={c.id}
-            className="btn btn--full btn--left saleCategoryButton sale-category-chip"
+            className="btn btn--left saleCategoryButton sale-category-chip"
             type="button"
-            onClick={(event) => handleCategoryClick(event, c.id)}
+            onClick={() => handleSelect(c.id)}
             aria-pressed={String(activeCategoryId) === String(c.id)}
             style={{
-              marginBottom: 8,
+              flex: '0 0 auto',
+              width: 'max-content',
+              minWidth: 'max-content',
+              marginBottom: 0,
               borderColor: String(activeCategoryId) === String(c.id) ? 'color-mix(in srgb, var(--theme-accent, #2563eb) 50%, var(--app-border, var(--border)))' : 'var(--app-border, var(--border))',
               background: String(activeCategoryId) === String(c.id)
                 ? 'color-mix(in srgb, var(--theme-accent, #2563eb) 22%, var(--app-surface, var(--panel)))'
                 : 'var(--app-button-bg, var(--button-bg))',
               color: 'var(--app-text, var(--text))',
+              whiteSpace: 'nowrap',
               boxShadow: String(activeCategoryId) === String(c.id)
                 ? 'inset 0 0 0 1px color-mix(in srgb, var(--theme-accent, #2563eb) 22%, transparent)'
                 : 'none'

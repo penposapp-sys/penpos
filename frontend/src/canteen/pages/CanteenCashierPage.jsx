@@ -245,6 +245,7 @@ export default function CanteenCashierPage() {
 
   const scheduleBarcodeFocus = (delayMs = 250) => {
     setTimeout(() => {
+      if (isMobilePortrait) return
       const el = (() => {
         try { return document.activeElement } catch { return null }
       })()
@@ -1067,6 +1068,7 @@ export default function CanteenCashierPage() {
     setSaving(false)
 
     setTimeout(() => {
+      if (isMobilePortrait) return
       const el = (() => {
         try { return document.activeElement } catch { return null }
       })()
