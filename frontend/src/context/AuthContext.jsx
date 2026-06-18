@@ -116,61 +116,70 @@ export const AuthProvider = ({ children }) => {
     const payload = { identifier: identifier ?? email, password, portal }
     const portalOverride = portal === 'platform' ? 'platform' : 'restaurant'
     const tokenKey = portal === 'platform' ? 'token_platform' : 'token_restaurant'
-    console.log('LOGIN REQUEST', payload)
-    const loginRes = await api('/api/auth/login', {
-      method: 'POST',
-      data: payload,
-      silent: true,
-      suppressAuthRedirect: true,
-      portalOverride
-    })
-    console.log('LOGIN RESPONSE', loginRes?.data)
-    if (!loginRes?.ok || !loginRes?.token) {
-      const err = new Error(loginRes?.message || 'Giriş başarısız')
-      err.code = loginRes?.code || null
-      err.response = { data: loginRes?.data }
-      throw err
-    }
 
-    localStorage.setItem(tokenKey, loginRes.token)
-    const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride })
-    if (!meRes?.ok) {
-      try {
-        localStorage.removeItem(tokenKey)
-      } catch {}
-      const err = new Error(meRes?.message || 'Giriş başarısız')
-      err.code = meRes?.code || null
-      err.response = { data: meRes?.data }
-      throw err
-    }
-    const meUser = meRes?.user
-    const normalized = meUser ? { ...meUser, permissions: normalizePermissions(meUser.permissions) } : null
-    setUser(normalized)
-    if (normalized?.tenantId) {
-      const ctxRes = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride })
-      setTenantCtx(ctxRes?.ok ? ctxRes : null)
-    } else {
-      setTenantCtx(null)
-    }
+    try {
+      console.log('LOGIN REQUEST', payload)
+      const loginRes = await api('/api/auth/login', {
+        method: 'POST',
+        data: payload,
+        silent: true,
+        suppressAuthRedirect: true,
+        portalOverride
+      })
+      console.log('LOGIN RESPONSE', loginRes?.data)
+      if (loginRes?.ok === false || !loginRes?.token) {
+        const err = new Error(loginRes?.message || 'GiriÅŸ baÅŸarÄ±sÄ±z')
+        err.code = loginRes?.code || null
+        err.response = { status: loginRes?.status, data: loginRes?.data }
+        throw err
+      }
 
-    if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
-      try {
-        const res = await api('/api/tenant/profile', { silent: true, suppressAuthRedirect: true, portalOverride })
-        if (!res?.ok || res?.success === false) {
+      localStorage.setItem(tokenKey, loginRes.token)
+      const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride })
+      if (meRes?.ok === false || !meRes?.user) {
+        try {
+          localStorage.removeItem(tokenKey)
+        } catch {}
+        const err = new Error(meRes?.message || 'GiriÅŸ baÅŸarÄ±sÄ±z')
+        err.code = meRes?.code || null
+        err.response = { status: meRes?.status, data: meRes?.data }
+        throw err
+      }
+      const meUser = meRes?.user
+      const normalized = meUser ? { ...meUser, permissions: normalizePermissions(meUser.permissions) } : null
+      setUser(normalized)
+      if (normalized?.tenantId) {
+        const ctxRes = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride })
+        setTenantCtx(ctxRes?.ok ? ctxRes : null)
+      } else {
+        setTenantCtx(null)
+      }
+
+      if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
+        try {
+          const res = await api('/api/tenant/profile', { silent: true, suppressAuthRedirect: true, portalOverride })
+          if (!res?.ok || res?.success === false) {
+            setAllowedBranchIds([])
+          } else {
+            const ids = resolveAllowedBranchIds(normalized, res?.tenant)
+            setAllowedBranchIds(ids)
+            persistActiveBranchSelection(normalized, ids)
+          }
+        } catch {
           setAllowedBranchIds([])
-        } else {
-          const ids = resolveAllowedBranchIds(normalized, res?.tenant)
-          setAllowedBranchIds(ids)
-          persistActiveBranchSelection(normalized, ids)
         }
-      } catch {
+      } else {
         setAllowedBranchIds([])
       }
-    } else {
-      setAllowedBranchIds([])
-    }
 
-    return normalized
+      return normalized
+    } catch (err) {
+      console.error('LOGIN ERROR', err)
+      console.error('LOGIN RESPONSE', err?.response)
+      console.error('LOGIN STATUS', err?.response?.status)
+      console.error('LOGIN DATA', err?.response?.data)
+      throw err
+    }
   }
 
   const logout = () => {
