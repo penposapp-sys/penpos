@@ -77,7 +77,7 @@ const scrollToSection = (event, targetId) => {
   window.scrollTo({ top, behavior: 'smooth' })
 }
 
-function Header({ settings, onOpenLogin, onOpenSystems, onRegister }) {
+function Header({ settings, onOpenSystems, onRegister, onLogin }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -91,8 +91,8 @@ function Header({ settings, onOpenLogin, onOpenSystems, onRegister }) {
           <a href="#egitim">Eğitim Videoları</a>
         </nav>
         <div className="lp-header-actions">
-          <a className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login" href="/login">Giriş Yap</a>
-          <a className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" href={`${settings.registerUrl || '/register'}?type=restaurant`}>1 Hafta Ücretsiz Dene</a>
+          <button className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={onLogin}>Giriş Yap</button>
+          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={onRegister}>1 Hafta Ücretsiz Dene</button>
         </div>
         <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü">
           <Icon name={open ? 'x' : 'menu'} className="lp-menu-icon" />
@@ -104,8 +104,8 @@ function Header({ settings, onOpenLogin, onOpenSystems, onRegister }) {
           <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>Özellikler</a>
           <a href="#fiyat" onClick={() => setOpen(false)}>Fiyat</a>
           <a href="#egitim" onClick={() => setOpen(false)}>Eğitim Videoları</a>
-          <a className="lp-direct-link-cta lp-direct-link-cta--login" href="/login" onClick={() => setOpen(false)}>Giriş Yap</a>
-          <a className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" href={`${settings.registerUrl || '/register'}?type=restaurant`} onClick={() => setOpen(false)}>1 Hafta Ücretsiz Dene</a>
+          <button className="lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => { setOpen(false); onLogin?.() }}>Giriş Yap</button>
+          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => { setOpen(false); onRegister?.() }}>1 Hafta Ücretsiz Dene</button>
         </div>
       ) : null}
     </header>
@@ -124,7 +124,7 @@ function MockVisual({ active }) {
           {['Ülker Metro', 'Dido Trio', 'Çilekli Süt'].map((item, index) => (
             <div key={item} className="lp-sale-row">
               <span>{item}</span>
-              <b>{`\u20BA${[15, 25, 20][index]},00`}</b>
+              <b>{`₺${[15, 25, 20][index]},00`}</b>
             </div>
           ))}
         </div>
@@ -143,7 +143,7 @@ function MockVisual({ active }) {
         <div className="lp-phone">
           <div className="lp-phone-notch" />
           <div className="lp-phone-body">
-            <div className="lp-qr-chip">QR Men\u00FC</div>
+            <div className="lp-qr-chip">QR Menü</div>
             <h4>Kategori düzeni</h4>
             <div className="lp-phone-cats">
               {['Burger', 'İçecek', 'Tatlı', 'Kahve'].map((item) => <div key={item}>{item}</div>)}
@@ -167,7 +167,7 @@ function MockVisual({ active }) {
             <span>Anlık kontrol</span>
           </div>
           <div className="lp-report-stats">
-            <div><small>Net Sat\u0131\u015F</small><strong>\u20BA1.250</strong></div>
+            <div><small>Net Satış</small><strong>₺1.250</strong></div>
             <div><small>Şube</small><strong>4</strong></div>
             <div><small>Durum</small><strong>Hazır</strong></div>
           </div>
@@ -1522,8 +1522,8 @@ export default function LandingPage() {
 
       <Header
         settings={settings}
-        onOpenLogin={() => setLoginOpen(true)}
         onRegister={() => nav(`${settings.registerUrl || '/register'}?type=restaurant`)}
+        onLogin={() => nav('/login')}
         onOpenSystems={(event) => {
           setActive('restaurant')
           scrollToSection(event, 'sistemler')
@@ -1540,8 +1540,8 @@ export default function LandingPage() {
               <h1><span>{settings.heroTitle || 'Restoran ve mağaza sistemlerini ayrı ayrı yönetin.'}</span></h1>
               <p>{settings.heroDescription || 'PenPOS; Restoran-Cafe ve Mağaza-Market için ayrı girişleri, ayrı ekran akışları olan modern otomasyon yapısıdır.'}</p>
               <div className="lp-hero-actions">
-                <a className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" href={`${settings.registerUrl || '/register'}?type=restaurant`}>1 Haftalık Ücretsiz Deneme</a>
-                <a className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" href="/login">Giriş Yap</a>
+                <button className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => nav('/register')}>1 Haftalık Ücretsiz Deneme</button>
+                <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => nav('/login')}>Giriş Yap</button>
               </div>
               <div className="lp-hero-points">
                 {['QR menü dahil', 'Sınırsız şube', 'YouTube eğitim videoları'].map((item) => (
@@ -1574,7 +1574,7 @@ export default function LandingPage() {
                   ['SALON 1 • Masa 4', 'Sipariş hazırlanıyor', '2 dk önce'],
                   ['Paket Servis #102', 'Kurye teslim aldı', 'Şimdi'],
                   ['Cari Hesap', 'Tahsilat tamamlandı', '1 dk önce'],
-                  ['QR Men\u00FC', 'Yeni sipari\u015F geldi', 'Canl\u0131']
+                  ['QR Menü', 'Yeni sipariş geldi', 'Canlı']
                 ].map(([title, desc, time]) => (
                   <div key={title} className="lp-operation-item">
                     <div className="lp-operation-left">
@@ -1635,7 +1635,7 @@ export default function LandingPage() {
           <SectionTitle eyebrow="Eğitim Videoları" title="Sistemi kısa videolarla hızlı öğrenin." text="Kurulum, satış, cari hesap, QR menü ve raporlama akışlarını mevcut eğitim videolarıyla adım adım izleyebilirsiniz." />
           <div className="lp-video-grid">
             {trainingVideos.map((video) => (
-              <button key={video.id} type="button" className="lp-video-card" onClick={() => window.open(video.youtubeUrl, '_blank', 'noopener,noreferrer')}>
+              <button key={video.id} type="button" className="lp-video-card" onClick={() => { window.location.href = video.youtubeUrl }}>
                 <div className="lp-video-icon-box">
                   <Icon name="play" className="lp-video-icon" />
                 </div>
