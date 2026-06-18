@@ -9,6 +9,7 @@ export const error = (code, message, status = 400) => {
 
 export const sendError = (res, err) => {
   const requestId = res.locals?.requestId || null
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
   if (
     err?.code === 11000 &&
@@ -47,6 +48,7 @@ export const sendError = (res, err) => {
     } catch {
     }
   }
+
   let payload
   if (status >= 500) {
     payload = err?.expose
@@ -55,11 +57,14 @@ export const sendError = (res, err) => {
   } else {
     payload = err.payload || { error: 'internal_error', message: err.message || 'Internal error' }
   }
+
   if (payload && payload.error && payload.code === undefined) {
     payload.code = payload.error
   }
+
   if (process.env.NODE_ENV !== 'production' && status >= 500) {
     payload.stack = err.stack
   }
+
   res.status(status).json({ ...payload, success: false, requestId })
 }

@@ -4,20 +4,11 @@ import PublicSystemLogin from '../../components/PublicSystemLogin.jsx'
 import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
 import { api } from '../../lib/apiClient.js'
 
-const buildLoginErrorMessage = (baseMessage, error) => {
-  const responseData = error?.response?.data
-  const serializedResponseData = typeof responseData === 'string'
-    ? responseData
-    : responseData
-      ? JSON.stringify(responseData)
-      : ''
-  const errorMessage = String(error?.message || '').trim()
-  const parts = [baseMessage]
-
-  if (serializedResponseData) parts.push(`response.data: ${serializedResponseData}`)
-  if (errorMessage) parts.push(`message: ${errorMessage}`)
-
-  return parts.join(' | ')
+const getFriendlyLoginError = (error) => {
+  const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
+  if (code === 'account_disabled') return 'Hesabınız devre dışı. Lütfen yetkilinizle iletişime geçin.'
+  if (code === 'wrong_portal') return 'Bu hesap mağaza giriş ekranı için uygun değil.'
+  return 'Giriş başarısız. E-posta/kullanıcı adı veya şifre hatalı.'
 }
 
 export default function CanteenLogin() {
@@ -38,6 +29,7 @@ export default function CanteenLogin() {
     setLoading(true)
     setError('')
     const payload = { identifier, password, portal: 'canteen' }
+
     try {
       console.log('LOGIN REQUEST', payload)
       const loginRes = await api('/api/auth/login', {
@@ -48,16 +40,18 @@ export default function CanteenLogin() {
         portalOverride: 'canteen',
       })
       console.log('LOGIN RESPONSE', loginRes?.data)
-      if (!loginRes?.ok || !loginRes?.token) {
+      if (loginRes?.ok === false || !loginRes?.token) {
         const err = new Error(loginRes?.message || 'Giriş başarısız')
+        err.code = loginRes?.code || null
         err.response = { data: loginRes?.data }
         throw err
       }
+
       localStorage.setItem('token_canteen', loginRes.token)
       nav('/canteen', { replace: true })
     } catch (err) {
       console.error(err)
-      setError(buildLoginErrorMessage('Giriş başarısız', err))
+      setError(getFriendlyLoginError(err))
     } finally {
       setLoading(false)
     }
@@ -76,7 +70,7 @@ export default function CanteenLogin() {
       identifierLabel="E-posta / Kullanıcı Adı"
       identifierPlaceholder="eposta veya kullanıcı adı"
       passwordLabel="Şifre"
-      passwordPlaceholder="sifrenizi girin"
+      passwordPlaceholder="şifrenizi girin"
       identifier={identifier}
       password={password}
       onIdentifierChange={setIdentifier}

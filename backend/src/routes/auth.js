@@ -3,12 +3,23 @@ import { forgotPassword, login, me, resetPassword } from '../services/authServic
 import { requireAuth } from '../middlewares/requireAuth.js'
 import { sendError } from '../utils/errors.js'
 import { error as logError } from '../utils/logger.js'
+import { info } from '../utils/logger.js'
 
 const router = Router()
 
 router.post('/login', async (req, res) => {
   try {
     const { identifier, email, password, portal } = req.body || {}
+    try {
+      if (process.env.NODE_ENV !== 'production') {
+        info('[AUTH_LOGIN_ROUTE_REQUEST]', {
+          requestId: req.requestId || null,
+          identifier: String(identifier ?? email ?? '').trim().toLowerCase(),
+          portal: String(portal || '').trim().toLowerCase() || null,
+          hasPassword: !!String(password || '')
+        })
+      }
+    } catch {}
     const result = await login(identifier ?? email, password, portal, { requestId: req.requestId })
     res.json(result)
   } catch (err) {

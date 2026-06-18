@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       console.log('LOGIN RES TOKEN', loginRes?.token)
       console.log('LOGIN RES DATA TOKEN', loginRes?.data?.token)
       if (loginRes?.ok === false || !loginRes?.token) {
-        const err = new Error(loginRes?.message || 'GiriÅŸ baÅŸarÄ±sÄ±z')
+        const err = new Error(loginRes?.message || 'Giriş başarısız')
         err.code = loginRes?.code || null
         err.response = { status: loginRes?.status, data: loginRes?.data }
         throw err
@@ -152,7 +152,7 @@ export const AuthProvider = ({ children }) => {
         try {
           localStorage.removeItem(tokenKey)
         } catch {}
-        const err = new Error(meRes?.message || 'GiriÅŸ baÅŸarÄ±sÄ±z')
+        const err = new Error(meRes?.message || 'Giriş başarısız')
         err.code = meRes?.code || null
         err.response = { status: meRes?.status, data: meRes?.data }
         throw err

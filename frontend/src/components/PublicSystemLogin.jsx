@@ -43,7 +43,7 @@ export default function PublicSystemLogin({
       ? 'system-login system-login--canteen'
       : theme === 'platform'
         ? 'system-login system-login--platform'
-      : 'system-login system-login--restaurant'
+        : 'system-login system-login--restaurant'
   ), [theme])
 
   return (

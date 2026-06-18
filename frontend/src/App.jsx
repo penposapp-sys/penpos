@@ -1,5 +1,6 @@
-import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import Layout from './components/Layout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import SignIn from './pages/SignIn.jsx'
@@ -75,6 +76,112 @@ import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionE
 
 const ProductReportPage = _ProductReportPage
 
+const EXIT_ROUTES = new Set([
+  '/',
+  '/landing',
+  '/login',
+  '/login/platform',
+  '/platform-login',
+  '/login/restoran',
+  '/login/kantin',
+  '/canteen/login',
+])
+
+const resolveBackFallbackPath = (pathname) => {
+  const path = String(pathname || '')
+
+  if (path.startsWith('/kermes/app/pos/orders/')) return '/kermes/app/pos'
+  if (path.startsWith('/kermes/app/walkin/')) return '/kermes/app/walkin'
+  if (path.startsWith('/kermes/app/delivery/')) return '/kermes/app/delivery'
+  if (path.startsWith('/kermes/app/package-courier')) return '/kermes'
+  if (path.startsWith('/kermes/app/pos')) return '/kermes'
+  if (path.startsWith('/kermes/app/walkin')) return '/kermes'
+  if (path.startsWith('/kermes/app/delivery')) return '/kermes'
+  if (path.startsWith('/kermes/app/')) return '/kermes'
+  if (path.startsWith('/kermes/settings')) return '/kermes'
+
+  if (path.startsWith('/canteen/cariler/')) return '/canteen/cariler'
+  if (path.startsWith('/canteen/ayarlar')) return '/canteen/kasa'
+  if (path.startsWith('/canteen/qr-siparisleri')) return '/canteen/kasa'
+  if (path.startsWith('/canteen/stok')) return '/canteen/kasa'
+  if (path.startsWith('/canteen/raporlar')) return '/canteen/kasa'
+  if (path.startsWith('/canteen/') && path !== '/canteen/kasa') return '/canteen/kasa'
+
+  if (path.startsWith('/platform')) return '/platform/kermes-tenants'
+  if (path.startsWith('/superadmin')) return '/superadmin/tenants'
+
+  return null
+}
+
+const canUseHistoryBack = () => {
+  try {
+    const idx = window.history?.state?.idx
+    if (typeof idx === 'number') return idx > 0
+    return window.history.length > 1
+  } catch {
+    return false
+  }
+}
+
+function CapacitorBackButtonHandler() {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    let isMounted = true
+
+    const register = async () => {
+      try {
+        if (!Capacitor.isNativePlatform()) return null
+        const appPlugin = window?.Capacitor?.Plugins?.App
+        if (!appPlugin?.addListener) return null
+
+        return await appPlugin.addListener('backButton', ({ canGoBack }) => {
+          if (!isMounted) return
+
+          const pathname = String(location.pathname || '')
+
+          if (EXIT_ROUTES.has(pathname)) {
+            appPlugin.exitApp?.()
+            return
+          }
+
+          if (canGoBack || canUseHistoryBack()) {
+            navigate(-1)
+            return
+          }
+
+          const fallbackPath = resolveBackFallbackPath(pathname)
+          if (fallbackPath && fallbackPath !== pathname) {
+            navigate(fallbackPath, { replace: true })
+            return
+          }
+
+          if (pathname !== '/login') {
+            navigate('/login', { replace: true })
+            return
+          }
+
+          appPlugin.exitApp?.()
+        })
+      } catch {
+        return null
+      }
+    }
+
+    const listenerPromise = register()
+
+    return () => {
+      isMounted = false
+      Promise.resolve(listenerPromise)
+        .then((listener) => listener?.remove?.())
+        .catch(() => {})
+    }
+  }, [location.pathname, navigate])
+
+  return null
+}
+
 const getDefaultRoute = (user, tenantCtx) => {
   if (!user) return null
   if (user.role === 'superadmin') return '/superadmin/tenants'
@@ -127,6 +234,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BusinessSettingsProvider>
+        <CapacitorBackButtonHandler />
         <Toast />
         <Routes>
         <Route path="/" element={<RootPublicEntryPage fallback={<LandingPage />} />} />

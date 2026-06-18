@@ -4,20 +4,11 @@ import PublicSystemLogin from '../components/PublicSystemLogin.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
-const buildLoginErrorMessage = (baseMessage, error) => {
-  const responseData = error?.response?.data
-  const serializedResponseData = typeof responseData === 'string'
-    ? responseData
-    : responseData
-      ? JSON.stringify(responseData)
-      : ''
-  const errorMessage = String(error?.message || '').trim()
-  const parts = [baseMessage]
-
-  if (serializedResponseData) parts.push(`response.data: ${serializedResponseData}`)
-  if (errorMessage) parts.push(`message: ${errorMessage}`)
-
-  return parts.join(' | ')
+const getFriendlyLoginError = (error) => {
+  const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
+  if (code === 'account_disabled') return 'Hesabınız devre dışı. Lütfen yetkilinizle iletişime geçin.'
+  if (code === 'wrong_portal') return 'Bu hesap bu giriş ekranı için uygun değil.'
+  return 'Giriş başarısız. E-posta/kullanıcı adı veya şifre hatalı.'
 }
 
 export default function SignIn({ portal }) {
@@ -46,11 +37,7 @@ export default function SignIn({ portal }) {
       nav(isRestaurant ? '/kermes' : '/', { replace: true })
     } catch (err) {
       console.error(err)
-      const code = err?.code || null
-      if (code === 'invalid_credentials') setError(buildLoginErrorMessage('E-posta / şifre hatalı', err))
-      else if (code === 'account_disabled') setError(buildLoginErrorMessage('Hesap devre dışı', err))
-      else if (code === 'wrong_portal') setError(buildLoginErrorMessage('Yanlış giriş ekranı', err))
-      else setError(buildLoginErrorMessage('Giriş başarısız', err))
+      setError(getFriendlyLoginError(err))
     } finally {
       setLoading(false)
     }
@@ -62,7 +49,7 @@ export default function SignIn({ portal }) {
       backLabel="Sistem seçimine dön"
       brand="PenPOS"
       systemLabel="RESTORAN / CAFE YÖNETİMİ"
-      welcomeTitle="Adisyon, mutfak ve satış akışını tek panelden yönetin."
+      welcomeTitle="Adisyon, mutfak ve satış akışınızı tek panelden yönetin."
       welcomeText="Masa yönetimi, paket servis, raporlar ve personel süreçlerini düzenli şekilde yönetin."
       formTitle="Restoran Girişi"
       formSubtitle="Üye bilgilerinizle panelinize giriş yapın."

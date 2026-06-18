@@ -5,20 +5,11 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
-const buildLoginErrorMessage = (baseMessage, error) => {
-  const responseData = error?.response?.data
-  const serializedResponseData = typeof responseData === 'string'
-    ? responseData
-    : responseData
-      ? JSON.stringify(responseData)
-      : ''
-  const errorMessage = String(error?.message || '').trim()
-  const parts = [baseMessage]
-
-  if (serializedResponseData) parts.push(`response.data: ${serializedResponseData}`)
-  if (errorMessage) parts.push(`message: ${errorMessage}`)
-
-  return parts.join(' | ')
+const getFriendlyLoginError = (error) => {
+  const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
+  if (code === 'account_disabled') return 'Hesabınız devre dışı. Lütfen sistem yöneticinizle iletişime geçin.'
+  if (code === 'wrong_portal') return 'Bu hesap platform yönetimi giriş ekranı için uygun değil.'
+  return 'Giriş başarısız. E-posta/kullanıcı adı veya şifre hatalı.'
 }
 
 export default function PlatformLogin() {
@@ -44,18 +35,17 @@ export default function PlatformLogin() {
       const allowed = ['platform_admin', 'superadmin']
       if (!allowed.includes(res?.role)) {
         logout()
-        setError('Bu giriş yalnızca Platform Yönetimi içindir.')
-        toast.error('Bu giriş yalnızca Platform Yönetimi içindir.')
+        const message = 'Bu giriş yalnızca Platform Yönetimi içindir.'
+        setError(message)
+        toast.error(message)
         return
       }
       nav('/platform/kermes-tenants', { replace: true })
     } catch (err) {
       console.error(err)
-      const msg = err?.code === 'invalid_credentials'
-        ? buildLoginErrorMessage('E-posta veya şifre hatalı', err)
-        : buildLoginErrorMessage('Giriş başarısız', err)
-      setError(msg)
-      toast.error(msg)
+      const message = getFriendlyLoginError(err)
+      setError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -74,7 +64,7 @@ export default function PlatformLogin() {
       identifierLabel="E-posta / Kullanıcı Adı"
       identifierPlaceholder="e-posta veya kullanıcı adı"
       passwordLabel="Şifre"
-      passwordPlaceholder="sifrenizi girin"
+      passwordPlaceholder="şifrenizi girin"
       identifier={identifier}
       password={password}
       onIdentifierChange={setIdentifier}

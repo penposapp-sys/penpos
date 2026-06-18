@@ -4,6 +4,7 @@ import { getSubscriptionUpgradePath, isSubscriptionAllowedPath } from './subscri
 const inflight = new Map()
 const cache = new Map()
 let lastRateLimitToastAt = 0
+const DEFAULT_REMOTE_API_ORIGIN = 'https://penpos.cloud'
 
 export const clearApiCache = () => {
   try {
@@ -15,6 +16,18 @@ const normalizeBaseUrl = (value) => {
   const v = String(value || '').replace(/\/+$/, '')
   if (v.endsWith('/api')) return v.slice(0, -4)
   return v
+}
+
+const isNativeRuntime = () => {
+  try {
+    if (typeof window === 'undefined') return false
+    const capacitor = window.Capacitor
+    if (typeof capacitor?.isNativePlatform === 'function') return !!capacitor.isNativePlatform()
+    const platform = String(capacitor?.getPlatform?.() || '').toLowerCase()
+    return platform === 'android' || platform === 'ios'
+  } catch {
+    return false
+  }
 }
 
 const forcePort4000 = (value) => {
@@ -66,7 +79,11 @@ const normalizeForAllowlist = (path) => {
 }
 
 const envBase = normalizeBaseUrl(import.meta.env.VITE_API_URL) || ''
-const base = import.meta.env.DEV ? forcePort4000(envBase || 'http://localhost:4000') : envBase
+const nativeEnvBase = normalizeBaseUrl(import.meta.env.VITE_API_URL_NATIVE || import.meta.env.VITE_API_URL_ANDROID || '') || ''
+const remoteBase = nativeEnvBase || (envBase && /^https?:\/\//i.test(envBase) ? envBase : DEFAULT_REMOTE_API_ORIGIN)
+const base = import.meta.env.DEV
+  ? forcePort4000(envBase || 'http://localhost:4000')
+  : (isNativeRuntime() ? remoteBase : envBase)
 
 
 if (import.meta.env.DEV) {
@@ -197,6 +214,12 @@ export const api = async (path, options = {}) => {
         } else {
           console.debug('[API_ACTION]', { url, method, hasBranchHeader, branchHeaderValue })
         }
+      } catch {}
+    }
+    if (isAuthLogin) {
+      try {
+        console.log('LOGIN REQUEST URL', url)
+        console.log('LOGIN REQUEST PORTAL', portal)
       } catch {}
     }
     let res
