@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { defaultWebsiteSettings } from '../constants/websiteSettings.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
@@ -77,7 +77,7 @@ const scrollToSection = (event, targetId) => {
   window.scrollTo({ top, behavior: 'smooth' })
 }
 
-function Header({ settings, onOpenLogin, onOpenSystems }) {
+function Header({ settings, onOpenLogin, onOpenSystems, onRegister }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -92,7 +92,7 @@ function Header({ settings, onOpenLogin, onOpenSystems }) {
         </nav>
         <div className="lp-header-actions">
           <button className="lp-btn lp-btn--text" type="button" onClick={onOpenLogin}>Giriş Yap</button>
-          <Link className="lp-btn lp-btn--primary" to={`${settings.registerUrl || '/register'}?type=restaurant`}>1 Hafta Ücretsiz Dene</Link>
+          <button className="lp-btn lp-btn--primary public-touch-card" type="button" onClick={onRegister}>1 Hafta Ücretsiz Dene</button>
         </div>
         <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü">
           <Icon name={open ? 'x' : 'menu'} className="lp-menu-icon" />
@@ -105,7 +105,7 @@ function Header({ settings, onOpenLogin, onOpenSystems }) {
           <a href="#fiyat" onClick={() => setOpen(false)}>Fiyat</a>
           <a href="#egitim" onClick={() => setOpen(false)}>Eğitim Videoları</a>
           <button type="button" onClick={() => { setOpen(false); onOpenLogin() }}>Giriş Yap</button>
-          <Link className="lp-btn lp-btn--primary" to={`${settings.registerUrl || '/register'}?type=restaurant`} onClick={() => setOpen(false)}>1 Hafta Ücretsiz Dene</Link>
+          <button className="lp-btn lp-btn--primary public-touch-card" type="button" onClick={() => { setOpen(false); onRegister?.() }}>1 Hafta Ücretsiz Dene</button>
         </div>
       ) : null}
     </header>
@@ -288,6 +288,7 @@ export default function LandingPage() {
   const [settings, setSettings] = useState(defaultWebsiteSettings)
   const [loginOpen, setLoginOpen] = useState(false)
   const [active, setActive] = useState('restaurant')
+  const nav = useNavigate()
 
   useBodyLayoutMode('public-site-layout')
 
@@ -571,12 +572,14 @@ export default function LandingPage() {
         .lp-hero-secondary {
           padding: 16px 28px;
           border-radius: 12px;
+          border: 0;
           font-size: 14px;
           font-weight: 900;
           text-decoration: none;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          cursor: pointer;
           transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s ease;
         }
         .lp-hero-primary {
@@ -1403,6 +1406,8 @@ export default function LandingPage() {
           padding: 24px;
           text-decoration: none;
           color: inherit;
+          text-align: left;
+          cursor: pointer;
         }
         .lp-login-card--dark {
           background: #0f0f0e;
@@ -1518,6 +1523,7 @@ export default function LandingPage() {
       <Header
         settings={settings}
         onOpenLogin={() => setLoginOpen(true)}
+        onRegister={() => nav(`${settings.registerUrl || '/register'}?type=restaurant`)}
         onOpenSystems={(event) => {
           setActive('restaurant')
           scrollToSection(event, 'sistemler')
@@ -1534,8 +1540,8 @@ export default function LandingPage() {
               <h1><span>{settings.heroTitle || 'Restoran ve mağaza sistemlerini ayrı ayrı yönetin.'}</span></h1>
               <p>{settings.heroDescription || 'PenPOS; Restoran-Cafe ve Mağaza-Market için ayrı girişleri, ayrı ekran akışları olan modern otomasyon yapısıdır.'}</p>
               <div className="lp-hero-actions">
-                <Link className="lp-hero-primary" to={`${settings.registerUrl || '/register'}?type=restaurant`}>1 Haftalık Ücretsiz Deneme</Link>
-                <button className="lp-hero-secondary" type="button" onClick={() => setLoginOpen(true)}>Giriş Yap</button>
+                <button className="lp-hero-primary public-touch-card" type="button" onClick={() => nav(`${settings.registerUrl || '/register'}?type=restaurant`)}>1 Haftalık Ücretsiz Deneme</button>
+                <button className="lp-hero-secondary public-touch-card" type="button" onClick={() => setLoginOpen(true)}>Giriş Yap</button>
               </div>
               <div className="lp-hero-points">
                 {['QR menü dahil', 'Sınırsız şube', 'YouTube eğitim videoları'].map((item) => (
@@ -1661,16 +1667,16 @@ export default function LandingPage() {
               <button className="lp-close" type="button" onClick={() => setLoginOpen(false)}>×</button>
             </div>
             <div className="lp-login-grid">
-              <Link className="lp-login-card lp-login-card--dark" to={settings.restaurantLoginUrl || '/login?type=restaurant'}>
+              <button type="button" className="lp-login-card lp-login-card--dark public-touch-card" onClick={() => nav(settings.restaurantLoginUrl || '/login?type=restaurant')}>
                 <Icon name="store" className="lp-login-icon" />
                 <strong>Restoran / Cafe Girişi</strong>
                 <p>Masa, adisyon, paket servis, mutfak ve QR menü akışı.</p>
-              </Link>
-              <Link className="lp-login-card lp-login-card--accent" to={settings.marketLoginUrl || '/login?type=market'}>
+              </button>
+              <button type="button" className="lp-login-card lp-login-card--accent public-touch-card" onClick={() => nav(settings.marketLoginUrl || '/login?type=market')}>
                 <Icon name="cart" className="lp-login-icon" />
                 <strong>Mağaza / Market Girişi</strong>
                 <p>Barkodlu hızlı satış, stok hareketi ve cari hesap akışı.</p>
-              </Link>
+              </button>
             </div>
           </div>
         </div>

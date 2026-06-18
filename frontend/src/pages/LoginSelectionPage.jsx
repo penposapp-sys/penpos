@@ -10,7 +10,7 @@ export default function LoginSelectionPage() {
   useBodyLayoutMode('public-site-layout')
 
   useEffect(() => {
-    document.title = 'PenPOS - Giriş Seçimi'
+    document.title = 'PenPOS - GiriÅŸ SeÃ§imi'
   }, [])
 
   useEffect(() => {
@@ -23,29 +23,29 @@ export default function LoginSelectionPage() {
       <div className="public-auth-shell public-auth-shell--modal public-auth-shell--website">
         <div className="public-auth-head">
           <div className="public-auth-head-row">
-            <div className="marketing-trial-badge login-selection-badge">Giriş seçimi</div>
-            <Link to="/" className="public-auth-close public-auth-close--website" aria-label="Ana sayfaya dön">
-              ×
+            <div className="marketing-trial-badge login-selection-badge">GiriÅŸ seÃ§imi</div>
+            <Link to="/" className="public-auth-close public-auth-close--website" aria-label="Ana sayfaya dÃ¶n">
+              Ã—
             </Link>
           </div>
-          <h1>Giriş yapmak istediğiniz sistemi seçin</h1>
-          <p>Mevcut bağlantılar korunur. İşletmeniz için uygun giriş ekranına aynı web sitesi teması ile devam edin.</p>
+          <h1>GiriÅŸ yapmak istediÄŸiniz sistemi seÃ§in</h1>
+          <p>Mevcut baÄŸlantÄ±lar korunur. Ä°ÅŸletmeniz iÃ§in uygun giriÅŸ ekranÄ±na aynÄ± web sitesi temasÄ± ile devam edin.</p>
         </div>
 
         <div className="public-auth-grid public-auth-grid--selection">
-          <Link to="/login/restoran" className="public-auth-card public-auth-card--website public-auth-card--restaurant">
-            <span aria-hidden="true">🍽</span>
-            <strong>Restoran / Cafe Girişi</strong>
-            <p>Masa, adisyon, paket servis, mutfak ve QR menü akışına tek panelden ulaşın.</p>
-            <em>Masa takibi, mutfak akışı ve servis operasyonu</em>
-          </Link>
+          <button type="button" className="public-auth-card public-auth-card--website public-auth-card--restaurant public-touch-card" onClick={() => nav('/login/restoran')}>
+            <span aria-hidden="true">ğŸ½</span>
+            <strong>Restoran / Cafe GiriÅŸi</strong>
+            <p>Masa, adisyon, paket servis, mutfak ve QR menÃ¼ akÄ±ÅŸÄ±na tek panelden ulaÅŸÄ±n.</p>
+            <em>Masa takibi, mutfak akÄ±ÅŸÄ± ve servis operasyonu</em>
+          </button>
 
-          <Link to="/canteen/login" className="public-auth-card public-auth-card--website public-auth-card--canteen">
-            <span aria-hidden="true">🛒</span>
-            <strong>Mağaza / Market Girişi</strong>
-            <p>Barkodlu hızlı satış, stok hareketi ve cari hesap akışına aynı premium ekranla bağlanın.</p>
-            <em>Hızlı kasa, stok kontrolü ve fiyat listesi yönetimi</em>
-          </Link>
+          <button type="button" className="public-auth-card public-auth-card--website public-auth-card--canteen public-touch-card" onClick={() => nav('/canteen/login')}>
+            <span aria-hidden="true">ğŸ›’</span>
+            <strong>MaÄŸaza / Market GiriÅŸi</strong>
+            <p>Barkodlu hÄ±zlÄ± satÄ±ÅŸ, stok hareketi ve cari hesap akÄ±ÅŸÄ±na aynÄ± premium ekranla baÄŸlanÄ±n.</p>
+            <em>HÄ±zlÄ± kasa, stok kontrolÃ¼ ve fiyat listesi yÃ¶netimi</em>
+          </button>
         </div>
       </div>
     </div>

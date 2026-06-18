@@ -9394,6 +9394,8 @@ textarea::placeholder {
   min-height: 124px;
   border-radius: 22px;
   padding: 16px 14px;
+  border: 1px solid transparent;
+  text-align: left;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
 
@@ -9443,6 +9445,52 @@ textarea::placeholder {
 .public-auth-card--website:hover {
   border-color: rgba(217,181,111,0.32);
   box-shadow: 0 28px 54px rgba(0,0,0,0.3);
+}
+
+body.public-site-layout .public-auth-page,
+body.public-site-layout .lp-page,
+body.public-site-layout .lp-main,
+body.public-site-layout .lp-hero,
+body.public-site-layout .lp-hero-inner,
+body.public-site-layout .lp-hero-copy,
+body.public-site-layout .lp-hero-actions,
+body.public-site-layout .lp-header-shell,
+body.public-site-layout .lp-header,
+body.public-site-layout .lp-mobile-nav,
+body.public-site-layout .lp-login-grid,
+body.public-site-layout .public-auth-grid,
+body.public-site-layout .public-auth-grid--selection {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+body.public-site-layout .lp-hero-left-glow,
+body.public-site-layout .lp-hero-right-glow,
+body.public-site-layout .lp-preview-glow,
+body.public-site-layout .marketing-bg,
+body.public-site-layout .marketing-noise {
+  pointer-events: none !important;
+}
+
+body.public-site-layout .lp-modal-backdrop,
+body.public-site-layout .lp-modal,
+body.public-site-layout .public-auth-shell,
+body.public-site-layout .public-auth-card,
+body.public-site-layout .lp-login-card,
+body.public-site-layout .lp-btn,
+body.public-site-layout .lp-hero-primary,
+body.public-site-layout .lp-hero-secondary,
+body.public-site-layout .public-touch-card,
+body.public-site-layout .card.public-touch-card {
+  position: relative;
+  z-index: 4;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.public-touch-card {
+  -webkit-tap-highlight-color: transparent;
 }
 
 .register-type-card {
