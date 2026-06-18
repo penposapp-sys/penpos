@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { api, clearApiCache } from '../lib/apiClient.js'
 import { normalizePermissions } from '../constants/permissions.js'
+import { clearAllAuthTokens, getAuthToken, removeAuthToken, setAuthToken } from '../lib/authStorage.js'
 
 const AuthContext = createContext()
 
@@ -14,7 +15,6 @@ const resolvePortalFromPathname = (pathname) => {
     path.startsWith('/platform-login')
   ) return 'platform'
   if (path.startsWith('/canteen') || path.startsWith('/login/kantin')) return 'canteen'
-  if (path.startsWith('/kermes') || path.startsWith('/login/restoran')) return 'restaurant'
   return 'restaurant'
 }
 
@@ -46,13 +46,28 @@ const persistActiveBranchSelection = (normalizedUser, branchIds = []) => {
   if (!selectedBranchId) return
 
   try {
-    if (systemType === 'kantin') {
+    if (systemType === 'kantin' || systemType === 'canteen') {
       localStorage.setItem('selectedBranchId_canteen', selectedBranchId)
     } else {
       localStorage.setItem('selectedBranchId', selectedBranchId)
     }
   } catch {
   }
+}
+
+const normalizeUser = (user) => (user ? { ...user, permissions: normalizePermissions(user.permissions) } : null)
+
+const resolvePortalFromUser = (user) => {
+  if (!user) return 'restaurant'
+  if (user.role === 'platform_admin' || user.role === 'superadmin') return 'platform'
+  if (user.systemType === 'kantin' || user.systemType === 'canteen') return 'canteen'
+  return 'restaurant'
+}
+
+const restorePortalOrder = (pathname) => {
+  const currentPortal = resolvePortalFromPathname(pathname)
+  const order = [currentPortal, 'restaurant', 'canteen', 'platform']
+  return order.filter((portal, index) => order.indexOf(portal) === index)
 }
 
 export const AuthProvider = ({ children }) => {
@@ -62,6 +77,38 @@ export const AuthProvider = ({ children }) => {
   const [allowedBranchIds, setAllowedBranchIds] = useState([])
 
   const initInFlightRef = useRef(false)
+
+  const hydratePortalState = async (portal, meRes) => {
+    const meUser = meRes?.user
+    const normalized = normalizeUser(meUser)
+    setUser(normalized)
+
+    if (normalized?.tenantId) {
+      const ctxRes = await api('/api/tenant/context', { silent: true, portalOverride: portal })
+      setTenantCtx(ctxRes?.ok ? ctxRes : null)
+    } else {
+      setTenantCtx(null)
+    }
+
+    if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
+      try {
+        const res = await api('/api/tenant/profile', { silent: true, portalOverride: portal })
+        if (!res?.ok || res?.success === false) {
+          setAllowedBranchIds([])
+        } else {
+          const ids = resolveAllowedBranchIds(normalized, res?.tenant)
+          setAllowedBranchIds(ids)
+          persistActiveBranchSelection(normalized, ids)
+        }
+      } catch {
+        setAllowedBranchIds([])
+      }
+    } else {
+      setAllowedBranchIds([])
+    }
+
+    return normalized
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -74,53 +121,23 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const portal = resolvePortalFromPathname(pathname)
-      const tokenKey = resolveTokenKeyForPortal(portal)
-      const token = localStorage.getItem(tokenKey)
-      if (!token) {
-        setLoading(false)
-        initInFlightRef.current = false
-        return
-      }
+
       try {
-        const portalOverride = portal
-        const meRes = await api('/api/auth/me', { silent: true, portalOverride })
-        if (!meRes?.ok) {
-          localStorage.removeItem(tokenKey)
-          setUser(null)
-          setTenantCtx(null)
-          setAllowedBranchIds([])
+        for (const portal of restorePortalOrder(pathname)) {
+          const tokenKey = resolveTokenKeyForPortal(portal)
+          const token = getAuthToken(tokenKey)
+          if (!token) continue
+
+          const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride: portal })
+          if (!meRes?.ok || !meRes?.user) {
+            removeAuthToken(tokenKey)
+            continue
+          }
+
+          await hydratePortalState(portal, meRes)
           return
         }
-        const user = meRes?.user
-        const normalized = user ? { ...user, permissions: normalizePermissions(user.permissions) } : null
-        setUser(normalized)
-        if (normalized?.tenantId) {
-          const ctxRes = await api('/api/tenant/context', { silent: true, portalOverride })
-          setTenantCtx(ctxRes?.ok ? ctxRes : null)
-        } else {
-          setTenantCtx(null)
-        }
 
-        if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
-          try {
-            const res = await api('/api/tenant/profile', { silent: true, portalOverride })
-            if (!res?.ok || res?.success === false) {
-              setAllowedBranchIds([])
-            } else {
-              const ids = resolveAllowedBranchIds(normalized, res?.tenant)
-              setAllowedBranchIds(ids)
-              persistActiveBranchSelection(normalized, ids)
-            }
-          } catch {
-            setAllowedBranchIds([])
-          }
-        } else {
-          setAllowedBranchIds([])
-        }
-        return normalized
-      } catch {
-        localStorage.removeItem(tokenKey)
         setUser(null)
         setTenantCtx(null)
         setAllowedBranchIds([])
@@ -129,10 +146,11 @@ export const AuthProvider = ({ children }) => {
         initInFlightRef.current = false
       }
     }
+
     init()
   }, [])
 
-  const login = async ({ identifier, email, password, portal }) => {
+  const login = async ({ identifier, email, password, portal, rememberMe = true }) => {
     const payload = { identifier: identifier ?? email, password, portal }
     const portalOverride =
       portal === 'platform' ? 'platform' :
@@ -142,73 +160,31 @@ export const AuthProvider = ({ children }) => {
       'restaurant'
     const tokenKey = resolveTokenKeyForPortal(portalOverride)
 
-    try {
-      console.log('[LOGIN_REQUEST]', {
-        identifier: payload.identifier,
-        portal: payload.portal,
-      })
-      const loginRes = await api('/api/auth/login', {
-        method: 'POST',
-        data: payload,
-        silent: true,
-        suppressAuthRedirect: true,
-        portalOverride
-      })
-      if (loginRes?.ok === false || !loginRes?.token) {
-        const err = new Error(loginRes?.message || 'Giriş başarısız')
-        err.code = loginRes?.code || null
-        err.response = { status: loginRes?.status, data: loginRes?.data }
-        throw err
-      }
-
-      localStorage.setItem(tokenKey, loginRes.token)
-      const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride })
-      if (meRes?.ok === false || !meRes?.user) {
-        try {
-          localStorage.removeItem(tokenKey)
-        } catch {}
-        const err = new Error(meRes?.message || 'Giriş başarısız')
-        err.code = meRes?.code || null
-        err.response = { status: meRes?.status, data: meRes?.data }
-        throw err
-      }
-      const meUser = meRes?.user
-      const normalized = meUser ? { ...meUser, permissions: normalizePermissions(meUser.permissions) } : null
-      setUser(normalized)
-      if (normalized?.tenantId) {
-        const ctxRes = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride })
-        setTenantCtx(ctxRes?.ok ? ctxRes : null)
-      } else {
-        setTenantCtx(null)
-      }
-
-      if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
-        try {
-          const res = await api('/api/tenant/profile', { silent: true, suppressAuthRedirect: true, portalOverride })
-          if (!res?.ok || res?.success === false) {
-            setAllowedBranchIds([])
-          } else {
-            const ids = resolveAllowedBranchIds(normalized, res?.tenant)
-            setAllowedBranchIds(ids)
-            persistActiveBranchSelection(normalized, ids)
-          }
-        } catch {
-          setAllowedBranchIds([])
-        }
-      } else {
-        setAllowedBranchIds([])
-      }
-
-      return normalized
-    } catch (err) {
-      console.error('[LOGIN_ERROR]', {
-        identifier: payload.identifier,
-        portal: payload.portal,
-        status: err?.response?.status,
-        data: err?.response?.data,
-      })
+    const loginRes = await api('/api/auth/login', {
+      method: 'POST',
+      data: payload,
+      silent: true,
+      suppressAuthRedirect: true,
+      portalOverride,
+    })
+    if (loginRes?.ok === false || !loginRes?.token) {
+      const err = new Error(loginRes?.message || 'Login failed')
+      err.code = loginRes?.code || loginRes?.error || null
+      err.response = { status: loginRes?.status, data: loginRes?.data || loginRes }
       throw err
     }
+
+    setAuthToken(tokenKey, loginRes.token, rememberMe !== false)
+    const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride })
+    if (meRes?.ok === false || !meRes?.user) {
+      removeAuthToken(tokenKey)
+      const err = new Error(meRes?.message || 'Login failed')
+      err.code = meRes?.code || null
+      err.response = { status: meRes?.status, data: meRes?.data || meRes }
+      throw err
+    }
+
+    return hydratePortalState(resolvePortalFromUser(meRes.user), meRes)
   }
 
   const logout = () => {
@@ -220,22 +196,16 @@ export const AuthProvider = ({ children }) => {
       }
     })()
     const nextPath = (() => {
-      if (pathname.startsWith('/canteen') || String(user?.systemType || '') === 'kantin') return '/canteen/login'
-      if (
-        pathname.startsWith('/platform') ||
-        pathname.startsWith('/platform-admin') ||
-        pathname.startsWith('/superadmin') ||
-        String(user?.role || '') === 'platform_admin' ||
-        String(user?.role || '') === 'superadmin'
-      ) {
+      if (pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || String(user?.role || '') === 'platform_admin' || String(user?.role || '') === 'superadmin') {
         return '/platform-login'
+      }
+      if (pathname.startsWith('/canteen') || String(user?.systemType || '') === 'kantin' || String(user?.systemType || '') === 'canteen') {
+        return '/canteen/login'
       }
       return '/login/restoran'
     })()
 
-    localStorage.removeItem('token_platform')
-    localStorage.removeItem('token_restaurant')
-    localStorage.removeItem('token_canteen')
+    clearAllAuthTokens()
     localStorage.removeItem('selectedBranchId')
     localStorage.removeItem('selectedBranchId_canteen')
     localStorage.removeItem('activeSystem')
@@ -250,43 +220,14 @@ export const AuthProvider = ({ children }) => {
   }
 
   const refresh = async () => {
-    try {
-      const pathname = (() => {
-        try {
-          return String(window.location?.pathname || '')
-        } catch {
-          return ''
-        }
-      })()
-      const portalOverride = resolvePortalFromPathname(pathname)
-      const meRes = await api('/api/auth/me', { silent: true, portalOverride })
-      if (!meRes?.ok) return
-      const user = meRes?.user
-      const normalized = user ? { ...user, permissions: normalizePermissions(user.permissions) } : null
-      setUser(normalized)
-      if (normalized?.tenantId) {
-        const ctxRes = await api('/api/tenant/context', { silent: true, portalOverride })
-        setTenantCtx(ctxRes?.ok ? ctxRes : null)
-      } else {
-        setTenantCtx(null)
-      }
+    const portal = resolvePortalFromUser(user) || resolvePortalFromPathname(window.location?.pathname || '')
+    const tokenKey = resolveTokenKeyForPortal(portal)
+    if (!getAuthToken(tokenKey)) return
 
-      if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
-        try {
-          const res = await api('/api/tenant/profile', { silent: true, portalOverride })
-          if (!res?.ok || res?.success === false) {
-            setAllowedBranchIds([])
-          } else {
-            const ids = resolveAllowedBranchIds(normalized, res?.tenant)
-            setAllowedBranchIds(ids)
-            persistActiveBranchSelection(normalized, ids)
-          }
-        } catch {
-          setAllowedBranchIds([])
-        }
-      } else {
-        setAllowedBranchIds([])
-      }
+    try {
+      const meRes = await api('/api/auth/me', { silent: true, portalOverride: portal })
+      if (!meRes?.ok || !meRes?.user) return
+      await hydratePortalState(portal, meRes)
     } catch {
     }
   }

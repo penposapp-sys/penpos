@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { api } from '../lib/apiClient.js'
 import { defaultWebsiteSettings } from '../constants/websiteSettings.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
@@ -289,6 +290,13 @@ export default function LandingPage() {
   const [loginOpen, setLoginOpen] = useState(false)
   const [active, setActive] = useState('restaurant')
   const nav = useNavigate()
+  const showAndroidDownload = (() => {
+    try {
+      return !Capacitor.isNativePlatform()
+    } catch {
+      return true
+    }
+  })()
 
   useBodyLayoutMode('public-site-layout')
 
@@ -569,7 +577,8 @@ export default function LandingPage() {
           gap: 16px;
         }
         .lp-hero-primary,
-        .lp-hero-secondary {
+        .lp-hero-secondary,
+        .lp-hero-download {
           padding: 16px 28px;
           border-radius: 12px;
           border: 0;
@@ -592,8 +601,14 @@ export default function LandingPage() {
           color: #fff;
           box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
         }
+        .lp-hero-download {
+          background: linear-gradient(135deg, #d48a58 0%, #b8734b 100%);
+          color: #fff;
+          box-shadow: 0 22px 55px rgba(184,115,75,.34);
+        }
         .lp-hero-primary:hover,
-        .lp-hero-secondary:hover { transform: translateY(-2px) scale(1.03); }
+        .lp-hero-secondary:hover,
+        .lp-hero-download:hover { transform: translateY(-2px) scale(1.03); }
         .lp-hero-points {
           margin-top: 28px;
           display: flex;
@@ -1517,6 +1532,18 @@ export default function LandingPage() {
           .lp-report-stats {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
+          .lp-hero-actions {
+            gap: 12px;
+          }
+          .lp-hero-primary,
+          .lp-hero-secondary,
+          .lp-hero-download {
+            width: 100%;
+          }
+          .lp-hero-download {
+            font-size: 15px;
+            padding: 18px 24px;
+          }
         }
       `}</style>
 
@@ -1542,6 +1569,16 @@ export default function LandingPage() {
               <div className="lp-hero-actions">
                 <button className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => nav('/register')}>1 Haftalık Ücretsiz Deneme</button>
                 <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => nav('/login')}>Giriş Yap</button>
+                {showAndroidDownload ? (
+                  <a
+                    className="lp-hero-download"
+                    href="https://drive.google.com/file/d/1c8I7iCdCtaSXrSIAjSpn0Af19honaUpn/view?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Android Uygulamasını İndir
+                  </a>
+                ) : null}
               </div>
               <div className="lp-hero-points">
                 {['QR menü dahil', 'Sınırsız şube', 'YouTube eğitim videoları'].map((item) => (

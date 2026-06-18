@@ -18,6 +18,8 @@ export default function PublicSystemLogin({
   password,
   onIdentifierChange,
   onPasswordChange,
+  rememberMe = true,
+  onRememberMeChange,
   onSubmit,
   error,
   loading,
@@ -35,6 +37,7 @@ export default function PublicSystemLogin({
   highlights = [],
   panelQuote,
   panelCaption,
+  showRememberMe = true,
 }) {
   const [showPassword, setShowPassword] = useState(false)
 
@@ -135,6 +138,16 @@ export default function PublicSystemLogin({
               </label>
 
               <div className="system-login__meta">
+                {showRememberMe && typeof onRememberMeChange === 'function' ? (
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(event) => onRememberMeChange(event.target.checked)}
+                    />
+                    <span>Beni hatirla</span>
+                  </label>
+                ) : <span />}
                 <Link to={forgotTo} className="system-login__text-link">{forgotLabel}</Link>
               </div>
 

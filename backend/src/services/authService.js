@@ -108,7 +108,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
       : (await findByUsername(normalizedIdentifier, portal ? portalUsernameFilter : {}))
         || (await findByUsername(normalizedIdentifier))
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.DEBUG_LOGIN === '1') {
       try {
         info('[AUTH_LOGIN_TRY]', {
           requestId: requestId || null,
@@ -131,7 +131,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     let ok = false
     try {
       ok = await bcrypt.compare(String(password || ''), String(pwHash || ''))
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.DEBUG_LOGIN === '1') {
         try {
           info('[AUTH_LOGIN_COMPARE]', {
             requestId: requestId || null,

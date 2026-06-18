@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import Modal from '../../components/Modal.jsx'
 import { toast } from '../../lib/toast.js'
+import { getAuthToken } from '../../lib/authStorage.js'
 
 const baseUrl = '/api'
 const tokenKey = 'token_canteen'
@@ -29,7 +30,7 @@ const downloadBlob = (blob, filename) => {
 }
 
 const fetchWithAuth = async (path, options = {}, { branchId } = {}) => {
-  const token = localStorage.getItem(tokenKey)
+  const token = getAuthToken(tokenKey)
   const headers = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(branchId ? { 'x-branch-id': String(branchId) } : {}),

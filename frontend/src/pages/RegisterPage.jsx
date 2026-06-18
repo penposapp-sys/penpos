@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
+import { setAuthToken } from '../lib/authStorage.js'
 import { defaultWebsiteSettings } from '../constants/websiteSettings.js'
 import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
@@ -82,11 +83,8 @@ export default function RegisterPage() {
     }
 
     try {
-      if (res.portal === 'canteen') {
-        localStorage.setItem('token_canteen', res.token)
-      } else {
-        localStorage.setItem('token_restaurant', res.token)
-      }
+      if (res.portal === 'canteen') setAuthToken('token_canteen', res.token, true)
+      else setAuthToken('token_restaurant', res.token, true)
     } catch {}
 
     toast.success('Üyelik oluşturuldu. Deneme süresi başlatıldı.')

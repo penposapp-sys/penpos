@@ -11,7 +11,7 @@ router.post('/login', async (req, res) => {
   try {
     const { identifier, email, password, portal } = req.body || {}
     try {
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.DEBUG_LOGIN === '1') {
         info('[AUTH_LOGIN_ROUTE_REQUEST]', {
           requestId: req.requestId || null,
           identifier: String(identifier ?? email ?? '').trim().toLowerCase(),

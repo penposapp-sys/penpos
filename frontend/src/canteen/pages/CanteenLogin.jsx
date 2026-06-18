@@ -1,55 +1,39 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PublicSystemLogin from '../../components/PublicSystemLogin.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
-import { api } from '../../lib/apiClient.js'
 
 const getFriendlyLoginError = (error) => {
   const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
-  if (code === 'account_disabled') return 'Hesabınız devre dışı. Lütfen yetkilinizle iletişime geçin.'
-  if (code === 'wrong_portal') return 'Bu hesap mağaza giriş ekranı için uygun değil.'
-  return 'Giriş başarısız. E-posta/kullanıcı adı veya şifre hatalı.'
+  if (code === 'account_disabled') return 'Hesabiniz devre disi. Lutfen yetkilinizle iletisime gecin.'
+  if (code === 'wrong_portal') return 'Bu hesap magaza giris ekrani icin uygun degil.'
+  return 'Giris basarisiz. E-posta/kullanici adi veya sifre hatali.'
 }
 
 export default function CanteenLogin() {
+  const { login } = useAuth()
   const nav = useNavigate()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
 
   useBodyLayoutMode('public-site-layout')
 
   useEffect(() => {
-    document.title = 'PenPOS - Mağaza Girişi'
+    document.title = 'PenPOS - Magaza Girisi'
   }, [])
 
   const onSubmit = async (event) => {
     event.preventDefault()
     setLoading(true)
     setError('')
-    const payload = { identifier, password, portal: 'canteen' }
-
     try {
-      console.log('[LOGIN_FORM_SUBMIT]', { identifier, portal: payload.portal })
-      const loginRes = await api('/api/auth/login', {
-        method: 'POST',
-        data: payload,
-        silent: true,
-        suppressAuthRedirect: true,
-        portalOverride: 'canteen',
-      })
-      if (loginRes?.ok === false || !loginRes?.token) {
-        const err = new Error(loginRes?.message || 'Giriş başarısız')
-        err.code = loginRes?.code || null
-        err.response = { data: loginRes?.data }
-        throw err
-      }
-
-      localStorage.setItem('token_canteen', loginRes.token)
+      await login({ identifier, password, portal: 'canteen', rememberMe })
       nav('/canteen', { replace: true })
     } catch (err) {
-      console.error(err)
       setError(getFriendlyLoginError(err))
     } finally {
       setLoading(false)
@@ -59,39 +43,41 @@ export default function CanteenLogin() {
   return (
     <PublicSystemLogin
       backTo="/login"
-      backLabel="Sistem seçimine dön"
+      backLabel="Sistem secimine don"
       brand="PenPOS"
-      systemLabel="KANTİN / MARKET YÖNETİMİ"
-      welcomeTitle="Hızlı kasa, stok ve cari akışlarınızı tek ekranda toplayın."
-      welcomeText="Barkodlu satış, stok hareketleri, cari bakiyeler ve günlük raporlar ile operasyonu sade ve hızlı yönetin."
-      formTitle="Mağaza Girişi"
-      formSubtitle="Mağaza veya market panelinize giriş yapın."
-      identifierLabel="E-posta / Kullanıcı Adı"
-      identifierPlaceholder="eposta veya kullanıcı adı"
-      passwordLabel="Şifre"
-      passwordPlaceholder="şifrenizi girin"
+      systemLabel="KANTIN / MARKET YONETIMI"
+      welcomeTitle="Hizli kasa, stok ve cari akislarinizi tek ekranda toplayin."
+      welcomeText="Barkodlu satis, stok hareketleri, cari bakiyeler ve gunluk raporlar ile operasyonu sade ve hizli yonetin."
+      formTitle="Magaza Girisi"
+      formSubtitle="Magaza veya market panelinize giris yapin."
+      identifierLabel="E-posta / Kullanici Adi"
+      identifierPlaceholder="eposta veya kullanici adi"
+      passwordLabel="Sifre"
+      passwordPlaceholder="sifrenizi girin"
       identifier={identifier}
       password={password}
+      rememberMe={rememberMe}
+      onRememberMeChange={setRememberMe}
       onIdentifierChange={setIdentifier}
       onPasswordChange={setPassword}
       onSubmit={onSubmit}
       error={error}
       loading={loading}
       forgotTo="/forgot-password?portal=canteen"
-      submitLabel="Giriş Yap"
-      loadingLabel="Giriş yapılıyor..."
+      submitLabel="Giris Yap"
+      loadingLabel="Giris yapiliyor..."
       registerTo="/register?type=market"
-      registerLabel="Yeni İşletme Kaydı"
-      registerText="Mağaza veya market hesabınızı açın, ürünlerinizi ve şubelerinizi kolayca yönetin."
-      supportTitle="Mağaza desteği"
+      registerLabel="Yeni Isletme Kaydi"
+      registerText="Magaza veya market hesabinizi acin, urunlerinizi ve subelerinizi kolayca yonetin."
+      supportTitle="Magaza destegi"
       supportItems={[
-        { label: 'Barkodlu Satış', value: 'Hızlı kasa' },
+        { label: 'Barkodlu Satis', value: 'Hizli kasa' },
         { label: 'Stok + Cari', value: 'Tek panel' },
       ]}
       theme="canteen"
-      highlights={['Hızlı Kasa', 'Stok Takibi', 'Cari Hesap', 'Şube Yönetimi']}
-      panelQuote="Yoğun satış saatlerinde kasayı yavaşlatmadan ürün, stok ve cari akışlarını tek panelden kontrol edin."
-      panelCaption="Mağaza paneli"
+      highlights={['Hizli Kasa', 'Stok Takibi', 'Cari Hesap', 'Sube Yonetimi']}
+      panelQuote="Yogun satis saatlerinde kasayi yavaslatmadan urun, stok ve cari akislarini tek panelden kontrol edin."
+      panelCaption="Magaza paneli"
     />
   )
 }

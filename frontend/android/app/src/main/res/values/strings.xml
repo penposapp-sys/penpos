@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">PenPos</string>
-    <string name="title_activity_main">PenPos</string>
+    <string name="app_name">PenPOS</string>
+    <string name="title_activity_main">PenPOS</string>
     <string name="package_name">com.penpos.app</string>
     <string name="custom_url_scheme">com.penpos.app</string>
 </resources>

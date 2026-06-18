@@ -51,6 +51,7 @@ import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
 import WebsiteLoadingScreen from './components/WebsiteLoadingScreen.jsx'
+import { hasAuthToken } from './lib/authStorage.js'
 
 import CanteenLayout from './canteen/layout/CanteenLayout.jsx'
 import CanteenLogin from './canteen/pages/CanteenLogin.jsx'
@@ -80,12 +81,21 @@ const EXIT_ROUTES = new Set([
   '/',
   '/landing',
   '/login',
+  '/login-selection',
   '/login/platform',
   '/platform-login',
   '/login/restoran',
   '/login/kantin',
   '/canteen/login',
 ])
+
+const isNativeApp = () => {
+  try {
+    return Capacitor.isNativePlatform()
+  } catch {
+    return false
+  }
+}
 
 const resolveBackFallbackPath = (pathname) => {
   const path = String(pathname || '')
@@ -123,9 +133,24 @@ const canUseHistoryBack = () => {
   }
 }
 
+const hasAnyAuthToken = () => (
+  hasAuthToken('token_restaurant') ||
+  hasAuthToken('token_canteen') ||
+  hasAuthToken('token_platform')
+)
+
+const resolveHomePath = (user) => {
+  if (!user) return null
+  if (user.role === 'superadmin') return '/superadmin/tenants'
+  if (user.role === 'platform_admin') return '/platform'
+  if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/canteen'
+  return '/kermes'
+}
+
 function CapacitorBackButtonHandler() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user, tenantCtx, loading } = useAuth()
 
   useEffect(() => {
     let isMounted = true
@@ -140,14 +165,26 @@ function CapacitorBackButtonHandler() {
           if (!isMounted) return
 
           const pathname = String(location.pathname || '')
+          const isPublicRoute = EXIT_ROUTES.has(pathname)
+          const hasToken = hasAnyAuthToken()
+          const isAuthenticated = !!user || hasToken
+          const homePath = user ? resolveHomePath(user) : null
 
-          if (EXIT_ROUTES.has(pathname)) {
+          if (!isAuthenticated && isPublicRoute) {
             appPlugin.exitApp?.()
             return
           }
 
-          if (canGoBack || canUseHistoryBack()) {
+          if (user && (canGoBack || canUseHistoryBack())) {
             navigate(-1)
+            return
+          }
+
+          if (!user && hasToken) {
+            if (loading) return
+            if (pathname !== '/login') {
+              navigate('/login', { replace: true })
+            }
             return
           }
 
@@ -157,12 +194,20 @@ function CapacitorBackButtonHandler() {
             return
           }
 
-          if (pathname !== '/login') {
-            navigate('/login', { replace: true })
+          if (homePath && homePath !== pathname) {
+            navigate(homePath, { replace: true })
             return
           }
 
-          appPlugin.exitApp?.()
+          const defaultRoute = getDefaultRoute(user, tenantCtx)
+          if (defaultRoute && defaultRoute !== pathname) {
+            navigate(defaultRoute, { replace: true })
+            return
+          }
+
+          if (isAuthenticated && pathname !== '/login') {
+            navigate('/login', { replace: true })
+          }
         })
       } catch {
         return null
@@ -177,7 +222,7 @@ function CapacitorBackButtonHandler() {
         .then((listener) => listener?.remove?.())
         .catch(() => {})
     }
-  }, [location.pathname, navigate])
+  }, [loading, location.pathname, navigate, tenantCtx, user])
 
   return null
 }
@@ -197,7 +242,7 @@ const getDefaultRoute = (user, tenantCtx) => {
       : getSubscriptionProfilePath(user.systemType)
   }
 
-  if (user.systemType === 'canteen') return '/canteen/kasa'
+  if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/canteen/kasa'
 
   if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/kermes/app/dashboard'
   if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/kermes/app/tables'
@@ -210,6 +255,25 @@ const getDefaultRoute = (user, tenantCtx) => {
   if (canSettings) return '/kermes/settings'
   if (user.role === 'tenant_admin' || perms.includes('audit_view')) return '/kermes/app/audit'
   return null
+}
+
+const RootEntryRoute = () => {
+  const { user, loading, tenantCtx } = useAuth()
+
+  if (loading) {
+    return (
+      <WebsiteLoadingScreen
+        badge="PenPOS"
+        title="Oturum kontrol ediliyor"
+        message="Acik oturum ve yonlendirme bilgileri hazirlaniyor."
+      />
+    )
+  }
+
+  const nextPath = getDefaultRoute(user, tenantCtx)
+  if (nextPath) return <Navigate to={nextPath} replace />
+  if (isNativeApp()) return <Navigate to="/login" replace />
+  return <RootPublicEntryPage fallback={<LandingPage />} />
 }
 
 const KermesIndexRedirect = () => {
@@ -237,7 +301,7 @@ export default function App() {
         <CapacitorBackButtonHandler />
         <Toast />
         <Routes>
-        <Route path="/" element={<RootPublicEntryPage fallback={<LandingPage />} />} />
+        <Route path="/" element={<RootEntryRoute />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<LoginSelectionPage />} />
         <Route path="/platform-login" element={<PlatformLogin />} />

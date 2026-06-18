@@ -1,11 +1,11 @@
 import { toast } from './toast.js'
 import { getSubscriptionUpgradePath, isSubscriptionAllowedPath } from './subscription.js'
+import { getAuthToken, removeAuthToken } from './authStorage.js'
 
 const inflight = new Map()
 const cache = new Map()
 let lastRateLimitToastAt = 0
 const DEFAULT_REMOTE_API_ORIGIN = 'https://penpos.cloud'
-let baseUrlLogged = false
 
 export const clearApiCache = () => {
   try {
@@ -33,9 +33,7 @@ const isNativeRuntime = () => {
 
 const forcePort4000 = (value) => {
   const raw = String(value || '').trim()
-  if (!raw) {
-  return ''
-}
+  if (!raw) return ''
 
   try {
     const u = new URL(raw)
@@ -58,12 +56,10 @@ const normalizeApiPath = (path) => {
   return `/api/${p}`
 }
 
-
 const inferPortalFromPathname = (pathname) => {
   const p = String(pathname || '').trim().toLowerCase()
   if (p.startsWith('/canteen')) return 'canteen'
   if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/superadmin') || p.startsWith('/login/platform') || p.startsWith('/platform-login')) return 'platform'
-  if (p.startsWith('/login/restoran') || p.startsWith('/kermes')) return 'restaurant'
   return 'restaurant'
 }
 
@@ -87,41 +83,35 @@ const base = import.meta.env.DEV
   ? forcePort4000(envBase || 'http://localhost:4000')
   : (isNativeRuntime() ? remoteBase : envBase)
 
-const logResolvedApiBase = () => {
-  if (baseUrlLogged) return
-  baseUrlLogged = true
-  try {
-    console.info('[API_BASE_URL]', {
-      mode: import.meta.env.MODE,
-      isNativeRuntime: isNativeRuntime(),
-      envBase,
-      nativeEnvBase,
-      resolvedBase: base,
-      loginUrl: `${base}${normalizeApiPath('/api/auth/login')}`,
-    })
-  } catch {}
-}
+const MISSING_BRANCH_MESSAGE = 'Sube secimi gerekli. Ayarlar > Sistem Ayarlari > Yetkili Subeler bolumunden sube secin.'
 
-
-if (import.meta.env.DEV) {
-  try {
-    const siteHost = String(window.location?.hostname || '').trim().toLowerCase()
-    const apiHost = (() => {
-      try { return new URL(base).hostname } catch { return '' }
-    })()
-    const isSiteLocal = siteHost === 'localhost' || siteHost === '127.0.0.1'
-    const isApiLan = /^192\.168\./.test(String(apiHost || ''))
-    if (isSiteLocal && isApiLan) {
-      console.warn('⚠️ Local ortamda LAN API URL kullanıyorsun. .env.lan yerine .env ile çalışmalısın.')
-    }
-  } catch {
+const parseRetryAfterMs = (headerValue) => {
+  const raw = String(headerValue || '').trim()
+  if (!raw) return 0
+  const sec = Number(raw)
+  if (Number.isFinite(sec) && sec > 0) return Math.round(sec * 1000)
+  const ts = Date.parse(raw)
+  if (Number.isFinite(ts)) {
+    const diff = ts - Date.now()
+    return diff > 0 ? diff : 0
   }
+  return 0
 }
 
-const MISSING_BRANCH_MESSAGE = 'Şube seçimi gerekli. “Ayarlar > Sistem Ayarları > Yetkili Şubeler” bölümünden şube seçin.'
+const getDefaultCacheTtlMs = (normalizedPath, method) => {
+  if (method !== 'GET') return 0
+  const p = String(normalizedPath || '')
+  if (p === '/api/tenant/context') return 15000
+  if (p === '/api/tenant/profile') return 15000
+  if (p === '/api/tenant/payment-settings') return 15000
+  if (p === '/api/settings/menu/active-items') return 15000
+  if (p.startsWith('/api/user/preferences/kitchen-filters')) return 15000
+  if (p.startsWith('/api/tenant/categories')) return 10000
+  if (/^\/api\/pos\/orders\/[^/]+$/.test(p)) return 1500
+  return 0
+}
 
 export const api = async (path, options = {}) => {
-  logResolvedApiBase()
   const silent = !!options.silent
   const suppressAuthRedirect = !!options.suppressAuthRedirect
   const portalOverride = String(options.portalOverride || '').trim()
@@ -142,7 +132,7 @@ export const api = async (path, options = {}) => {
   const isAuthPath = allowlistPath.startsWith('/api/auth/')
   const isHealthPath = allowlistPath === '/api/health' || allowlistPath.startsWith('/api/health/')
   const isAuthLogin = allowlistPath === '/api/auth/login'
-  const token = isAuthLogin ? null : localStorage.getItem(tokenKey)
+  const token = isAuthLogin ? null : getAuthToken(tokenKey)
   const selectedBranchId = localStorage.getItem(branchKey)
   const skipBranchHeader = !!options.skipBranchHeader
   const branchIdOverride = options.branchIdOverride
@@ -156,46 +146,19 @@ export const api = async (path, options = {}) => {
   const headers = {
     ...baseHeaders,
     ...(!skipBranchHeader && shouldAttachBranch && (branchIdOverride || selectedBranchId) ? { 'x-branch-id': String(branchIdOverride || selectedBranchId) } : {}),
-    ...incomingHeaders
+    ...incomingHeaders,
   }
   const { silent: _silent, skipBranchHeader: _skipBranchHeader, branchIdOverride: _branchIdOverride, data: _data, suppressAuthRedirect: _suppressAuthRedirect, portalOverride: _portalOverride, cacheTtlMs: _cacheTtlMs, cacheMode: _cacheMode, retryOn429: _retryOn429, ...fetchOptions } = options
+
   const wrap = (ok, status, data) => {
     const basePayload = {
       ok: !!ok,
       status: Number(status || 0),
       data: data ?? {},
-      success: !!ok
+      success: !!ok,
     }
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
-      return { ...basePayload, ...data }
-    }
+    if (data && typeof data === 'object' && !Array.isArray(data)) return { ...basePayload, ...data }
     return basePayload
-  }
-
-  const getDefaultCacheTtlMs = (normalizedPath, method) => {
-    if (method !== 'GET') return 0
-    const p = String(normalizedPath || '')
-    if (p === '/api/tenant/context') return 15000
-    if (p === '/api/tenant/profile') return 15000
-    if (p === '/api/tenant/payment-settings') return 15000
-    if (p === '/api/settings/menu/active-items') return 15000
-    if (p.startsWith('/api/user/preferences/kitchen-filters')) return 15000
-    if (p.startsWith('/api/tenant/categories')) return 10000
-    if (/^\/api\/pos\/orders\/[^/]+$/.test(p)) return 1500
-    return 0
-  }
-
-  const parseRetryAfterMs = (headerValue) => {
-    const raw = String(headerValue || '').trim()
-    if (!raw) return 0
-    const sec = Number(raw)
-    if (Number.isFinite(sec) && sec > 0) return Math.round(sec * 1000)
-    const ts = Date.parse(raw)
-    if (Number.isFinite(ts)) {
-      const diff = ts - Date.now()
-      return diff > 0 ? diff : 0
-    }
-    return 0
   }
 
   const attemptRequest = async (attempt) => {
@@ -203,12 +166,12 @@ export const api = async (path, options = {}) => {
     const urlRaw = /^https?:\/\//i.test(normalizedPath) ? normalizedPath : `${base}${normalizedPath}`
     let url = urlRaw
     try {
-  if (import.meta.env.DEV && /^https?:\/\//i.test(urlRaw)) {
-    const u = new URL(urlRaw)
-    u.port = '4000'
-    url = u.toString()
-  }
-} catch {}
+      if (import.meta.env.DEV && /^https?:\/\//i.test(urlRaw)) {
+        const u = new URL(urlRaw)
+        u.port = '4000'
+        url = u.toString()
+      }
+    } catch {}
 
     const method = String(fetchOptions.method || 'GET').toUpperCase()
     if (_data !== undefined && fetchOptions.body === undefined && method !== 'GET' && method !== 'HEAD') {
@@ -221,36 +184,10 @@ export const api = async (path, options = {}) => {
         delete headers['Content-Type']
       } catch {}
     }
-    const hasBranchHeader = Object.prototype.hasOwnProperty.call(headers, 'x-branch-id') && !!headers['x-branch-id']
-    if (import.meta.env.DEV) {
-      try {
-        const isListRequest = method === 'GET' && (url.includes('overview') || url.includes('list') || url.includes('reports') || url.includes('accounts') || url.includes('kitchen'))
-        const u = new URL(url)
-        const branchHeaderValue = hasBranchHeader ? headers['x-branch-id'] : null
-        if (isListRequest) {
-          console.debug('[API_LIST]', { url, method, params: u.searchParams, hasBranchHeader, branchHeaderValue })
-        } else {
-          console.debug('[API_ACTION]', { url, method, hasBranchHeader, branchHeaderValue })
-        }
-      } catch {}
-    }
-    if (isAuthLogin) {
-      try {
-        console.info('[LOGIN_REQUEST_TARGET]', {
-          url,
-          portal,
-          isNativeRuntime: isNativeRuntime(),
-          resolvedBase: base,
-          envBase,
-          nativeEnvBase,
-        })
-      } catch {}
-    }
-    let res
+
     const bodyKey = bodyIsFormData ? '[formdata]' : String(fetchOptions.body || '')
     const key = `${method} ${url} | ${bodyKey} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')}`
     const canDedupe = !fetchOptions.signal && !bodyIsFormData
-
     const cacheKey = `${method} ${url} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')}`
     const shouldCache = method === 'GET' && !fetchOptions.signal && !bodyIsFormData && cacheMode !== 'no-store'
     const ttl = (() => {
@@ -263,21 +200,17 @@ export const api = async (path, options = {}) => {
 
     if (shouldCache && ttl > 0) {
       const hit = cache.get(cacheKey)
-      if (hit && hit.expiresAt > Date.now()) {
-        return hit.value
-      }
+      if (hit && hit.expiresAt > Date.now()) return hit.value
     }
-    if (canDedupe && inflight.has(key)) {
-      return inflight.get(key)
-    }
+    if (canDedupe && inflight.has(key)) return inflight.get(key)
 
     const run = (async () => {
+      let res
       try {
         res = await fetch(url, { ...fetchOptions, headers })
-      } catch (raw) {
-        const data = { message: 'network_error', raw }
-        if (!silent) toast.error('Ağ hatası')
-        return wrap(false, 0, data)
+      } catch {
+        if (!silent) toast.error('Ag hatasi')
+        return wrap(false, 0, { message: 'network_error' })
       }
 
       const retryAfterMs = res?.status === 429 ? parseRetryAfterMs(res.headers?.get?.('Retry-After')) : 0
@@ -290,44 +223,38 @@ export const api = async (path, options = {}) => {
         await new Promise(r => setTimeout(r, waitMs))
         return attemptRequest(attempt + 1)
       }
+
       if (!res.ok) {
-      const code = data.code || data.error || 'error'
-      const message = data.message || 'İşlem başarısız'
+        const code = data.code || data.error || 'error'
+        const message = data.message || 'Islem basarisiz'
 
-      if (import.meta.env.DEV && res.status === 403) {
-        try {
-          console.debug('[API_403]', { url, method, code, message, data })
-        } catch {
-        }
-      }
-
-      if (res.status === 401 && !suppressAuthRedirect) {
-        try {
-          localStorage.removeItem(tokenKey)
-        } catch {}
-        try {
-          window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')
-        } catch {}
-      }
-
-      if (res.status === 403 && code === 'missing_branch') {
-        const shouldDispatch = !(method === 'GET' || suppressBranchModal)
-        if (shouldDispatch) {
+        if (res.status === 401 && !suppressAuthRedirect) {
           try {
-            window.dispatchEvent(new CustomEvent('missing_branch', { detail: { path: normalizedPath } }))
+            removeAuthToken(tokenKey)
+          } catch {}
+          try {
+            window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')
           } catch {}
         }
-      }
 
-      if (res.status === 402 && code === 'SUBSCRIPTION_EXPIRED') {
-        try {
-          const redirectTo = getSubscriptionUpgradePath(pathname)
-          window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
-          if (!isSubscriptionAllowedPath(pathname, pathname)) {
-            window.location.replace(redirectTo)
+        if (res.status === 403 && code === 'missing_branch') {
+          const shouldDispatch = !(method === 'GET' || suppressBranchModal)
+          if (shouldDispatch) {
+            try {
+              window.dispatchEvent(new CustomEvent('missing_branch', { detail: { path: normalizedPath } }))
+            } catch {}
           }
-        } catch {}
-      }
+        }
+
+        if (res.status === 402 && code === 'SUBSCRIPTION_EXPIRED') {
+          try {
+            const redirectTo = getSubscriptionUpgradePath(pathname)
+            window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
+            if (!isSubscriptionAllowedPath(pathname, pathname)) {
+              window.location.replace(redirectTo)
+            }
+          } catch {}
+        }
 
         if (!silent) {
           if (res.status === 429) {
@@ -345,6 +272,7 @@ export const api = async (path, options = {}) => {
 
         return wrap(false, res.status, { ...data, code, message })
       }
+
       const okPayload = wrap(true, res.status, data)
       if (shouldCache && ttl > 0) {
         cache.set(cacheKey, { expiresAt: Date.now() + ttl, value: okPayload })
@@ -378,7 +306,6 @@ const parseFilenameFromContentDisposition = (value) => {
 }
 
 export const apiDownload = async (path, options = {}) => {
-  logResolvedApiBase()
   const silent = !!options.silent
   const suppressAuthRedirect = !!options.suppressAuthRedirect
   const portalOverride = String(options.portalOverride || '').trim()
@@ -392,7 +319,7 @@ export const apiDownload = async (path, options = {}) => {
   const portal = portalOverride || inferPortalFromPathname(pathname)
   const tokenKey = portal === 'canteen' ? 'token_canteen' : (portal === 'platform' ? 'token_platform' : 'token_restaurant')
   const branchKey = portal === 'canteen' ? 'selectedBranchId_canteen' : 'selectedBranchId'
-  const token = localStorage.getItem(tokenKey)
+  const token = getAuthToken(tokenKey)
   const selectedBranchId = localStorage.getItem(branchKey)
   const skipBranchHeader = !!options.skipBranchHeader
   const branchIdOverride = options.branchIdOverride
@@ -401,26 +328,25 @@ export const apiDownload = async (path, options = {}) => {
   const urlRaw = /^https?:\/\//i.test(normalizedPath) ? normalizedPath : `${base}${normalizedPath}`
   let url = urlRaw
   try {
-  if (import.meta.env.DEV && /^https?:\/\//i.test(urlRaw)) {
-    const u = new URL(urlRaw)
-    u.port = '4000'
-    url = u.toString()
-  }
-} catch {}
-
+    if (import.meta.env.DEV && /^https?:\/\//i.test(urlRaw)) {
+      const u = new URL(urlRaw)
+      u.port = '4000'
+      url = u.toString()
+    }
+  } catch {}
 
   const headers = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(!skipBranchHeader && (branchIdOverride || selectedBranchId) ? { 'x-branch-id': String(branchIdOverride || selectedBranchId) } : {}),
-    ...(options.headers || {})
+    ...(options.headers || {}),
   }
 
   let res
   try {
     res = await fetch(url, { method: 'GET', headers })
-  } catch (raw) {
-    if (!silent) toast.error('Ağ hatası')
-    return { ok: false, status: 0, blob: null, filename: '', error: { message: 'network_error', raw } }
+  } catch {
+    if (!silent) toast.error('Ag hatasi')
+    return { ok: false, status: 0, blob: null, filename: '', error: { message: 'network_error' } }
   }
 
   if (!res.ok) {
@@ -431,11 +357,11 @@ export const apiDownload = async (path, options = {}) => {
       data = {}
     }
     const code = data.code || data.error || 'error'
-    const message = data.message || 'İşlem başarısız'
+    const message = data.message || 'Islem basarisiz'
 
     if (res.status === 401 && !suppressAuthRedirect) {
       try {
-        localStorage.removeItem(tokenKey)
+        removeAuthToken(tokenKey)
       } catch {}
       try {
         window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')

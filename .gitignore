@@ -34,3 +34,5 @@ Thumbs.db
 uploads/
 .vercel/
 .trae/
+
+frontend/.gradle-user-home/

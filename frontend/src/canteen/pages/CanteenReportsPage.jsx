@@ -8,6 +8,7 @@ import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import ZReportModal from '../../features/reports/ZReportModal.tsx'
 import BranchFilterCard from '../../components/BranchFilterCard.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
+import { getAuthToken } from '../../lib/authStorage.js'
 
 const REPORT_BRANCH_SELECTION_STORAGE_KEY = 'selectedReportBranchIds_canteen'
 
@@ -548,7 +549,7 @@ export default function CanteenReportsPage() {
     setError('')
     try {
       const token = (() => {
-        try { return String(localStorage.getItem('token_canteen') || '') } catch { return '' }
+        try { return String(getAuthToken('token_canteen') || '') } catch { return '' }
       })()
       const url = `/api/canteen/reports/export?${qs}`
       const res = await fetch(url, {

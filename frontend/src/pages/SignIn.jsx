@@ -6,9 +6,9 @@ import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
 const getFriendlyLoginError = (error) => {
   const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
-  if (code === 'account_disabled') return 'Hesabınız devre dışı. Lütfen yetkilinizle iletişime geçin.'
-  if (code === 'wrong_portal') return 'Bu hesap bu giriş ekranı için uygun değil.'
-  return 'Giriş başarısız. E-posta/kullanıcı adı veya şifre hatalı.'
+  if (code === 'account_disabled') return 'Hesabiniz devre disi. Lutfen yetkilinizle iletisime gecin.'
+  if (code === 'wrong_portal') return 'Bu hesap bu giris ekrani icin uygun degil.'
+  return 'Giris basarisiz. E-posta/kullanici adi veya sifre hatali.'
 }
 
 export default function SignIn({ portal }) {
@@ -18,14 +18,15 @@ export default function SignIn({ portal }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
 
   useBodyLayoutMode('public-site-layout')
 
   const isRestaurant = portal === 'restaurant' || portal === 'kermes'
-  const portalName = isRestaurant ? 'Restoran' : 'Giriş'
+  const portalName = isRestaurant ? 'Restoran' : 'Giris'
 
   useEffect(() => {
-    document.title = `PenPOS - ${portalName} Girişi`
+    document.title = `PenPOS - ${portalName} Girisi`
   }, [portalName])
 
   const onSubmit = async (event) => {
@@ -33,11 +34,9 @@ export default function SignIn({ portal }) {
     setLoading(true)
     setError('')
     try {
-      console.log('[LOGIN_FORM_SUBMIT]', { identifier, portal })
-      await login({ identifier, password, portal })
+      await login({ identifier, password, portal, rememberMe })
       nav(isRestaurant ? '/kermes' : '/', { replace: true })
     } catch (err) {
-      console.error(err)
       setError(getFriendlyLoginError(err))
     } finally {
       setLoading(false)
@@ -47,38 +46,40 @@ export default function SignIn({ portal }) {
   return (
     <PublicSystemLogin
       backTo="/login"
-      backLabel="Sistem seçimine dön"
+      backLabel="Sistem secimine don"
       brand="PenPOS"
-      systemLabel="RESTORAN / CAFE YÖNETİMİ"
-      welcomeTitle="Adisyon, mutfak ve satış akışınızı tek panelden yönetin."
-      welcomeText="Masa yönetimi, paket servis, raporlar ve personel süreçlerini düzenli şekilde yönetin."
-      formTitle="Restoran Girişi"
-      formSubtitle="Üye bilgilerinizle panelinize giriş yapın."
-      identifierLabel="E-posta / Kullanıcı Adı"
-      identifierPlaceholder="eposta veya kullanıcı adı"
-      passwordLabel="Şifre"
-      passwordPlaceholder="şifrenizi girin"
+      systemLabel="RESTORAN / CAFE YONETIMI"
+      welcomeTitle="Adisyon, mutfak ve satis akislarinizi tek panelden yonetin."
+      welcomeText="Masa yonetimi, paket servis, raporlar ve personel sureclerini duzenli sekilde yonetin."
+      formTitle="Restoran Girisi"
+      formSubtitle="Uye bilgilerinizle panelinize giris yapin."
+      identifierLabel="E-posta / Kullanici Adi"
+      identifierPlaceholder="eposta veya kullanici adi"
+      passwordLabel="Sifre"
+      passwordPlaceholder="sifrenizi girin"
       identifier={identifier}
       password={password}
+      rememberMe={rememberMe}
+      onRememberMeChange={setRememberMe}
       onIdentifierChange={setIdentifier}
       onPasswordChange={setPassword}
       onSubmit={onSubmit}
       error={error}
       loading={loading}
       forgotTo="/forgot-password?portal=restaurant"
-      submitLabel="Giriş Yap"
-      loadingLabel="Giriş yapılıyor..."
+      submitLabel="Giris Yap"
+      loadingLabel="Giris yapiliyor..."
       registerTo="/register?type=restaurant"
-      registerLabel="Şimdi Kaydolun"
-      registerText="Yeni restoran hesabınızı oluşturun, şubenizi ve menünüzü hızlıca yayına alın."
-      supportTitle="Restoran desteği"
+      registerLabel="Simdi Kaydolun"
+      registerText="Yeni restoran hesabinizi olusturun, subenizi ve menunuzu hizlica yayina alin."
+      supportTitle="Restoran destegi"
       supportItems={[
-        { label: 'Masa + Paket', value: 'Canlı operasyon' },
-        { label: 'QR Menü', value: 'Hazır altyapı' },
+        { label: 'Masa + Paket', value: 'Canli operasyon' },
+        { label: 'QR Menu', value: 'Hazir altyapi' },
       ]}
       theme="restaurant"
-      highlights={['Masa Takibi', 'Mutfak Akışı', 'Paket Servis', 'QR Menü']}
-      panelQuote="Çok şubeli yapılarda hızlı operasyon, net raporlama ve düzenli sipariş akışı için tek ekrandan kontrol sağlayın."
+      highlights={['Masa Takibi', 'Mutfak Akisi', 'Paket Servis', 'QR Menu']}
+      panelQuote="Cok subeli yapilarda hizli operasyon, net raporlama ve duzenli siparis akisi icin tek ekrandan kontrol saglayin."
       panelCaption="Restoran paneli"
     />
   )

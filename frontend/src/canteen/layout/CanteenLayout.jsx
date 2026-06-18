@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
+import { getAuthToken, removeAuthToken } from '../../lib/authStorage.js'
 import MobileTopSheetNav from '../../components/MobileTopSheetNav.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { normalizePermissions } from '../../constants/permissions.js'
@@ -8,6 +9,7 @@ import { useTheme } from '../../theme/ThemeContext.jsx'
 import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
 import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionAllowedPath, isSubscriptionExpired } from '../../lib/subscription.js'
 import WebsiteLoadingScreen from '../../components/WebsiteLoadingScreen.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 
 const tokenKey = 'token_canteen'
 const qrSeenAtKey = 'canteen_qr_orders_seen_at'
@@ -36,6 +38,7 @@ const setQrSeenAt = (value) => {
 
 export default function CanteenLayout() {
   const nav = useNavigate()
+  const { logout: authLogout } = useAuth()
   const { pathname } = useLocation()
   const [me, setMe] = useState(null)
   const [session, setSession] = useState(null)
@@ -97,7 +100,7 @@ export default function CanteenLayout() {
 
   useEffect(() => {
     const run = async () => {
-      const token = localStorage.getItem(tokenKey)
+      const token = getAuthToken(tokenKey)
       if (!token) {
         setMe(null)
         setSession(null)
@@ -107,7 +110,7 @@ export default function CanteenLayout() {
       setLoading(true)
       const res = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true })
       if (!res?.ok || !res?.user) {
-        try { localStorage.removeItem(tokenKey) } catch {}
+        try { removeAuthToken(tokenKey) } catch {}
         setMe(null)
         setSession(null)
         setLoading(false)
@@ -115,8 +118,8 @@ export default function CanteenLayout() {
       }
       const u = res.user
       const normalized = u ? { ...u, permissions: normalizePermissions(u.permissions) } : u
-      if (u.role === 'platform_admin' || u.role === 'superadmin' || u.systemType !== 'kantin') {
-        try { localStorage.removeItem(tokenKey) } catch {}
+      if (u.role === 'platform_admin' || u.role === 'superadmin' || (u.systemType !== 'kantin' && u.systemType !== 'canteen')) {
+        try { removeAuthToken(tokenKey) } catch {}
         setMe(null)
         setSession(null)
         setLoading(false)
@@ -293,7 +296,7 @@ export default function CanteenLayout() {
     )
   }
 
-  if (!localStorage.getItem(tokenKey) && !loading) {
+  if (!getAuthToken(tokenKey) && !loading) {
     return <Navigate to="/canteen/login" replace />
   }
 
@@ -316,8 +319,8 @@ export default function CanteenLayout() {
   }
 
   const logout = () => {
-    try { localStorage.removeItem(tokenKey) } catch {}
-    nav('/canteen/login', { replace: true })
+    try { removeAuthToken(tokenKey) } catch {}
+    authLogout()
   }
 
   const handleSidebarNavigate = (to) => {

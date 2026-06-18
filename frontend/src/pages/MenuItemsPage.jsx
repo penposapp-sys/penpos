@@ -11,6 +11,7 @@ import { api } from '../lib/apiClient.js'
 import { getSubscriptionStatus } from '../lib/subscription.js'
 import { normalizeBranchIdList } from '../lib/branchVisibility.js'
 import { toast } from '../lib/toast.js'
+import { getAuthToken } from '../lib/authStorage.js'
 import ProductCatalogStyles from './ProductCatalogStyles.jsx'
 import {
   buildProductPayload,
@@ -199,7 +200,7 @@ const downloadBlob = (blob, filename) => {
 }
 
 const fetchWithAuth = async (path, options = {}) => {
-  const token = localStorage.getItem('token_restaurant')
+  const token = getAuthToken('token_restaurant')
   const selectedBranchId = localStorage.getItem('selectedBranchId')
   const headers = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
