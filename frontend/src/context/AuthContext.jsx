@@ -114,7 +114,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async ({ identifier, email, password, portal }) => {
     const payload = { identifier: identifier ?? email, password, portal }
-    const portalOverride = portal === 'platform' ? 'platform' : 'restaurant'
+    const portalOverride =
+      portal === 'platform' ? 'platform' :
+      portal === 'canteen' ? 'canteen' :
+      portal === 'kermes' ? 'kermes' :
+      'restaurant'
     const tokenKey = portal === 'platform' ? 'token_platform' : 'token_restaurant'
 
     try {
