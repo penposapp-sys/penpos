@@ -4,6 +4,22 @@ import PublicSystemLogin from '../../components/PublicSystemLogin.jsx'
 import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
 import { api } from '../../lib/apiClient.js'
 
+const buildLoginErrorMessage = (baseMessage, error) => {
+  const responseData = error?.response?.data
+  const serializedResponseData = typeof responseData === 'string'
+    ? responseData
+    : responseData
+      ? JSON.stringify(responseData)
+      : ''
+  const errorMessage = String(error?.message || '').trim()
+  const parts = [baseMessage]
+
+  if (serializedResponseData) parts.push(`response.data: ${serializedResponseData}`)
+  if (errorMessage) parts.push(`message: ${errorMessage}`)
+
+  return parts.join(' | ')
+}
+
 export default function CanteenLogin() {
   const nav = useNavigate()
   const [identifier, setIdentifier] = useState('')
@@ -21,21 +37,27 @@ export default function CanteenLogin() {
     event.preventDefault()
     setLoading(true)
     setError('')
+    const payload = { identifier, password, portal: 'canteen' }
     try {
+      console.log('LOGIN REQUEST', payload)
       const loginRes = await api('/api/auth/login', {
         method: 'POST',
-        data: { identifier, password, portal: 'canteen' },
+        data: payload,
         silent: true,
         suppressAuthRedirect: true,
         portalOverride: 'canteen',
       })
+      console.log('LOGIN RESPONSE', loginRes?.data)
       if (!loginRes?.ok || !loginRes?.token) {
-        throw new Error(loginRes?.message || 'Giriş başarısız')
+        const err = new Error(loginRes?.message || 'Giriş başarısız')
+        err.response = { data: loginRes?.data }
+        throw err
       }
       localStorage.setItem('token_canteen', loginRes.token)
       nav('/canteen', { replace: true })
     } catch (err) {
-      setError(err?.message || 'Giriş başarısız')
+      console.error(err)
+      setError(buildLoginErrorMessage('Giriş başarısız', err))
     } finally {
       setLoading(false)
     }
@@ -47,14 +69,14 @@ export default function CanteenLogin() {
       backLabel="Sistem seçimine dön"
       brand="PenPOS"
       systemLabel="KANTİN / MARKET YÖNETİMİ"
-      welcomeTitle="Hızlı kasa, stok ve cari akışlarını tek ekranda toplayın."
+      welcomeTitle="Hızlı kasa, stok ve cari akışlarınızı tek ekranda toplayın."
       welcomeText="Barkodlu satış, stok hareketleri, cari bakiyeler ve günlük raporlar ile operasyonu sade ve hızlı yönetin."
       formTitle="Mağaza Girişi"
       formSubtitle="Mağaza veya market panelinize giriş yapın."
       identifierLabel="E-posta / Kullanıcı Adı"
       identifierPlaceholder="eposta veya kullanıcı adı"
       passwordLabel="Şifre"
-      passwordPlaceholder="şifrenizi girin"
+      passwordPlaceholder="sifrenizi girin"
       identifier={identifier}
       password={password}
       onIdentifierChange={setIdentifier}

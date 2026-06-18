@@ -83,23 +83,23 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (normalized?.tenantId && (normalized.role === 'tenant_admin' || normalized.role === 'staff')) {
-      try {
-        const res = await api('/api/tenant/profile', { silent: true, portalOverride })
-        if (!res?.ok || res?.success === false) {
-          setAllowedBranchIds([])
+          try {
+            const res = await api('/api/tenant/profile', { silent: true, portalOverride })
+            if (!res?.ok || res?.success === false) {
+              setAllowedBranchIds([])
+            } else {
+              const ids = resolveAllowedBranchIds(normalized, res?.tenant)
+              setAllowedBranchIds(ids)
+              persistActiveBranchSelection(normalized, ids)
+            }
+          } catch {
+            setAllowedBranchIds([])
+          }
         } else {
-          const ids = resolveAllowedBranchIds(normalized, res?.tenant)
-          setAllowedBranchIds(ids)
-          persistActiveBranchSelection(normalized, ids)
+          setAllowedBranchIds([])
         }
+        return normalized
       } catch {
-        setAllowedBranchIds([])
-      }
-    } else {
-      setAllowedBranchIds([])
-    }
-    return normalized
-  } catch {
         localStorage.removeItem(tokenKey)
         setUser(null)
         setTenantCtx(null)
@@ -116,6 +116,7 @@ export const AuthProvider = ({ children }) => {
     const payload = { identifier: identifier ?? email, password, portal }
     const portalOverride = portal === 'platform' ? 'platform' : 'restaurant'
     const tokenKey = portal === 'platform' ? 'token_platform' : 'token_restaurant'
+    console.log('LOGIN REQUEST', payload)
     const loginRes = await api('/api/auth/login', {
       method: 'POST',
       data: payload,
@@ -123,9 +124,11 @@ export const AuthProvider = ({ children }) => {
       suppressAuthRedirect: true,
       portalOverride
     })
+    console.log('LOGIN RESPONSE', loginRes?.data)
     if (!loginRes?.ok || !loginRes?.token) {
       const err = new Error(loginRes?.message || 'Giriş başarısız')
       err.code = loginRes?.code || null
+      err.response = { data: loginRes?.data }
       throw err
     }
 
@@ -137,6 +140,7 @@ export const AuthProvider = ({ children }) => {
       } catch {}
       const err = new Error(meRes?.message || 'Giriş başarısız')
       err.code = meRes?.code || null
+      err.response = { data: meRes?.data }
       throw err
     }
     const meUser = meRes?.user

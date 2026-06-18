@@ -4,6 +4,22 @@ import PublicSystemLogin from '../components/PublicSystemLogin.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
+const buildLoginErrorMessage = (baseMessage, error) => {
+  const responseData = error?.response?.data
+  const serializedResponseData = typeof responseData === 'string'
+    ? responseData
+    : responseData
+      ? JSON.stringify(responseData)
+      : ''
+  const errorMessage = String(error?.message || '').trim()
+  const parts = [baseMessage]
+
+  if (serializedResponseData) parts.push(`response.data: ${serializedResponseData}`)
+  if (errorMessage) parts.push(`message: ${errorMessage}`)
+
+  return parts.join(' | ')
+}
+
 export default function SignIn({ portal }) {
   const { login } = useAuth()
   const nav = useNavigate()
@@ -29,11 +45,12 @@ export default function SignIn({ portal }) {
       await login({ identifier, password, portal })
       nav(isRestaurant ? '/kermes' : '/', { replace: true })
     } catch (err) {
+      console.error(err)
       const code = err?.code || null
-      if (code === 'invalid_credentials') setError('E-posta / şifre hatalı')
-      else if (code === 'account_disabled') setError('Hesap devre dışı')
-      else if (code === 'wrong_portal') setError('Yanlış giriş ekranı')
-      else setError(err.message || 'Giriş başarısız')
+      if (code === 'invalid_credentials') setError(buildLoginErrorMessage('E-posta / şifre hatalı', err))
+      else if (code === 'account_disabled') setError(buildLoginErrorMessage('Hesap devre dışı', err))
+      else if (code === 'wrong_portal') setError(buildLoginErrorMessage('Yanlış giriş ekranı', err))
+      else setError(buildLoginErrorMessage('Giriş başarısız', err))
     } finally {
       setLoading(false)
     }

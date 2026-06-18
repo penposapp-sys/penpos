@@ -5,6 +5,22 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
+const buildLoginErrorMessage = (baseMessage, error) => {
+  const responseData = error?.response?.data
+  const serializedResponseData = typeof responseData === 'string'
+    ? responseData
+    : responseData
+      ? JSON.stringify(responseData)
+      : ''
+  const errorMessage = String(error?.message || '').trim()
+  const parts = [baseMessage]
+
+  if (serializedResponseData) parts.push(`response.data: ${serializedResponseData}`)
+  if (errorMessage) parts.push(`message: ${errorMessage}`)
+
+  return parts.join(' | ')
+}
+
 export default function PlatformLogin() {
   const { login, logout } = useAuth()
   const nav = useNavigate()
@@ -34,7 +50,10 @@ export default function PlatformLogin() {
       }
       nav('/platform/kermes-tenants', { replace: true })
     } catch (err) {
-      const msg = err?.code === 'invalid_credentials' ? 'E-posta veya şifre hatalı' : (err?.message || 'Giriş başarısız')
+      console.error(err)
+      const msg = err?.code === 'invalid_credentials'
+        ? buildLoginErrorMessage('E-posta veya şifre hatalı', err)
+        : buildLoginErrorMessage('Giriş başarısız', err)
       setError(msg)
       toast.error(msg)
     } finally {
@@ -55,7 +74,7 @@ export default function PlatformLogin() {
       identifierLabel="E-posta / Kullanıcı Adı"
       identifierPlaceholder="e-posta veya kullanıcı adı"
       passwordLabel="Şifre"
-      passwordPlaceholder="şifrenizi girin"
+      passwordPlaceholder="sifrenizi girin"
       identifier={identifier}
       password={password}
       onIdentifierChange={setIdentifier}
