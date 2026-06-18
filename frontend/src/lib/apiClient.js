@@ -5,6 +5,7 @@ const inflight = new Map()
 const cache = new Map()
 let lastRateLimitToastAt = 0
 const DEFAULT_REMOTE_API_ORIGIN = 'https://penpos.cloud'
+let baseUrlLogged = false
 
 export const clearApiCache = () => {
   try {
@@ -85,6 +86,21 @@ const base = import.meta.env.DEV
   ? forcePort4000(envBase || 'http://localhost:4000')
   : (isNativeRuntime() ? remoteBase : envBase)
 
+const logResolvedApiBase = () => {
+  if (baseUrlLogged) return
+  baseUrlLogged = true
+  try {
+    console.info('[API_BASE_URL]', {
+      mode: import.meta.env.MODE,
+      isNativeRuntime: isNativeRuntime(),
+      envBase,
+      nativeEnvBase,
+      resolvedBase: base,
+      loginUrl: `${base}${normalizeApiPath('/api/auth/login')}`,
+    })
+  } catch {}
+}
+
 
 if (import.meta.env.DEV) {
   try {
@@ -104,6 +120,7 @@ if (import.meta.env.DEV) {
 const MISSING_BRANCH_MESSAGE = 'Şube seçimi gerekli. “Ayarlar > Sistem Ayarları > Yetkili Şubeler” bölümünden şube seçin.'
 
 export const api = async (path, options = {}) => {
+  logResolvedApiBase()
   const silent = !!options.silent
   const suppressAuthRedirect = !!options.suppressAuthRedirect
   const portalOverride = String(options.portalOverride || '').trim()
@@ -218,8 +235,14 @@ export const api = async (path, options = {}) => {
     }
     if (isAuthLogin) {
       try {
-        console.log('LOGIN REQUEST URL', url)
-        console.log('LOGIN REQUEST PORTAL', portal)
+        console.info('[LOGIN_REQUEST_TARGET]', {
+          url,
+          portal,
+          isNativeRuntime: isNativeRuntime(),
+          resolvedBase: base,
+          envBase,
+          nativeEnvBase,
+        })
       } catch {}
     }
     let res
@@ -354,6 +377,7 @@ const parseFilenameFromContentDisposition = (value) => {
 }
 
 export const apiDownload = async (path, options = {}) => {
+  logResolvedApiBase()
   const silent = !!options.silent
   const suppressAuthRedirect = !!options.suppressAuthRedirect
   const portalOverride = String(options.portalOverride || '').trim()

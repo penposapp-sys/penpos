@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import mongoose from 'mongoose'
 import { signToken } from '../utils/jwt.js'
 import { error } from '../utils/errors.js'
 import { sendMail } from '../utils/mailer.js'
@@ -37,6 +38,14 @@ const buildResetPasswordUrl = (token, portal) => {
 }
 
 const hashResetToken = (token) => crypto.createHash('sha256').update(String(token || '')).digest('hex')
+
+const getMongoDiagnostics = () => ({
+  readyState: mongoose.connection?.readyState ?? null,
+  host: mongoose.connection?.host || null,
+  name: mongoose.connection?.name || null,
+  port: mongoose.connection?.port || null,
+  nodeEnv: process.env.NODE_ENV || null
+})
 
 const resolveForgotFilter = (portal) => {
   const normalizedPortal = normalizePortal(portal)
@@ -103,6 +112,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
       try {
         info('[AUTH_LOGIN_TRY]', {
           requestId: requestId || null,
+          ...getMongoDiagnostics(),
           identifier: normalizedIdentifier,
           mode: isEmail ? 'email' : 'username',
           portal: portal || null,
@@ -121,6 +131,18 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     let ok = false
     try {
       ok = await bcrypt.compare(String(password || ''), String(pwHash || ''))
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          info('[AUTH_LOGIN_COMPARE]', {
+            requestId: requestId || null,
+            ...getMongoDiagnostics(),
+            identifier: normalizedIdentifier,
+            portal: portal || null,
+            userFound: !!user,
+            bcryptOk: !!ok
+          })
+        } catch {}
+      }
     } catch (e) {
       const err = error('invalid_credentials', 'Invalid credentials', 401)
       err.cause = e
@@ -263,6 +285,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     const status = Number(err?.status || 500)
     const safe = {
       requestId: requestId || null,
+      ...getMongoDiagnostics(),
       identifier: normalizedIdentifier,
       portal: portal || null,
       userFound: !!user,

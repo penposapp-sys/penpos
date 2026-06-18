@@ -1,15 +1,14 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig(({ mode }) => {
-  const isProd = mode === 'production'
   return {
     server: {
       host: true,
       port: 5173
     },
     build: {
-      sourcemap: isProd ? false : true
+      sourcemap: mode !== 'production'
     },
-    esbuild: isProd ? { drop: ['console', 'debugger'] } : {}
+    esbuild: mode === 'production' ? { drop: ['debugger'] } : {}
   }
 })

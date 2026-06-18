@@ -29,7 +29,13 @@ export const connectDB = async () => {
       throw new Error('MONGODB_URI is not configured')
     }
     await mongoose.connect(uri)
-    logger.info('MongoDB connected')
+    logger.info('MongoDB connected', {
+      readyState: mongoose.connection.readyState,
+      host: mongoose.connection.host || null,
+      name: mongoose.connection.name || null,
+      port: mongoose.connection.port || null,
+      nodeEnv: process.env.NODE_ENV || null
+    })
     await syncUserIndexes()
     try {
       const admin = mongoose.connection.db.admin()
