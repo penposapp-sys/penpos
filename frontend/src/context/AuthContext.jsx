@@ -127,6 +127,10 @@ export const AuthProvider = ({ children }) => {
         portalOverride
       })
       console.log('LOGIN RESPONSE', loginRes?.data)
+      console.log('LOGIN RES FULL', JSON.stringify(loginRes, null, 2))
+      console.log('LOGIN RES KEYS', Object.keys(loginRes || {}))
+      console.log('LOGIN RES TOKEN', loginRes?.token)
+      console.log('LOGIN RES DATA TOKEN', loginRes?.data?.token)
       if (loginRes?.ok === false || !loginRes?.token) {
         const err = new Error(loginRes?.message || 'GiriÅŸ baÅŸarÄ±sÄ±z')
         err.code = loginRes?.code || null
@@ -136,6 +140,10 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem(tokenKey, loginRes.token)
       const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride })
+      console.log('ME RES FULL', JSON.stringify(meRes, null, 2))
+      console.log('ME RES KEYS', Object.keys(meRes || {}))
+      console.log('ME RES USER', meRes?.user)
+      console.log('ME RES DATA USER', meRes?.data?.user)
       if (meRes?.ok === false || !meRes?.user) {
         try {
           localStorage.removeItem(tokenKey)
