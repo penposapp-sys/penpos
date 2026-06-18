@@ -9493,6 +9493,14 @@ body.public-site-layout .card.public-touch-card {
   -webkit-tap-highlight-color: transparent;
 }
 
+.lp-direct-link-cta {
+  position: relative;
+  z-index: 9999;
+  pointer-events: auto;
+  touch-action: manipulation;
+  display: inline-flex;
+}
+
 .register-type-card {
   min-width: 0;
   background: rgba(255,255,255,0.05);

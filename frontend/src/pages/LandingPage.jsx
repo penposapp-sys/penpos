@@ -91,8 +91,8 @@ function Header({ settings, onOpenLogin, onOpenSystems, onRegister }) {
           <a href="#egitim">Eğitim Videoları</a>
         </nav>
         <div className="lp-header-actions">
-          <button className="lp-btn lp-btn--text" type="button" onClick={onOpenLogin}>Giriş Yap</button>
-          <button className="lp-btn lp-btn--primary public-touch-card" type="button" onClick={onRegister}>1 Hafta Ücretsiz Dene</button>
+          <a className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login" href="/login">Giriş Yap</a>
+          <a className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" href={`${settings.registerUrl || '/register'}?type=restaurant`}>1 Hafta Ücretsiz Dene</a>
         </div>
         <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü">
           <Icon name={open ? 'x' : 'menu'} className="lp-menu-icon" />
@@ -104,8 +104,8 @@ function Header({ settings, onOpenLogin, onOpenSystems, onRegister }) {
           <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>Özellikler</a>
           <a href="#fiyat" onClick={() => setOpen(false)}>Fiyat</a>
           <a href="#egitim" onClick={() => setOpen(false)}>Eğitim Videoları</a>
-          <button type="button" onClick={() => { setOpen(false); onOpenLogin() }}>Giriş Yap</button>
-          <button className="lp-btn lp-btn--primary public-touch-card" type="button" onClick={() => { setOpen(false); onRegister?.() }}>1 Hafta Ücretsiz Dene</button>
+          <a className="lp-direct-link-cta lp-direct-link-cta--login" href="/login" onClick={() => setOpen(false)}>Giriş Yap</a>
+          <a className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" href={`${settings.registerUrl || '/register'}?type=restaurant`} onClick={() => setOpen(false)}>1 Hafta Ücretsiz Dene</a>
         </div>
       ) : null}
     </header>
@@ -1540,8 +1540,8 @@ export default function LandingPage() {
               <h1><span>{settings.heroTitle || 'Restoran ve mağaza sistemlerini ayrı ayrı yönetin.'}</span></h1>
               <p>{settings.heroDescription || 'PenPOS; Restoran-Cafe ve Mağaza-Market için ayrı girişleri, ayrı ekran akışları olan modern otomasyon yapısıdır.'}</p>
               <div className="lp-hero-actions">
-                <button className="lp-hero-primary public-touch-card" type="button" onClick={() => nav(`${settings.registerUrl || '/register'}?type=restaurant`)}>1 Haftalık Ücretsiz Deneme</button>
-                <button className="lp-hero-secondary public-touch-card" type="button" onClick={() => setLoginOpen(true)}>Giriş Yap</button>
+                <a className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" href={`${settings.registerUrl || '/register'}?type=restaurant`}>1 Haftalık Ücretsiz Deneme</a>
+                <a className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" href="/login">Giriş Yap</a>
               </div>
               <div className="lp-hero-points">
                 {['QR menü dahil', 'Sınırsız şube', 'YouTube eğitim videoları'].map((item) => (
