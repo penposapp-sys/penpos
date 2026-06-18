@@ -21,7 +21,7 @@ export default function SignIn({ portal }) {
 
   useBodyLayoutMode('public-site-layout')
 
-  const isRestaurant = portal === 'kermes'
+  const isRestaurant = portal === 'restaurant' || portal === 'kermes'
   const portalName = isRestaurant ? 'Restoran' : 'Giriş'
 
   useEffect(() => {
@@ -33,6 +33,7 @@ export default function SignIn({ portal }) {
     setLoading(true)
     setError('')
     try {
+      console.log('[LOGIN_FORM_SUBMIT]', { identifier, portal })
       await login({ identifier, password, portal })
       nav(isRestaurant ? '/kermes' : '/', { replace: true })
     } catch (err) {
@@ -64,7 +65,7 @@ export default function SignIn({ portal }) {
       onSubmit={onSubmit}
       error={error}
       loading={loading}
-      forgotTo="/forgot-password?portal=kermes"
+      forgotTo="/forgot-password?portal=restaurant"
       submitLabel="Giriş Yap"
       loadingLabel="Giriş yapılıyor..."
       registerTo="/register?type=restaurant"

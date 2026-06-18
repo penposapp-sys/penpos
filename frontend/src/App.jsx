@@ -242,7 +242,7 @@ export default function App() {
         <Route path="/login" element={<LoginSelectionPage />} />
         <Route path="/platform-login" element={<PlatformLogin />} />
         <Route path="/login/platform" element={<Navigate to="/platform-login" replace />} />
-        <Route path="/login/restoran" element={<SignIn portal="kermes" />} />
+        <Route path="/login/restoran" element={<SignIn portal="restaurant" />} />
         <Route path="/login/kantin" element={<Navigate to="/canteen/login" replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

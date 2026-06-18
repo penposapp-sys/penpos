@@ -4,6 +4,27 @@ import { normalizePermissions } from '../constants/permissions.js'
 
 const AuthContext = createContext()
 
+const resolvePortalFromPathname = (pathname) => {
+  const path = String(pathname || '').trim().toLowerCase()
+  if (
+    path.startsWith('/platform') ||
+    path.startsWith('/platform-admin') ||
+    path.startsWith('/superadmin') ||
+    path.startsWith('/login/platform') ||
+    path.startsWith('/platform-login')
+  ) return 'platform'
+  if (path.startsWith('/canteen') || path.startsWith('/login/kantin')) return 'canteen'
+  if (path.startsWith('/kermes') || path.startsWith('/login/restoran')) return 'restaurant'
+  return 'restaurant'
+}
+
+const resolveTokenKeyForPortal = (portal) => {
+  const normalizedPortal = String(portal || '').trim().toLowerCase()
+  if (normalizedPortal === 'platform') return 'token_platform'
+  if (normalizedPortal === 'canteen') return 'token_canteen'
+  return 'token_restaurant'
+}
+
 const resolveAllowedBranchIds = (normalizedUser, tenantProfile) => {
   const tenantAllowed = Array.isArray(tenantProfile?.allowedBranchIds) ? tenantProfile.allowedBranchIds.map(String).filter(Boolean) : []
   if (String(normalizedUser?.role || '') !== 'staff') return tenantAllowed
@@ -53,9 +74,8 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const tokenKey = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform') || pathname.startsWith('/platform-login')
-        ? 'token_platform'
-        : 'token_restaurant'
+      const portal = resolvePortalFromPathname(pathname)
+      const tokenKey = resolveTokenKeyForPortal(portal)
       const token = localStorage.getItem(tokenKey)
       if (!token) {
         setLoading(false)
@@ -63,7 +83,7 @@ export const AuthProvider = ({ children }) => {
         return
       }
       try {
-        const portalOverride = tokenKey === 'token_platform' ? 'platform' : 'restaurant'
+        const portalOverride = portal
         const meRes = await api('/api/auth/me', { silent: true, portalOverride })
         if (!meRes?.ok) {
           localStorage.removeItem(tokenKey)
@@ -118,11 +138,15 @@ export const AuthProvider = ({ children }) => {
       portal === 'platform' ? 'platform' :
       portal === 'canteen' ? 'canteen' :
       portal === 'kermes' ? 'kermes' :
+      portal === 'restaurant' ? 'restaurant' :
       'restaurant'
-    const tokenKey = portal === 'platform' ? 'token_platform' : 'token_restaurant'
+    const tokenKey = resolveTokenKeyForPortal(portalOverride)
 
     try {
-      console.log('LOGIN REQUEST', payload)
+      console.log('[LOGIN_REQUEST]', {
+        identifier: payload.identifier,
+        portal: payload.portal,
+      })
       const loginRes = await api('/api/auth/login', {
         method: 'POST',
         data: payload,
@@ -130,11 +154,6 @@ export const AuthProvider = ({ children }) => {
         suppressAuthRedirect: true,
         portalOverride
       })
-      console.log('LOGIN RESPONSE', loginRes?.data)
-      console.log('LOGIN RES FULL', JSON.stringify(loginRes, null, 2))
-      console.log('LOGIN RES KEYS', Object.keys(loginRes || {}))
-      console.log('LOGIN RES TOKEN', loginRes?.token)
-      console.log('LOGIN RES DATA TOKEN', loginRes?.data?.token)
       if (loginRes?.ok === false || !loginRes?.token) {
         const err = new Error(loginRes?.message || 'Giriş başarısız')
         err.code = loginRes?.code || null
@@ -144,10 +163,6 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem(tokenKey, loginRes.token)
       const meRes = await api('/api/auth/me', { silent: true, suppressAuthRedirect: true, portalOverride })
-      console.log('ME RES FULL', JSON.stringify(meRes, null, 2))
-      console.log('ME RES KEYS', Object.keys(meRes || {}))
-      console.log('ME RES USER', meRes?.user)
-      console.log('ME RES DATA USER', meRes?.data?.user)
       if (meRes?.ok === false || !meRes?.user) {
         try {
           localStorage.removeItem(tokenKey)
@@ -186,10 +201,12 @@ export const AuthProvider = ({ children }) => {
 
       return normalized
     } catch (err) {
-      console.error('LOGIN ERROR', err)
-      console.error('LOGIN RESPONSE', err?.response)
-      console.error('LOGIN STATUS', err?.response?.status)
-      console.error('LOGIN DATA', err?.response?.data)
+      console.error('[LOGIN_ERROR]', {
+        identifier: payload.identifier,
+        portal: payload.portal,
+        status: err?.response?.status,
+        data: err?.response?.data,
+      })
       throw err
     }
   }
@@ -241,9 +258,7 @@ export const AuthProvider = ({ children }) => {
           return ''
         }
       })()
-      const portalOverride = pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/login/platform') || pathname.startsWith('/platform-login')
-        ? 'platform'
-        : 'restaurant'
+      const portalOverride = resolvePortalFromPathname(pathname)
       const meRes = await api('/api/auth/me', { silent: true, portalOverride })
       if (!meRes?.ok) return
       const user = meRes?.user

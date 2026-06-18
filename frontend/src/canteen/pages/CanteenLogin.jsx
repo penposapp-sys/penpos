@@ -31,7 +31,7 @@ export default function CanteenLogin() {
     const payload = { identifier, password, portal: 'canteen' }
 
     try {
-      console.log('LOGIN REQUEST', payload)
+      console.log('[LOGIN_FORM_SUBMIT]', { identifier, portal: payload.portal })
       const loginRes = await api('/api/auth/login', {
         method: 'POST',
         data: payload,
@@ -39,7 +39,6 @@ export default function CanteenLogin() {
         suppressAuthRedirect: true,
         portalOverride: 'canteen',
       })
-      console.log('LOGIN RESPONSE', loginRes?.data)
       if (loginRes?.ok === false || !loginRes?.token) {
         const err = new Error(loginRes?.message || 'Giriş başarısız')
         err.code = loginRes?.code || null

@@ -22,7 +22,7 @@ const resolvePortalMeta = (portal) => {
     }
   }
   return {
-    portal: 'kermes',
+    portal: 'restaurant',
     title: 'Şifremi Unuttum',
     subtitle: 'Restoran hesabınız için şifre sıfırlama bağlantısı gönderelim.',
     backTo: '/login/restoran',
