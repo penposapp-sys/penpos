@@ -42,7 +42,7 @@ export function isPerfDebugEnabled() {
 }
 
 export function isProductImagesDisabled() {
-  return readCachedFlag(DISABLE_IMAGES_KEY)
+  return isPerfDebugEnabled() && readCachedFlag(DISABLE_IMAGES_KEY)
 }
 
 export function getPerfNow() {
