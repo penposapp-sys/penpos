@@ -56,6 +56,7 @@ function Icon({ name, className = '' }) {
   if (name === 'chart') return <svg className={className} viewBox="0 0 24 24" fill="none"><path d="M5 19V9M12 19V5M19 19v-7" {...base} /></svg>
   if (name === 'check') return <svg className={className} viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" {...base} /></svg>
   if (name === 'store') return <svg className={className} viewBox="0 0 24 24" fill="none"><path d="M4 10h16l-1.5-5h-13L4 10zM6 10v9h12v-9M9 19v-5h6v5" {...base} /></svg>
+  if (name === 'whatsapp') return <svg className={className} viewBox="0 0 24 24" fill="none"><path d="M12 3.2a8.8 8.8 0 0 0-7.5 13.5L3.4 21l4.5-1.2A8.8 8.8 0 1 0 12 3.2z" fill="currentColor" fillOpacity=".16" /><path d="M12 4.7a7.3 7.3 0 0 0-6.2 11.2l.2.3-.8 2.8 2.9-.8.3.2A7.3 7.3 0 1 0 12 4.7z" fill="currentColor" /><path d="M9.2 8.6c-.2 0-.4 0-.6.4l-.5 1c-.1.2-.2.5 0 .8.2.4.8 1.5 1.8 2.3 1.1 1 2 1.3 2.4 1.5.3.1.6 0 .8-.2l.9-1.1c.1-.2.4-.2.7-.1l1.5.7c.3.1.5.3.4.6 0 .4-.2 1.2-.8 1.8-.5.5-1.1.7-1.8.7-.5 0-1.2-.1-2.1-.5-.6-.2-1.3-.6-2-1.1-2.2-1.5-3.6-4-3.7-4.2-.1-.2-.9-1.2-.9-2.3 0-1.1.6-1.7.8-2 .3-.3.6-.4.8-.4h.4c.2 0 .5 0 .7.5l.6 1.6c.1.3.1.5 0 .7l-.3.5c-.1.1-.2.3-.3.4-.1.1-.2.3 0 .5.2.3.6 1 1.4 1.6.9.8 1.6 1.1 1.9 1.3.2.1.4 0 .6-.1l.4-.5c.2-.2.4-.2.6-.1l1.9.9" fill="#fff" /></svg>
   return <svg className={className} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" {...base} /></svg>
 }
 
@@ -1363,6 +1364,93 @@ export default function LandingPage() {
           color: rgba(255,255,255,.35);
           font-size: 14px;
         }
+        .lp-footer-contact {
+          display: grid;
+          gap: 12px;
+        }
+        .lp-footer-contact-title {
+          color: #fff;
+          font-size: 18px;
+          font-weight: 700;
+          letter-spacing: -.02em;
+        }
+        .lp-footer-contact-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        .lp-footer-contact-links a {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 46px;
+          padding: 0 18px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,.12);
+          background: rgba(255,255,255,.04);
+          color: #fff;
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 600;
+          transition: transform .24s ease, border-color .24s ease, background .24s ease;
+        }
+        .lp-footer-contact-links a:hover {
+          transform: translateY(-1px);
+          border-color: rgba(184,115,75,.6);
+          background: rgba(184,115,75,.12);
+        }
+        .lp-floating-whatsapp {
+          position: fixed;
+          right: 24px;
+          bottom: 24px;
+          z-index: 60;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 45px;
+          padding: 7px 12px 7px 7px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.96);
+          color: #111827;
+          text-decoration: none;
+          box-shadow: 0 20px 45px rgba(0,0,0,.18);
+          border: 1px solid rgba(15,23,42,.08);
+          transition: transform .24s ease, box-shadow .24s ease;
+        }
+        .lp-floating-whatsapp:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 24px 52px rgba(0,0,0,.24);
+        }
+        .lp-floating-whatsapp-icon {
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          background: linear-gradient(180deg, #25d366 0%, #16a34a 100%);
+          color: #fff;
+        }
+        .lp-floating-whatsapp-icon svg {
+          width: 17px;
+          height: 17px;
+        }
+        .lp-floating-whatsapp-copy {
+          display: grid;
+          gap: 2px;
+          line-height: 1.1;
+        }
+        .lp-floating-whatsapp-copy strong {
+          color: #111827;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: -.02em;
+        }
+        .lp-floating-whatsapp-copy span {
+          color: #16a34a;
+          font-size: 9px;
+          font-weight: 700;
+        }
         .lp-modal-backdrop {
           position: fixed;
           inset: 0;
@@ -1544,6 +1632,27 @@ export default function LandingPage() {
             font-size: 15px;
             padding: 18px 24px;
           }
+          .lp-floating-whatsapp {
+            right: 14px;
+            bottom: 14px;
+            min-height: 35px;
+            padding: 5px 9px 5px 5px;
+            gap: 6px;
+          }
+          .lp-floating-whatsapp-icon {
+            width: 23px;
+            height: 23px;
+          }
+          .lp-floating-whatsapp-icon svg {
+            width: 13px;
+            height: 13px;
+          }
+          .lp-floating-whatsapp-copy strong {
+            font-size: 9px;
+          }
+          .lp-floating-whatsapp-copy span {
+            font-size: 7px;
+          }
         }
       `}</style>
 
@@ -1672,22 +1781,47 @@ export default function LandingPage() {
           <SectionTitle eyebrow="Eğitim Videoları" title="Sistemi kısa videolarla hızlı öğrenin." text="Kurulum, satış, cari hesap, QR menü ve raporlama akışlarını mevcut eğitim videolarıyla adım adım izleyebilirsiniz." />
           <div className="lp-video-grid">
             {trainingVideos.map((video) => (
-              <button key={video.id} type="button" className="lp-video-card" onClick={() => { window.location.href = video.youtubeUrl }}>
+              <div key={video.id} className="lp-video-card">
                 <div className="lp-video-icon-box">
                   <Icon name="play" className="lp-video-icon" />
                 </div>
                 <strong>{video.title}</strong>
-                <p>{video.description || 'Videoyu YouTube üzerinde aç.'}</p>
-                <div className="lp-video-link">Videoyu Aç <Icon name="arrow" className="lp-feature-link-icon" /></div>
-              </button>
+                <p>{video.description || 'Video açıklaması daha sonra eklenecek.'}</p>
+                <div className="lp-video-link">Video bağlantısı daha sonra eklenecek</div>
+              </div>
             ))}
           </div>
         </section>
       </main>
 
+      <a
+        href="https://wa.me/905313375562"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="lp-floating-whatsapp"
+        aria-label="WhatsApp hattı"
+      >
+        <span className="lp-floating-whatsapp-icon">
+          <Icon name="whatsapp" />
+        </span>
+        <span className="lp-floating-whatsapp-copy">
+          <strong>WhatsApp</strong>
+          <strong>Hattı</strong>
+          <span>Çevrimiçi</span>
+        </span>
+      </a>
+
       <footer className="lp-footer">
         <div className="lp-footer-inner">
           <Logo settings={settings} />
+          <div className="lp-footer-contact">
+            <div className="lp-footer-contact-title">İletişim</div>
+            <div className="lp-footer-contact-links">
+              <a href="mailto:penpos.app@gmail.com">penpos.app@gmail.com</a>
+              <a href="tel:+905313375562">0531 337 55 62</a>
+              <a href="https://wa.me/905313375562" target="_blank" rel="noopener noreferrer">WhatsApp: 0531 337 55 62</a>
+            </div>
+          </div>
           <div className="lp-footer-copy">© 2026 PenPOS. Restoran, mağaza ve market otomasyon sistemi.</div>
         </div>
       </footer>
