@@ -64,7 +64,6 @@ export default function CanteenSettingsProductsPage() {
   const [barcode, setBarcode] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [sellPrice, setSellPrice] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [imageError, setImageError] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -200,7 +199,6 @@ export default function CanteenSettingsProductsPage() {
     setBarcode('')
     setBuyPrice('')
     setSellPrice('')
-    setImageUrl('')
     setImageFile(null)
     setImageError('')
     setCategoryId('')
@@ -265,7 +263,6 @@ export default function CanteenSettingsProductsPage() {
         barcode: normalizedBarcode,
         price,
         costPrice: Number.isFinite(cost) ? cost : 0,
-        imageUrl: String(imageUrl || '').trim(),
         categoryId: String(categoryId || '').trim() || null,
         stockTrackingEnabled: stockTrackingEnabled === true,
         stockQty: Number(String(stockQty || '').replace(',', '.')) || 0
@@ -334,7 +331,6 @@ export default function CanteenSettingsProductsPage() {
         barcode: normalizedBarcode,
         price: Number.isFinite(price) ? price : 0,
         costPrice: Number.isFinite(cost) ? cost : 0,
-        imageUrl: String(editImageUrl || '').trim(),
         categoryId: String(editCategoryId || '').trim() || null,
         stockTrackingEnabled: editStockTrackingEnabled === true,
         stockQty: Number.isFinite(nextStock) ? nextStock : 0

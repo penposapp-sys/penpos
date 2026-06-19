@@ -164,7 +164,6 @@ export const buildProductPayload = (form = {}) => ({
   name: String(form.name || '').trim(),
   price: asNumber(form.price, 0),
   description: String(form.description || '').trim(),
-  imageUrl: String(form.imageUrl || '').trim(),
   sortOrder: asNumber(form.sortOrder, 0),
   isWeightBased: !!form.isWeightBased,
   printLabelEnabled: !!form.printLabelEnabled,

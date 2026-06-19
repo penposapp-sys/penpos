@@ -12,6 +12,7 @@ import { themeKeys, themes } from '../theme/themeConfig.js'
 import { buildSafeBusinessSettings, defaultBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
 import { getSubscriptionStatus } from '../lib/subscription.js'
 import { toast } from '../lib/toast.js'
+import { resolveApiOrigin } from '../lib/runtimeApi.js'
 
 const BUSINESS_SETTINGS_SECTIONS = {
   general: [
@@ -869,16 +870,7 @@ export const SettingsSystemContent = () => {
   const [success, setSuccess] = useState('')
   const { refresh, setAllowedBranchIds } = useAuth()
 
-  const apiOrigin = React.useMemo(() => {
-    const fallback = '/api'
-    try {
-      const u = new URL(import.meta.env.VITE_API_URL || fallback)
-      u.port = '4000'
-      return u.origin
-    } catch {
-      return fallback
-    }
-  }, [])
+  const apiOrigin = React.useMemo(() => resolveApiOrigin(), [])
 
   const logoPreviewSrc = React.useMemo(() => {
     const raw = String(logoUrl || '').trim()

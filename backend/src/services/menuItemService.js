@@ -115,7 +115,7 @@ export const createMenuItemService = async (tenantId, dto) => {
     isWeightBased: !!dto.isWeightBased,
     printLabelEnabled: dto.printLabelEnabled === true,
     description: dto.description ?? '',
-    imageUrl: dto.imageUrl ?? '',
+    imageUrl: '',
     settings: buildNextSettings({}, dto.settings, {
       previousPrice: null,
       nextPrice: dto.price,
@@ -154,7 +154,7 @@ export const updateMenuItemService = async (tenantId, id, dto) => {
     isWeightBased: dto.isWeightBased ?? i.isWeightBased,
     printLabelEnabled: dto.printLabelEnabled ?? i.printLabelEnabled,
     description: dto.description ?? i.description,
-    imageUrl: dto.imageUrl ?? i.imageUrl,
+    imageUrl: i.imageUrl,
     settings: buildNextSettings(i.settings, dto.settings, {
       previousPrice: i.price,
       nextPrice: dto.price ?? i.price,

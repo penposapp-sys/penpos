@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { PRODUCT_PLACEHOLDER_SRC, resolveProductImageUrl } from '../lib/productImage.js'
 import { isProductImagesDisabled } from '../lib/perfDebug.js'
 
@@ -14,12 +14,20 @@ export default function ProductImage({
 }) {
   const [failed, setFailed] = useState(false)
   const disableImages = isProductImagesDisabled()
-  const resolved = useMemo(() => {
-    if (disableImages || failed) return PRODUCT_PLACEHOLDER_SRC
+  const baseSource = useMemo(() => {
     return src && String(src).trim()
       ? resolveProductImageUrl({ imageUrl: src })
       : resolveProductImageUrl(product)
-  }, [disableImages, failed, product, src])
+  }, [product, src])
+
+  useEffect(() => {
+    setFailed(false)
+  }, [baseSource])
+
+  const resolved = useMemo(() => {
+    if (disableImages || failed) return PRODUCT_PLACEHOLDER_SRC
+    return baseSource
+  }, [baseSource, disableImages, failed])
 
   return (
     <img

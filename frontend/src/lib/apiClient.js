@@ -1,34 +1,16 @@
 import { toast } from './toast.js'
 import { getSubscriptionUpgradePath, isSubscriptionAllowedPath } from './subscription.js'
 import { getAuthToken, removeAuthToken } from './authStorage.js'
+import { resolveApiBase } from './runtimeApi.js'
 
 const inflight = new Map()
 const cache = new Map()
 let lastRateLimitToastAt = 0
-const DEFAULT_REMOTE_API_ORIGIN = 'https://penpos.cloud'
 
 export const clearApiCache = () => {
   try {
     cache.clear()
   } catch {}
-}
-
-const normalizeBaseUrl = (value) => {
-  const v = String(value || '').replace(/\/+$/, '')
-  if (v.endsWith('/api')) return v.slice(0, -4)
-  return v
-}
-
-const isNativeRuntime = () => {
-  try {
-    if (typeof window === 'undefined') return false
-    const capacitor = window.Capacitor
-    if (typeof capacitor?.isNativePlatform === 'function') return !!capacitor.isNativePlatform()
-    const platform = String(capacitor?.getPlatform?.() || '').toLowerCase()
-    return platform === 'android' || platform === 'ios'
-  } catch {
-    return false
-  }
 }
 
 const forcePort4000 = (value) => {
@@ -76,12 +58,7 @@ const normalizeForAllowlist = (path) => {
   return normalizeApiPath(raw)
 }
 
-const envBase = normalizeBaseUrl(import.meta.env.VITE_API_URL) || ''
-const nativeEnvBase = normalizeBaseUrl(import.meta.env.VITE_API_URL_NATIVE || import.meta.env.VITE_API_URL_ANDROID || '') || ''
-const remoteBase = nativeEnvBase || (envBase && /^https?:\/\//i.test(envBase) ? envBase : DEFAULT_REMOTE_API_ORIGIN)
-const base = import.meta.env.DEV
-  ? forcePort4000(envBase || 'http://localhost:4000')
-  : (isNativeRuntime() ? remoteBase : envBase)
+const base = resolveApiBase()
 
 const MISSING_BRANCH_MESSAGE = 'Sube secimi gerekli. Ayarlar > Sistem Ayarlari > Yetkili Subeler bolumunden sube secin.'
 

@@ -9,6 +9,7 @@ import { toast } from '../lib/toast.js'
 import { useTheme } from '../theme/ThemeContext.jsx'
 import { themeKeys, themes } from '../theme/themeConfig.js'
 import { buildSafeBusinessSettings, defaultBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
+import { resolveApiOrigin } from '../lib/runtimeApi.js'
 
 const settingsTheme = {
   pageBg: 'radial-gradient(circle at top left, color-mix(in srgb, var(--settings-accent-soft) 28%, transparent) 0, transparent 32%), radial-gradient(circle at bottom right, color-mix(in srgb, var(--settings-border) 62%, transparent) 0, transparent 28%), var(--app-bg)',
@@ -740,16 +741,7 @@ export function SettingsSystemContent() {
     branches: businessBranches,
   } = useBusinessSettings()
 
-  const apiOrigin = useMemo(() => {
-    const fallback = '/api'
-    try {
-      const url = new URL(import.meta.env.VITE_API_URL || fallback)
-      url.port = '4000'
-      return url.origin
-    } catch {
-      return fallback
-    }
-  }, [])
+  const apiOrigin = useMemo(() => resolveApiOrigin(), [])
 
   const logoPreviewSrc = useMemo(() => {
     const raw = String(logoUrl || '').trim()

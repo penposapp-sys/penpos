@@ -1,36 +1,9 @@
+import { resolveApiOrigin } from './runtimeApi.js'
+
 export const PRODUCT_PLACEHOLDER_SRC = '/images/default-product.webp'
 export const ACCEPTED_PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 export const MAX_PRODUCT_IMAGE_BYTES = 1024 * 1024
-
-const normalizeBaseUrl = (value) => String(value || '').replace(/\/+$/, '')
-
-const inferApiOrigin = () => {
-  const envBase = normalizeBaseUrl(import.meta.env.VITE_API_URL)
-  if (envBase) {
-    try {
-      const url = new URL(envBase)
-      if (import.meta.env.DEV) url.port = '4000'
-      url.pathname = ''
-      url.search = ''
-      url.hash = ''
-      return url.toString().replace(/\/+$/, '')
-    } catch {
-      return envBase
-    }
-  }
-
-  if (typeof window !== 'undefined') {
-    const { protocol, hostname, port, origin } = window.location
-    if (import.meta.env.DEV && (port === '5173' || port === '4173')) {
-      return `${protocol}//${hostname}:4000`
-    }
-    return origin
-  }
-
-  return ''
-}
-
-const API_ORIGIN = inferApiOrigin()
+const API_ORIGIN = resolveApiOrigin()
 
 export function formatProductImageSize(value) {
   const size = Number(value || 0)

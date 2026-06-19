@@ -137,7 +137,6 @@ export const createProduct = async (tenantId, branchId, input) => {
   const stockTrackingEnabled = input?.stockTrackingEnabled === true
   const stockQtyRaw = input?.stockQty
   const stockQty = Number(stockQtyRaw || 0)
-  const imageUrl = String(input?.imageUrl || '').trim()
   try {
     const created = await prodRepo.create({
       tenantId,
@@ -151,7 +150,7 @@ export const createProduct = async (tenantId, branchId, input) => {
       price: Number.isFinite(price) ? price : 0,
       costPrice: Number.isFinite(costPrice) ? costPrice : 0,
       vatRate: Number.isFinite(vatRate) ? vatRate : 0,
-      imageUrl,
+      imageUrl: '',
       isActive: true,
       createdAt: new Date()
     })
@@ -208,7 +207,6 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
     update.categoryId = input?.categoryId ? String(input.categoryId) : null
     if (update.categoryId) await ensureCategoryInScope(tenantId, branchId, update.categoryId)
   }
-  if (input?.imageUrl !== undefined) update.imageUrl = String(input?.imageUrl || '').trim()
   try {
     const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, update)
     if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
