@@ -32,6 +32,7 @@ import { requireActiveSubscription } from './middlewares/requireActiveSubscripti
 import { requireAuth } from './middlewares/requireAuth.js'
 import { tenantGuard } from './middlewares/tenantGuard.js'
 import { sendError } from './utils/errors.js'
+import { UPLOADS_STATIC_DIRS } from './utils/uploads.js'
 import debugRouter from './routes/debug.js'
 import canteenRouter from './modules/canteen/routes/canteen.js'
 
@@ -89,13 +90,17 @@ export const createServer = () => {
   }
   app.use(express.json())
   app.use('/public', express.static(path.join(__dirname, '..', 'public')))
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  const uploadsStaticOptions = {
     setHeaders: (res, filePath) => {
       if (filePath.includes(`${path.sep}uploads${path.sep}products${path.sep}`)) {
         res.setHeader('Cache-Control', 'public, max-age=31536000')
       }
     }
-  }))
+  }
+  for (const uploadsDir of UPLOADS_STATIC_DIRS) {
+    app.use('/uploads', express.static(uploadsDir, uploadsStaticOptions))
+    app.use('/api/uploads', express.static(uploadsDir, uploadsStaticOptions))
+  }
   app.use((req, res, next) => {
     const id = randomUUID()
     req.requestId = id

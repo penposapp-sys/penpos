@@ -3,10 +3,12 @@ import path from 'path'
 import { randomBytes } from 'crypto'
 import sharp from 'sharp'
 import { error } from './errors.js'
+import { resolveUploadDir, resolveUploadDirCandidates } from './uploads.js'
 
 export const MAX_PRODUCT_IMAGE_BYTES = 1024 * 1024
 export const PRODUCT_IMAGE_PLACEHOLDER = '/images/default-product.webp'
-export const PRODUCT_IMAGE_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'products')
+export const PRODUCT_IMAGE_UPLOAD_DIR = resolveUploadDir('products')
+export const PRODUCT_IMAGE_UPLOAD_DIRS = resolveUploadDirCandidates('products')
 export const PRODUCT_IMAGE_PUBLIC_PREFIX = '/uploads/products/'
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -15,11 +17,21 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/webp'
 ])
 
-const normalizeImageValue = (value) => String(value || '').trim()
+const normalizeImageValue = (value) => String(value || '').trim().replace(/\\/g, '/')
+
+export const normalizeLocalProductImagePath = (value) => {
+  const normalized = normalizeImageValue(value)
+  if (!normalized) return ''
+  if (normalized.startsWith(PRODUCT_IMAGE_PUBLIC_PREFIX)) return normalized
+  if (normalized.startsWith(`/api${PRODUCT_IMAGE_PUBLIC_PREFIX}`)) return normalized.slice(4)
+  if (normalized.startsWith(`api${PRODUCT_IMAGE_PUBLIC_PREFIX}`)) return normalized.slice(3)
+  if (normalized.startsWith(PRODUCT_IMAGE_PUBLIC_PREFIX.slice(1))) return `/${normalized}`
+  return normalized
+}
 
 export const isRemoteImageUrl = (value) => /^https?:\/\//i.test(normalizeImageValue(value))
 
-export const isLocalProductImagePath = (value) => normalizeImageValue(value).startsWith(PRODUCT_IMAGE_PUBLIC_PREFIX)
+export const isLocalProductImagePath = (value) => normalizeLocalProductImagePath(value).startsWith(PRODUCT_IMAGE_PUBLIC_PREFIX)
 
 export const isAcceptedProductImageMimeType = (value) => ALLOWED_MIME_TYPES.has(String(value || '').toLowerCase())
 
@@ -77,17 +89,21 @@ export const saveOptimizedProductImage = async (file) => {
 export const deleteProductImageFile = async (imageUrl) => {
   if (!isLocalProductImagePath(imageUrl)) return false
 
-  const relativeFileName = normalizeImageValue(imageUrl).slice(PRODUCT_IMAGE_PUBLIC_PREFIX.length)
+  const relativeFileName = normalizeLocalProductImagePath(imageUrl)
+    .slice(PRODUCT_IMAGE_PUBLIC_PREFIX.length)
+    .split(/[?#]/, 1)[0]
   if (!relativeFileName || relativeFileName.includes('/') || relativeFileName.includes('\\')) return false
 
-  const absolutePath = path.join(PRODUCT_IMAGE_UPLOAD_DIR, relativeFileName)
-  try {
-    await fs.unlink(absolutePath)
-    return true
-  } catch (err) {
-    if (err?.code === 'ENOENT') return false
-    throw err
+  let deleted = false
+  for (const absolutePath of PRODUCT_IMAGE_UPLOAD_DIRS.map((dir) => path.join(dir, relativeFileName))) {
+    try {
+      await fs.unlink(absolutePath)
+      deleted = true
+    } catch (err) {
+      if (err?.code !== 'ENOENT') throw err
+    }
   }
+  return deleted
 }
 
 export const replaceProductImageFile = async (currentImageUrl, file) => {

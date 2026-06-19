@@ -6004,6 +6004,7 @@ textarea::placeholder {
   }
   body.sales-mobile-scroll .saleCategoryPanelScroll {
     display: flex;
+    flex-direction: row;
     flex-wrap: nowrap !important;
     align-items: stretch;
     gap: 6px;

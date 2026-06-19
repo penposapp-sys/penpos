@@ -21,6 +21,7 @@ export default function ProductImageUploadField({
   const inputId = useId()
   const [dragActive, setDragActive] = useState(false)
   const [previewUrl, setPreviewUrl] = useState('')
+  const [previewFailed, setPreviewFailed] = useState(false)
 
   useEffect(() => {
     if (!file) {
@@ -38,7 +39,12 @@ export default function ProductImageUploadField({
     return PRODUCT_PLACEHOLDER_SRC
   }, [currentImageUrl, previewUrl])
 
+  useEffect(() => {
+    setPreviewFailed(false)
+  }, [displaySrc])
+
   const fileSizeLabel = file ? formatProductImageSize(file.size) : existingSizeLabel
+  const previewSrc = previewFailed ? PRODUCT_PLACEHOLDER_SRC : displaySrc
 
   const commitFile = (nextFile) => {
     if (!nextFile) return
@@ -83,7 +89,15 @@ export default function ProductImageUploadField({
           }}
         />
         <div className="product-image-upload__preview">
-          <img src={displaySrc} alt="Ürün önizleme" />
+          <img
+            src={previewSrc}
+            alt="Ürün önizleme"
+            onError={(event) => {
+              if (event.currentTarget.src.endsWith(PRODUCT_PLACEHOLDER_SRC)) return
+              setPreviewFailed(true)
+              event.currentTarget.src = PRODUCT_PLACEHOLDER_SRC
+            }}
+          />
         </div>
         <div className="product-image-upload__copy">
           <strong>Dosya seç veya sürükle bırak</strong>

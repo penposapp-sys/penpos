@@ -4,9 +4,10 @@ import MenuItem from '../models/MenuItem.js'
 import CanteenProduct from '../modules/canteen/models/CanteenProduct.js'
 import {
   PRODUCT_IMAGE_PUBLIC_PREFIX,
-  PRODUCT_IMAGE_UPLOAD_DIR,
+  PRODUCT_IMAGE_UPLOAD_DIRS,
   ensureProductImageUploadDir,
-  isLocalProductImagePath
+  isLocalProductImagePath,
+  normalizeLocalProductImagePath
 } from '../utils/productImageStorage.js'
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -14,35 +15,47 @@ const START_DELAY_MS = 60 * 1000
 
 const listReferencedImagePaths = async () => {
   const [menuItems, canteenProducts] = await Promise.all([
-    MenuItem.find({ imageUrl: { $regex: '^/uploads/products/' } }).select('imageUrl').lean(),
-    CanteenProduct.find({ imageUrl: { $regex: '^/uploads/products/' } }).select('imageUrl').lean()
+    MenuItem.find({ imageUrl: { $regex: 'uploads/products/' } }).select('imageUrl').lean(),
+    CanteenProduct.find({ imageUrl: { $regex: 'uploads/products/' } }).select('imageUrl').lean()
   ])
 
   const references = new Set()
   for (const doc of [...menuItems, ...canteenProducts]) {
     const imageUrl = String(doc?.imageUrl || '').trim()
-    if (isLocalProductImagePath(imageUrl)) references.add(imageUrl)
+    if (isLocalProductImagePath(imageUrl)) references.add(normalizeLocalProductImagePath(imageUrl))
   }
   return references
 }
 
 export const cleanupUnusedProductImages = async () => {
   await ensureProductImageUploadDir()
-  const [entries, references] = await Promise.all([
-    fs.readdir(PRODUCT_IMAGE_UPLOAD_DIR, { withFileTypes: true }),
+  const [directories, references] = await Promise.all([
+    Promise.all(PRODUCT_IMAGE_UPLOAD_DIRS.map(async (dir) => {
+      try {
+        return {
+          dir,
+          entries: await fs.readdir(dir, { withFileTypes: true })
+        }
+      } catch (err) {
+        if (err?.code === 'ENOENT') return { dir, entries: [] }
+        throw err
+      }
+    })),
     listReferencedImagePaths()
   ])
 
   let deletedCount = 0
-  for (const entry of entries) {
-    if (!entry.isFile()) continue
-    const publicPath = `${PRODUCT_IMAGE_PUBLIC_PREFIX}${entry.name}`
-    if (references.has(publicPath)) continue
-    try {
-      await fs.unlink(path.join(PRODUCT_IMAGE_UPLOAD_DIR, entry.name))
-      deletedCount += 1
-    } catch (err) {
-      if (err?.code !== 'ENOENT') throw err
+  for (const directory of directories) {
+    for (const entry of directory.entries) {
+      if (!entry.isFile()) continue
+      const publicPath = `${PRODUCT_IMAGE_PUBLIC_PREFIX}${entry.name}`
+      if (references.has(publicPath)) continue
+      try {
+        await fs.unlink(path.join(directory.dir, entry.name))
+        deletedCount += 1
+      } catch (err) {
+        if (err?.code !== 'ENOENT') throw err
+      }
     }
   }
 

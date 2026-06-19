@@ -4,6 +4,10 @@ export const PRODUCT_PLACEHOLDER_SRC = '/images/default-product.webp'
 export const ACCEPTED_PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 export const MAX_PRODUCT_IMAGE_BYTES = 1024 * 1024
 const API_ORIGIN = resolveApiOrigin()
+const PRODUCT_UPLOADS_PREFIX = '/uploads/products/'
+
+const normalizeImageValue = (value) => String(value || '').trim().replace(/\\/g, '/')
+const toAbsoluteProductUrl = (value) => (API_ORIGIN ? `${API_ORIGIN}${value}` : value)
 
 export function formatProductImageSize(value) {
   const size = Number(value || 0)
@@ -26,7 +30,7 @@ export function validateProductImageFile(file) {
 }
 
 export function resolveProductImageUrl(product) {
-  const raw = String(
+  const raw = normalizeImageValue(
     product?.imageUrl ||
     product?.photoUrl ||
     product?.image ||
@@ -35,11 +39,15 @@ export function resolveProductImageUrl(product) {
     product?.media?.photoUrl ||
     product?.media?.image ||
     ''
-  ).trim()
+  )
 
   if (!raw) return PRODUCT_PLACEHOLDER_SRC
   if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw
   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) return raw
-  if (raw.startsWith('/')) return API_ORIGIN ? `${API_ORIGIN}${raw}` : raw
+  if (raw.startsWith('/api/uploads/')) return toAbsoluteProductUrl(raw.slice(4))
+  if (raw.startsWith('api/uploads/')) return toAbsoluteProductUrl(raw.slice(3))
+  if (raw.startsWith('uploads/')) return toAbsoluteProductUrl(`/${raw}`)
+  if (raw.startsWith('/')) return toAbsoluteProductUrl(raw)
+  if (/^[^/]+\.(jpe?g|png|webp)$/i.test(raw)) return toAbsoluteProductUrl(`${PRODUCT_UPLOADS_PREFIX}${raw}`)
   return PRODUCT_PLACEHOLDER_SRC
 }
