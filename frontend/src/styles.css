@@ -2579,18 +2579,35 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .saleCategoryPanelScroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
   min-width: 0;
   max-width: 100%;
-  cursor: grab;
-  user-select: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: 10px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.saleCategoryPanelScroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .saleCategoryButton {
-  white-space: nowrap;
-}
-
-.saleCategoryPanelScroll:active {
-  cursor: grabbing;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .salePanelScroll.saleProductsVirtualScroll {
