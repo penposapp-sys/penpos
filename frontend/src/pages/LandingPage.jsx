@@ -1572,7 +1572,7 @@ export default function LandingPage() {
                 {showAndroidDownload ? (
                   <a
                     className="lp-hero-download"
-                    href="https://drive.google.com/file/d/1c8I7iCdCtaSXrSIAjSpn0Af19honaUpn/view?usp=sharing"
+                    href="https://drive.google.com/file/d/1_QZs8wYc0mtVSfPtBllJIXt5r-e9M9iv/view?usp=sharing"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
