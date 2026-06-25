@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import ConfirmModal from '../ConfirmModal.jsx'
 import Modal from '../Modal.jsx'
 import { SettingsToggle, SettingsUiStyles } from '../settings/SettingsUi.jsx'
@@ -87,6 +88,7 @@ export default function PrintStationsCard({
   onSavePrinters,
   onReload
 }) {
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [rotateStationId, setRotateStationId] = useState('')
   const [deleteStationId, setDeleteStationId] = useState('')
   const [secretModalOpen, setSecretModalOpen] = useState(false)
@@ -103,6 +105,7 @@ export default function PrintStationsCard({
   }, [JSON.stringify(stations || [])])
 
   const blocked = busy || submitting
+  const isCompact = isMobilePortrait || isTablet
 
   const doRotate = async () => {
     const id = String(rotateStationId || '').trim()
@@ -247,12 +250,12 @@ export default function PrintStationsCard({
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <SettingsUiStyles />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompact ? 'flex-start' : 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontWeight: 800 }}>Print Station</div>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>İstasyon bilgisayar demektir. Birden fazla istasyon aynı anda aktif olabilir ve her istasyonun altına birden fazla fiş ve etiket yazıcısı ekleyebilirsin.</div>
         </div>
-        <button className="btn" onClick={handleCreate} disabled={blocked}>Yeni İstasyon Ekle</button>
+        <button className="btn" onClick={handleCreate} disabled={blocked} style={{ width: isMobilePortrait ? '100%' : undefined }}>Yeni İstasyon Ekle</button>
       </div>
 
       <div style={{ display: 'grid', gap: 8 }}>
@@ -270,23 +273,23 @@ export default function PrintStationsCard({
             : agentPrinters
 
           return (
-            <div key={s.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 800 }}>{s.name}</div>
+            <div key={s.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 12, minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{s.name}</div>
                   <div style={{ marginTop: 2, fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <div>Station ID: <span style={{ fontFamily: 'monospace' }}>{shortId(s.id)}</span></div>
                     <button className="btn btn--compact" onClick={() => copyText('Station ID', s.id)} disabled={blocked}>Kopyala</button>
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)', display: 'grid', gap: 2 }}>
                     <div>{s.isActive ? 'Aktif' : 'Pasif'} · {label}{age}</div>
-                    <div>PC: {host || '-'} · v{ver || '-'} · Agent Yazıcıları: {printersCount} · Tanımlı Kurallar: {configuredPrinters.length}</div>
+                    <div style={{ overflowWrap: 'anywhere' }}>PC: {host || '-'} · v{ver || '-'} · Agent Yazıcıları: {printersCount} · Tanımlı Kurallar: {configuredPrinters.length}</div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button className="btn" onClick={() => onActivate(s.id)} disabled={blocked || s.isActive === true}>{s.isActive ? 'Aktif' : 'Aktif Yap'}</button>
-                  <button className="btn" onClick={() => setRotateStationId(String(s.id))} disabled={blocked}>Secret Yenile</button>
-                  <button className="btn btn--danger" onClick={() => setDeleteStationId(String(s.id))} disabled={blocked}>Sil</button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: isCompact ? '100%' : 'auto' }}>
+                  <button className="btn" onClick={() => onActivate(s.id)} disabled={blocked || s.isActive === true} style={{ flex: isCompact ? '1 1 140px' : undefined }}>{s.isActive ? 'Aktif' : 'Aktif Yap'}</button>
+                  <button className="btn" onClick={() => setRotateStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Secret Yenile</button>
+                  <button className="btn btn--danger" onClick={() => setDeleteStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Sil</button>
                 </div>
               </div>
 
@@ -297,10 +300,10 @@ export default function PrintStationsCard({
                       <div style={{ fontWeight: 800 }}>İstasyon Yazıcıları</div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>Etiket yazıcılarında kategori filtresi boşsa tüm kategoriler basılır.</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'label')} disabled={blocked}>Etiket Yazıcısı Ekle</button>
-                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'receipt')} disabled={blocked}>Fiş Yazıcısı Ekle</button>
-                      <button className="btn" type="button" onClick={() => savePrinters(s.id)} disabled={blocked}>Kaydet</button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: isCompact ? '100%' : 'auto' }}>
+                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'label')} disabled={blocked} style={{ flex: isCompact ? '1 1 160px' : undefined }}>Etiket Yazıcısı Ekle</button>
+                      <button className="btn" type="button" onClick={() => addDraft(s.id, 'receipt')} disabled={blocked} style={{ flex: isCompact ? '1 1 160px' : undefined }}>Fiş Yazıcısı Ekle</button>
+                      <button className="btn" type="button" onClick={() => savePrinters(s.id)} disabled={blocked} style={{ flex: isCompact ? '1 1 160px' : undefined }}>Kaydet</button>
                     </div>
                   </div>
 
@@ -309,8 +312,8 @@ export default function PrintStationsCard({
                   )}
 
                   {draftPrinters.map((entry) => (
-                    <div key={entry.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--app-border, var(--border))', borderRadius: 10, background: 'var(--app-surface)' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px,1fr) 150px minmax(220px,1fr) auto auto', gap: 10, alignItems: 'end' }}>
+                    <div key={entry.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--app-border, var(--border))', borderRadius: 10, background: 'var(--app-surface)', minWidth: 0 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(180px,1fr) 150px minmax(220px,1fr) auto auto', gap: 10, alignItems: 'end', minWidth: 0 }}>
                         <label>
                           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kural Adı</div>
                           <input className="input" value={entry.name} onChange={(e) => updateDraft(s.id, entry.id, 'name', e.target.value)} disabled={blocked} />
@@ -329,15 +332,15 @@ export default function PrintStationsCard({
                             {(availablePrinters || []).map((printer) => <option key={printer} value={printer}>{printer}</option>)}
                           </select>
                         </label>
-                        <div style={{ minWidth: 140 }}>
+                        <div style={{ minWidth: 0 }}>
                           <SettingsToggle label="Aktif" checked={entry.isActive} onChange={(e) => updateDraft(s.id, entry.id, 'isActive', e.target.checked)} disabled={blocked} />
                         </div>
-                        <button className="btn btn--danger" type="button" onClick={() => removeDraft(s.id, entry.id)} disabled={blocked}>Sil</button>
+                        <button className="btn btn--danger" type="button" onClick={() => removeDraft(s.id, entry.id)} disabled={blocked} style={{ width: isCompact ? '100%' : undefined }}>Sil</button>
                       </div>
 
                       {entry.printerType === 'label' ? (
                         <div style={{ display: 'grid', gap: 10 }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '120px 120px 120px', gap: 10 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? 'repeat(auto-fit, minmax(120px, 1fr))' : '120px 120px 120px', gap: 10 }}>
                             <label>
                               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Genişlik</div>
                               <input className="input" value={entry.widthMm} onChange={(e) => updateDraft(s.id, entry.id, 'widthMm', e.target.value)} disabled={blocked} />
@@ -409,7 +412,7 @@ export default function PrintStationsCard({
                         </div>
                       ) : (
                         <div style={{ display: 'grid', gap: 10 }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '120px 120px', gap: 10 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? 'repeat(auto-fit, minmax(120px, 1fr))' : '120px 120px', gap: 10 }}>
                             <label>
                               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş Genişliği</div>
                               <input className="input" value={entry.receiptWidthMm} onChange={(e) => updateDraft(s.id, entry.id, 'receiptWidthMm', e.target.value)} disabled={blocked} />
@@ -420,7 +423,7 @@ export default function PrintStationsCard({
                             </label>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) minmax(220px, 1fr)', gap: 12 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(220px, 1fr) minmax(220px, 1fr)', gap: 12 }}>
                             <SettingsToggle
                               label="Kasa fişinde kullan"
                               checked={entry.useForCashierReceipt === true}

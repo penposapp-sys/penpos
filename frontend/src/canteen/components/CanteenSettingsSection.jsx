@@ -6,6 +6,11 @@ export function CanteenSettingsCard({ children, style = {}, ...props }) {
       {...props}
       className={props.className || 'card'}
       style={{
+        width: '100%',
+        minWidth: 0,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
         borderRadius: 24,
         border: '1px solid var(--app-border, var(--border))',
         background: 'linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 96%, transparent), var(--app-surface-soft, var(--panelElevated)))',
@@ -42,7 +47,7 @@ export default function CanteenSettingsSection({
   children,
 }) {
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div style={{ display: 'grid', gap: 16, minWidth: 0, maxWidth: '100%' }}>
       {actions ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{actions}</div> : null}
 
       {Array.isArray(stats) && stats.length > 0 ? (

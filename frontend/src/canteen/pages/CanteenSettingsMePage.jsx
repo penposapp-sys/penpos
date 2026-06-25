@@ -153,13 +153,13 @@ export default function CanteenSettingsMePage() {
       {!loading && !me ? <CanteenSettingsCard style={{ padding: 18 }}>Kullanıcı bilgisi alınamadı.</CanteenSettingsCard> : null}
 
       {!loading && me ? (
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+        <div style={{ display: 'grid', gap: 16, minWidth: 0, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}>
           <CanteenSettingsCard style={{ padding: 20 }}>
             <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Kullanıcı Adı</div>
             <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5, marginBottom: 14 }}>
               Giriş ekranında kullanacağınız kullanıcı adını doğrulayıp güncelleyin.
             </div>
-            <form onSubmit={saveUsername} style={{ display: 'grid', gap: 12 }}>
+            <form onSubmit={saveUsername} style={{ display: 'grid', gap: 12, minWidth: 0 }}>
               <label>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanıcı adı</div>
                 <input className="input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="ornek: magaza1" />
@@ -178,7 +178,7 @@ export default function CanteenSettingsMePage() {
             <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5, marginBottom: 14 }}>
               Bildirim ve oturum kurtarma işlemleri için kullandığınız e-posta adresini güncelleyin.
             </div>
-            <form onSubmit={saveEmail} style={{ display: 'grid', gap: 12 }}>
+            <form onSubmit={saveEmail} style={{ display: 'grid', gap: 12, minWidth: 0 }}>
               <label>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta adresi</div>
                 <input className="input" value={email} onChange={(event) => setEmail(event.target.value)} />
@@ -196,7 +196,7 @@ export default function CanteenSettingsMePage() {
             <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5, marginBottom: 14 }}>
               Hesabınızı daha güvenli tutmak için yeni bir şifre belirleyin.
             </div>
-            <form onSubmit={savePassword} style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <form onSubmit={savePassword} style={{ display: 'grid', gap: 12, minWidth: 0, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
               <label>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut şifre</div>
                 <input className="input" type="password" value={pwCurrent} onChange={(event) => setPwCurrent(event.target.value)} />

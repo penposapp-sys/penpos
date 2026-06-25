@@ -20,6 +20,14 @@ function buildSettingsThemeVars(theme) {
     '--settings-text-muted': dark ? '#8c8c8c' : '#64748b',
     '--settings-accent': theme?.accent || '#2f6df6',
     '--settings-accent-2': theme?.accentHover || '#22b8e6',
+    '--settings-button-bg': 'var(--menu-active-bg)',
+    '--settings-button-bg-hover': 'var(--menu-active-bg)',
+    '--settings-button-bg-active': 'var(--menu-active-bg)',
+    '--settings-button-border': 'var(--border-hover)',
+    '--settings-button-text': 'var(--sidebar-nav-text-active, #ffffff)',
+    '--settings-button-disabled-bg': dark ? '#2f2f2f' : '#d1d5db',
+    '--settings-button-disabled-border': dark ? '#3f3f46' : '#d1d5db',
+    '--settings-button-disabled-text': dark ? '#9ca3af' : '#6b7280',
     '--settings-shadow': dark ? '0 28px 80px rgba(0,0,0,0.38)' : '0 22px 56px rgba(15,23,42,0.10)',
     '--settings-card-shadow': dark ? '0 18px 40px rgba(0,0,0,0.24)' : '0 14px 34px rgba(15,23,42,0.08)'
   }
@@ -96,18 +104,65 @@ function SettingsChromeStyle() {
       .canteen-settings-shell button:not(.btn--primary):not(.btn--danger),
       .canteen-settings-shell .btn:not(.btn--primary):not(.btn--danger) { color: var(--settings-text) !important; }
       .canteen-settings-shell [style*='var(--muted)'] { color: var(--settings-text-soft) !important; }
-      .canteen-settings-shell .btn--primary {
-        background: linear-gradient(135deg, var(--settings-accent), var(--settings-accent-2)) !important;
-        border-color: transparent !important;
-        color: #ffffff !important;
+      .canteen-settings-shell :is(
+        button,
+        .btn,
+        .settings-ui-submit,
+        .settings-ui-btn,
+        .settings-ui-branch-all-btn,
+        .settings-ui-branch-clear-btn,
+        .canteen-settings-menu-toggle
+      ):not(.canteen-settings-home-card):not(.canteen-settings-side-link):not(.qr-theme-card):not(.settings-ui-btn-danger):not(.btn--danger) {
+        background: var(--settings-button-bg) !important;
+        border-color: var(--settings-button-border) !important;
+        color: var(--settings-button-text) !important;
+        box-shadow: none !important;
+      }
+      .canteen-settings-shell :is(
+        button,
+        .btn,
+        .settings-ui-submit,
+        .settings-ui-btn,
+        .settings-ui-branch-all-btn,
+        .settings-ui-branch-clear-btn,
+        .canteen-settings-menu-toggle
+      ):not(.canteen-settings-home-card):not(.canteen-settings-side-link):not(.qr-theme-card):not(.settings-ui-btn-danger):not(.btn--danger):not(:disabled):not([disabled]):hover {
+        background: var(--settings-button-bg-hover) !important;
+        border-color: var(--settings-button-bg-hover) !important;
+        color: var(--settings-button-text) !important;
+      }
+      .canteen-settings-shell :is(
+        button,
+        .btn,
+        .settings-ui-submit,
+        .settings-ui-btn,
+        .settings-ui-branch-all-btn,
+        .settings-ui-branch-clear-btn,
+        .canteen-settings-menu-toggle
+      ):not(.canteen-settings-home-card):not(.canteen-settings-side-link):not(.qr-theme-card):not(.settings-ui-btn-danger):not(.btn--danger):is(:active, .active, .is-active, [data-active="true"]) {
+        background: var(--settings-button-bg-active) !important;
+        border-color: var(--settings-button-bg-active) !important;
+        color: var(--settings-button-text) !important;
+      }
+      .canteen-settings-shell :is(
+        button,
+        .btn,
+        .settings-ui-submit,
+        .settings-ui-btn,
+        .settings-ui-branch-all-btn,
+        .settings-ui-branch-clear-btn,
+        .canteen-settings-menu-toggle
+      ):not(.canteen-settings-home-card):not(.canteen-settings-side-link):not(.qr-theme-card):not(.settings-ui-btn-danger):not(.btn--danger):is(:disabled, [disabled], [aria-disabled="true"]) {
+        background: var(--settings-button-disabled-bg) !important;
+        border-color: var(--settings-button-disabled-border) !important;
+        color: var(--settings-button-disabled-text) !important;
+        box-shadow: none !important;
       }
       .canteen-settings-menu-toggle {
         min-height: 42px;
         min-width: 42px;
         padding: 0 14px;
         border-radius: 16px;
-        border: 1px solid var(--settings-border);
-        background: rgba(255,255,255,0.04);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -128,6 +183,7 @@ function SettingsTopHeader({ title, subtitle, icon, rightSlot, compact = false }
         alignItems: compact ? 'center' : 'flex-start',
         justifyContent: 'space-between',
         gap: 16,
+        flexWrap: compact ? 'wrap' : 'nowrap',
         padding: compact ? '14px 16px' : '18px 20px',
         borderRadius: 24,
         border: '1px solid var(--settings-border)',
@@ -215,6 +271,12 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           }
           .canteen-settings-home-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
           .canteen-settings-home-card {
+            width: 100%;
+            display: grid;
+            justify-items: stretch;
+            align-items: start;
+            align-content: start;
+            gap: 0;
             text-align: left;
             min-height: 168px;
             border-radius: 24px;
@@ -223,15 +285,15 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             padding: 16px;
             color: var(--settings-text);
             cursor: pointer;
-            transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+            transition: border-color .2s ease, background-color .2s ease, color .2s ease;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
           }
+          .canteen-settings-home-card > * { min-width: 0; }
           .canteen-settings-home-card:hover {
-            transform: translateY(-3px);
             border-color: rgba(47,109,246,0.35);
-            box-shadow: 0 20px 42px rgba(0,0,0,0.24);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
           }
-          .canteen-settings-home-cardtop { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+          .canteen-settings-home-cardtop { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; min-width: 0; }
           .canteen-settings-home-icon {
             width: 46px;
             height: 46px;
@@ -248,12 +310,17 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             border-radius: 999px;
             background: rgba(255,255,255,0.08);
             color: var(--settings-text);
-            font-size: 12px;
+            font-size: clamp(11px, 0.18vw + 10.6px, 12px);
             font-weight: 900;
+            line-height: 1.25;
+            white-space: normal;
+            text-align: center;
+            max-width: min(100%, 132px);
+            overflow-wrap: anywhere;
           }
-          .canteen-settings-home-card h3 { margin: 0; font-size: 17px; line-height: 1.15; font-weight: 950; }
-          .canteen-settings-home-card p { margin: 8px 0 0; color: var(--settings-text-soft); font-size: 13px; line-height: 1.5; font-weight: 700; }
-          .canteen-settings-home-link { margin-top: 16px; font-size: 13px; font-weight: 900; color: var(--settings-text); }
+          .canteen-settings-home-card h3 { margin: 0; font-size: clamp(15px, 0.48vw + 13.2px, 17px); line-height: 1.15; font-weight: 950; overflow-wrap: anywhere; }
+          .canteen-settings-home-card p { margin: 8px 0 0; color: var(--settings-text-soft); font-size: clamp(12px, 0.24vw + 11.4px, 13px); line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; }
+          .canteen-settings-home-link { margin-top: 16px; font-size: clamp(12px, 0.24vw + 11.4px, 13px); font-weight: 900; color: var(--settings-text); line-height: 1.4; overflow-wrap: anywhere; }
           .canteen-settings-home-empty {
             margin-top: 16px;
             padding: 20px;
@@ -269,6 +336,16 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           }
           @media (max-width: 760px) {
             .canteen-settings-home-grid { grid-template-columns: 1fr; }
+            .canteen-settings-home-card {
+              min-height: 0;
+              padding: 15px;
+            }
+            .canteen-settings-home-cardtop {
+              margin-bottom: 12px;
+            }
+            .canteen-settings-home-link {
+              margin-top: 14px;
+            }
           }
         `}</style>
 
@@ -320,7 +397,7 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
           <button
             type="button"
             onClick={() => onOpen(ROOT_PATH)}
-            style={{ minHeight: 42, padding: '0 16px', borderRadius: 16, border: '1px solid var(--settings-border)', background: 'rgba(255,255,255,0.04)', fontWeight: 900, cursor: 'pointer' }}
+            style={{ minHeight: 42, padding: '0 16px', borderRadius: 16, border: '1px solid var(--settings-border)', background: 'rgba(255,255,255,0.04)', color: 'var(--settings-text)', fontWeight: 900, cursor: 'pointer' }}
           >
             ← Ayarlara Dön
           </button>
@@ -497,7 +574,7 @@ function MobileSettingsDetail({ current, items, onOpen, children }) {
             <button
               type="button"
               onClick={() => onOpen(ROOT_PATH)}
-              style={{ minHeight: 38, padding: '0 12px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'rgba(255,255,255,0.04)', fontWeight: 900, fontSize: 12 }}
+              style={{ minHeight: 38, padding: '0 12px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'rgba(255,255,255,0.04)', color: 'var(--settings-text)', fontWeight: 900, fontSize: 12 }}
             >
               ← Ayarlar
             </button>

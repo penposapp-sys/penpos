@@ -3,13 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import PublicSystemLogin from '../components/PublicSystemLogin.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
-
-const getFriendlyLoginError = (error) => {
-  const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
-  if (code === 'account_disabled') return 'Hesabiniz devre disi. Lutfen yetkilinizle iletisime gecin.'
-  if (code === 'wrong_portal') return 'Bu hesap bu giris ekrani icin uygun degil.'
-  return 'Giris basarisiz. E-posta/kullanici adi veya sifre hatali.'
-}
+import { getFriendlyLoginError } from '../lib/loginErrors.js'
 
 export default function SignIn({ portal }) {
   const { login } = useAuth()
@@ -37,7 +31,9 @@ export default function SignIn({ portal }) {
       await login({ identifier, password, portal, rememberMe })
       nav(isRestaurant ? '/kermes' : '/', { replace: true })
     } catch (err) {
-      setError(getFriendlyLoginError(err))
+      setError(getFriendlyLoginError(err, {
+        wrongPortalMessage: 'Bu hesap bu giris ekrani icin uygun degil.'
+      }))
     } finally {
       setLoading(false)
     }

@@ -3,15 +3,15 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { SettingsCard, SettingsField, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
+import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
 import { useTheme } from '../theme/ThemeContext.jsx'
-import { themeKeys, themes } from '../theme/themeConfig.js'
 
 const normalizeUsername = (value) => String(value || '').trim().toLowerCase()
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/
 
 export default function SettingsMePage({ apiBase }) {
   const { refresh } = useAuth()
-  const { themeKey, darkMode, setThemeKey, setDarkMode } = useTheme()
+  const { themeKey, darkMode, setThemeKey, setDarkMode, isMobileRuntime } = useTheme()
   const [me, setMe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
@@ -26,6 +26,11 @@ export default function SettingsMePage({ apiBase }) {
   const [platformDarkMode, setPlatformDarkMode] = useState(darkMode)
 
   const isPlatformMode = apiBase === '/api/platform'
+  const [localThemeId, setLocalThemeId] = useState(themeKey)
+
+  useEffect(() => {
+    setLocalThemeId(themeKey)
+  }, [themeKey])
 
   const load = async () => {
     setLoading(true)
@@ -207,43 +212,15 @@ export default function SettingsMePage({ apiBase }) {
           </SettingsCard>
 
           {isPlatformMode ? (
-            <SettingsCard title="Tema Tercihleri" description="Platform paneli için tema ve koyu mod tercihlerini ayrı kaydedin." icon="🎨">
+            <SettingsCard title="Gorunum Modu" description="Platform panelini beyaz mod veya koyu mod olarak kullanin." icon="🎨">
               <form onSubmit={savePlatformTheme} style={{ display: 'grid', gap: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 14, border: '1px solid var(--app-border)', borderRadius: 18 }}>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    <div style={{ fontWeight: 800 }}>Koyu mod</div>
-                    <div style={{ fontSize: 13, color: 'var(--app-text-secondary)' }}>Platform paneli koyu yüzeylerle gösterilir.</div>
-                  </div>
-                  <input type="checkbox" checked={platformDarkMode} onChange={(e) => setPlatformDarkMode(e.target.checked)} />
-                </label>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                  {themeKeys.map((key) => {
-                    const item = themes[key]
-                    const selected = platformThemeId === key
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setPlatformThemeId(key)}
-                        style={{
-                          borderRadius: 22,
-                          border: `1px solid ${selected ? 'var(--theme-accent, #0f172a)' : 'var(--app-border)'}`,
-                          background: selected ? 'var(--app-surface-soft)' : 'var(--app-surface)',
-                          padding: 14,
-                          textAlign: 'left',
-                          color: 'var(--app-text)',
-                        }}
-                      >
-                        <div style={{ height: 42, borderRadius: 16, background: item.gradient }} />
-                        <div style={{ marginTop: 10, fontWeight: 900 }}>{item.name}</div>
-                      </button>
-                    )
-                  })}
-                </div>
+                <ThemeSelectionCards
+                  darkMode={platformDarkMode}
+                  onToggleDarkMode={(nextDarkMode) => setPlatformDarkMode(Boolean(nextDarkMode))}
+                />
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button className="settings-ui-submit" disabled={saving}>Tema Tercihlerini Kaydet</button>
+                  <button className="settings-ui-submit" disabled={saving}>Gorunum Modunu Kaydet</button>
                 </div>
               </form>
             </SettingsCard>

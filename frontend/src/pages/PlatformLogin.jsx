@@ -2,15 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PublicSystemLogin from '../components/PublicSystemLogin.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { getFriendlyLoginError } from '../lib/loginErrors.js'
 import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
-
-const getFriendlyLoginError = (error) => {
-  const code = String(error?.code || error?.response?.data?.code || error?.response?.data?.error || '').trim()
-  if (code === 'account_disabled') return 'Hesabiniz devre disi. Lutfen sistem yoneticinizle iletisime gecin.'
-  if (code === 'wrong_portal') return 'Bu hesap platform yonetimi giris ekrani icin uygun degil.'
-  return 'Giris basarisiz. E-posta/kullanici adi veya sifre hatali.'
-}
 
 export default function PlatformLogin() {
   const { login, logout } = useAuth()
@@ -43,7 +37,10 @@ export default function PlatformLogin() {
       }
       nav('/platform/kermes-tenants', { replace: true })
     } catch (err) {
-      const message = getFriendlyLoginError(err)
+      const message = getFriendlyLoginError(err, {
+        accountDisabledMessage: 'Hesabiniz devre disi. Lutfen sistem yoneticinizle iletisime gecin.',
+        wrongPortalMessage: 'Bu hesap platform yonetimi giris ekrani icin uygun degil.'
+      })
       setError(message)
       toast.error(message)
     } finally {

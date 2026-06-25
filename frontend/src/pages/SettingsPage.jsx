@@ -1,18 +1,22 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Armchair, Bike, Building2, CreditCard, Package, Printer, QrCode, ReceiptText, Search, Store, UserRound, Users } from 'lucide-react'
 import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import Modal from '../components/Modal.jsx'
 import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
+import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import { useTheme } from '../theme/ThemeContext.jsx'
-import { themeKeys, themes } from '../theme/themeConfig.js'
+import { normalizeThemeId, themeKeys, themes } from '../theme/themeConfig.js'
 import { buildSafeBusinessSettings, defaultBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
 import { getSubscriptionStatus } from '../lib/subscription.js'
 import { toast } from '../lib/toast.js'
 import { resolveApiOrigin } from '../lib/runtimeApi.js'
+import { validateProductImageFile } from '../lib/productImage.js'
 
 const BUSINESS_SETTINGS_SECTIONS = {
   general: [
@@ -61,6 +65,27 @@ const BUSINESS_SETTINGS_SECTIONS = {
   ],
 }
 
+const SETTINGS_ICONS = {
+  search: Search,
+  account: UserRound,
+  business: Store,
+  branches: Building2,
+  staff: Users,
+  tables: Armchair,
+  printers: Printer,
+  payments: CreditCard,
+  delivery: Bike,
+  billing: ReceiptText,
+  catalog: Package,
+  qr: QrCode,
+}
+
+function SettingsIcon({ icon, size = 20, strokeWidth = 2.15 }) {
+  const Icon = SETTINGS_ICONS[icon]
+  if (!Icon) return <span aria-hidden="true">•</span>
+  return <Icon size={size} strokeWidth={strokeWidth} aria-hidden="true" />
+}
+
 function SettingsSwitchGroup({ title, items, values, onToggle }) {
   return (
     <div className="card" style={{ borderColor: 'var(--border)' }}>
@@ -78,45 +103,55 @@ function SettingsSwitchGroup({ title, items, values, onToggle }) {
 }
 
 function ThemeSelector({ selectedThemeName, onSelectThemeName }) {
-  const { setThemeKey } = useTheme()
+  const { themeKey, setThemeKey } = useTheme()
+  const [localSelectedTheme, setLocalSelectedTheme] = useState(normalizeThemeId(selectedThemeName || themeKey || 'white'))
+
+  useEffect(() => {
+    setLocalSelectedTheme(normalizeThemeId(selectedThemeName || themeKey || 'white'))
+  }, [selectedThemeName, themeKey])
+
+  const activeThemeName = normalizeThemeId(localSelectedTheme || selectedThemeName || themeKey || 'white')
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(168px, 1fr))', gap: 12 }}>
       {themeKeys.map((key) => {
         const item = themes[key]
-        const selected = selectedThemeName === key
+        const selected = activeThemeName === key
 
         return (
           <button
             key={key}
             type="button"
             onClick={() => {
+              setLocalSelectedTheme(key)
               setThemeKey(key)
               onSelectThemeName?.(key)
             }}
             style={{
-              borderRadius: 24,
+              borderRadius: 18,
               border: `1px solid ${selected ? 'var(--theme-accent, #0f172a)' : 'var(--app-border, var(--border))'}`,
-              background: selected ? 'var(--theme-accent, #0f172a)' : 'var(--app-surface-soft, var(--panelElevated))',
-              color: selected ? '#ffffff' : 'var(--app-text-secondary, var(--text-secondary))',
-              padding: 16,
+              background: 'var(--app-surface)',
+              color: 'var(--app-text)',
+              padding: 12,
               textAlign: 'left',
               cursor: 'pointer',
-              transition: 'transform 180ms ease, box-shadow 180ms ease',
-              boxShadow: selected ? '0 18px 36px rgba(15, 23, 42, 0.18)' : '0 10px 22px rgba(15, 23, 42, 0.05)'
+              appearance: 'none',
+              boxShadow: 'none',
+              display: 'grid',
+              gap: 10,
             }}
           >
-            <div style={{ height: 48, borderRadius: 18, background: item.gradient }} />
-            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ height: 10, borderRadius: 999, background: `linear-gradient(90deg, ${item.accent}, ${item.accentHover || item.accent})` }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ fontWeight: 900 }}>{item.name}</div>
               {selected && (
-                <span style={{ borderRadius: 999, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '4px 8px', fontSize: 11, fontWeight: 900 }}>
+                <span style={{ borderRadius: 999, border: '1px solid var(--settings-button-border, var(--app-border))', background: 'var(--settings-button-bg, #111111)', color: 'var(--settings-button-text, #ffffff)', padding: '4px 8px', fontSize: 11, fontWeight: 900 }}>
                   Seçili
                 </span>
               )}
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: selected ? '#ffffff' : 'var(--app-text)', lineHeight: 1.5 }}>
-              Yan bar, üst bar, aktif menü kapsülü ve aksiyon butonları tema rengine göre güncellenir.
+            <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', lineHeight: 1.45 }}>
+              {item.description}
             </div>
           </button>
         )
@@ -125,7 +160,125 @@ function ThemeSelector({ selectedThemeName, onSelectThemeName }) {
   )
 }
 
-function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onOpenSystemMenu, onBack, rightSlot }) {
+function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onOpenSystemMenu, onBack, rightSlot, isCompact = false }) {
+  const controlButtons = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
+      {onOpenSystemMenu ? (
+        <button
+          type="button"
+          onClick={onOpenSystemMenu}
+          style={{
+            height: 40,
+            width: 40,
+            borderRadius: 14,
+            border: '1px solid var(--settings-border)',
+            background: 'var(--app-surface)',
+            color: 'var(--app-text)',
+            fontSize: 18,
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: '0 10px 18px rgba(15, 23, 42, 0.08)',
+          }}
+          aria-label="Sistem menüsünü aç veya kapat"
+        >
+          ≡
+        </button>
+      ) : null}
+
+      {onToggleMenu ? (
+        <button
+          type="button"
+          onClick={onToggleMenu}
+          style={{
+            height: 40,
+            width: 40,
+            borderRadius: 14,
+            border: 'none',
+            background: 'var(--theme-accent, #0f172a)',
+            color: '#ffffff',
+            fontSize: 18,
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: '0 10px 18px rgba(15, 23, 42, 0.16)',
+          }}
+          aria-label="Ayar menüsünü aç veya kapat"
+        >
+          ≡
+        </button>
+      ) : null}
+
+      <div
+        style={{
+          height: 40,
+          minWidth: 40,
+          padding: '0 10px',
+          borderRadius: 14,
+          display: 'grid',
+          placeItems: 'center',
+          border: '1px solid var(--settings-border)',
+          background: 'var(--app-surface)',
+          fontWeight: 900,
+          color: 'var(--app-text)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+          fontSize: 14,
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </div>
+    </div>
+  )
+
+  if (isCompact) {
+    return (
+      <div
+        style={{
+          borderRadius: 22,
+          border: '1px solid var(--settings-border)',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--app-surface) 98%, transparent), var(--settings-panel-soft))',
+          padding: '12px',
+          marginBottom: 12,
+          display: 'grid',
+          gap: 12,
+          boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          {controlButtons}
+          {rightSlot ? <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', maxWidth: '100%' }}>{rightSlot}</div> : null}
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--app-text)', lineHeight: 1.05, overflowWrap: 'anywhere' }}>
+            {title}
+          </div>
+          {subtitle ? <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 700, marginTop: 4, lineHeight: 1.45 }}>{subtitle}</div> : null}
+        </div>
+
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            style={{
+              minHeight: 42,
+              width: '100%',
+              padding: '0 14px',
+              borderRadius: 14,
+              border: '1px solid var(--settings-border)',
+              background: 'var(--settings-button-bg, #111111)',
+              color: 'var(--settings-button-text, #ffffff)',
+              fontWeight: 900,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            ← Ayarlara Dön
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -143,69 +296,7 @@ function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onOpenSystemM
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        {onOpenSystemMenu ? (
-          <button
-            type="button"
-            onClick={onOpenSystemMenu}
-            style={{
-              height: 40,
-              width: 40,
-              borderRadius: 14,
-              border: '1px solid var(--settings-border)',
-              background: 'var(--app-surface)',
-              color: 'var(--app-text)',
-              fontSize: 18,
-              fontWeight: 900,
-              cursor: 'pointer',
-              boxShadow: '0 10px 18px rgba(15, 23, 42, 0.08)',
-            }}
-            aria-label="Sistem menüsünü aç veya kapat"
-          >
-            ≡
-          </button>
-        ) : null}
-
-        {onToggleMenu ? (
-          <button
-            type="button"
-            onClick={onToggleMenu}
-            style={{
-              height: 40,
-              width: 40,
-              borderRadius: 14,
-              border: 'none',
-              background: 'var(--theme-accent, #0f172a)',
-              color: '#ffffff',
-              fontSize: 18,
-              fontWeight: 900,
-              cursor: 'pointer',
-              boxShadow: '0 10px 18px rgba(15, 23, 42, 0.16)',
-            }}
-            aria-label="Ayar menüsünü aç veya kapat"
-          >
-            ≡
-          </button>
-        ) : null}
-
-        <div
-          style={{
-            height: 40,
-            minWidth: 40,
-            padding: '0 10px',
-            borderRadius: 14,
-            display: 'grid',
-            placeItems: 'center',
-            border: '1px solid var(--settings-border)',
-            background: 'var(--app-surface)',
-            fontWeight: 900,
-            color: 'var(--app-text)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
-            fontSize: 14,
-          }}
-        >
-          {icon}
-        </div>
-
+        {controlButtons}
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--app-text)', lineHeight: 1.05 }}>
             {title}
@@ -225,8 +316,8 @@ function SettingsPageHeader({ title, subtitle, icon, onToggleMenu, onOpenSystemM
               padding: '0 14px',
               borderRadius: 14,
               border: '1px solid var(--settings-border)',
-              background: 'var(--app-button-bg)',
-              color: 'var(--app-text)',
+              background: 'var(--settings-button-bg, #111111)',
+              color: 'var(--settings-button-text, #ffffff)',
               fontWeight: 900,
               fontSize: 13,
               cursor: 'pointer',
@@ -258,8 +349,9 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           box-shadow: var(--card-shadow);
         }
         .settings-search-row {
-          display: flex;
-          align-items: center;
+          display: grid;
+          grid-template-columns: minmax(280px, 1fr) auto;
+          align-items: start;
           min-width: 0;
           gap: 14px;
           margin: 0 0 14px;
@@ -281,18 +373,27 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           border-radius: 20px;
           background: var(--app-input);
         }
+        .settings-search-box svg {
+          flex-shrink: 0;
+          color: var(--app-text-secondary);
+        }
         .settings-search-box input {
           border: 0;
           outline: 0;
           min-width: 0;
           width: 100%;
+          padding: 0;
+          font: inherit;
+          font-size: 14px;
+          line-height: 1.2;
           font-weight: 700;
           color: var(--app-text);
           background: transparent;
         }
-        .settings-filter-list { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; max-width: 100%; }
+        .settings-filter-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
         .settings-filter-list button {
           max-width: 100%;
+          font: inherit;
           border: 1px solid var(--settings-border);
           border-radius: 999px;
           background: var(--app-button-bg);
@@ -309,22 +410,29 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
         }
         .settings-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .settings-module-card {
+          appearance: none;
           text-align: left;
           border: 1px solid var(--settings-border);
           border-radius: 22px;
           padding: 16px;
           background: linear-gradient(135deg, var(--app-surface), var(--app-surface-soft));
           box-shadow: var(--card-shadow);
-          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+          transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
           cursor: pointer;
           color: var(--app-text);
+          font: inherit;
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          min-width: 0;
+          min-height: 188px;
         }
         .settings-module-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.13);
-          border-color: var(--settings-accent);
+          transform: none;
+          box-shadow: var(--card-shadow);
+          border-color: var(--settings-border);
         }
-        .settings-module-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+        .settings-module-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 12px; min-width: 0; }
         .settings-module-icon {
           width: 46px;
           height: 46px;
@@ -337,24 +445,38 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
           flex-shrink: 0;
         }
+        .settings-module-copy {
+          display: grid;
+          align-content: start;
+          gap: 8px;
+          min-width: 0;
+          flex: 1 1 auto;
+        }
         .settings-module-badge {
           padding: 7px 11px;
           border-radius: 999px;
           background: var(--settings-accent-soft);
           color: var(--settings-accent-text);
-          font-size: 12px;
+          font-size: clamp(11px, 0.18vw + 10.6px, 12px);
           font-weight: 950;
+          line-height: 1.25;
+          white-space: normal;
+          text-align: center;
+          max-width: min(100%, 132px);
+          overflow-wrap: anywhere;
         }
-        .settings-module-card h3 { margin: 0; font-size: 17px; font-weight: 950; color: var(--app-text); }
-        .settings-module-card p { min-height: 0; margin: 8px 0 0; color: var(--app-text-secondary); font-size: 13px; font-weight: 700; line-height: 1.4; }
+        .settings-module-card h3 { margin: 0; font-size: clamp(15px, 0.48vw + 13.2px, 17px); font-weight: 950; color: var(--app-text); line-height: 1.25; overflow-wrap: anywhere; }
+        .settings-module-card p { min-height: 0; margin: 0; color: var(--app-text-secondary); font-size: clamp(12px, 0.24vw + 11.4px, 13px); font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
         .settings-module-link {
-          margin-top: 14px;
+          margin-top: auto;
+          padding-top: 14px;
           color: var(--settings-accent-text);
-          font-size: 13px;
+          font-size: clamp(12px, 0.24vw + 11.4px, 13px);
           font-weight: 950;
-          transition: transform 0.2s ease;
+          transition: color 0.2s ease;
+          line-height: 1.4;
+          overflow-wrap: anywhere;
         }
-        .settings-module-card:hover .settings-module-link { transform: translateX(4px); }
         .settings-empty-state {
           padding: 24px;
           border-radius: 24px;
@@ -365,7 +487,8 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
         }
         @media (max-width: 1280px) {
           .settings-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .settings-search-row { flex-direction: column; align-items: stretch; }
+          .settings-search-row { grid-template-columns: 1fr; }
+          .settings-filter-list { justify-content: flex-start; }
         }
         @media (max-width: 768px) {
           .settings-center-panel { padding: 12px; }
@@ -379,7 +502,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
       <section className="settings-center-panel">
         <div className="settings-search-row">
           <div className="settings-search-box">
-            <span>🔍</span>
+            <SettingsIcon icon="search" />
             <input value={searchValue} onChange={(e) => onSearchChange(e.target.value)} placeholder="Ayar adı, açıklama veya kategori ara" />
           </div>
 
@@ -396,12 +519,16 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           {settingsCards.map((item) => (
             <button key={item.key} type="button" className="settings-module-card" onClick={() => openSettingsPage(item.to)}>
               <div className="settings-module-top">
-                <div className="settings-module-icon">{item.icon}</div>
+                <div className="settings-module-icon">
+                  <SettingsIcon icon={item.icon} size={22} />
+                </div>
                 <span className="settings-module-badge">{item.group}</span>
               </div>
 
-              <h3>{item.title}</h3>
-              <p>{item.desc}</p>
+              <div className="settings-module-copy">
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </div>
 
               <div className="settings-module-link">Ayar sayfasını aç →</div>
             </button>
@@ -421,19 +548,19 @@ export default function SettingsPage() {
   const { pathname } = useLocation()
   const nav = useNavigate()
   const { isMobilePortrait } = useResponsiveFlags()
-  const { theme } = useTheme()
+  const { theme, isMobileRuntime } = useTheme()
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [settingsSearch, setSettingsSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('Tümü')
   const shellTheme = {
-    pageBg: `radial-gradient(circle at top left, ${theme.accentSoft} 0, transparent 32%), radial-gradient(circle at bottom right, ${theme.border} 0, transparent 28%), var(--app-bg)`,
+    pageBg: 'var(--app-bg)',
     cardBorder: theme.border,
-    shadow: theme.activeGlow,
+    shadow: 'none',
     accent: theme.accent,
     accentSoft: theme.accentSoft,
     accentText: theme.accentText,
     gradient: theme.gradient,
-    panelSoft: theme.darkMode ? 'color-mix(in srgb, var(--app-surface-soft) 86%, transparent)' : 'rgba(255,255,255,0.88)'
+    panelSoft: isMobileRuntime ? 'var(--app-surface-soft)' : (theme.darkMode ? 'color-mix(in srgb, var(--app-surface-soft) 86%, transparent)' : 'rgba(255,255,255,0.88)')
   }
   const settingsCssVars = {
     '--settings-border': shellTheme.cardBorder,
@@ -441,10 +568,18 @@ export default function SettingsPage() {
     '--settings-accent-soft': shellTheme.accentSoft,
     '--settings-accent-text': shellTheme.accentText,
     '--settings-gradient': shellTheme.gradient,
-    '--settings-accent-shadow': theme.activeGlow,
-    '--settings-panel-bg': theme.darkMode ? 'var(--app-surface-soft)' : theme.accentSoft,
-    '--settings-panel-soft': theme.darkMode ? 'color-mix(in srgb, var(--app-surface-soft) 90%, transparent)' : `${theme.accentSoft}cc`,
-    '--settings-accent-soft-glow': `${theme.accentSoft}99`,
+    '--settings-accent-shadow': 'none',
+    '--settings-panel-bg': 'var(--app-surface-soft)',
+    '--settings-panel-soft': 'color-mix(in srgb, var(--app-surface-soft) 90%, transparent)',
+    '--settings-accent-soft-glow': 'transparent',
+    '--settings-button-bg': 'var(--menu-active-bg)',
+    '--settings-button-bg-hover': 'var(--menu-active-bg)',
+    '--settings-button-bg-active': 'var(--menu-active-bg)',
+    '--settings-button-border': 'var(--border-hover)',
+    '--settings-button-text': 'var(--sidebar-nav-text-active, #ffffff)',
+    '--settings-button-disabled-bg': theme.darkMode ? '#2f2f2f' : '#d1d5db',
+    '--settings-button-disabled-border': theme.darkMode ? '#3f3f46' : '#d1d5db',
+    '--settings-button-disabled-text': theme.darkMode ? '#9ca3af' : '#6b7280',
   }
   const todayLabel = useMemo(
     () => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()),
@@ -468,7 +603,7 @@ export default function SettingsPage() {
           key: 'account',
           to: '/kermes/settings/me',
           label: 'Hesabım',
-          icon: '👤',
+          icon: 'account',
           group: 'İşletme',
           description: 'Giriş bilgileri, şifre ve kullanıcı hesabı'
         }]
@@ -483,7 +618,7 @@ export default function SettingsPage() {
             key: 'business',
             to: '/kermes/settings/system',
             label: 'İşletme Ayarları',
-            icon: '🏪',
+            icon: 'business',
             group: 'İşletme',
             description: 'Firma bilgileri, servis, kapanış saati'
           },
@@ -491,7 +626,7 @@ export default function SettingsPage() {
             key: 'branches',
             to: '/kermes/settings/branches',
             label: 'Şube Ayarları',
-            icon: '🏢',
+            icon: 'branches',
             group: 'İşletme',
             description: 'Şube listesi, aktiflik ve şubeye bağlı personel'
           },
@@ -499,7 +634,7 @@ export default function SettingsPage() {
             key: 'staff',
             to: '/kermes/settings/staff',
             label: 'Personel Ayarları',
-            icon: '👥',
+            icon: 'staff',
             group: 'Personel',
             description: 'Personel, şifre, yetki ve aktiflik yönetimi'
           },
@@ -507,7 +642,7 @@ export default function SettingsPage() {
             key: 'tables',
             to: '/kermes/settings/tables',
             label: 'Masa Ayarları',
-            icon: '🪑',
+            icon: 'tables',
             group: 'Satış',
             description: 'Masa listesi ve oturma düzeni'
           },
@@ -515,7 +650,7 @@ export default function SettingsPage() {
             key: 'printers',
             to: '/kermes/settings/printers',
             label: 'Yazıcı Ayarları',
-            icon: '🖨️',
+            icon: 'printers',
             group: 'Cihaz',
             description: 'Print Agent, fiş ve etiket yazıcıları'
           },
@@ -523,7 +658,7 @@ export default function SettingsPage() {
             key: 'payments',
             to: '/kermes/settings/payments',
             label: 'Ödeme Seçenekleri',
-            icon: '💳',
+            icon: 'payments',
             group: 'Satış',
             description: 'Nakit, kart, banka ve veresiye seçenekleri'
           },
@@ -531,7 +666,7 @@ export default function SettingsPage() {
             key: 'delivery',
             to: '/kermes/settings/delivery',
             label: 'Paket Servis',
-            icon: '🛵',
+            icon: 'delivery',
             group: 'Satış',
             description: 'Paket sipariş davranışları ve otomasyonlar'
           },
@@ -540,7 +675,7 @@ export default function SettingsPage() {
                 key: 'billing',
                 to: '/kermes/settings/billing',
                 label: 'Paket & Satın Alma',
-                icon: '🧾',
+                icon: 'billing',
                 group: 'Finans',
                 description: 'Abonelik, paket ve satın alma yönetimi'
               }]
@@ -557,7 +692,7 @@ export default function SettingsPage() {
             key: 'catalog',
             to: '/kermes/settings/catalog',
             label: 'Ürün & Kategori',
-            icon: '📦',
+            icon: 'catalog',
             group: 'Ürün',
             description: 'Ürün, kategori, görünüm ve sıralama ayarları'
           },
@@ -565,7 +700,7 @@ export default function SettingsPage() {
             key: 'qr',
             to: '/kermes/settings/qr',
             label: 'QR Menü',
-            icon: '▦',
+            icon: 'qr',
             group: 'Dijital',
             description: 'Public menü, QR indir, masa QR ve görünüm'
           },
@@ -580,7 +715,7 @@ export default function SettingsPage() {
           key: 'billing',
           to: '/kermes/settings/billing',
           label: 'Paket & Satın Alma',
-          icon: '🧾',
+          icon: 'billing',
           group: 'Finans',
           description: 'Plan yükseltme ve ödeme adımları'
         }]
@@ -609,7 +744,7 @@ export default function SettingsPage() {
       const matchesFilter = activeFilter === 'Tümü' || item.group === activeFilter
       if (!matchesFilter) return false
       if (!needle) return true
-      const haystack = [item.label, item.description, item.group]
+      const haystack = [item.title, item.desc, item.group]
         .join(' ')
         .toLocaleLowerCase('tr')
       return haystack.includes(needle)
@@ -655,6 +790,7 @@ export default function SettingsPage() {
             title="Ayarlar"
             subtitle="Ayar bölümlerini buradan yönetin"
             icon="AY"
+            isCompact
             onOpenSystemMenu={openSystemMenu}
             rightSlot={
               <div style={{ minHeight: 40, padding: '0 14px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center' }}>
@@ -680,11 +816,12 @@ export default function SettingsPage() {
     }
 
     return (
-      <div className="main pageMobile settings-scope" style={{ display: 'grid', gap: 12, position: 'relative', overflowX: 'hidden', ...settingsCssVars }}>
+      <div className="main pageMobile settings-scope" style={{ display: 'grid', gap: 10, position: 'relative', overflowX: 'hidden', padding: 0, ...settingsCssVars }}>
         <SettingsPageHeader
           title={current?.label || 'Ayarlar'}
           subtitle={current?.description || ''}
-          icon={current?.icon || 'AY'}
+          icon={current?.icon ? <SettingsIcon icon={current.icon} size={18} /> : 'AY'}
+          isCompact
           onOpenSystemMenu={openSystemMenu}
           onToggleMenu={() => setSettingsMenuOpen((value) => !value)}
           onBack={goSettingsHome}
@@ -692,13 +829,13 @@ export default function SettingsPage() {
         {settingsMenuOpen && (
           <aside
             style={{
-              borderRadius: 30,
+              borderRadius: 22,
               border: `1px solid ${shellTheme.cardBorder}`,
               background: 'color-mix(in srgb, var(--app-surface) 94%, transparent)',
-              padding: 16,
-              boxShadow: '0 30px 80px rgba(15, 23, 42, 0.16)',
+              padding: 12,
+              boxShadow: '0 18px 36px rgba(15, 23, 42, 0.12)',
               display: 'grid',
-              gap: 16,
+              gap: 12,
             }}
           >
             {settingsGroups.map((group) => (
@@ -730,7 +867,9 @@ export default function SettingsPage() {
                     }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>{item.icon}</span>
+                      <span style={{ display: 'grid', placeItems: 'center' }}>
+                        <SettingsIcon icon={item.icon} size={18} />
+                      </span>
                       <span>{item.label}</span>
                     </span>
                     <span>›</span>
@@ -740,7 +879,7 @@ export default function SettingsPage() {
             ))}
           </aside>
         )}
-        <div style={{ borderRadius: 20, border: `1px solid ${shellTheme.cardBorder}`, background: 'color-mix(in srgb, var(--app-surface) 80%, transparent)', padding: 10, boxShadow: shellTheme.shadow, minWidth: 0, overflowX: 'hidden' }}>
+        <div style={{ minWidth: 0, overflowX: 'hidden' }}>
           <Outlet />
         </div>
       </div>
@@ -777,7 +916,7 @@ export default function SettingsPage() {
             <SettingsPageHeader
               title={current?.label || 'Ayarlar'}
               subtitle={current?.description || ''}
-              icon={current?.icon || 'AY'}
+              icon={current?.icon ? <SettingsIcon icon={current.icon} size={18} /> : 'AY'}
               onToggleMenu={() => setSettingsMenuOpen((value) => !value)}
               onBack={goSettingsHome}
             />
@@ -835,7 +974,9 @@ export default function SettingsPage() {
                           }}
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 18 }}>{item.icon}</span>
+                            <span style={{ display: 'grid', placeItems: 'center' }}>
+                              <SettingsIcon icon={item.icon} size={18} />
+                            </span>
                             <span>{item.label}</span>
                           </span>
                           <span>›</span>
@@ -865,10 +1006,16 @@ export const SettingsSystemContent = () => {
   const [logoLoading, setLogoLoading] = useState(false)
   const [branches, setBranches] = useState([])
   const [allowedBranchIds, setAllowedBranchIdsLocal] = useState([])
+  const [selectedThemeId, setSelectedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
+  const [selectedDarkMode, setSelectedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
+  const [savedThemeId, setSavedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
+  const [savedDarkMode, setSavedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const { refresh, setAllowedBranchIds } = useAuth()
+  const { setSettingsLocally } = useBusinessSettings()
+  const { isMobileRuntime, setThemeKey, setDarkMode } = useTheme()
 
   const apiOrigin = React.useMemo(() => resolveApiOrigin(), [])
 
@@ -881,7 +1028,12 @@ export const SettingsSystemContent = () => {
 
   const load = async () => {
     setError('')
-    const profileRes = await api('/api/tenant/profile', { silent: true, skipBranchHeader: true })
+    const [profileRes, businessRes, branchesRes] = await Promise.all([
+      api('/api/tenant/profile', { silent: true, skipBranchHeader: true }),
+      api('/api/settings/business', { silent: true, skipBranchHeader: true }),
+      api('/api/branches', { silent: true, skipBranchHeader: true }),
+    ])
+
     if (profileRes?.success === false) {
       setName('')
       setDescription('')
@@ -891,12 +1043,19 @@ export const SettingsSystemContent = () => {
       return
     }
     const t = profileRes?.tenant || null
+    const nextThemeId = normalizeThemeId(businessRes?.settings?.appearance?.themeId || defaultBusinessSettings.appearance.themeId)
+    const nextDarkMode = businessRes?.settings?.appearance?.darkMode === true
     setName(t?.name || '')
     setDescription(t?.description || '')
     setLogoUrl(t?.logoUrl || '')
     setAllowedBranchIdsLocal(Array.isArray(t?.allowedBranchIds) ? t.allowedBranchIds : [])
+    setSelectedThemeId(nextThemeId)
+    setSelectedDarkMode(nextDarkMode)
+    setSavedThemeId(nextThemeId)
+    setSavedDarkMode(nextDarkMode)
+    setThemeKey(nextThemeId)
+    setDarkMode(nextDarkMode)
 
-    const branchesRes = await api('/api/branches', { silent: true, skipBranchHeader: true })
     if (branchesRes?.success === false) {
       setBranches([])
       return
@@ -918,22 +1077,63 @@ export const SettingsSystemContent = () => {
     setError('')
     setSuccess('')
     try {
-      const res = await api('/api/tenant/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ name, description, allowedBranchIds }),
-        silent: true,
-        skipBranchHeader: true
-      })
+      const [profileSaveRes, businessSaveRes] = await Promise.all([
+        api('/api/tenant/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ name, description, allowedBranchIds }),
+          silent: true,
+          skipBranchHeader: true
+        }),
+        api('/api/settings/business', {
+          method: 'PUT',
+          body: JSON.stringify({
+            settings: {
+              appearance: {
+                themeId: selectedThemeId,
+                darkMode: selectedDarkMode,
+              },
+            },
+          }),
+          silent: true,
+          skipBranchHeader: true,
+        }),
+      ])
+
+      const res = profileSaveRes
+      const businessRes = businessSaveRes
+
       if (res?.success === false) {
         setError(res.message || 'Bu işlem için yetkiniz yok')
         return
       }
+      if (businessRes?.success === false) {
+        setError(businessRes.message || 'Tema ayarları kaydedilemedi')
+        return
+      }
+
+      const nextThemeId = normalizeThemeId(businessRes?.settings?.appearance?.themeId || selectedThemeId || defaultBusinessSettings.appearance.themeId)
+      const nextDarkMode = businessRes?.settings?.appearance?.darkMode === true
+      setSelectedThemeId(nextThemeId)
+      setSelectedDarkMode(nextDarkMode)
+      setSavedThemeId(nextThemeId)
+      setSavedDarkMode(nextDarkMode)
+      setThemeKey(nextThemeId)
+      setDarkMode(nextDarkMode)
+      setSettingsLocally({
+        appearance: {
+          themeId: nextThemeId,
+          darkMode: nextDarkMode,
+        },
+      })
+
       try {
         setAllowedBranchIds(Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : [])
         window.dispatchEvent(new CustomEvent('allowed_branches_changed', { detail: { allowedBranchIds: Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds : [] } }))
       } catch {}
       setSuccess('Kaydedildi')
+      await load()
       await refresh()
+      return
     } catch (err) {
       setError(err.message)
     } finally {
@@ -941,8 +1141,23 @@ export const SettingsSystemContent = () => {
     }
   }
 
+  const handleThemeSelect = (themeId) => {
+    setSelectedThemeId(themeId)
+    setThemeKey(themeId)
+  }
+
+  const handleDarkModeToggle = (nextDarkMode) => {
+    setSelectedDarkMode(Boolean(nextDarkMode))
+    setDarkMode(Boolean(nextDarkMode))
+  }
+
   const uploadLogo = async () => {
     if (!logoFile) return
+    const validationMessage = validateProductImageFile(logoFile)
+    if (validationMessage) {
+      setError(validationMessage)
+      return
+    }
     setLogoLoading(true)
     setError('')
     setSuccess('')
@@ -1016,9 +1231,14 @@ export const SettingsSystemContent = () => {
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                onChange={(e) => {
+                  const nextFile = e.target.files?.[0] || null
+                  const validationMessage = validateProductImageFile(nextFile)
+                  setLogoFile(validationMessage ? null : nextFile)
+                  setError(validationMessage || '')
+                }}
               />
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>PNG/JPG/WebP, max 2MB</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>PNG/JPG/WebP, max 5MB. Otomatik olarak 800x800 WebP optimize edilir.</div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button type="button" className="btn" disabled={!logoFile || logoLoading} onClick={uploadLogo}>
@@ -1058,16 +1278,19 @@ export const SettingsSystemContent = () => {
         </div>
 
         <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Tema Secenekleri</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Gorunum Modu</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-            Mevcut sistem temasi korunur. Buradaki secimler eski sistemin ustune ek olarak uygulanir.
+            Bu paneli beyaz mod veya koyu mod olarak kullanin.
           </div>
-          <ThemeSelector />
+          <ThemeSelectionCards
+            darkMode={selectedDarkMode}
+            onToggleDarkMode={handleDarkModeToggle}
+          />
         </div>
 
         {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
         {success && <div style={{ color: '#22c55e', fontSize: 13 }}>{success}</div>}
-        <button className="btn" disabled={loading}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        <button className="btn" disabled={loading || (selectedThemeId === savedThemeId && selectedDarkMode === savedDarkMode)}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
       </form>
     </div>
   )
@@ -1483,6 +1706,7 @@ export const SettingsTablesContent = () => {
 }
 
 export const SettingsPaymentsContent = () => {
+  const { isMobilePortrait } = useResponsiveFlags()
   const [methods, setMethods] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -1614,13 +1838,13 @@ export const SettingsPaymentsContent = () => {
     <div>
       <h3 style={{ marginTop: 0 }}>Ödeme Seçenekleri Ayarları</h3>
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      <div style={{ display: 'grid', gap: 10, maxWidth: 860 }}>
+      <div style={{ display: 'grid', gap: 10, maxWidth: 860, width: '100%' }}>
         {(methods || []).map((method) => {
           const isEditing = editingId === method.id
           return (
-          <div key={method.id} className="card" style={{ display: 'grid', gap: 12, padding: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) auto', gap: 12, alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <div key={method.id} className="card" style={{ display: 'grid', gap: 12, padding: 14, minWidth: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1.6fr) auto', gap: 12, alignItems: 'center', minWidth: 0 }}>
+              <label style={{ display: 'flex', alignItems: isMobilePortrait ? 'flex-start' : 'center', gap: 12, minWidth: 0 }}>
                 <input type="checkbox" checked={!!method.enabled} onChange={() => toggleEnabled(method.id)} disabled={saving} />
                 {!isEditing ? (
                   <div style={{ minWidth: 0 }}>
@@ -1640,12 +1864,13 @@ export const SettingsPaymentsContent = () => {
                   />
                 )}
               </label>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, justifyContent: isMobilePortrait ? 'stretch' : 'flex-end', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className="btn"
                   onClick={() => setEditingId(isEditing ? '' : method.id)}
                   disabled={saving}
+                  style={{ flex: isMobilePortrait ? '1 1 140px' : undefined }}
                 >
                   {isEditing ? 'Tamam' : 'Duzenle'}
                 </button>
@@ -1654,7 +1879,7 @@ export const SettingsPaymentsContent = () => {
                   className="btn"
                   onClick={() => removeMethod(method)}
                   disabled={saving}
-                  style={{ borderColor: '#fecaca', color: '#b91c1c' }}
+                  style={{ borderColor: '#fecaca', color: '#b91c1c', flex: isMobilePortrait ? '1 1 140px' : undefined }}
                 >
                   Sil
                 </button>
@@ -1664,27 +1889,27 @@ export const SettingsPaymentsContent = () => {
         )})}
       </div>
 
-      <div className="card" style={{ marginTop: 12, maxWidth: 860, display: 'grid', gap: 12 }}>
+      <div className="card" style={{ marginTop: 12, maxWidth: 860, width: '100%', display: 'grid', gap: 12, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontWeight: 800 }}>Yeni ödeme seçeneği</div>
             <div style={{ color: 'var(--app-text-muted)', fontSize: 13 }}>Yemek Kartı, Ticket, Multinet, Havale, Online Ödeme gibi yeni yöntemler ekleyebilirsiniz.</div>
           </div>
-          <button type="button" className="btn" onClick={() => setAdding((current) => !current)} disabled={saving}>
+          <button type="button" className="btn" onClick={() => setAdding((current) => !current)} disabled={saving} style={{ width: isMobilePortrait ? '100%' : undefined }}>
             {adding ? 'Vazgeç' : '+ Ödeme Seçeneği Ekle'}
           </button>
         </div>
         {adding && (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
             <input
               className="input"
               value={addingName}
               onChange={(event) => setAddingName(event.target.value)}
               placeholder="Ödeme adı"
               disabled={saving}
-              style={{ flex: '1 1 280px', minWidth: 220 }}
+              style={{ flex: '1 1 280px', minWidth: isMobilePortrait ? 0 : 220 }}
             />
-            <button type="button" className="btn" onClick={addMethod} disabled={saving}>
+            <button type="button" className="btn" onClick={addMethod} disabled={saving} style={{ width: isMobilePortrait ? '100%' : undefined }}>
               {saving ? 'Kaydediliyor...' : 'Ekle'}
             </button>
           </div>
@@ -1692,7 +1917,7 @@ export const SettingsPaymentsContent = () => {
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <button className="btn" onClick={save} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        <button className="btn" onClick={save} disabled={saving} style={{ width: isMobilePortrait ? '100%' : undefined }}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
       </div>
     </div>
   )

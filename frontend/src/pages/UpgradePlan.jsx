@@ -125,7 +125,7 @@ export default function UpgradePlan() {
             <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>Abonelik, plan ve limit bilgileri.</div>
           </div>
           {!!planName && (
-            <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--border)', background: '#f9fafb', fontWeight: 800 }}>
+            <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--settings-button-border, var(--border))', background: 'var(--settings-button-bg, #111111)', color: 'var(--settings-button-text, #ffffff)', fontWeight: 800 }}>
               {planMeta.label}
             </span>
           )}

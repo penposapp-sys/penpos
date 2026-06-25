@@ -5,6 +5,7 @@ import Tenant from '../models/Tenant.js'
 import Branch from '../models/Branch.js'
 import { error } from '../utils/errors.js'
 import { buildIncomingBusinessSettings, mergeBusinessSettings } from '../utils/businessSettings.js'
+import { resolveUploadDir } from '../utils/uploads.js'
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -168,8 +169,8 @@ export const syncTenantLogoSettings = async (tenantId, { url = '', fileName = ''
 }
 
 export const removeTenantLogoFiles = async (tenantId) => {
-  const dir = path.join(process.cwd(), 'uploads', `tenant-${tenantId}`)
-  await Promise.all(['logo.png', 'logo.jpg', 'logo.webp'].map(async (fileName) => {
+  const dir = resolveUploadDir(`tenant-${tenantId}`)
+  await Promise.all(['logo.png', 'logo.jpg', 'logo.jpeg', 'logo.webp'].map(async (fileName) => {
     try {
       await fs.unlink(path.join(dir, fileName))
     } catch {}

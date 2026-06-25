@@ -2,7 +2,7 @@ import { resolveApiOrigin } from './runtimeApi.js'
 
 export const PRODUCT_PLACEHOLDER_SRC = '/images/default-product.webp'
 export const ACCEPTED_PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-export const MAX_PRODUCT_IMAGE_BYTES = 1024 * 1024
+export const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024
 const API_ORIGIN = resolveApiOrigin()
 const PRODUCT_UPLOADS_PREFIX = '/uploads/products/'
 
@@ -21,10 +21,10 @@ export function validateProductImageFile(file) {
   if (!file) return ''
   const type = String(file.type || '').toLowerCase()
   if (!ACCEPTED_PRODUCT_IMAGE_TYPES.includes(type)) {
-    return 'Desteklenmeyen dosya formatı. Lütfen JPG, PNG veya WEBP yükleyin.'
+    return 'Desteklenmeyen dosya formati. Lutfen JPG, PNG veya WEBP yukleyin.'
   }
   if (Number(file.size || 0) > MAX_PRODUCT_IMAGE_BYTES) {
-    return 'Görsel boyutu en fazla 1 MB olabilir.'
+    return 'Gorsel boyutu en fazla 5 MB olabilir.'
   }
   return ''
 }

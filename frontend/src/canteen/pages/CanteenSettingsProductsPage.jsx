@@ -483,8 +483,8 @@ export default function CanteenSettingsProductsPage() {
         .canteen-settings-products-page [style*='var(--muted)'] {
           color: var(--app-text-secondary, var(--muted)) !important;
         }
-        .canteen-settings-products-page button:not(.btn--primary):not(.btn--danger) {
-          color: var(--app-text) !important;
+        .canteen-settings-products-page button:not(.btn--danger) {
+          color: var(--settings-button-text, #ffffff) !important;
         }
         .canteen-settings-products-page .products-row-card {
           min-width: 0;

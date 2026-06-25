@@ -195,6 +195,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     tenantId: new mongoose.Types.ObjectId(tenantId),
     branchId: { $in: branchObjectIds },
     isActive: true,
+    $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }],
     createdAt: { $gte: from, $lt: to }
   }
 
@@ -408,7 +409,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
 export const summary = async (tenantId, branchIds, query) => {
   const { from, to } = getLocalRangeExclusive(query?.period, query?.start, query?.end)
   const ids = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
-  const match = { tenantId: new mongoose.Types.ObjectId(tenantId), branchId: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) }, isActive: true, createdAt: { $gte: from, $lt: to } }
+  const match = { tenantId: new mongoose.Types.ObjectId(tenantId), branchId: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) }, isActive: true, $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }], createdAt: { $gte: from, $lt: to } }
 
   const totals = await CanteenSale.aggregate([
     { $match: match },
@@ -451,7 +452,7 @@ export const summary = async (tenantId, branchIds, query) => {
 export const products = async (tenantId, branchIds, query) => {
   const { from, to } = getLocalRangeExclusive(query?.period, query?.start, query?.end)
   const ids = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
-  const match = { tenantId: new mongoose.Types.ObjectId(tenantId), branchId: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) }, isActive: true, createdAt: { $gte: from, $lt: to } }
+  const match = { tenantId: new mongoose.Types.ObjectId(tenantId), branchId: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) }, isActive: true, $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }], createdAt: { $gte: from, $lt: to } }
   const rows = await CanteenSale.aggregate([
     { $match: match },
     { $unwind: '$items' },

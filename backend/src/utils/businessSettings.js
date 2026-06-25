@@ -1,3 +1,5 @@
+import { normalizeThemeId } from './themeNormalization.js'
+
 export const defaultBusinessSettings = {
   business: {
     businessName: '',
@@ -39,7 +41,7 @@ export const defaultBusinessSettings = {
     darkMode: false,
     colorfulProducts: false,
     animationsEnabled: true,
-    themeId: 'default',
+    themeId: 'white',
   },
   order: {
     confirmBeforeAddingToCart: false,
@@ -142,6 +144,7 @@ const withLegacyAliases = (settings, { activeBranchIds = [] } = {}) => {
   next.notifications.voiceWarnings = next.notifications.voiceAlertsEnabled
 
   next.appearance.animations = next.appearance.animationsEnabled
+  next.appearance.themeId = normalizeThemeId(next.appearance.themeId)
   next.appearance.themeName = next.appearance.themeId
 
   next.order.confirmBeforeAddToCart = next.order.confirmBeforeAddingToCart
@@ -218,7 +221,7 @@ export function mergeBusinessSettings(existingSettings = {}, options = {}) {
       ...defaultBusinessSettings.appearance,
       ...appearance,
       animationsEnabled: appearance.animationsEnabled ?? appearance.animations ?? defaultBusinessSettings.appearance.animationsEnabled,
-      themeId: appearance.themeId ?? appearance.themeName ?? defaultBusinessSettings.appearance.themeId,
+      themeId: normalizeThemeId(appearance.themeId ?? appearance.themeName ?? defaultBusinessSettings.appearance.themeId),
     },
     order: {
       ...defaultBusinessSettings.order,

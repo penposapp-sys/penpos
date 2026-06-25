@@ -41,10 +41,10 @@ export default function SettingsBranchCards({
                 padding: 12,
                 textAlign: 'left',
                 cursor: 'pointer',
-                background: isSelected ? 'var(--app-surface-2, var(--app-surface-soft))' : 'var(--app-surface)',
-                color: 'var(--app-text)',
-                borderColor: isSelected ? 'var(--theme-accent, #2563eb)' : 'var(--app-border, var(--border))',
-                boxShadow: isSelected ? '0 18px 40px rgba(37, 99, 235, 0.12)' : '0 10px 26px rgba(15, 23, 42, 0.04)'
+                background: isSelected ? 'var(--menu-active-bg, var(--card-hover))' : 'var(--app-surface)',
+                color: isSelected ? 'var(--sidebar-nav-text-active, #ffffff)' : 'var(--app-text)',
+                borderColor: isSelected ? 'var(--border-hover)' : 'var(--app-border, var(--border))',
+                boxShadow: 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>

@@ -1,6 +1,11 @@
 const DEFAULT_REMOTE_API_ORIGIN = 'https://penpos.cloud'
 const DEFAULT_LOCAL_DEV_API_ORIGIN = 'http://localhost:4000'
 
+const isLoopbackHostname = (value) => {
+  const host = String(value || '').trim().toLowerCase()
+  return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1'
+}
+
 export const normalizeBaseUrl = (value) => {
   const normalized = String(value || '').replace(/\/+$/, '')
   if (normalized.endsWith('/api')) return normalized.slice(0, -4)
@@ -63,9 +68,19 @@ export const resolveApiOrigin = () => {
   const nativeEnvBase = normalizeBaseUrl(import.meta.env.VITE_API_URL_NATIVE || import.meta.env.VITE_API_URL_ANDROID || '') || ''
 
   if (import.meta.env.DEV) {
+    let currentWindowOrigin = ''
+    try {
+      const protocol = String(window.location?.protocol || 'http:')
+      const hostname = String(window.location?.hostname || '').trim()
+      if (isLocalDevHostname(hostname)) currentWindowOrigin = `${protocol}//${hostname}:4000`
+    } catch {}
+
     try {
       if (envBase) {
         const envUrl = new URL(envBase)
+        if (currentWindowOrigin && isLoopbackHostname(envUrl.hostname)) {
+          return currentWindowOrigin
+        }
         if (isLocalDevHostname(envUrl.hostname)) {
           const localOrigin = forceOriginPort(envBase, 4000)
           if (localOrigin) return localOrigin
@@ -73,11 +88,7 @@ export const resolveApiOrigin = () => {
       }
     } catch {}
 
-    try {
-      const protocol = String(window.location?.protocol || 'http:')
-      const hostname = String(window.location?.hostname || '').trim()
-      if (isLocalDevHostname(hostname)) return `${protocol}//${hostname}:4000`
-    } catch {}
+    if (currentWindowOrigin) return currentWindowOrigin
 
     return DEFAULT_LOCAL_DEV_API_ORIGIN
   }

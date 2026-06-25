@@ -225,7 +225,7 @@ export default function CanteenSettingsBillingPage() {
           <div style={{ display: 'grid', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontWeight: 900, fontSize: 18 }}>{planName}</div>
-              <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--border)', background: '#f9fafb', fontWeight: 800 }}>
+              <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--settings-button-border, var(--border))', background: 'var(--settings-button-bg, #111111)', color: 'var(--settings-button-text, #ffffff)', fontWeight: 800 }}>
                 {planMeta.label}
               </span>
             </div>
@@ -239,7 +239,7 @@ export default function CanteenSettingsBillingPage() {
             {planLimits.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {planLimits.slice(0, 8).map(([k, v]) => (
-                  <div key={k} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--border)', background: '#f9fafb' }}>
+                  <div key={k} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--settings-button-border, var(--border))', background: 'var(--settings-button-bg, #111111)', color: 'var(--settings-button-text, #ffffff)' }}>
                     {k}: {String(v)}
                   </div>
                 ))}
@@ -286,7 +286,7 @@ export default function CanteenSettingsBillingPage() {
                 {Array.isArray(normalizeLimits(it.requestedLimits)) && normalizeLimits(it.requestedLimits).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {normalizeLimits(it.requestedLimits).slice(0, 8).map(([k, v]) => (
-                      <span key={k} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid var(--border)', background: '#f9fafb' }}>
+                      <span key={k} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid var(--settings-button-border, var(--border))', background: 'var(--settings-button-bg, #111111)', color: 'var(--settings-button-text, #ffffff)' }}>
                         {k}: {String(v)}
                       </span>
                     ))}

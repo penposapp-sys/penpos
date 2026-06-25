@@ -480,8 +480,9 @@ export default function AccountsPage() {
                   onClick={() => setViewMode('cards')}
                   style={{
                     minWidth: 88,
-                    background: viewMode === 'cards' ? 'var(--theme-accent, #111827)' : 'transparent',
-                    color: viewMode === 'cards' ? '#fff' : 'inherit'
+                    background: viewMode === 'cards' ? 'var(--menu-active-bg, var(--card-hover))' : 'transparent',
+                    borderColor: viewMode === 'cards' ? 'var(--border-hover)' : 'transparent',
+                    color: viewMode === 'cards' ? 'var(--sidebar-nav-text-active, #ffffff)' : 'inherit'
                   }}
                 >
                   Liste
@@ -492,8 +493,9 @@ export default function AccountsPage() {
                   onClick={() => setViewMode('table')}
                   style={{
                     minWidth: 88,
-                    background: viewMode === 'table' ? 'var(--theme-accent, #111827)' : 'transparent',
-                    color: viewMode === 'table' ? '#fff' : 'inherit'
+                    background: viewMode === 'table' ? 'var(--menu-active-bg, var(--card-hover))' : 'transparent',
+                    borderColor: viewMode === 'table' ? 'var(--border-hover)' : 'transparent',
+                    color: viewMode === 'table' ? 'var(--sidebar-nav-text-active, #ffffff)' : 'inherit'
                   }}
                 >
                   Tablo

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { buildBranchQueryParams, normalizeBranchIds } from '../lib/branchQuery.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import BranchFilterCard from '../components/BranchFilterCard.jsx'
+import Modal from '../components/Modal.jsx'
 import { downloadBlob } from '../lib/download.js'
 import { useTheme } from '../theme/ThemeContext.jsx'
 
@@ -326,13 +327,13 @@ const buildWeeklyCustomerBars = (datasets) => {
 function KpiCard({ title, value, note, trend, tone = 'blue' }) {
   const colors = STATUS_COLORS[tone] || STATUS_COLORS.blue
   return (
-    <div style={{ ...CARD_STYLE, padding: 20, display: 'grid', gap: 10 }}>
+    <div style={{ ...CARD_STYLE, padding: 20, display: 'grid', gap: 10, minWidth: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 600 }}>{title}</div>
-        <span style={{ background: colors.bg, color: colors.fg, borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 900 }}>{trend}</span>
+        <div className="responsive-card-note" style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 600, minWidth: 0 }}>{title}</div>
+        <span className="responsive-card-badge" style={{ background: colors.bg, color: colors.fg, borderRadius: 999, padding: '6px 10px', fontWeight: 900 }}>{trend}</span>
       </div>
-      <div style={{ fontSize: 28, fontWeight: 900 }}>{value}</div>
-      <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: 12 }}>{note}</div>
+      <div className="responsive-card-value" style={{ fontWeight: 900 }}>{value}</div>
+      <div className="responsive-card-note" style={{ color: 'var(--app-text-muted, var(--muted))' }}>{note}</div>
     </div>
   )
 }
@@ -363,7 +364,7 @@ function ReportFilter({
           {tabs.map((tab) => {
             const active = period === tab.key
             return (
-              <button key={tab.key} type="button" className="btn" onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--theme-accent, #111827)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--theme-accent, #111827)' : 'var(--app-border, var(--border))', color: active ? '#ffffff' : 'var(--app-text, var(--text))', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
+              <button key={tab.key} type="button" className={`btn${active ? ' is-active' : ''}`} aria-pressed={active ? 'true' : 'false'} onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--button-active-bg)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--button-active-bg)' : 'var(--app-border, var(--border))', color: active ? 'var(--button-active-text)' : 'var(--button-text)', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
                 {tab.label}
               </button>
             )
@@ -424,7 +425,7 @@ function ReportHero() {
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, minWidth: 260 }}>
-          <button type="button" className="btn" style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '14px 18px', fontWeight: 900 }}>
+          <button type="button" className="btn button-light" style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '14px 18px', fontWeight: 900 }}>
             Excel Aktar
           </button>
           <button type="button" className="btn" style={{ borderRadius: 18, background: 'rgba(255,255,255,0.08)', color: '#ffffff', padding: '14px 18px', fontWeight: 900, borderColor: 'rgba(255,255,255,0.14)' }}>
@@ -535,8 +536,8 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
       <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
         {statCards.map((item) => (
           <div key={item.label} style={{ borderRadius: 18, background: theme.accentSoft, padding: '12px 14px', minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: theme.accentText, fontWeight: 700 }}>{item.label}</div>
-            <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900, color: theme.text, overflowWrap: 'anywhere' }}>{item.value}</div>
+            <div className="responsive-card-badge" style={{ color: theme.accentText, fontWeight: 700 }}>{item.label}</div>
+            <div className="responsive-card-title" style={{ marginTop: 6, fontWeight: 900, color: theme.text }}>{item.value}</div>
           </div>
         ))}
       </div>
@@ -629,16 +630,16 @@ export function TopSellersPanel({ datasets, headerAction = null }) {
   return (
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>En Cok Satanlar</h2>
+        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900, color: theme.text }}>En Cok Satanlar</h2>
         {headerAction}
       </div>
       <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
         {rows.length === 0 ? (
           <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Satis verisi bulunamadı.</div>
         ) : rows.map((item, index) => (
-          <div key={`${item.menuItemId || item.name}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 18, background: theme.accentSoft, padding: '14px 16px', minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: theme.text, minWidth: 0, overflowWrap: 'anywhere' }}>{`${index + 1}. ${String(item.name || '-').toUpperCase('tr-TR')}`}</div>
-            <div style={{ fontSize: 16, color: theme.accentText, whiteSpace: 'nowrap', fontWeight: 800 }}>{`${Number(item.qty || 0)} adet`}</div>
+          <div key={`${item.menuItemId || item.name}-${index}`} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, borderRadius: 18, background: theme.accentSoft, padding: '14px 16px', minWidth: 0 }}>
+            <div className="responsive-card-title" style={{ fontWeight: 900, color: theme.text, minWidth: 0 }}>{`${index + 1}. ${String(item.name || '-').toUpperCase('tr-TR')}`}</div>
+            <div className="responsive-card-badge" style={{ color: theme.accentText, fontWeight: 800, textAlign: 'right' }}>{`${Number(item.qty || 0)} adet`}</div>
           </div>
         ))}
       </div>
@@ -653,7 +654,7 @@ export function CategoryRevenuePanel({ datasets, summary, headerAction = null })
   return (
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Kategori Cirosu</h2>
+        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900, color: theme.text }}>Kategori Cirosu</h2>
         {headerAction}
       </div>
       <div style={{ marginTop: 22, display: 'grid', gap: 18 }}>
@@ -661,9 +662,9 @@ export function CategoryRevenuePanel({ datasets, summary, headerAction = null })
           <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Kategori bazli veri bulunamadı.</div>
         ) : rows.map((item) => (
           <div key={item.name}>
-            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14, minWidth: 0 }}>
-              <b style={{ color: theme.text, minWidth: 0, overflowWrap: 'anywhere' }}>{item.name}</b>
-              <span style={{ color: theme.accentText, whiteSpace: 'nowrap', fontWeight: 800 }}>{fmtTl(item.revenue, 0)}</span>
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
+              <b className="responsive-card-note" style={{ color: theme.text, minWidth: 0 }}>{item.name}</b>
+              <span className="responsive-card-badge" style={{ color: theme.accentText, fontWeight: 800, textAlign: 'right' }}>{fmtTl(item.revenue, 0)}</span>
             </div>
             <div style={{ height: 8, borderRadius: 999, background: theme.accentSoft }}>
               <div style={{ width: `${Math.max(8, Math.round((item.revenue / max) * 100))}%`, height: 8, borderRadius: 999, background: theme.gradient }} />
@@ -675,41 +676,43 @@ export function CategoryRevenuePanel({ datasets, summary, headerAction = null })
   )
 }
 
-function ReportCard({ report, onClick }) {
+function ReportCard({ report, onClick, compact = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{ ...CARD_STYLE, padding: 20, textAlign: 'left', cursor: 'pointer', transition: 'transform 160ms ease, box-shadow 160ms ease', minHeight: 250 }}
+      data-button-layout="card"
+      style={{ ...CARD_STYLE, padding: compact ? 16 : 20, textAlign: 'left', cursor: 'pointer', transition: 'transform 160ms ease, box-shadow 160ms ease', minHeight: compact ? 0 : 250, minWidth: 0, overflow: 'hidden', gap: 0 }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ display: 'grid', height: 48, width: 48, placeItems: 'center', borderRadius: 18, background: 'var(--app-surface-soft, var(--panelElevated))', fontSize: 22 }}>
           {report.icon}
         </div>
 
-        <span style={{ borderRadius: 999, background: 'var(--app-surface-soft, var(--panelElevated))', padding: '6px 12px', fontSize: 11, fontWeight: 900, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
+        <span className="responsive-card-badge" style={{ borderRadius: 999, background: 'var(--app-surface-soft, var(--panelElevated))', padding: '6px 12px', fontWeight: 900, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
           Rapor
         </span>
       </div>
 
-      <div style={{ marginTop: 18, fontSize: 20, fontWeight: 900 }}>
+      <div className="responsive-card-title" style={{ marginTop: 18, fontWeight: 900 }}>
         {report.title}
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
+      <div className="responsive-card-note" style={{ marginTop: 8, lineHeight: 1.6, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
         {report.description}
       </div>
 
-      <div style={{ marginTop: 20, borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--app-text)' }}>
+      <div style={{ marginTop: 20, borderTop: '1px solid var(--app-border, var(--border))', paddingTop: 16 }}>
+        <div className="responsive-card-badge" style={{ fontWeight: 900, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
           Icerdigi metrikler
         </div>
 
-        <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 62, alignContent: 'flex-start' }}>
+        <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: compact ? 0 : 62, alignContent: 'flex-start' }}>
           {report.metrics.slice(0, 4).map((metric) => (
             <span
               key={metric}
-              style={{ borderRadius: 999, background: 'var(--app-surface-soft, var(--panelElevated))', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}
+              className="responsive-card-chip"
+              style={{ borderRadius: 999, background: 'var(--app-surface-soft, var(--panelElevated))', padding: '6px 12px', fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}
             >
               {metric}
             </span>
@@ -717,12 +720,12 @@ function ReportCard({ report, onClick }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--app-text)' }}>
+      <div style={{ marginTop: 20, display: 'flex', alignItems: compact ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12, flexDirection: compact ? 'column' : 'row' }}>
+        <span className="responsive-card-badge" style={{ fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))', width: compact ? '100%' : 'auto' }}>
           Detay için ac
         </span>
 
-        <span style={{ borderRadius: 12, background: '#020617', padding: '10px 14px', fontSize: 11, fontWeight: 900, color: '#ffffff' }}>
+        <span className="responsive-card-badge" style={{ borderRadius: 12, background: 'var(--button-active-bg)', border: '1px solid var(--button-active-bg)', padding: '10px 14px', fontWeight: 900, color: 'var(--button-active-text)', width: compact ? '100%' : 'auto', textAlign: 'center' }}>
           Ac
         </span>
       </div>
@@ -734,7 +737,7 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
   return (
     <section style={{ display: 'grid', gap: 14 }}>
       <div>
-        <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Rapor Kutuphanesi</h2>
+        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900 }}>Rapor Kutuphanesi</h2>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
           Özet panellerin altindan detay raporlara gecis yap.
         </p>
@@ -745,6 +748,7 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
           <ReportCard
             key={report.key}
             report={report}
+            compact={isMobilePortrait}
             onClick={() => onSelect(report)}
           />
         ))}
@@ -758,82 +762,50 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabe
   const metricEntries = Array.isArray(detailData?.metricEntries) && detailData.metricEntries.length > 0
     ? detailData.metricEntries
     : report.metrics.map((metric) => ({ label: metric, value: detailData?.metricValues?.[metric] ?? 'Veri yok' }))
-  const [bounds, setBounds] = useState({ top: 24, left: 24, width: null, height: null })
   const canPrint = report?.key === 'productPerformance'
 
-  useEffect(() => {
-    const updateBounds = () => {
-      try {
-        const main = document.querySelector('main')
-        if (!main) return
-        const rect = main.getBoundingClientRect()
-        setBounds({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height
-        })
-      } catch {}
-    }
-
-    updateBounds()
-    window.addEventListener('resize', updateBounds)
-    return () => window.removeEventListener('resize', updateBounds)
-  }, [])
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: bounds.top,
-        left: bounds.left,
-        width: bounds.width || 'calc(100vw - 48px)',
-        minHeight: bounds.height || 'calc(100vh - 48px)',
-        zIndex: 80,
-        background: 'rgba(15, 23, 42, 0.22)',
-        backdropFilter: 'blur(6px)',
-        padding: isMobilePortrait ? 12 : 20,
-        display: 'grid',
-        alignItems: 'start',
-        overflow: 'hidden',
-        borderRadius: 34
+    <Modal
+      open
+      onClose={onClose}
+      title={report.detailTitle}
+      backdropClose
+      dialogStyle={{
+        width: isMobilePortrait ? 'min(100%, calc(100vw - 20px))' : 'min(1440px, calc(100vw - 32px))',
+        maxWidth: '100%',
+        maxHeight: isMobilePortrait ? 'calc(100vh - 20px)' : 'calc(100vh - 32px)'
+      }}
+      bodyStyle={{
+        padding: isMobilePortrait ? 16 : 22
       }}
     >
       <div
-        onClick={(event) => event.stopPropagation()}
         style={{
-          maxHeight: '100%',
-          overflow: 'hidden',
-          borderRadius: 32,
-          background: 'var(--app-surface, var(--panel))',
-          padding: 24,
-          boxShadow: '0 25px 50px rgba(15, 23, 42, 0.18)',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: 0
+          minHeight: 0,
+          gap: 18
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 30, fontWeight: 900 }}>{report.detailTitle}</h2>
-            <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--app-text-secondary, var(--text-secondary))' }}>{report.description}</p>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--app-text-secondary, var(--text-secondary))' }}>{report.description}</p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {canPrint && (
               <button
                 type="button"
-                className="btn"
+                className="btn button-light"
                 onClick={() => printProductReportDocument({ report, detailData, rangeLabel, branchesLabel })}
                 style={{ fontWeight: 900 }}
               >
                 Yazdır
               </button>
             )}
-            <button type="button" className="btn" onClick={onClose} style={{ background: 'var(--app-surface-soft, var(--panelElevated))', fontWeight: 900 }}>Kapat</button>
           </div>
         </div>
 
-        <div className="scrollbar-hidden" style={{ marginTop: 24, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
+        <div className="scrollbar-hidden" style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
         <div style={{ display: 'grid', gridTemplateColumns: metricGrid, gap: 12 }}>
           {metricEntries.map((metric) => (
             <div key={metric.label} style={{ borderRadius: 18, background: 'var(--app-surface-soft, var(--panelElevated))', padding: 16 }}>
@@ -843,7 +815,7 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabe
           ))}
         </div>
 
-        <div style={{ marginTop: 24, border: '1px solid #e2e8f0', borderRadius: 24, overflowX: 'auto', overflowY: 'hidden' }}>
+        <div style={{ marginTop: 24, border: '1px solid var(--app-border, var(--border))', borderRadius: 24, overflowX: 'auto', overflowY: 'hidden' }}>
           <table className="table" style={{ width: '100%' }}>
             <thead>
               <tr style={{ background: 'var(--app-surface-soft, var(--panelElevated))' }}>
@@ -857,7 +829,7 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabe
                 </tr>
               ) : detailData.rows.map((row, rowIndex) => (
                 <tr key={`${report.key}-${rowIndex}`}>
-                  {report.tableColumns.map((col) => <td key={col} style={{ padding: '14px 16px', color: '#475569' }}>{getRowValueByColumn(row, col) ?? '-'}</td>)}
+                  {report.tableColumns.map((col) => <td key={col} style={{ padding: '14px 16px', color: 'var(--app-text, var(--text))' }}>{getRowValueByColumn(row, col) ?? '-'}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -865,7 +837,7 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabe
         </div>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1337,7 +1309,7 @@ export default function ReportsPage() {
   }, [period, rangeStart, rangeEnd, selectedKey])
 
   return (
-    <div style={{ position: 'relative', display: 'grid', gap: 20 }}>
+    <div className="reports-page" style={{ position: 'relative', display: 'grid', gap: 20 }}>
       <ReportFilter
         period={period}
         setPeriod={setPeriod}
@@ -1358,23 +1330,23 @@ export default function ReportsPage() {
           period={period}
           setPeriod={setPeriod}
           showModeToggle={false}
-          headerAction={hourlyReport ? <button className="btn" type="button" onClick={() => setSelectedReport(hourlyReport)}>Detay</button> : null}
+          headerAction={hourlyReport ? <button className="btn button-light" type="button" onClick={() => setSelectedReport(hourlyReport)}>Detay</button> : null}
         />
         <PaymentOverviewPanel
           datasets={datasets}
           summary={summary}
-          headerAction={paymentReport ? <button className="btn" type="button" onClick={() => setSelectedReport(paymentReport)}>Detay</button> : null}
+          headerAction={paymentReport ? <button className="btn button-light" type="button" onClick={() => setSelectedReport(paymentReport)}>Detay</button> : null}
         />
       </div>
       <div style={{ display: 'grid', gap: 20, gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)' }}>
         <TopSellersPanel
           datasets={datasets}
-          headerAction={topSellersReport ? <button className="btn" type="button" onClick={() => setSelectedReport(topSellersReport)}>Detay</button> : null}
+          headerAction={topSellersReport ? <button className="btn button-light" type="button" onClick={() => setSelectedReport(topSellersReport)}>Detay</button> : null}
         />
         <CategoryRevenuePanel
           datasets={datasets}
           summary={summary}
-          headerAction={categoryRevenueReport ? <button className="btn" type="button" onClick={() => setSelectedReport(categoryRevenueReport)}>Detay</button> : null}
+          headerAction={categoryRevenueReport ? <button className="btn button-light" type="button" onClick={() => setSelectedReport(categoryRevenueReport)}>Detay</button> : null}
         />
       </div>
       <ReportCatalog onSelect={setSelectedReport} isMobilePortrait={isMobilePortrait} />

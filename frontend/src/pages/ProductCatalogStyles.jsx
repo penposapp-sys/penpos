@@ -238,6 +238,15 @@ export default function ProductCatalogStyles() {
         display: grid;
         gap: 8px;
         padding: 10px;
+        grid-template-rows: auto auto minmax(48px, auto) auto auto;
+        align-content: start;
+      }
+      .product-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 0;
       }
       .product-name-cell {
         min-width: 0;
@@ -285,32 +294,65 @@ export default function ProductCatalogStyles() {
         margin: 0 auto;
         border-radius: 14px;
       }
+      .product-thumb-fallback {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+      }
       .product-card-meta-top {
         color: var(--app-text-soft, var(--app-text-secondary));
         font-weight: 800;
         font-size: 11px;
         line-height: 1.3;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .product-card-copy {
+        min-width: 0;
+        text-align: center;
+        display: grid;
+        gap: 4px;
+        align-content: start;
       }
       .product-card-title {
         font-weight: 950;
         font-size: 13px;
         line-height: 1.25;
+        color: var(--app-text);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: calc(1.25em * 2);
+        word-break: break-word;
       }
       .product-card-meta {
-        margin-top: 4px;
         color: var(--app-text-soft, var(--app-text-secondary));
         font-size: 11px;
         font-weight: 800;
         line-height: 1.35;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: calc(1.35em * 2);
+        word-break: break-word;
       }
       .product-card-stats {
         display: grid;
         gap: 8px;
+        align-self: stretch;
       }
       .product-card-settings-btn {
         min-height: 34px;
         padding: 0 12px;
         font-size: 12px;
+        align-self: end;
       }
       .product-thumb img {
         width: 100%;
@@ -324,9 +366,13 @@ export default function ProductCatalogStyles() {
         border-radius: 999px;
         padding: 6px 10px;
         background: color-mix(in srgb, #f59e0b 16%, var(--app-surface));
-        color: #fbbf24;
+        color: color-mix(in srgb, #8a4b00 86%, var(--app-text));
         font-weight: 900;
         font-size: 12px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .product-money-chip {
         background: #111827;
@@ -334,7 +380,7 @@ export default function ProductCatalogStyles() {
       }
       .product-stock-chip {
         background: color-mix(in srgb, #19a974 16%, var(--app-surface));
-        color: #6ee7b7;
+        color: #111111;
       }
       .product-row-actions {
         display: flex;
@@ -519,7 +565,7 @@ export default function ProductCatalogStyles() {
       }
       .product-toggle.active {
         justify-content: flex-end;
-        background: linear-gradient(135deg, #d79416, #f0a126);
+        background: linear-gradient(135deg, #22c55e, #16a34a);
       }
       .product-toggle i {
         width: 22px;
@@ -657,13 +703,138 @@ export default function ProductCatalogStyles() {
         padding-top: 14px;
         background: linear-gradient(180deg, rgba(15,23,42,0), color-mix(in srgb, var(--app-bg) 96%, transparent) 30%);
       }
+      html[data-theme="light"].theme-white .product-action-btn,
+      html[data-theme="light"].theme-white .product-secondary-btn,
+      html[data-theme="light"].theme-white .product-pill-btn,
+      html[data-theme="light"].theme-white .product-kebab-trigger {
+        background: #ffffff;
+        color: #111111;
+        border-color: #d1d5db;
+        box-shadow: none;
+      }
+      html[data-theme="light"].theme-white .product-dark-btn,
+      html[data-theme="light"].theme-white .product-money-chip,
+      html[data-theme="light"].theme-white .product-category-pill.active,
+      html[data-theme="light"].theme-white .product-pill-btn.active,
+      html[data-theme="light"].theme-white .product-toolbar-badge,
+      html[data-theme="light"].theme-white .product-settings-section > button.open {
+        background: #111111;
+        color: #ffffff;
+        border-color: #111111;
+        box-shadow: none;
+      }
+      html[data-theme="light"].theme-white .product-stock-chip {
+        background: #f3f4f6;
+        color: #111111;
+        border-color: #d1d5db;
+      }
+      html[data-theme="light"].theme-white .product-toggle.active {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+      }
+      html[data-theme="light"].theme-white .product-toggle.active i {
+        background: #ffffff;
+      }
+      html[data-theme="light"].theme-white .product-image-upload.is-drag-active {
+        border-color: #111111;
+        box-shadow: 0 0 0 3px rgba(17,17,17,0.08);
+      }
+      html[data-theme="light"].theme-white .product-category-edit-btn {
+        background: #ffffff;
+        color: #111111;
+      }
+      html[data-theme="light"].theme-white .product-chip {
+        background: #f3f4f6;
+        color: #111111;
+      }
+      html[data-theme="light"].theme-white .product-settings-section > button.open > div:first-child {
+        background: #111111 !important;
+        color: #ffffff !important;
+      }
+      html[data-theme="light"].theme-white .product-settings-section > button.open .product-chip {
+        background: rgba(255,255,255,0.16) !important;
+        color: #ffffff !important;
+      }
+      html[data-theme="light"].theme-white .product-card-title,
+      html[data-theme="light"].theme-white .product-name-text,
+      html[data-theme="light"].theme-white .product-card-meta-top,
+      html[data-theme="light"].theme-white .product-card-meta,
+      html[data-theme="light"].theme-white .product-name-subtext,
+      html[data-theme="light"].theme-white .product-field span,
+      html[data-theme="light"].theme-white .product-toggle-label {
+        color: #111111;
+      }
       @media (max-width: 1280px) {
         .product-card-list {
           min-width: 900px;
         }
       }
+      @media (max-width: 1180px) {
+        .product-list-row-wrap {
+          overflow-x: visible;
+          cursor: default;
+        }
+        .product-list-row-wrap:active {
+          cursor: default;
+        }
+        .product-list-check { grid-area: check; }
+        .product-list-thumb { grid-area: thumb; }
+        .product-list-name { grid-area: name; }
+        .product-list-category-chip { grid-area: category; }
+        .product-list-price-chip { grid-area: price; }
+        .product-list-stock-chip { grid-area: stock; }
+        .product-toggle-cell--active { grid-area: active; }
+        .product-toggle-cell--qr { grid-area: qr; }
+        .product-list-actions { grid-area: actions; }
+        .product-list-kebab { grid-area: kebab; justify-self: end; }
+        .product-card-list {
+          min-width: 0;
+          gap: 8px 10px;
+          grid-template-columns: 28px 52px minmax(180px, 1.2fr) auto auto;
+          grid-template-areas:
+            "check thumb name price kebab"
+            "check thumb category stock stock"
+            "check thumb active qr actions";
+        }
+        .product-list-name .product-name-text,
+        .product-list-name .product-name-subtext {
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
+        }
+        .product-toggle-cell > div {
+          flex-wrap: nowrap;
+          gap: 6px;
+        }
+        .product-toggle-label {
+          font-size: 11px;
+        }
+        .product-toggle-cell,
+        .product-list-stock-chip,
+        .product-list-category-chip {
+          justify-self: start;
+        }
+        .product-list-price-chip,
+        .product-toggle-cell--qr,
+        .product-list-actions,
+        .product-list-kebab {
+          justify-self: end;
+        }
+        .product-list-actions .product-dark-btn {
+          min-height: 32px;
+          padding: 0 10px;
+          font-size: 11px;
+        }
+        .product-card {
+          padding: 8px 10px;
+        }
+      }
       @media (max-width: 980px) {
-        .product-card-list { min-width: 860px; }
+        .product-card-list {
+          grid-template-columns: 28px 52px minmax(0, 1fr) auto;
+        }
+        .product-toggle-cell > div {
+          flex-wrap: wrap;
+        }
       }
       @media (max-width: 768px) {
         .product-grid {
@@ -710,6 +881,58 @@ export default function ProductCatalogStyles() {
         .product-preview-thumb {
           width: min(180px, 56vw);
           height: min(180px, 56vw);
+        }
+        .product-card-list {
+          gap: 6px 8px;
+          grid-template-columns: 28px 52px minmax(0, 1fr) auto;
+          grid-template-areas:
+            "check thumb name kebab"
+            "check thumb category price"
+            "check thumb stock active"
+            "check thumb qr actions";
+          align-items: start;
+        }
+        .product-toggle-cell > div {
+          flex-wrap: nowrap;
+        }
+        .product-toggle-label {
+          font-size: 11px;
+        }
+        .product-list-actions,
+        .product-list-kebab {
+          justify-self: end;
+        }
+        .product-list-actions .product-dark-btn {
+          width: auto;
+          min-height: 32px;
+          padding: 0 10px;
+          font-size: 11px;
+        }
+      }
+      @media (max-width: 480px) {
+        .product-card {
+          padding: 8px;
+        }
+        .product-card-list {
+          gap: 6px 7px;
+          grid-template-columns: 24px 48px minmax(0, 1fr) auto;
+        }
+        .product-thumb,
+        .product-thumb--card {
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+        }
+        .product-chip {
+          font-size: 11px;
+          padding: 5px 8px;
+        }
+        .product-name-text {
+          font-size: 12px;
+        }
+        .product-name-subtext {
+          font-size: 11px;
+          margin-top: 2px;
         }
       }
     `}</style>

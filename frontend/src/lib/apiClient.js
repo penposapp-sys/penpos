@@ -88,6 +88,39 @@ const getDefaultCacheTtlMs = (normalizedPath, method) => {
   return 0
 }
 
+const getAuthRedirectPath = (portal) => (
+  portal === 'canteen'
+    ? '/canteen/login'
+    : (portal === 'platform' ? '/platform-login' : '/login/restoran')
+)
+
+const isPublicAuthPath = (pathname) => {
+  const path = String(pathname || '').trim().toLowerCase()
+  return (
+    path === '/login' ||
+    path === '/login-selection' ||
+    path === '/login/platform' ||
+    path === '/platform-login' ||
+    path === '/login/restoran' ||
+    path === '/login/kantin' ||
+    path === '/canteen/login' ||
+    path.startsWith('/forgot-password') ||
+    path.startsWith('/reset-password')
+  )
+}
+
+const shouldSkipAuthRedirect = (targetPath) => {
+  try {
+    const currentPath = String(window.location?.pathname || '').trim().toLowerCase()
+    const nextPath = String(targetPath || '').trim().toLowerCase()
+    if (!nextPath) return true
+    if (currentPath === nextPath) return true
+    return isPublicAuthPath(currentPath) && isPublicAuthPath(nextPath)
+  } catch {
+    return false
+  }
+}
+
 export const api = async (path, options = {}) => {
   const silent = !!options.silent
   const suppressAuthRedirect = !!options.suppressAuthRedirect
@@ -187,7 +220,7 @@ export const api = async (path, options = {}) => {
         res = await fetch(url, { ...fetchOptions, headers })
       } catch {
         if (!silent) toast.error('Ag hatasi')
-        return wrap(false, 0, { message: 'network_error' })
+        return wrap(false, 0, { code: 'network_error', error: 'network_error', message: 'network_error' })
       }
 
       const retryAfterMs = res?.status === 429 ? parseRetryAfterMs(res.headers?.get?.('Retry-After')) : 0
@@ -210,7 +243,10 @@ export const api = async (path, options = {}) => {
             removeAuthToken(tokenKey)
           } catch {}
           try {
-            window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')
+            const redirectPath = getAuthRedirectPath(portal)
+            if (!shouldSkipAuthRedirect(redirectPath)) {
+              window.location.href = redirectPath
+            }
           } catch {}
         }
 
@@ -323,7 +359,7 @@ export const apiDownload = async (path, options = {}) => {
     res = await fetch(url, { method: 'GET', headers })
   } catch {
     if (!silent) toast.error('Ag hatasi')
-    return { ok: false, status: 0, blob: null, filename: '', error: { message: 'network_error' } }
+    return { ok: false, status: 0, blob: null, filename: '', error: { code: 'network_error', error: 'network_error', message: 'network_error' } }
   }
 
   if (!res.ok) {
@@ -341,7 +377,10 @@ export const apiDownload = async (path, options = {}) => {
         removeAuthToken(tokenKey)
       } catch {}
       try {
-        window.location.href = portal === 'canteen' ? '/canteen/login' : (portal === 'platform' ? '/platform-login' : '/login/restoran')
+        const redirectPath = getAuthRedirectPath(portal)
+        if (!shouldSkipAuthRedirect(redirectPath)) {
+          window.location.href = redirectPath
+        }
       } catch {}
     }
 

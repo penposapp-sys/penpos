@@ -8,7 +8,6 @@ import { normalizePermissions } from '../../constants/permissions.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
 import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionAllowedPath, isSubscriptionExpired } from '../../lib/subscription.js'
-import WebsiteLoadingScreen from '../../components/WebsiteLoadingScreen.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 
 const tokenKey = 'token_canteen'
@@ -48,7 +47,7 @@ export default function CanteenLayout() {
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { theme, themeKey } = useTheme()
+  const { theme, themeKey, isMobileRuntime } = useTheme()
 
   useBodyLayoutMode('pos-app-layout')
 
@@ -161,26 +160,29 @@ export default function CanteenLayout() {
 
   const isExpired = isSubscriptionExpired(tenantCtx)
 
-  const IconCart = ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9H7.5L6 6z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M6 6l-2-2H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="9" cy="20" r="1" stroke="currentColor" strokeWidth="2"/><circle cx="18" cy="20" r="1" stroke="currentColor" strokeWidth="2"/></svg>
+  const IconCart = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9H7.5L6 6z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M6 6l-2-2H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="9" cy="20" r="1" stroke="currentColor" strokeWidth="2"/><circle cx="18" cy="20" r="1" stroke="currentColor" strokeWidth="2"/></svg>
   )
-  const IconUsers = ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  const IconUsers = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
   )
-  const IconBarChart = ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M4 19V9m6 10V5m6 14v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  const IconBarChart = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M4 19V9m6 10V5m6 14v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
   )
-  const IconSettings = ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" strokeWidth="2"/><path d="M19.4 15a7.96 7.96 0 0 0 .1-2 7.96 7.96 0 0 0-.1-2l2.1-1.6-2-3.5-2.5 1a8.2 8.2 0 0 0-3.4-2l-.4-2.6h-4l-.4 2.6a8.2 8.2 0 0 0-3.4 2l-2.5-1-2 3.5L4.6 9a7.96 7.96 0 0 0-.1 2c0 .7.1 1.4.1 2l-2.1 1.6 2 3.5 2.5-1a8.2 8.2 0 0 0 3.4 2l.4 2.6h4l.4-2.6a8.2 8.2 0 0 0 3.4-2l2.5 1 2-3.5-2.1-1.6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  const IconSettings = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" strokeWidth="2"/><path d="M19.4 15a7.96 7.96 0 0 0 .1-2 7.96 7.96 0 0 0-.1-2l2.1-1.6-2-3.5-2.5 1a8.2 8.2 0 0 0-3.4-2l-.4-2.6h-4l-.4 2.6a8.2 8.2 0 0 0-3.4 2l-2.5-1-2 3.5L4.6 9a7.96 7.96 0 0 0-.1 2c0 .7.1 1.4.1 2l-2.1 1.6 2 3.5 2.5-1a8.2 8.2 0 0 0 3.4 2l.4 2.6h4l.4-2.6a8.2 8.2 0 0 0 3.4-2l2.5 1 2-3.5-2.1-1.6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   )
-  const IconBoxes = ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 0 0-1.2-1.8l-7-3.1a2 2 0 0 0-1.6 0l-7 3.1A2 2 0 0 0 3 8v8a2 2 0 0 0 1.2 1.8l7 3.1a2 2 0 0 0 1.6 0l7-3.1A2 2 0 0 0 21 16Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M3.3 7.3 12 11l8.7-3.7" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M12 22V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  const IconBoxes = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 0 0-1.2-1.8l-7-3.1a2 2 0 0 0-1.6 0l-7 3.1A2 2 0 0 0 3 8v8a2 2 0 0 0 1.2 1.8l7 3.1a2 2 0 0 0 1.6 0l7-3.1A2 2 0 0 0 21 16Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M3.3 7.3 12 11l8.7-3.7" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M12 22V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
   )
-  const IconQrOrders = ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M3 5h2v2H3zM3 11h2v2H3zM3 17h2v2H3z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
+  const IconQrOrders = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M3 5h2v2H3zM3 11h2v2H3zM3 17h2v2H3z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
   )
-  const IconLogout = ({ size = 16 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M10 17l5-5-5-5M3 12h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  const IconHistory = ({ size = 18, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 1 3 6.7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M3 7v5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 7v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  )
+  const IconLogout = ({ size = 16, ...props }) => (
+    <svg {...props} width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M10 17l5-5-5-5M3 12h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   )
 
   const perms = Array.isArray(me?.permissions) ? me.permissions : []
@@ -188,6 +190,7 @@ export default function CanteenLayout() {
   const canPos = isAdmin || perms.includes('canteen_pos_access')
   const canCustomers = isAdmin || perms.includes('canteen_customers_view') || perms.includes('canteen_customers_manage')
   const canReports = isAdmin || perms.includes('canteen_reports_view')
+  const canSales = canReports || isAdmin || perms.includes('canteen_sales_view')
   const canStock = isAdmin || perms.includes('canteen_stock_manage') || perms.includes('canteen_stock_count')
   const canSettings = isAdmin || perms.includes('manage_settings')
   const canQrOrders = canPos || canCustomers
@@ -247,10 +250,11 @@ export default function CanteenLayout() {
     if (canQrOrders) base.push({ to: '/canteen/qr-siparisleri', label: 'QR Siparişleri', icon: IconQrOrders })
     if (canCustomers) base.push({ to: '/canteen/cariler', label: 'Cariler', icon: IconUsers })
     if (canReports) base.push({ to: '/canteen/raporlar', label: 'Raporlar', icon: IconBarChart })
+    if (canSales) base.push({ to: '/canteen/yapilan-satislar', label: 'Yapılan Satışlar', icon: IconHistory })
     if (canStock) base.push({ to: '/canteen/stok', label: 'Stok', icon: IconBoxes })
     if (canSettings) base.push({ to: '/canteen/ayarlar', label: 'Ayarlar', icon: IconSettings })
     return base
-  }, [canCustomers, canPos, canQrOrders, canReports, canSettings, canStock, isExpired])
+  }, [canCustomers, canPos, canQrOrders, canReports, canSales, canSettings, canStock, isExpired])
 
   const items = useMemo(() => {
     return (itemsBase || []).map((i) => {
@@ -266,48 +270,39 @@ export default function CanteenLayout() {
 
   const pageTitle = current?.label || 'Mağaza'
   const gridCols = isMobilePortrait ? '1fr' : `${desktopCollapsed ? (isTablet ? 92 : 94) : 228}px 1fr`
-  const isMono = themeKey === 'mono'
   const shellBg = theme.appBg || '#f5f7fb'
-  const sidebarText = isMono ? '#1f2937' : '#ffffff'
-  const sidebarMuted = isMono ? 'rgba(31,41,55,0.74)' : 'rgba(255,255,255,0.74)'
-  const sidebarIconBg = isMono ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.08)'
-  const sidebarHoverBg = isMono ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.14)'
-  const sidebarActiveText = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
-  const sidebarLogoutText = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
-  const sidebarLogoBg = theme.darkMode ? 'var(--surface-elevated, #1b1a18)' : theme.card
-  const sidebarActiveShadow = theme.activeGlow || '0 18px 45px rgba(15, 23, 42, 0.22)'
-  const shellShadow = isMono ? '0 14px 34px rgba(24, 24, 27, 0.08)' : '0 18px 42px rgba(15, 23, 42, 0.08)'
-  const sidebarShadow = isMono ? '0 14px 32px rgba(24, 24, 27, 0.12)' : '0 24px 48px rgba(15, 23, 42, 0.22)'
-  const topbarBorder = isMono ? 'rgba(24,24,27,0.08)' : theme.border
+  const sidebarText = 'var(--sidebar-item-text, var(--sidebar-nav-text, var(--app-text)))'
+  const sidebarMuted = 'var(--sidebar-item-text, var(--sidebar-nav-text, var(--app-text-secondary)))'
+  const sidebarIconBg = 'var(--sidebar-item-icon-bg, var(--sidebar-nav-icon-bg, var(--app-surface-soft)))'
+  const sidebarHoverBg = 'var(--sidebar-item-hover-bg, var(--sidebar-nav-hover-bg, var(--app-surface-soft)))'
+  const effectiveDarkMode = theme.darkMode
+  const whiteModeSidebar = theme.themeFamily === 'white' && !effectiveDarkMode
+  const sidebarActiveText = 'var(--sidebar-item-text-active, var(--sidebar-nav-text-active, var(--app-text)))'
+  const sidebarLogoutText = 'var(--sidebar-logout-text, var(--sidebar-item-text-active, var(--sidebar-nav-text-active, var(--app-text))))'
+  const activeSidebarIconColor = 'var(--sidebar-item-icon-active, var(--sidebar-nav-icon-active, #111111))'
+  const sidebarLogoBg = effectiveDarkMode ? 'var(--surface-elevated, #1b1a18)' : theme.card
+  const sidebarActiveShadow = 'none'
+  const shellShadow = '0 18px 42px rgba(15, 23, 42, 0.08)'
+  const sidebarShadow = '0 24px 48px rgba(15, 23, 42, 0.14)'
+  const topbarBorder = theme.border
   const accountLabel = String(me?.name || me?.fullName || me?.username || me?.email || 'Kullanıcı').trim()
   const navButtonWidth = desktopCollapsed ? 58 : 188
-  const navItemHeight = desktopCollapsed ? 44 : 46
-  const navItemGap = 8
+  const navItemHeight = desktopCollapsed ? 42 : 44
+  const navItemGap = 6
   const navStep = navItemHeight + navItemGap
+  const mobileShellPadding = 8
+  const mobileMainPadding = 8
+  const mobileMainRadius = 22
+  const mobileTopbarPadding = '12px 14px'
+  const mobileContentInset = 8
   const activeIndex = items.findIndex((item) => item.to === current?.to)
-
-  if (loading) {
-    return (
-      <WebsiteLoadingScreen
-        badge="Mağaza paneli"
-        title="Mağaza ekranı hazırlanıyor"
-        message="Oturum, şube ve yetki bilgileri alınırken ekran aynı web sitesi diliyle kuruluyor."
-      />
-    )
-  }
 
   if (!getAuthToken(tokenKey) && !loading) {
     return <Navigate to="/canteen/login" replace />
   }
 
   if (loading) {
-    return (
-      <div className="public-auth-page">
-        <div className="main" style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
-          <div className="card">Yükleniyor...</div>
-        </div>
-      </div>
-    )
+    return null
   }
 
   if (!me) {
@@ -349,7 +344,7 @@ export default function CanteenLayout() {
           gap: 14,
           height: '100%',
           minHeight: 0,
-          padding: isMobilePortrait ? 12 : 16,
+          padding: isMobilePortrait ? mobileShellPadding : 16,
           alignItems: isMobilePortrait ? 'stretch' : 'start',
         }}
       >
@@ -363,10 +358,12 @@ export default function CanteenLayout() {
               alignSelf: 'start',
               height: 'calc(100dvh - 32px)',
               minHeight: 0,
-              borderRadius: 34,
-              background: theme.sidebar,
-              padding: desktopCollapsed ? '12px 10px' : '12px',
-              boxShadow: sidebarShadow,
+              borderRadius: 36,
+              background: 'var(--sidebar-bg)',
+              padding: 12,
+              border: '1px solid var(--border-soft)',
+              backdropFilter: 'blur(24px)',
+              boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -378,25 +375,26 @@ export default function CanteenLayout() {
                 type="button"
                 onClick={() => setDesktopCollapsed((value) => !value)}
                 style={{
-                  width: desktopCollapsed ? 64 : 144,
+                  width: desktopCollapsed ? 64 : 140,
                   height: 64,
                   borderRadius: 24,
-                  border: 'none',
-                  background: sidebarLogoBg,
-                  boxShadow: '0 18px 40px rgba(15, 23, 42, 0.16)',
+                  border: '1px solid var(--sidebar-logo-border, var(--border-soft))',
+                  background: 'var(--sidebar-logo-bg, var(--card-bg))',
+                  backdropFilter: 'var(--glass-blur)',
+                  boxShadow: 'var(--sidebar-active-shadow, var(--shadow-soft))',
                   display: 'grid',
                   placeItems: 'center',
                   cursor: 'pointer',
-                  transition: 'width 320ms ease'
+                  transition: 'width 500ms ease'
                 }}
                 aria-label="Sidebar ac kapat"
               >
                 <img
-                  src={desktopCollapsed ? '/logo-1.png' : (theme.darkMode ? '/logo-3.png' : '/logo-2.png')}
+                  src={desktopCollapsed ? '/logo-1.png' : (effectiveDarkMode ? '/logo-3.png' : '/logo-2.png')}
                   alt="PenPOS"
                   style={{
-                    width: desktopCollapsed ? 36 : 112,
-                    height: desktopCollapsed ? 36 : 42,
+                    width: desktopCollapsed ? 36 : 110,
+                    height: desktopCollapsed ? 36 : 40,
                     objectFit: 'contain',
                     pointerEvents: 'none',
                     display: 'block'
@@ -407,7 +405,7 @@ export default function CanteenLayout() {
             </div>
 
             <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <nav style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '14px 4px 20px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <nav style={{ position: 'relative', minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 4, paddingRight: 4, paddingTop: 16, paddingBottom: 24 }}>
                 <div
                   style={{
                     position: 'relative',
@@ -415,7 +413,8 @@ export default function CanteenLayout() {
                     marginLeft: 'auto',
                     marginRight: desktopCollapsed ? 'auto' : 0,
                     display: 'grid',
-                    gap: navItemGap
+                    gap: navItemGap,
+                    paddingTop: 2
                   }}
                 >
                   {activeIndex >= 0 && (
@@ -423,16 +422,21 @@ export default function CanteenLayout() {
                       style={{
                         position: 'absolute',
                         left: 0,
-                        top: 0,
+                        top: 2,
                         zIndex: 0,
                         width: navButtonWidth,
                         height: navItemHeight,
-                        borderRadius: 22,
-                        background: theme.card,
-                        border: '1px solid rgba(255,255,255,0.72)',
-                        boxShadow: sidebarActiveShadow,
+                        borderRadius: 24,
+                        background: whiteModeSidebar
+                          ? '#111111'
+                          : 'var(--sidebar-active-bg, var(--menu-active-bg, var(--card-bg, var(--app-surface))))',
+                        border: whiteModeSidebar
+                          ? '1px solid #111111'
+                          : '1px solid var(--sidebar-active-border, var(--border-soft, var(--app-border)))',
+                        boxShadow: whiteModeSidebar ? 'var(--shadow-soft), var(--shadow-glow)' : 'var(--sidebar-active-shadow, none)',
                         transform: `translateY(${activeIndex * navStep}px)`,
-                        transition: 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1), width 220ms ease'
+                        transition: 'transform 500ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms ease',
+                        backdropFilter: 'var(--glass-blur)'
                       }}
                     />
                   )}
@@ -445,9 +449,10 @@ export default function CanteenLayout() {
                       <button
                         key={item.to}
                         type="button"
-                        className="sidebar-menü-button"
+                        className={active ? 'sidebar-menu-button active' : 'sidebar-menu-button'}
                         title={item.label}
                         onClick={() => handleSidebarNavigate(item.to)}
+                        aria-current={active ? 'page' : undefined}
                         style={{
                           position: 'relative',
                           zIndex: 1,
@@ -456,45 +461,60 @@ export default function CanteenLayout() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: desktopCollapsed ? 'center' : 'flex-start',
-                          gap: desktopCollapsed ? 0 : 10,
+                          gap: desktopCollapsed ? 0 : 8,
                           padding: desktopCollapsed ? 0 : '0 12px',
                           border: 'none',
-                          borderRadius: 22,
-                          background: 'transparent',
-                          color: active ? sidebarActiveText : sidebarMuted,
+                          borderRadius: 24,
+                          background: active && whiteModeSidebar ? '#111111' : 'transparent',
+                          color: active ? (whiteModeSidebar ? '#ffffff' : sidebarActiveText) : sidebarMuted,
                           cursor: 'pointer',
                           fontWeight: 900,
-                          textAlign: 'left'
+                          textAlign: 'left',
+                          transition: 'all .25s ease',
+                          outline: 'none',
+                          boxShadow: 'none',
+                          appearance: 'none',
+                          WebkitAppearance: 'none'
                         }}
                       >
-                        {!active && (
+                        {!active && !whiteModeSidebar && (
                           <span
-                            className="sidebar-menü-hover"
+                            className="sidebar-menu-hover"
                             style={{
                               position: 'absolute',
                               inset: 0,
                               borderRadius: 22,
                               pointerEvents: 'none',
-                              background: sidebarHoverBg
+                              background: whiteModeSidebar ? 'transparent' : sidebarHoverBg
                             }}
                           />
                         )}
-                        <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: desktopCollapsed ? 0 : 10 }}>
+                        <span style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: desktopCollapsed ? 0 : 8 }}>
                           <span
+                            className={active ? 'canteen-sidebar-icon-pill is-active' : 'canteen-sidebar-icon-pill'}
                             style={{
                               display: 'grid',
-                              width: desktopCollapsed ? 34 : 36,
-                              height: desktopCollapsed ? 34 : 36,
+                              position: 'relative',
+                              zIndex: 10,
+                              width: desktopCollapsed ? 32 : 34,
+                              height: desktopCollapsed ? 32 : 34,
                               placeItems: 'center',
-                              borderRadius: 15,
-                              background: active ? theme.accent : sidebarIconBg,
-                              color: active ? '#ffffff' : sidebarText,
-                              boxShadow: active ? `0 14px 30px ${theme.accent}33` : 'none',
-                              transition: 'all 260ms ease'
+                              borderRadius: 16,
+                              background: active
+                                ? (whiteModeSidebar ? '#ffffff' : 'var(--sidebar-item-icon-active-bg, var(--sidebar-nav-icon-active-bg, var(--app-surface-soft)))')
+                                : sidebarIconBg,
+                              color: active
+                                ? activeSidebarIconColor
+                                : sidebarText,
+                              boxShadow: 'none',
+                              transform: 'none'
                             }}
                           >
-                            <span style={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
-                              <Icon size={15} />
+                            <span
+                              className={active ? 'canteen-sidebar-icon-glyph is-active' : 'canteen-sidebar-icon-glyph'}
+                              style={{ position: 'relative', display: 'grid', placeItems: 'center', color: active ? activeSidebarIconColor : 'currentColor' }}
+                            >
+                              <Icon size={13} color="currentColor" />
                               {item.to === '/canteen/qr-siparisleri' && qrAlertCount > 0 && (
                                 <span
                                   style={{
@@ -521,7 +541,7 @@ export default function CanteenLayout() {
                             </span>
                           </span>
                           {!desktopCollapsed && (
-                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13 }}>
+                            <span style={{ position: 'relative', zIndex: 10, fontSize: 12, fontWeight: 900, color: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {item.label}
                             </span>
                           )}
@@ -551,7 +571,7 @@ export default function CanteenLayout() {
                 )}
                 <button
                   type="button"
-                  className="sidebar-menü-button"
+                  className="sidebar-menu-button"
                   onClick={logout}
                   title="Çıkış"
                   style={{
@@ -560,19 +580,19 @@ export default function CanteenLayout() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: desktopCollapsed ? 'center' : 'flex-start',
-                    gap: desktopCollapsed ? 0 : 10,
+                    gap: desktopCollapsed ? 0 : 8,
                     padding: desktopCollapsed ? 0 : '0 12px',
-                    borderRadius: 22,
+                    borderRadius: 24,
                     border: 'none',
-                    background: desktopCollapsed ? 'rgba(255,255,255,0.1)' : theme.card,
+                    background: 'var(--sidebar-logout-bg, var(--card-hover))',
                     color: desktopCollapsed ? sidebarText : sidebarLogoutText,
                     cursor: 'pointer',
                     fontWeight: 900,
-                    boxShadow: desktopCollapsed ? 'none' : '0 16px 32px rgba(15, 23, 42, 0.14)'
+                    boxShadow: 'none'
                   }}
                 >
-                  <span style={{ display: 'grid', width: desktopCollapsed ? 34 : 36, height: desktopCollapsed ? 34 : 36, placeItems: 'center', borderRadius: 15, background: desktopCollapsed ? 'rgba(255,255,255,0.08)' : theme.accent, color: '#ffffff' }}>
-                    <IconLogout size={15} />
+                  <span style={{ display: 'grid', width: desktopCollapsed ? 32 : 34, height: desktopCollapsed ? 32 : 34, placeItems: 'center', borderRadius: 16, background: 'var(--sidebar-logout-icon-bg, var(--sidebar-item-icon-bg, var(--app-surface-soft)))', color: 'var(--sidebar-logout-icon-color, var(--sidebar-item-icon, var(--app-text)))' }}>
+                    <IconLogout size={13} />
                   </span>
                   {!desktopCollapsed && <span>Çıkış</span>}
                 </button>
@@ -589,9 +609,9 @@ export default function CanteenLayout() {
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            borderRadius: 34,
+            borderRadius: isMobilePortrait ? mobileMainRadius : 34,
             background: theme.card,
-            padding: isMobilePortrait ? 14 : 18,
+            padding: isMobilePortrait ? mobileMainPadding : 18,
             boxShadow: shellShadow
           }}
         >
@@ -604,8 +624,8 @@ export default function CanteenLayout() {
                 justifyContent: 'space-between',
                 gap: 16,
                 flexWrap: 'wrap',
-                padding: isMobilePortrait ? '16px 18px' : '18px 22px',
-                borderRadius: 34,
+                padding: isMobilePortrait ? mobileTopbarPadding : '18px 22px',
+                borderRadius: isMobilePortrait ? 24 : 34,
                 background: theme.topbar,
                 border: `1px solid ${topbarBorder}`,
                 boxShadow: '0 12px 28px rgba(15, 23, 42, 0.06)'
@@ -631,7 +651,7 @@ export default function CanteenLayout() {
                     &#8801;
                   </button>
                 )}
-                <div style={{ fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 18 : 22, lineHeight: 1.1 }}>{pageTitle}</div>
+                <div style={{ fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 17 : 22, lineHeight: 1.1 }}>{pageTitle}</div>
               </div>
 
               <div className="topbar-meta" style={{ gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -652,7 +672,7 @@ export default function CanteenLayout() {
 
           <section className="page-scroll page-scroll-area scrollbar-hidden" style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingRight: isMobilePortrait ? 0 : 2 }}>
             <div className="page-content" key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>
-              <div className="main" style={{ padding: 0 }}>
+              <div className="main" style={{ padding: isMobilePortrait ? mobileContentInset : 0 }}>
                 <Outlet context={{ me, session, tenantCtx }} />
               </div>
             </div>

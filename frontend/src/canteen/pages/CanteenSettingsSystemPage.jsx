@@ -3,48 +3,62 @@ import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import { useBusinessSettings } from '../../context/BusinessSettingsContext.jsx'
 import { useTheme } from '../../theme/ThemeContext.jsx'
-import { themeKeys, themes } from '../../theme/themeConfig.js'
+import ThemeSelectionCards from '../../components/settings/ThemeSelectionCards.jsx'
+import { normalizeThemeId } from '../../theme/themeConfig.js'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const buildAppearanceSnapshot = (appearance) => ({
-  themeId: String(appearance?.themeId || 'default'),
-  darkMode: appearance?.darkMode === true
+  themeId: normalizeThemeId(appearance?.themeId || 'white'),
+  darkMode: appearance?.darkMode === true,
 })
+
+const normalizeBranchIdsList = (branchIds) => (
+  Array.isArray(branchIds)
+    ? branchIds.map(String).filter(Boolean).sort()
+    : []
+)
 
 export default function CanteenSettingsSystemPage() {
   const { me } = useOutletContext()
   const { setSettingsLocally } = useBusinessSettings()
-  const { setThemeKey, setDarkMode, theme, themeKey, darkMode } = useTheme()
+  const { setThemeKey, setDarkMode, theme, isMobileRuntime } = useTheme()
+  const { isMobilePortrait } = useResponsiveFlags()
   const isAdmin = me?.role === 'tenant_admin'
   const [loading, setLoading] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
   const [settings, setSettings] = useState(null)
   const [branches, setBranches] = useState([])
   const [allowedBranchIds, setAllowedBranchIds] = useState([])
+  const [savedAllowedBranchIds, setSavedAllowedBranchIds] = useState([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [savedAppearance, setSavedAppearance] = useState({ themeId: 'default', darkMode: false })
+  const [savedAppearance, setSavedAppearance] = useState({ themeId: 'white', darkMode: false })
 
   const load = async (options = {}) => {
     const background = options?.background === true
     if (!background) setLoading(true)
     if (!background) setError('')
     if (!background) setSuccess('')
-    const [s, b] = await Promise.all([
+
+    const [settingsRes, branchesRes] = await Promise.all([
       api('/api/canteen/settings', { silent: true }),
-      api('/api/canteen/branches', { silent: true })
+      api('/api/canteen/branches', { silent: true }),
     ])
 
-    const nextAppearance = buildAppearanceSnapshot(s?.settings?.appearance)
+    const nextAppearance = buildAppearanceSnapshot(settingsRes?.settings?.appearance)
     setSettings({
-      ...(s?.settings || null),
-      appearance: nextAppearance
+      ...(settingsRes?.settings || null),
+      appearance: nextAppearance,
     })
     setSettingsLocally({ appearance: nextAppearance })
     setSavedAppearance(nextAppearance)
     setThemeKey(nextAppearance.themeId)
     setDarkMode(nextAppearance.darkMode)
-    setBranches(Array.isArray(b?.branches) ? b.branches : [])
-    setAllowedBranchIds(Array.isArray(s?.settings?.allowedBranchIds) ? s.settings.allowedBranchIds.map(String).filter(Boolean) : [])
+    setBranches(Array.isArray(branchesRes?.branches) ? branchesRes.branches : [])
+    const nextAllowedBranchIds = normalizeBranchIdsList(settingsRes?.settings?.allowedBranchIds)
+    setAllowedBranchIds(nextAllowedBranchIds)
+    setSavedAllowedBranchIds(nextAllowedBranchIds)
+
     if (!background) setLoading(false)
   }
 
@@ -58,7 +72,7 @@ export default function CanteenSettingsSystemPage() {
     setSuccess('')
     const res = await api('/api/canteen/settings', { method: 'PUT', data: patch, silent: true })
     if (!res?.ok) {
-      setError(res?.message || 'Güncellenemedi')
+      setError(res?.message || 'Guncellenemedi')
       setLoading(false)
       return res
     }
@@ -66,12 +80,14 @@ export default function CanteenSettingsSystemPage() {
     const nextAppearance = buildAppearanceSnapshot(res?.settings?.appearance)
     setSettings({
       ...(res.settings || null),
-      appearance: nextAppearance
+      appearance: nextAppearance,
     })
     setSettingsLocally({ appearance: nextAppearance })
     setSavedAppearance(nextAppearance)
     if (Array.isArray(res?.settings?.allowedBranchIds)) {
-      setAllowedBranchIds(res.settings.allowedBranchIds.map(String).filter(Boolean))
+      const nextAllowedBranchIds = normalizeBranchIdsList(res.settings.allowedBranchIds)
+      setAllowedBranchIds(nextAllowedBranchIds)
+      setSavedAllowedBranchIds(nextAllowedBranchIds)
     }
     setLoading(false)
     return res
@@ -79,23 +95,30 @@ export default function CanteenSettingsSystemPage() {
 
   const activeBranches = useMemo(() => branches.filter((branch) => branch.isActive !== false), [branches])
   const allowedSet = useMemo(() => new Set((allowedBranchIds || []).map(String)), [allowedBranchIds])
-  const selectedThemeId = String(settings?.appearance?.themeId || 'default')
+  const currentAppearance = buildAppearanceSnapshot(settings?.appearance)
   const darkModeEnabled = settings?.appearance?.darkMode === true
-  const themeDirty = selectedThemeId !== savedAppearance.themeId || darkModeEnabled !== savedAppearance.darkMode
+  const themeDirty = currentAppearance.themeId !== savedAppearance.themeId || currentAppearance.darkMode !== savedAppearance.darkMode
+  const branchesDirty = normalizeBranchIdsList(allowedBranchIds).join(',') !== savedAllowedBranchIds.join(',')
 
-  const shellTheme = {
-    pageBg: `radial-gradient(circle at top left, ${theme.accentSoft} 0, transparent 30%), radial-gradient(circle at bottom right, ${theme.border} 0, transparent 26%), var(--app-bg)`,
-    border: theme.border,
-    shadow: theme.activeGlow,
-  }
+  const shellTheme = isMobileRuntime
+    ? {
+        pageBg: 'var(--app-surface)',
+        border: 'var(--app-border, var(--border))',
+        shadow: 'none',
+      }
+    : {
+        pageBg: 'var(--app-bg)',
+        border: theme.border,
+        shadow: 'none',
+      }
 
   const revertThemePreview = () => {
     setSettings((current) => ({
       ...(current || {}),
-      appearance: buildAppearanceSnapshot(savedAppearance)
+      appearance: buildAppearanceSnapshot(savedAppearance),
     }))
     setSettingsLocally({ appearance: buildAppearanceSnapshot(savedAppearance) })
-    setThemeKey(savedAppearance.themeId)
+    setThemeKey(normalizeThemeId(savedAppearance.themeId))
     setDarkMode(savedAppearance.darkMode)
   }
 
@@ -103,17 +126,28 @@ export default function CanteenSettingsSystemPage() {
     setSavingTheme(true)
     setError('')
     setSuccess('')
-    const nextAppearance = buildAppearanceSnapshot(settings?.appearance)
-    const saved = await update({ appearance: nextAppearance })
+    const saved = await update({ appearance: currentAppearance })
     setSavingTheme(false)
     if (!saved?.ok) {
       revertThemePreview()
       return
     }
-    setSuccess('Tema ayarları kaydedildi')
+    setSuccess('Gorunum modu kaydedildi')
   }
 
-  if (!settings) return <div className="card">Yükleniyor...</div>
+  const saveSystemSettings = async () => {
+    const nextAllowed = normalizeBranchIdsList(allowedBranchIds)
+    if (nextAllowed.length === 0) return
+    const patch = {
+      allowedBranchIds: nextAllowed,
+      ...(themeDirty ? { appearance: currentAppearance } : {}),
+    }
+    const saved = await update(patch)
+    if (!saved?.ok) return
+    setSuccess(themeDirty ? 'Gorunum modu ve sube ayarlari kaydedildi' : 'Sube ayarlari kaydedildi')
+  }
+
+  if (!settings) return <div className="card">Yukleniyor...</div>
 
   return (
     <div className="canteen-settings-system-page" style={{ display: 'grid', gap: 16 }}>
@@ -133,10 +167,11 @@ export default function CanteenSettingsSystemPage() {
         .canteen-settings-system-page [style*='var(--muted)'] {
           color: var(--app-text-secondary, var(--muted)) !important;
         }
-        .canteen-settings-system-page button:not(.btn--primary) {
-          color: var(--app-text) !important;
+        .canteen-settings-system-page button:not(.theme-selection-card) {
+          color: var(--settings-button-text, #ffffff) !important;
         }
       `}</style>
+
       <div
         className="card"
         style={{
@@ -144,20 +179,20 @@ export default function CanteenSettingsSystemPage() {
           border: `1px solid ${shellTheme.border}`,
           background: shellTheme.pageBg,
           boxShadow: shellTheme.shadow,
-          padding: 22,
+          padding: isMobilePortrait ? 18 : 22,
           display: 'grid',
           gap: 14,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 30, fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--app-text)' }}>Sistem Ayarları</div>
-            <div style={{ marginTop: 8, maxWidth: 760, color: 'var(--app-text-secondary)', fontWeight: 700, lineHeight: 1.6 }}>
-              Tema, koyu mod, yetkili şubeler ve temel fiş ayarlarını restoran paneline yakın bir düzenle yönetin.
+            <div style={{ fontSize: isMobilePortrait ? 22 : 30, lineHeight: 1.08, fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--app-text)' }}>Sistem Ayarlari</div>
+            <div style={{ marginTop: 8, maxWidth: 760, color: 'var(--app-text-secondary)', fontWeight: 700, lineHeight: 1.6, fontSize: isMobilePortrait ? 12.5 : 14 }}>
+              Tema, koyu mod, yetkili subeler ve temel fis ayarlarini restoran paneline yakin bir duzenle yonetin.
             </div>
           </div>
           <button className="btn" type="button" onClick={load} disabled={loading || savingTheme}>
-            {loading ? 'Yükleniyor...' : 'Yenile'}
+            {loading ? 'Yukleniyor...' : 'Yenile'}
           </button>
         </div>
       </div>
@@ -167,15 +202,15 @@ export default function CanteenSettingsSystemPage() {
 
       {Array.isArray(allowedBranchIds) && allowedBranchIds.length === 0 && (
         <div className="card" style={{ borderColor: 'color-mix(in srgb, #f59e0b 35%, var(--app-border))', background: 'color-mix(in srgb, #f59e0b 10%, var(--app-surface))', color: 'var(--app-text)' }}>
-          Henüz yetkili şube seçilmedi. Kaydetmeniz gerekiyor.
+          Henuz yetkili sube secilmedi. Kaydetmeniz gerekiyor.
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', minWidth: 0, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16 }}>
         <div className="card" style={{ display: 'grid', gap: 12 }}>
           <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>Temel Sistem Bilgileri</div>
           <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Varsayılan KDV</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Varsayilan KDV</div>
             <input
               className="input"
               value={String(settings.defaultVatRate ?? 0)}
@@ -184,7 +219,7 @@ export default function CanteenSettingsSystemPage() {
             />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş Üst Metin</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fis Ust Metin</div>
             <input
               className="input"
               value={String(settings.receiptHeader || '')}
@@ -193,7 +228,7 @@ export default function CanteenSettingsSystemPage() {
             />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş Alt Metin</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fis Alt Metin</div>
             <input
               className="input"
               value={String(settings.receiptFooter || '')}
@@ -204,86 +239,26 @@ export default function CanteenSettingsSystemPage() {
         </div>
 
         <div className="card" style={{ display: 'grid', gap: 12 }}>
-          <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>Tema Seçenekleri</div>
+          <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>Gorunum Modu</div>
           <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700 }}>
-            Tema kartına tıklayın, koyu modu değiştirin ve ardından kaydedin. Önizleme anında uygulanır.
+            Bu paneli beyaz mod veya koyu mod olarak kullanin.
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 14, border: '1px solid var(--border)', borderRadius: 18 }}>
-            <div style={{ display: 'grid', gap: 4 }}>
-              <div style={{ fontWeight: 800 }}>Koyu mod</div>
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Kartlar ve yüzeyler koyu renk paletiyle gösterilir.</div>
-            </div>
-            <button
-              type="button"
-              className="btn"
-              disabled={!isAdmin || loading || savingTheme}
-              onClick={() => {
-                const nextDarkMode = !darkModeEnabled
-                const nextAppearance = {
-                  ...buildAppearanceSnapshot(settings?.appearance),
-                  darkMode: nextDarkMode
-                }
-                setSettings((current) => ({
-                  ...current,
-                  appearance: nextAppearance
-                }))
-                setSettingsLocally({ appearance: nextAppearance })
-                setDarkMode(nextDarkMode)
-              }}
-              style={{
-                minWidth: 120,
-                background: darkModeEnabled ? 'var(--theme-accent, #111827)' : 'var(--button-bg, #e5e7eb)',
-                borderColor: darkModeEnabled ? 'var(--theme-accent, #111827)' : 'var(--button-border, #d1d5db)',
-                color: darkModeEnabled ? '#ffffff' : 'var(--text)'
-              }}
-            >
-              {darkModeEnabled ? 'Açık' : 'Kapalı'}
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            {themeKeys.map((key) => {
-              const item = themes[key]
-              const selected = selectedThemeId === key
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  disabled={!isAdmin || loading || savingTheme}
-                  onClick={() => {
-                    const nextAppearance = {
-                      ...buildAppearanceSnapshot(settings?.appearance),
-                      themeId: key
-                    }
-                    setSettings((current) => ({
-                      ...current,
-                      appearance: nextAppearance
-                    }))
-                    setSettingsLocally({ appearance: nextAppearance })
-                    setThemeKey(key)
-                  }}
-                  style={{
-                    borderRadius: 24,
-                    border: `1px solid ${selected ? 'var(--theme-accent, #0f172a)' : 'var(--border)'}`,
-                    background: selected ? 'var(--panelElevated)' : 'var(--panel)',
-                    color: 'var(--text)',
-                    padding: 16,
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    boxShadow: selected ? 'var(--card-shadow)' : '0 10px 22px rgba(15, 23, 42, 0.05)'
-                  }}
-                >
-                  <div style={{ height: 48, borderRadius: 18, background: item.gradient }} />
-                  <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ fontWeight: 900 }}>{item.name}</div>
-                    {selected ? <span style={{ borderRadius: 999, background: 'var(--theme-accent, #0f172a)', color: '#ffffff', padding: '4px 8px', fontSize: 11, fontWeight: 900 }}>Seçili</span> : null}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+          <ThemeSelectionCards
+            darkMode={darkModeEnabled}
+            onToggleDarkMode={(nextDarkMode) => {
+              const nextAppearance = {
+                ...buildAppearanceSnapshot(settings?.appearance),
+                darkMode: Boolean(nextDarkMode),
+              }
+              setSettings((current) => ({
+                ...current,
+                appearance: nextAppearance,
+              }))
+              setSettingsLocally({ appearance: nextAppearance })
+              setDarkMode(Boolean(nextDarkMode))
+            }}
+          />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
             <button
@@ -292,7 +267,7 @@ export default function CanteenSettingsSystemPage() {
               disabled={!isAdmin || loading || savingTheme || !themeDirty}
               onClick={revertThemePreview}
             >
-              Vazgeç
+              Vazgec
             </button>
             <button
               className="btn btn--primary"
@@ -300,7 +275,7 @@ export default function CanteenSettingsSystemPage() {
               disabled={!isAdmin || loading || savingTheme || !themeDirty}
               onClick={saveThemeSettings}
             >
-              {savingTheme ? 'Kaydediliyor...' : 'Tema Ayarlarını Kaydet'}
+              {savingTheme ? 'Kaydediliyor...' : 'Gorunumu Kaydet'}
             </button>
           </div>
         </div>
@@ -308,8 +283,8 @@ export default function CanteenSettingsSystemPage() {
 
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div>
-          <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>Yetkili Şubeler</div>
-          <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700 }}>Bu panel için erişilebilecek şubeleri seçin.</div>
+          <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>Yetkili Subeler</div>
+          <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700 }}>Bu panel icin erisilebilecek subeleri secin.</div>
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
           {activeBranches.map((branch) => {
@@ -342,14 +317,8 @@ export default function CanteenSettingsSystemPage() {
           <button
             className="btn btn--primary"
             type="button"
-            disabled={!isAdmin || loading || !Array.isArray(allowedBranchIds) || allowedBranchIds.length === 0}
-            onClick={async () => {
-              const nextAllowed = Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String).filter(Boolean) : []
-              if (nextAllowed.length === 0) return
-              const saved = await update({ allowedBranchIds: nextAllowed })
-              if (!saved?.ok) return
-              setSuccess('Şube ayarları kaydedildi')
-            }}
+            disabled={!isAdmin || loading || (!branchesDirty && !themeDirty) || !Array.isArray(allowedBranchIds) || allowedBranchIds.length === 0}
+            onClick={saveSystemSettings}
           >
             Kaydet
           </button>

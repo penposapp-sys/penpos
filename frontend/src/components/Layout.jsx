@@ -25,7 +25,7 @@ export default function Layout() {
   const { pathname } = useLocation()
   const { user, logout, tenantCtx } = useAuth()
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
-  const { themeKey, theme } = useTheme()
+  const { themeKey, theme, isMobileRuntime } = useTheme()
   const { getSetting } = useBusinessSettings()
   const { selectedDate, setSelectedDate } = useAppDate()
   const dateInputRef = useRef(null)
@@ -260,6 +260,7 @@ export default function Layout() {
   const isDashboardPage = pathname === '/kermes/app/dashboard'
   const isReportsPage = pathname === '/kermes/app/reports'
   const isSettingsRoute = pathname.startsWith('/kermes/settings')
+  const isMobileSettingsRoute = isMobilePortrait && isSettingsRoute
   const isDesktopSalesRoute = !isMobilePortrait && (
     pathname.startsWith('/kermes/app/pos') ||
     pathname.startsWith('/kermes/app/walkin') ||
@@ -307,18 +308,19 @@ export default function Layout() {
       window.removeEventListener('resize', updateHeight)
     }
   }, [isSettingsRoute, isMobilePortrait, pathname])
-  const isMonoTheme = themeKey === 'mono'
-  const sidebarTextColor = theme.darkMode ? 'var(--text-secondary)' : '#ffffff'
-  const sidebarActiveTextColor = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
-  const sidebarIconColor = theme.darkMode ? 'var(--text-secondary)' : '#ffffff'
-  const sidebarActiveIconColor = theme.darkMode ? '#b86e26' : '#d9862a'
-  const sidebarIconBg = theme.darkMode ? 'var(--surface-glass)' : 'rgba(255,255,255,0.08)'
-  const sidebarActiveIconBg = theme.darkMode ? '#f4f1ec' : 'transparent'
-  const logoutIconBg = theme.darkMode ? 'var(--surface-glass)' : 'rgba(255,255,255,0.16)'
-  const logoutTextColor = theme.darkMode ? 'var(--text-primary)' : '#0f172a'
+  const sidebarTextColor = 'var(--sidebar-item-text, var(--sidebar-nav-text, var(--app-text)))'
+  const sidebarActiveTextColor = 'var(--sidebar-item-text-active, var(--sidebar-nav-text-active, var(--app-text)))'
+  const sidebarIconColor = 'var(--sidebar-item-icon, var(--sidebar-nav-icon, var(--app-text)))'
+  const sidebarActiveIconColor = 'var(--sidebar-item-icon-active, var(--sidebar-nav-icon-active, var(--theme-accent)))'
+  const sidebarIconBg = 'var(--sidebar-item-icon-bg, var(--sidebar-nav-icon-bg, var(--app-surface)))'
+  const sidebarActiveIconBg = 'var(--sidebar-item-icon-active-bg, var(--sidebar-nav-icon-active-bg, var(--app-surface-soft)))'
+  const logoutIconBg = 'var(--sidebar-logout-icon-bg, var(--sidebar-item-icon-bg, var(--sidebar-nav-icon-bg, var(--app-surface))))'
+  const logoutIconColor = 'var(--sidebar-logout-icon-color, var(--sidebar-item-icon, var(--sidebar-nav-icon, var(--app-text))))'
+  const logoutTextColor = 'var(--sidebar-logout-text, var(--sidebar-item-text-active, var(--sidebar-nav-text-active, var(--app-text))))'
+  const effectiveDarkMode = theme.darkMode
   const sidebarLogoSrc = desktopCollapsed
     ? '/logo-1.png'
-    : (theme.darkMode ? '/logo-3.png' : '/logo-2.png')
+    : (effectiveDarkMode ? '/logo-3.png' : '/logo-2.png')
   const topbarDate = useMemo(() => {
     const value = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date()
     return value.toLocaleDateString('tr-TR', {
@@ -340,6 +342,11 @@ export default function Layout() {
   const navItemHeight = desktopCollapsed ? 42 : 44
   const navItemGap = 6
   const navStep = navItemHeight + navItemGap
+  const mobileShellPadding = isMobileSettingsRoute ? 4 : 8
+  const mobileMainRadius = isMobileSettingsRoute ? 0 : 22
+  const mobileMainPadding = isMobileSettingsRoute ? 0 : 8
+  const mobileTopbarPadding = '12px 14px'
+  const mobileContentInset = isMobileSettingsRoute ? 6 : 8
 
   return (
     <div className="pos-app-shell" style={{ background: 'transparent', color: 'var(--app-text, var(--text))' }}>
@@ -357,7 +364,7 @@ export default function Layout() {
           }, 0)
         }}
       />
-      <div style={{ display: 'flex', height: '100%', minHeight: 0, alignItems: isMobilePortrait ? 'stretch' : 'flex-start', gap: isSettingsRoute ? 10 : 12, padding: isMobilePortrait ? 12 : (isSettingsRoute ? 12 : 16) }}>
+      <div style={{ display: 'flex', height: '100%', minHeight: 0, alignItems: isMobilePortrait ? 'stretch' : 'flex-start', gap: isMobilePortrait ? 8 : (isSettingsRoute ? 10 : 12), padding: isMobilePortrait ? mobileShellPadding : (isSettingsRoute ? 12 : 16) }}>
         {!isMobilePortrait && (
           <aside
             className="pos-sidebar"
@@ -371,7 +378,7 @@ export default function Layout() {
               height: 'calc(100dvh - 32px)',
               overflow: 'hidden',
               borderRadius: 36,
-              background: theme.sidebar,
+              background: 'var(--sidebar-bg)',
               padding: 12,
               border: '1px solid var(--border-soft)',
               backdropFilter: 'blur(24px)',
@@ -405,10 +412,10 @@ export default function Layout() {
                   display: 'grid',
                   placeItems: 'center',
                   borderRadius: 24,
-                  border: '1px solid var(--border-soft)',
-                  background: 'var(--card-bg)',
+                  border: '1px solid var(--sidebar-logo-border, var(--border-soft))',
+                  background: 'var(--sidebar-logo-bg, var(--card-bg))',
                   backdropFilter: 'var(--glass-blur)',
-                  boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
+                  boxShadow: 'var(--sidebar-active-shadow, var(--shadow-soft))',
                   cursor: 'pointer',
                   transition: 'width 500ms ease'
                 }}
@@ -443,11 +450,11 @@ export default function Layout() {
                       height: navItemHeight,
                       width: navButtonWidth,
                       borderRadius: 24,
-                      background: 'var(--menu-active-bg, var(--card-hover))',
-                      boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
+                      background: 'var(--sidebar-active-bg, var(--menu-active-bg, var(--card-hover)))',
+                      boxShadow: 'var(--sidebar-active-shadow, none)',
                       transition: 'transform 500ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms ease',
                       transform: `translateY(${activeIndex * navStep}px)`,
-                      border: '1px solid var(--border-hover)',
+                      border: '1px solid var(--sidebar-active-border, var(--border-hover))',
                       backdropFilter: 'var(--glass-blur)'
                     }}
                   />
@@ -513,17 +520,17 @@ export default function Layout() {
                             height: desktopCollapsed ? 32 : 34,
                             placeItems: 'center',
                             borderRadius: 16,
-                            background: active ? sidebarActiveIconBg : (isMonoTheme ? 'rgba(15,23,42,0.06)' : sidebarIconBg),
-                            color: active ? sidebarActiveIconColor : (isMonoTheme ? '#0f172a' : sidebarIconColor),
-                            boxShadow: active && theme.darkMode ? 'var(--shadow-soft), var(--shadow-glow)' : 'none',
-                            transform: active ? 'scale(1.05)' : 'scale(1)'
+                            background: active ? sidebarActiveIconBg : sidebarIconBg,
+                            color: active ? sidebarActiveIconColor : sidebarIconColor,
+                            boxShadow: 'none',
+                            transform: 'none'
                           }}
                         >
                           {Icon ? <Icon size={13} /> : null}
                         </span>
 
                         {!desktopCollapsed && (
-                          <span style={{ position: 'relative', zIndex: 10, fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ position: 'relative', zIndex: 10, fontSize: 12, fontWeight: 900, color: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {item.label}
                           </span>
                         )}
@@ -553,7 +560,7 @@ export default function Layout() {
                   padding: desktopCollapsed ? 0 : '0 12px',
                   borderRadius: 24,
                   border: 'none',
-                  background: desktopCollapsed ? 'var(--surface-glass)' : 'var(--card-hover)',
+                  background: 'var(--sidebar-logout-bg, var(--card-hover))',
                   color: desktopCollapsed ? sidebarTextColor : logoutTextColor,
                   cursor: 'pointer',
                   fontWeight: 900
@@ -577,8 +584,8 @@ export default function Layout() {
                       height: desktopCollapsed ? 32 : 34,
                       placeItems: 'center',
                       borderRadius: 16,
-                      background: desktopCollapsed ? logoutIconBg : 'var(--surface-strong)',
-                      color: desktopCollapsed ? sidebarIconColor : 'var(--surface-strong-contrast)'
+                      background: logoutIconBg,
+                      color: logoutIconColor
                     }}
                   >
                     <IconLogin size={13} />
@@ -591,7 +598,7 @@ export default function Layout() {
           </aside>
         )}
 
-        <main className="pos-main" style={{ position: 'relative', zIndex: 10, minWidth: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: isSettingsRoute ? 30 : 36, background: 'var(--card-bg)', border: '1px solid var(--border-soft)', backdropFilter: 'var(--glass-blur)', padding: isMobilePortrait ? 12 : (isSettingsRoute ? 12 : 18), boxShadow: 'var(--shadow-soft), var(--shadow-glow)', maxWidth: '100%' }}>
+        <main className="pos-main" style={{ position: 'relative', zIndex: 10, minWidth: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: isMobilePortrait ? mobileMainRadius : (isSettingsRoute ? 30 : 36), background: isMobileSettingsRoute ? 'transparent' : 'var(--card-bg)', border: isMobileSettingsRoute ? '0' : '1px solid var(--border-soft)', backdropFilter: isMobileSettingsRoute ? 'none' : 'var(--glass-blur)', padding: isMobilePortrait ? mobileMainPadding : (isSettingsRoute ? 12 : 18), boxShadow: isMobileSettingsRoute ? 'none' : 'var(--shadow-soft), var(--shadow-glow)', maxWidth: '100%' }}>
           {!isSettingsRoute ? <header
             ref={topbarRef}
             className="topbar"
@@ -613,7 +620,7 @@ export default function Layout() {
                 justifyContent: 'space-between',
                 gap: 16,
                 flexWrap: isMobilePortrait ? 'nowrap' : 'wrap',
-                padding: isMobilePortrait ? '16px 18px' : '18px 22px',
+                padding: isMobilePortrait ? mobileTopbarPadding : '18px 22px',
                 borderRadius: 999,
                 background: theme.topbar,
                 border: '1px solid var(--topbar-border)',
@@ -639,7 +646,7 @@ export default function Layout() {
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0, minWidth: 0 }}>
                 <button
-                  className="btn"
+                  className="btn button-light"
                   type="button"
                   onClick={() => {
                     if (!isDashboardPage) return
@@ -676,16 +683,18 @@ export default function Layout() {
 
                 {isMobilePortrait && user && (
                   <button
-                    className="btn"
+                    className="btn button-light"
                     type="button"
                     onClick={logout}
                     style={{
+                      minHeight: 42,
                       borderRadius: 999,
                       paddingInline: 12,
                       background: 'var(--app-contrast-surface)',
                       borderColor: 'var(--app-contrast-border)',
                       color: 'var(--app-contrast-text)',
                       fontWeight: 900,
+                      whiteSpace: 'nowrap',
                       boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}
                   >
@@ -695,7 +704,7 @@ export default function Layout() {
 
                 {isReportsPage && (
                   <button
-                    className="btn"
+                    className="btn button-light"
                     type="button"
                     onClick={() => {
                       try {
@@ -703,12 +712,14 @@ export default function Layout() {
                       } catch {}
                     }}
                     style={{
+                      minHeight: 42,
                       borderRadius: 999,
                       paddingInline: isMobilePortrait ? 12 : undefined,
                       background: 'var(--app-contrast-surface)',
                       borderColor: 'var(--app-contrast-border)',
                       color: 'var(--app-contrast-text)',
                       fontWeight: 900,
+                      whiteSpace: 'nowrap',
                       boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}
                   >
@@ -733,7 +744,7 @@ export default function Layout() {
             }}
           >
             <div className={`page-content${isDesktopSalesRoute ? ' sales-page-content' : ''}`} key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>
-              <div className={`main${isDesktopSalesRoute ? ' sales-page-main' : ''}`} style={{ padding: 0 }}>
+              <div className={`main${isDesktopSalesRoute ? ' sales-page-main' : ''}`} style={{ padding: isMobilePortrait ? mobileContentInset : 0 }}>
                 <Outlet />
               </div>
             </div>

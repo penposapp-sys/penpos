@@ -13,7 +13,9 @@
   --app-text-muted: #6b7280;
   --app-input: #ffffff;
   --app-input-border: #d1d5db;
-  --app-button-bg: #e5e7eb;
+  --app-button-bg: #ffffff;
+  --app-button-text: #111111;
+  --app-button-active-text: #ffffff;
   --bg: #ffffff;
   --panel: #ffffff;
   --panelElevated: #f3f4f6;
@@ -23,8 +25,13 @@
   --accentHover: #374151;
   --border: #e5e7eb;
   --input-bg: #ffffff;
-  --button-bg: #e5e7eb;
+  --button-bg: #ffffff;
+  --button-text: #111111;
+  --button-active-bg: #111111;
+  --button-active-text: #ffffff;
   --button-border: #d1d5db;
+  --button-disabled-bg: #e5e7eb;
+  --button-disabled-text: #6b7280;
   --card-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
   --success: #16a34a;
   --warning: #f59e0b;
@@ -1785,6 +1792,45 @@ body {
   opacity: 1 !important;
 }
 
+.keep-badge-contrast,
+.status-contrast,
+.badge-contrast {
+  color: inherit;
+}
+
+[data-theme="dark"] :is(
+  .keep-badge-contrast,
+  .status-contrast,
+  .badge-contrast,
+  [class*="badge"],
+  [class*="Badge"],
+  [class*="status"],
+  [class*="Status"],
+  [class*="pill"],
+  [class*="Pill"],
+  [class*="tag"],
+  [class*="Tag"],
+  [class*="indicator"],
+  [class*="Indicator"]
+) :is(
+  .theme-muted,
+  .theme-soft,
+  .muted,
+  .text-muted,
+  .text-gray-400,
+  .text-gray-500,
+  .text-slate-400,
+  .text-slate-500,
+  .text-zinc-400,
+  .text-zinc-500,
+  .text-white\/50,
+  .text-white\/60,
+  .text-white\/70
+) {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
 body.public-site-layout {
   overflow-x: hidden;
   overflow-y: auto;
@@ -1820,10 +1866,10 @@ body.scroll-lock { overflow: hidden !important }
     --ui-font-base: 10px;
     --ui-font-sm: 8px;
     --ui-font-lg: 10px;
-    --ui-btn-px: 12px;
-    --ui-btn-py: 8px;
-    --ui-btn-minh: 40px;
-    --ui-card-pad: 12px;
+    --ui-btn-px: 10px;
+    --ui-btn-py: 7px;
+    --ui-btn-minh: 38px;
+    --ui-card-pad: 10px;
   }
 
   body.mobile-ui {
@@ -1882,6 +1928,11 @@ body.scroll-lock { overflow: hidden !important }
 
   body.mobile-ui .card {
     padding: var(--ui-card-pad);
+    border-radius: 20px;
+  }
+
+  body.mobile-ui .main {
+    padding: 8px;
   }
 
   body.mobile-ui .page-pill {
@@ -1921,7 +1972,7 @@ body.scroll-lock { overflow: hidden !important }
 .brand { font-weight: 700; letter-spacing: .5px; margin-bottom: 16px }
 .sidebar nav { display: grid; gap: 8px }
 .nav-link {
-  color: var(--muted);
+  color: var(--sidebar-nav-text, var(--muted));
   text-decoration: none;
   padding: 10px 12px;
   border-radius: 18px;
@@ -2006,11 +2057,11 @@ body.scroll-lock { overflow: hidden !important }
   background: var(--app-surface-soft, var(--panelElevated));
 }
 .nav-link.active, .nav-link:hover {
-  color: var(--text);
+  color: var(--sidebar-nav-text-active, var(--text));
   background: var(--menu-active-bg, var(--card-hover));
   border-color: var(--border-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-soft), var(--shadow-glow);
+  transform: none;
+  box-shadow: none;
 }
 .nav-link:focus-visible {
   outline: 2px solid #9ca3af;
@@ -2023,12 +2074,17 @@ body.scroll-lock { overflow: hidden !important }
 .nav-icon {
   display: grid;
   place-items: center;
-  color: #111111;
+  color: var(--sidebar-nav-icon, #111111);
   width: 36px;
   height: 36px;
   border-radius: 14px;
-  background: var(--canteen-nav-icon-bg, rgba(255,255,255,0.08));
+  background: var(--sidebar-nav-icon-bg, var(--canteen-nav-icon-bg, rgba(255,255,255,0.08)));
   transition: all 300ms ease;
+}
+.nav-link.active .nav-icon,
+.nav-link:hover .nav-icon {
+  color: var(--sidebar-nav-icon-active, var(--text));
+  background: var(--sidebar-nav-icon-active-bg, var(--canteen-nav-icon-bg, rgba(255,255,255,0.12)));
 }
 .page-pill {
   background: var(--theme-accent-soft, #eef0f3);
@@ -2143,13 +2199,14 @@ body.scroll-lock { overflow: hidden !important }
   border-color: var(--border-hover);
   background: var(--menu-active-bg, var(--card-hover));
   color: var(--app-text, var(--text));
+  box-shadow: none;
 }
 
 .subnav-pill.is-active {
   background: var(--menu-active-bg, var(--card-hover));
   border-color: var(--border-hover);
   color: var(--app-text, var(--text));
-  box-shadow: var(--shadow-soft), var(--shadow-glow);
+  box-shadow: none;
 }
 .topbar {
   grid-column: 1 / -1;
@@ -2170,7 +2227,7 @@ body.scroll-lock { overflow: hidden !important }
 .main { padding: 16px; height: auto; min-height: 0; overflow: visible; -webkit-overflow-scrolling: touch }
 
 .pageMobile {
-  padding: 12px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2244,7 +2301,7 @@ body.modal-open .qr-menu .menu-row:hover {
 .desktop-row,
 .desktop-table { }
 
-.pageMobile { padding: 12px; display: flex; flex-direction: column; gap: 12px; max-width: 100%; min-width: 0 }
+.pageMobile { padding: 8px; display: flex; flex-direction: column; gap: 10px; max-width: 100%; min-width: 0 }
 .breakAny { overflow-wrap: anywhere; word-break: break-word }
 .mobileStack { display: grid; gap: 10px }
 .actionWrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
@@ -2371,9 +2428,8 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .delivery-order-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
   border-color: var(--app-border, var(--border));
+  box-shadow: none;
 }
 
 .delivery-card-top,
@@ -3769,6 +3825,20 @@ body.modal-open .qr-menu .menu-row:hover {
   color: #ffffff;
 }
 
+.productCard[data-has-image="true"] .productCard__name,
+.productCard[data-has-image="true"] .productCard__price,
+.kasaProductCard[data-has-image="true"] .kasaProductCardTitle,
+.kasaProductCard[data-has-image="true"] .kasaProductCardMeta,
+.kasaProductCard[data-has-image="true"] .kasaProductCardPrice {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.kasaProductCard[data-has-image="true"] .kasaProductCardStock {
+  color: #111111 !important;
+  text-shadow: none;
+}
+
 .productCard[data-has-image="false"] {
   background: var(--app-surface, var(--panel));
   aspect-ratio: auto;
@@ -4416,14 +4486,13 @@ body.modal-open .qr-menu .menu-row:hover {
   overflow-wrap: anywhere;
 }
 .kasaCategoryCard:hover {
-  transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--theme-accent, var(--accent)) 30%, var(--app-border, var(--border)));
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--app-bg, #0f172a) 22%, transparent);
+  box-shadow: none;
 }
 .kasaCategoryCard[data-active="true"] {
   background: color-mix(in srgb, var(--theme-accent, var(--accent)) 18%, var(--app-surface, var(--panel)));
   border-color: color-mix(in srgb, var(--theme-accent, var(--accent)) 55%, var(--app-border, var(--border)));
-  box-shadow: 0 16px 28px color-mix(in srgb, var(--theme-accent, var(--accent)) 20%, transparent);
+  box-shadow: none;
 }
 .kasaCatalogLayout { display: grid; gap: 12px }
 .kasaProductGrid {
@@ -4491,7 +4560,7 @@ body.modal-open .qr-menu .menu-row:hover {
   padding: 3px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--theme-accent, var(--accent)) 12%, var(--app-surface, var(--panel)));
-  color: color-mix(in srgb, var(--theme-accent, var(--accent)) 70%, var(--app-text, var(--text))) !important;
+  color: var(--app-contrast-text, #111111) !important;
 }
 .kasaProductGridScroll { max-height: 64vh; overflow-y: auto; padding-right: 2px }
 .kasaCartPanel { padding: 2mm; gap: 2mm !important }
@@ -4746,7 +4815,7 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 .kasaProductCardStock {
   background: #ecfdf5;
-  color: #16a34a !important;
+  color: #111111 !important;
   font-size: 8px;
   padding: 2px 5px;
   white-space: nowrap;
@@ -5115,7 +5184,7 @@ body.modal-open .qr-menu .menu-row:hover {
     font-size: 9px;
   }
   .kasaProductCardStock {
-    color: #16a34a !important;
+    color: #111111 !important;
     background: #ecfdf5;
     font-size: 7px;
     padding: 1px 4px;
@@ -5141,10 +5210,9 @@ body.modal-open .qr-menu .menu-row:hover {
   transition: all .25s ease;
 }
 .card:hover {
-  transform: translateY(-2px);
   border-color: var(--border-hover);
   background: var(--card-hover);
-  box-shadow: var(--shadow-soft), var(--shadow-glow);
+  box-shadow: var(--shadow-soft);
 }
 .card--stable:hover {
   transform: none;
@@ -5189,11 +5257,24 @@ input::placeholder,
 textarea::placeholder {
   color: var(--app-text-muted, var(--muted));
 }
-.btn {
+:where(
+  button,
+  .btn,
+  .btn-primary,
+  .btn--primary,
+  .btn-secondary,
+  .btn--secondary,
+  .btn-danger,
+  .btn--danger,
+  .btn-success,
+  .btn--success,
+  button[type="submit"],
+  button[type="button"]
+) {
   appearance: none;
   background: var(--app-button-bg, var(--button-bg));
-  color: var(--app-text, var(--text));
-  border: 1px solid var(--app-input-border, rgba(148,163,184,.25));
+  color: var(--app-button-text, var(--button-text, var(--app-text, var(--text))));
+  border: 1px solid var(--button-border, var(--app-input-border, rgba(148,163,184,.25)));
   border-radius: 999px;
   padding: 8px 14px;
   cursor: pointer;
@@ -5210,7 +5291,132 @@ textarea::placeholder {
   backdrop-filter: var(--glass-blur);
   transition: all .25s ease;
 }
-.btn::before {
+
+:where(
+  button,
+  .btn,
+  .btn-primary,
+  .btn--primary,
+  .btn-secondary,
+  .btn--secondary,
+  .btn-danger,
+  .btn--danger,
+  .btn-success,
+  .btn--success,
+  button[type="submit"],
+  button[type="button"]
+) :is(span, svg, svg *, i) {
+  color: inherit;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+:where(button, .btn)[data-button-layout="card"] {
+  display: grid;
+  width: 100%;
+  justify-content: normal;
+  justify-items: stretch;
+  align-items: stretch;
+  align-content: start;
+  white-space: normal;
+}
+
+:where(button, .btn)[data-button-layout="card"] > * {
+  min-width: 0;
+}
+
+.responsive-card-title,
+.responsive-card-value,
+.responsive-card-note,
+.responsive-card-badge,
+.responsive-card-heading,
+.responsive-card-chip {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.responsive-card-heading {
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.15;
+}
+
+.responsive-card-title {
+  font-size: clamp(14px, 1.45vw, 18px);
+  line-height: 1.2;
+}
+
+.responsive-card-value {
+  font-size: clamp(22px, 3.2vw, 28px);
+  line-height: 1.05;
+}
+
+.responsive-card-note {
+  font-size: clamp(11px, 1.15vw, 13px);
+  line-height: 1.45;
+}
+
+.responsive-card-badge {
+  max-width: 100%;
+  font-size: clamp(10px, 1vw, 12px);
+  line-height: 1.2;
+}
+
+.responsive-card-chip {
+  font-size: clamp(10px, 0.95vw, 12px);
+  line-height: 1.2;
+}
+
+.dashboard-page,
+.reports-page,
+.settings-home,
+.canteen-settings-shell,
+.canteen-settings-home-grid {
+  min-width: 0;
+}
+
+.dashboard-page > *,
+.reports-page > *,
+.settings-home > * {
+  min-width: 0;
+}
+
+.dashboard-page :is(button, .card, [data-button-layout="card"]),
+.reports-page :is(button, .card, [data-button-layout="card"]),
+.settings-home .settings-module-card,
+.canteen-settings-home-card {
+  min-width: 0;
+}
+
+.dashboard-page :is(button, .card, [data-button-layout="card"]) :is(div, span, p, b, h2, h3),
+.reports-page :is(button, .card, [data-button-layout="card"]) :is(div, span, p, b, h2, h3),
+.settings-home .settings-module-card :is(div, span, p, h3),
+.canteen-settings-home-card :is(div, span, p, h3) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.dashboard-page h2,
+.reports-page h2 {
+  font-size: clamp(18px, 1.65vw, 24px) !important;
+  line-height: 1.15 !important;
+}
+
+.dashboard-page :is(button, .card, [data-button-layout="card"]) span:not(.page-pill),
+.reports-page :is(button, .card, [data-button-layout="card"]) span:not(.page-pill),
+.settings-home .settings-module-card span,
+.canteen-settings-home-card span {
+  white-space: normal;
+}
+
+.dashboard-page :is(button, .card, [data-button-layout="card"]) .page-pill,
+.reports-page :is(button, .card, [data-button-layout="card"]) .page-pill {
+  white-space: nowrap;
+}
+
+.btn::before,
+button::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -5219,50 +5425,184 @@ textarea::placeholder {
   transition: all 300ms ease;
   pointer-events: none;
 }
-.btn:hover {
+:where(.btn, button):hover {
   background: var(--menu-active-bg, var(--card-hover));
   border-color: var(--border-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-soft), var(--shadow-glow);
+  box-shadow: none;
 }
-.btn:hover::before {
+.btn:hover::before,
+button:hover::before {
   opacity: 1;
 }
-.btn:active {
+:where(.btn, button):active {
   background: var(--app-surface-soft, var(--panelElevated));
   border-color: var(--app-border, var(--border));
-  transform: scale(0.97);
+  transform: none;
 }
-.btn:focus-visible {
+:where(.btn, button):focus-visible {
   outline: 2px solid #9ca3af;
   outline-offset: 2px;
 }
-.btn.active,
-.btn.is-active,
-.btn[aria-pressed="true"],
-.btn[data-active="true"] {
-  background: var(--menu-active-bg, var(--card-hover));
-  border-color: var(--border-hover);
-  color: var(--app-text, var(--text));
+:is(
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .category-pill.active,
+  .filter-pill.active,
+  .tab.active
+) {
+  background: var(--button-active-bg) !important;
+  border-color: var(--button-active-bg) !important;
+  color: var(--button-active-text) !important;
   font-weight: 600;
-  box-shadow: var(--shadow-soft), var(--shadow-glow);
+  box-shadow: none;
+}
+
+:is(
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .category-pill.active,
+  .filter-pill.active,
+  .tab.active
+) :is(span, svg, svg *, i) {
+  color: inherit !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white :is(
+  .btn--primary,
+  .btn-primary,
+  .settings-ui-submit,
+  .product-dark-btn,
+  .primary,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  button[style*="var(--button-active-bg)"],
+  button[style*="var(--menu-active-bg"],
+  button[style*="#111111"],
+  button[style*="#111827"],
+  .btn[style*="var(--button-active-bg)"],
+  .btn[style*="var(--menu-active-bg"],
+  .btn[style*="#111111"],
+  .btn[style*="#111827"],
+  a.active,
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .theme-selection-card-selected
+) {
+  background: var(--button-active-bg) !important;
+  border-color: var(--button-active-bg) !important;
+  color: var(--button-active-text) !important;
+}
+
+html[data-theme="light"].theme-white :is(
+  .btn--primary,
+  .btn-primary,
+  .settings-ui-submit,
+  .product-dark-btn,
+  .primary,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  button[style*="var(--button-active-bg)"],
+  button[style*="var(--menu-active-bg"],
+  button[style*="#111111"],
+  button[style*="#111827"],
+  .btn[style*="var(--button-active-bg)"],
+  .btn[style*="var(--menu-active-bg"],
+  .btn[style*="#111111"],
+  .btn[style*="#111827"],
+  a.active,
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .theme-selection-card-selected
+) :is(*, svg, svg *, path, circle, rect, g, use, span, i) {
+  color: var(--button-active-text) !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.btn--secondary,
+.btn-secondary {
+  background: var(--button-bg);
+  border-color: var(--button-border);
+  color: var(--button-text);
+  font-weight: 600;
 }
 
 .btn.btn--toggle.active,
 .btn.btn--toggle.is-active,
 .btn.btn--toggle[aria-pressed="true"],
 .btn.btn--toggle[data-active="true"] {
-  background: #616161;
-  border-color: #616161;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border-color: #16a34a;
   color: #ffffff;
 }
-.btn:disabled,
-.btn[aria-disabled="true"] {
-  background: var(--app-surface-soft, var(--panelElevated));
-  border-color: var(--app-border, var(--border));
-  color: var(--app-text-muted, var(--muted));
+
+:where(button, .btn):is(:disabled, [disabled], [aria-disabled="true"]) {
+  background: var(--button-disabled-bg) !important;
+  color: var(--button-disabled-text) !important;
+  border-color: var(--button-disabled-bg) !important;
+  opacity: 1 !important;
   cursor: not-allowed;
-  opacity: 0.6;
+  box-shadow: none !important;
+}
+
+:where(button, .btn):is(:disabled, [disabled], [aria-disabled="true"]) :is(span, svg, svg *, i) {
+  color: inherit !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 .hamburger-btn {
   background: var(--surface-glass);
@@ -5289,21 +5629,21 @@ textarea::placeholder {
   transition: all 300ms ease;
 }
 .hover-lift:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.18);
+  transform: none;
+  box-shadow: inherit;
 }
 .hover-lift-strong {
   transition: all 300ms ease;
 }
 .hover-lift-strong:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+  transform: none;
+  box-shadow: inherit;
 }
 .sidebar-menu-button {
   transition: all 300ms ease;
 }
 .sidebar-menu-button:hover {
-  transform: translateY(-2px) scale(1.02);
+  transform: none;
 }
 .sidebar-menu-hover {
   opacity: 0;
@@ -5311,17 +5651,44 @@ textarea::placeholder {
 }
 .sidebar-menu-button:hover .sidebar-menu-hover {
   opacity: 1;
-  background: rgba(255,255,255,0.15);
-}
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  background: rgba(255,255,255,0.1);
 }
 
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button[aria-current="page"] .canteen-sidebar-icon-pill,
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .canteen-sidebar-icon-pill,
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button[aria-current="page"] .canteen-sidebar-icon-glyph,
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .canteen-sidebar-icon-glyph {
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button[aria-current="page"] .canteen-sidebar-icon-pill :is(svg, svg *, i),
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .canteen-sidebar-icon-pill :is(svg, svg *, i),
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button[aria-current="page"] .canteen-sidebar-icon-glyph :is(svg, svg *, i),
+html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .canteen-sidebar-icon-glyph :is(svg, svg *, i) {
+  color: #ffffff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  filter: none !important;
+}
+
+.sidebar-menÃ¼-hover {
+  opacity: 0 !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+.sidebar-menÃ¼-button:hover .sidebar-menÃ¼-hover,
+.sidebar-menÃ¼-button:focus .sidebar-menÃ¼-hover,
+.sidebar-menÃ¼-button:focus-visible .sidebar-menÃ¼-hover,
+.sidebar-menÃ¼-button:active .sidebar-menÃ¼-hover {
+  opacity: 0 !important;
+  background: transparent !important;
+  display: none !important;
+}
 .btn--primary {
-  background: var(--app-contrast-surface);
-  border-color: var(--app-contrast-border);
-  color: var(--app-contrast-text);
+  background: var(--button-active-bg);
+  border-color: var(--button-active-bg);
+  color: var(--button-active-text);
   font-weight: 600;
   box-shadow: 0 14px 32px rgba(0,0,0,0.18);
 }
@@ -5635,8 +6002,101 @@ textarea::placeholder {
   }
 }
 .btn--primary:hover {
-  background: color-mix(in srgb, var(--app-contrast-surface) 88%, var(--app-surface-soft, var(--panelElevated)));
-  border-color: color-mix(in srgb, var(--app-contrast-border) 78%, var(--app-border, var(--border)));
+  background: color-mix(in srgb, var(--button-active-bg) 88%, var(--app-surface-soft, var(--panelElevated)));
+  border-color: color-mix(in srgb, var(--button-active-bg) 78%, var(--app-border, var(--border)));
+  box-shadow: none;
+}
+.btn--success,
+.btn-success {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #062e16;
+  font-weight: 600;
+}
+.btn--success:hover,
+.btn-success:hover {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+.btn--warning,
+.btn-warning {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #111111;
+  font-weight: 600;
+}
+.btn--warning:hover,
+.btn-warning:hover {
+  background: #d97706;
+  border-color: #d97706;
+  color: #111111;
+}
+.settings-scope :is(
+  button,
+  .btn,
+  .settings-ui-submit,
+  .settings-ui-btn,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .settings-back-btn,
+  .settings-save-btn,
+  .settings-menü-btn
+):not(.settings-module-card):not(.theme-selection-card):not(.settings-ui-btn-danger):not(.btn--danger):not(.settings-ui-branch-pill):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: var(--settings-button-bg, #111111) !important;
+  border-color: var(--settings-button-border, #111111) !important;
+  color: var(--settings-button-text, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+.settings-scope :is(
+  button,
+  .btn,
+  .settings-ui-submit,
+  .settings-ui-btn,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .settings-back-btn,
+  .settings-save-btn,
+  .settings-menü-btn
+):not(.settings-module-card):not(.theme-selection-card):not(.settings-ui-btn-danger):not(.btn--danger):not(.settings-ui-branch-pill):not(:disabled):not([disabled]):hover {
+  background: var(--settings-button-bg-hover, #1f2937) !important;
+  border-color: var(--settings-button-bg-hover, #1f2937) !important;
+  color: var(--settings-button-text, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+.settings-scope :is(
+  button,
+  .btn,
+  .settings-ui-submit,
+  .settings-ui-btn,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .settings-back-btn,
+  .settings-save-btn,
+  .settings-menü-btn
+):not(.settings-module-card):not(.theme-selection-card):not(.settings-ui-btn-danger):not(.btn--danger):not(.settings-ui-branch-pill):is(:active, .active, .is-active, [data-active="true"], [aria-current="page"]) {
+  background: var(--settings-button-bg-active, #0f172a) !important;
+  border-color: var(--settings-button-bg-active, #0f172a) !important;
+  color: var(--settings-button-text, #ffffff) !important;
+}
+
+.settings-scope :is(
+  button,
+  .btn,
+  .settings-ui-submit,
+  .settings-ui-btn,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .settings-back-btn,
+  .settings-save-btn,
+  .settings-menü-btn
+):not(.settings-module-card):not(.theme-selection-card):not(.settings-ui-btn-danger):not(.btn--danger):not(.settings-ui-branch-pill):is(:disabled, [disabled], [aria-disabled="true"]) {
+  background: var(--settings-button-disabled-bg, #d1d5db) !important;
+  border-color: var(--settings-button-disabled-border, #d1d5db) !important;
+  color: var(--settings-button-disabled-text, #6b7280) !important;
+  box-shadow: none !important;
 }
 .btn--danger {
   background: #ef4444;
@@ -5659,6 +6119,400 @@ textarea::placeholder {
 .btn--danger-soft:hover {
   background: #fecaca;
   border-color: #fca5a5;
+}
+
+html[data-theme="light"].theme-white :is(
+  button:not(.productCard):not(.kasaProductCard),
+  .btn,
+  .sidebar-menu-button,
+  .saleCategoryButton,
+  .product-action-btn,
+  .product-secondary-btn,
+  .product-pill-btn,
+  .product-dark-btn,
+  .product-category-pill,
+  .settings-ui-submit,
+  .settings-ui-btn,
+  .settings-ui-btn-danger,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .settings-ui-branch-pill,
+  .kasaPaymentMethodButton,
+  .kasaCheckoutButton,
+  .canteen-settings-menu-toggle,
+  .hamburger-btn,
+  .nav-link,
+  [role="button"]
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: #ffffff !important;
+  color: #111111 !important;
+  border-color: #d1d5db !important;
+}
+
+html[data-theme="light"].theme-white :is(
+  button:not(.productCard):not(.kasaProductCard),
+  .btn,
+  .sidebar-menu-button,
+  .saleCategoryButton,
+  .product-action-btn,
+  .product-secondary-btn,
+  .product-pill-btn,
+  .product-dark-btn,
+  .product-category-pill,
+  .settings-ui-submit,
+  .settings-ui-btn,
+  .settings-ui-btn-danger,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .settings-ui-branch-pill,
+  .kasaPaymentMethodButton,
+  .kasaCheckoutButton,
+  .canteen-settings-menu-toggle,
+  .hamburger-btn,
+  .nav-link,
+  [role="button"]
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white button.productCard[data-has-image="true"] :is(.productCard__name, .productCard__price),
+html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true"] :is(.kasaProductCardTitle, .kasaProductCardMeta, .kasaProductCardPrice) {
+  color: #ffffff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true"] :is(.kasaProductCardTitle, .kasaProductCardMeta, .kasaProductCardPrice) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.45);
+}
+
+html[data-theme="light"].theme-white body.app-shell-active :is(
+  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button),
+  button:focus-visible,
+  .btn:hover,
+  .btn:focus-visible,
+  .sidebar-menu-button:hover,
+  .sidebar-menu-button:focus-visible,
+  .saleCategoryButton:hover,
+  .saleCategoryButton:focus-visible,
+  .product-action-btn:hover,
+  .product-secondary-btn:hover,
+  .product-pill-btn:hover,
+  .product-dark-btn:hover,
+  .product-category-pill:hover,
+  .settings-ui-submit:hover,
+  .settings-ui-btn:hover,
+  .settings-ui-btn-danger:hover,
+  .settings-ui-branch-all-btn:hover,
+  .settings-ui-branch-clear-btn:hover,
+  .settings-ui-branch-pill:hover,
+  .kasaPaymentMethodButton:hover,
+  .kasaCheckoutButton:hover,
+  .canteen-settings-menu-toggle:hover,
+  .hamburger-btn:hover,
+  .nav-link:hover
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: color-mix(in srgb, #f3f4f6 78%, #ffffff) !important;
+  color: #111111 !important;
+  border-color: #d1d5db !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06) !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active :is(
+  button:active,
+  .btn:active,
+  .nav-link:active,
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .sidebar-menu-button.active,
+  .saleCategoryButton.active,
+  .product-pill-btn.active,
+  .product-category-pill.active,
+  .settings-ui-branch-all-btn.active,
+  .settings-ui-branch-pill.active,
+  [aria-pressed="true"],
+  [aria-current="page"]
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: #111111 !important;
+  color: #ffffff !important;
+  border-color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active :is(
+  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button),
+  button:focus-visible,
+  .btn:hover,
+  .btn:focus-visible,
+  .sidebar-menu-button:hover,
+  .sidebar-menu-button:focus-visible,
+  .saleCategoryButton:hover,
+  .saleCategoryButton:focus-visible,
+  .product-action-btn:hover,
+  .product-secondary-btn:hover,
+  .product-pill-btn:hover,
+  .product-dark-btn:hover,
+  .product-category-pill:hover,
+  .settings-ui-submit:hover,
+  .settings-ui-btn:hover,
+  .settings-ui-btn-danger:hover,
+  .settings-ui-branch-all-btn:hover,
+  .settings-ui-branch-clear-btn:hover,
+  .settings-ui-branch-pill:hover,
+  .kasaPaymentMethodButton:hover,
+  .kasaCheckoutButton:hover,
+  .canteen-settings-menu-toggle:hover,
+  .hamburger-btn:hover,
+  .nav-link:hover
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active :is(
+  button:active,
+  .btn:active,
+  .nav-link:active,
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .sidebar-menu-button.active,
+  .saleCategoryButton.active,
+  .product-pill-btn.active,
+  .product-category-pill.active,
+  .settings-ui-branch-all-btn.active,
+  .settings-ui-branch-pill.active,
+  [aria-pressed="true"],
+  [aria-current="page"]
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+  color: #ffffff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white .nav-link .nav-icon {
+  color: #111111 !important;
+  background: #f3f4f6 !important;
+}
+
+html[data-theme="light"].theme-white .nav-link.active .nav-icon,
+html[data-theme="light"].theme-white .nav-link:hover .nav-icon {
+  color: #ffffff !important;
+  background: #111111 !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar :is(a, button)[title] > span:last-child > span:first-child {
+  color: #111111 !important;
+  background: #f3f4f6 !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar :is(a, button)[title][aria-current="page"] > span:last-child > span:first-child,
+html[data-theme="light"].theme-white .pos-sidebar :is(a, button)[title].active > span:last-child > span:first-child,
+html[data-theme="light"].theme-white .pos-sidebar :is(a, button)[title]:hover > span:last-child > span:first-child {
+  color: #111111 !important;
+  background: #ffffff !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar :is(a, button)[title] > span:last-child > span:first-child :is(svg, svg *, i) {
+  color: currentColor !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white .productCard[data-has-image="true"] :is(.productCard__name, .productCard__price),
+html[data-theme="light"].theme-white .kasaProductCard[data-has-image="true"] :is(.kasaProductCardTitle, .kasaProductCardMeta, .kasaProductCardPrice) {
+  color: #ffffff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme="light"].theme-white .kasaProductCard[data-has-image="true"] .kasaProductCardStock,
+html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true"] .kasaProductCardStock {
+  color: #111111 !important;
+  text-shadow: none !important;
+}
+
+body.app-shell-active :is(.light-button, .button-light, .pill-light, .toggle-light, .surface-button, .contrast-button) {
+  color: #111111 !important;
+}
+
+body.app-shell-active.theme-white .light-button,
+body.app-shell-active.theme-white .button-light,
+body.app-shell-active.theme-white .pill-light,
+body.app-shell-active.theme-white .toggle-light,
+body.app-shell-active.theme-white .surface-button,
+body.app-shell-active.theme-white .contrast-button,
+html[data-theme="dark"] body.app-shell-active :is(.light-button, .button-light, .pill-light, .toggle-light, .surface-button, .contrast-button),
+.mobile-performance-mode.mobile-system-dark body.app-shell-active :is(.light-button, .button-light, .pill-light, .toggle-light, .surface-button, .contrast-button) {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white .productCard--photo .productCard__overlay {
+  background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.08)) !important;
+}
+
+html[data-theme="light"].theme-white .productCard--photo .productCard__name,
+html[data-theme="light"].theme-white .productCard--photo .productCard__price {
+  color: #ffffff !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar > div:first-child :is(button, [role="button"]) {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-soft) !important;
+  color: #111111 !important;
+  box-shadow: var(--shadow-soft), var(--shadow-glow) !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button):hover,
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button):focus-visible,
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button):active {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] {
+  background: #111111 !important;
+  border: 1px solid #111111 !important;
+  box-shadow: var(--shadow-soft), var(--shadow-glow) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:first-child {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:first-child :is(svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  filter: brightness(0) !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:first-child > span {
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:last-child {
+  color: #ffffff !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button) > span:last-child > span:first-child,
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button) > span:last-child > span:last-child {
+  color: inherit !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]) > span:last-child > span:first-child {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]) > span:last-child > span:first-child :is(svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  filter: brightness(0) !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button) > span:last-child > span:first-child :is(svg, svg *, i),
+html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button) > span:last-child > span:last-child :is(svg, svg *, i) {
+  color: currentColor !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:first-child {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:first-child :is(svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]) > span:last-child > span:first-child {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]) > span:last-child > span:first-child :is(svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  filter: brightness(0) !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]):hover,
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]):focus-visible,
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button):not([aria-current="page"]):active {
+  background: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav button[title]:hover,
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav button[title]:focus,
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav button[title]:focus-visible,
+html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav button[title]:active {
+  background: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06) !important;
+  outline: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-child > button {
+  background: var(--card-hover) !important;
+  border: none !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-child > button > span:last-child > span:first-child {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-child > button > span:last-child > span:first-child :is(svg, svg *, i) {
+  color: #111111 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-child > button > span:last-child > span:last-child {
+  color: #111111 !important;
 }
 
 .btn--compact {
@@ -5984,7 +6838,20 @@ textarea::placeholder {
   body.sales-mobile-scroll .saleProductsMobileIntro {
     display: block;
     min-height: 0;
-    padding: 8px 12px;
+    padding: 10px 12px;
+  }
+  body.sales-mobile-scroll .saleProductsMobileIntro,
+  body.sales-mobile-scroll .saleCategoryPanel,
+  body.sales-mobile-scroll .saleProductsPanel,
+  body.sales-mobile-scroll .saleCartPanelShell,
+  body.mobile-sales-mode .saleProductsMobileIntro,
+  body.mobile-sales-mode .saleCategoryPanel,
+  body.mobile-sales-mode .saleProductsPanel,
+  body.mobile-sales-mode .saleCartPanelShell {
+    border-radius: 22px;
+    padding: 10px;
+    box-shadow: none;
+    backdrop-filter: none;
   }
   body.sales-mobile-scroll .saleProductsPanelHeader {
     display: none !important;
@@ -5994,8 +6861,8 @@ textarea::placeholder {
     min-height: 0;
     overflow: visible;
     min-width: 0;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
     touch-action: auto;
     pointer-events: auto;
   }
@@ -6067,6 +6934,13 @@ textarea::placeholder {
   body.sales-mobile-scroll .saleCartMobileActionBar {
     flex-shrink: 0;
   }
+  body.sales-mobile-scroll .saleCategoryPanelTitle,
+  body.sales-mobile-scroll .saleCartHeader,
+  body.mobile-sales-mode .saleCategoryPanelTitle,
+  body.mobile-sales-mode .saleCartHeader {
+    padding-bottom: 6px;
+    border-bottom-color: var(--border-soft);
+  }
 
   body.sales-mobile-scroll .salePanel {
     min-height: 0;
@@ -6090,7 +6964,7 @@ textarea::placeholder {
     min-height: 0;
     max-height: 100%;
     padding-right: 0;
-    padding-top: 6px !important;
+    padding-top: 8px !important;
     overscroll-behavior-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
@@ -6108,6 +6982,7 @@ textarea::placeholder {
     overflow-x: hidden;
     flex: 1 1 auto;
     min-height: 240px;
+    margin-top: 8px !important;
     padding-right: 0;
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     scroll-padding-bottom: 112px;
@@ -6124,7 +6999,8 @@ textarea::placeholder {
     position: sticky;
     bottom: 0;
     z-index: 4;
-    padding-top: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
     padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
   }
   body.sales-mobile-scroll .saleCartFooterInner {
@@ -6201,6 +7077,7 @@ textarea::placeholder {
     min-height: 78px;
     height: 78px;
     aspect-ratio: auto;
+    border-radius: 18px;
   }
   body.sales-mobile-scroll .productCard__content {
     padding: 6px 7px;
@@ -6224,7 +7101,7 @@ textarea::placeholder {
 
   body.sales-mobile-scroll .saleProductsVirtualScroll .productCard,
   body.mobile-sales-mode .kasaProductVirtualScroll .kasaProductCard {
-    box-shadow: 0 2px 8px rgba(0,0,0,.08) !important;
+    box-shadow: none !important;
   }
   body.mobile-sales-mode .stickyBottom,
   body.mobile-sales-mode .kasaBottomBar {
@@ -10723,28 +11600,418 @@ body.tenant-dark-mode,
   box-shadow: var(--shadow-soft), var(--shadow-glow);
 }
 
-.canteen-stock-page .stickyTop > .card:first-child {
-  justify-content: flex-end !important;
+.mobile-performance-mode.mobile-system-light {
+  color-scheme: light;
+  --app-shell-bg: #f6f7f9;
+  --app-bg: #f6f7f9;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f1f3f5;
+  --app-surface-2: #f1f3f5;
+  --app-surface-3: #e5e7eb;
+  --app-border: #d9dee5;
+  --app-text: #111827;
+  --app-text-secondary: #4b5563;
+  --app-text-muted: #6b7280;
+  --app-input: #ffffff;
+  --app-button-bg: #ffffff;
+  --app-button-text: #111827;
+  --panel: #ffffff;
+  --panelElevated: #f1f3f5;
+  --panel-shell-bg: #ffffff;
+  --menu-active-bg: #f1f3f5;
+  --card-bg: #ffffff;
+  --card-hover: #ffffff;
+  --border-soft: #d9dee5;
+  --border-hover: #d9dee5;
+  --surface-glass: rgba(255, 255, 255, 0.92);
+  --glass-blur: none;
+  --shadow-soft: none;
+  --shadow-glow: none;
+  --sidebar-bg: #ffffff;
+  --topbar-bg: #ffffff;
+  --topbar-border: #d9dee5;
+  --topbar-shadow: none;
+  --body-backdrop: none;
+  --modal-backdrop: rgba(15, 23, 42, 0.35);
+  --theme-accent: #111827;
+  --theme-accent-hover: #1f2937;
+  --theme-accent-soft: #eef2f7;
+  --theme-accent-text: #111827;
+  --theme-active-glow: none;
+  --theme-gradient: #111827;
+  --theme-card-bg: #ffffff;
+  --theme-border: #d9dee5;
+  --theme-text: #111827;
+  --theme-muted: #6b7280;
+  --border: #d9dee5;
+  --text: #111827;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --muted: #6b7280;
+  --input-bg: #ffffff;
+  --button-bg: #ffffff;
+  --button-text: #111827;
+  --button-active-bg: #111827;
+  --app-button-active-text: #ffffff;
+  --button-active-text: #ffffff;
+  --button-border: #d9dee5;
+  --button-disabled-bg: #e5e7eb;
+  --button-disabled-text: #6b7280;
+  --card-shadow: none;
 }
 
-.canteen-stock-page .stickyTop > .card:first-child > div:first-child {
-  display: none !important;
+.mobile-performance-mode.mobile-system-dark {
+  color-scheme: dark;
+  --app-bg: #1f1f1f;
+  --app-shell-bg: #1f1f1f;
+  --app-surface: #242424;
+  --app-surface-soft: #2a2a2a;
+  --app-surface-2: #2a2a2a;
+  --app-surface-3: #303030;
+  --app-border: #3a3a3a;
+  --app-text: #ffffff;
+  --app-text-secondary: #f1f1f1;
+  --app-text-muted: #d6d6d6;
+  --card-bg: #242424;
+  --card-hover: #2a2a2a;
+  --border-soft: #3a3a3a;
+  --border-hover: #4a4a4a;
+  --sidebar-bg: #202020;
+  --topbar-bg: #202020;
+  --panel: #242424;
+  --panelElevated: #2a2a2a;
+  --border: #3a3a3a;
+  --text: #ffffff;
+  --text-primary: #ffffff;
+  --text-secondary: #f1f1f1;
+  --muted: #d6d6d6;
+  --input-bg: #242424;
+  --button-bg: #2a2a2a;
+  --button-text: #f3f4f6;
+  --button-active-bg: #ffffff;
+  --app-button-active-text: #111111;
+  --button-active-text: #111111;
+  --button-border: #4a4a4a;
+  --button-disabled-bg: #3a3a3a;
+  --button-disabled-text: #9ca3af;
+  --theme-card-bg: #242424;
+  --theme-border: #3a3a3a;
+  --theme-text: #ffffff;
+  --theme-muted: #d6d6d6;
+  --card-shadow: none;
+  --app-input: #242424;
+  --app-button-bg: #2a2a2a;
+  --app-button-text: #f3f4f6;
+  --panel-shell-bg: #242424;
+  --menu-active-bg: #2a2a2a;
+  --surface-glass: rgba(36, 36, 36, 0.92);
+  --glass-blur: none;
+  --shadow-soft: none;
+  --shadow-glow: none;
+  --topbar-border: #3a3a3a;
+  --topbar-shadow: none;
+  --body-backdrop: none;
+  --modal-backdrop: rgba(0, 0, 0, 0.35);
+  --theme-accent: #d39b69;
+  --theme-accent-hover: #e1b78f;
+  --theme-accent-soft: rgba(211, 155, 105, 0.12);
+  --theme-accent-text: #f8e7d6;
+  --theme-active-glow: none;
+  --theme-gradient: #d39b69;
 }
 
-.canteen-reports-page > div:first-child > div:first-child {
-  justify-content: flex-end !important;
+.mobile-performance-mode *,
+.mobile-performance-mode *::before,
+.mobile-performance-mode *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
 }
 
-.canteen-reports-page > div:first-child > div:first-child > div:first-child {
-  display: none !important;
+.mobile-performance-mode *,
+.mobile-performance-mode *::before,
+.mobile-performance-mode *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
-.canteen-settings-system-page > .card:first-child > div:first-child {
-  justify-content: flex-end !important;
+.mobile-performance-mode .pos-app-shell,
+.mobile-performance-mode .card,
+.mobile-performance-mode .settings-card,
+.mobile-performance-mode .settings-ui-table-shell,
+.mobile-performance-mode .pos-sidebar,
+.mobile-performance-mode .topSheetPanel,
+.mobile-performance-mode .topSheetItem,
+.mobile-performance-mode .subnav-pill,
+.mobile-performance-mode .posMiniBar,
+.mobile-performance-mode .posDrawer,
+.mobile-performance-mode .kasaBottomBar,
+.mobile-performance-mode .modalCard,
+.mobile-performance-mode .modalHeader,
+.mobile-performance-mode .saleCartFooter,
+.mobile-performance-mode .payment-panel,
+.mobile-performance-mode .payment-panel-body,
+.mobile-performance-mode .kasaPaymentPanel,
+.mobile-performance-mode .kasaCartPanel,
+.mobile-performance-mode .kasaShowcasePanel,
+.mobile-performance-mode .productCard,
+.mobile-performance-mode .kasaProductCard,
+.mobile-performance-mode .kasaCategoryCard,
+.mobile-performance-mode .saleCategoryButton {
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 
-.canteen-settings-system-page > .card:first-child > div:first-child > div:first-child {
-  display: none !important;
+.mobile-performance-mode .btn::before,
+.mobile-performance-mode .sidebar-menu-hover,
+.mobile-performance-mode .productCard__overlay {
+  opacity: 0 !important;
+}
+
+.mobile-performance-mode .productCard,
+.mobile-performance-mode .kasaProductCard,
+.mobile-performance-mode .kasaCategoryCard,
+.mobile-performance-mode .saleCategoryButton,
+.mobile-performance-mode .productCard__img,
+.mobile-performance-mode .kasaProductCardImage,
+.mobile-performance-mode .kasaCategoryCardImage {
+  transition: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.mobile-performance-mode .productCard,
+.mobile-performance-mode .kasaProductCard,
+.mobile-performance-mode .kasaCategoryCard {
+  background: var(--app-surface) !important;
+  border-color: var(--app-border, var(--border)) !important;
+}
+
+.mobile-performance-mode .card:hover,
+.mobile-performance-mode .btn:hover,
+.mobile-performance-mode .nav-link:hover,
+.mobile-performance-mode .subnav-pill:hover,
+.mobile-performance-mode .hamburger-btn:hover,
+.mobile-performance-mode .hover-lift:hover,
+.mobile-performance-mode .hover-lift-strong:hover,
+.mobile-performance-mode .sidebar-menu-button:hover,
+.mobile-performance-mode .sidebar-menu-button:hover .sidebar-menu-hover,
+.mobile-performance-mode .admin-table tbody tr:hover,
+.mobile-performance-mode .canteen-sale-row:hover,
+.mobile-performance-mode .delivery-order-card:hover,
+.mobile-performance-mode .kasaCategoryCard:hover,
+.mobile-performance-mode .productCard:hover,
+.mobile-performance-mode .kasaProductCard:hover,
+.mobile-performance-mode .saleCategoryButton:hover,
+.mobile-performance-mode .txCard.clickable:hover,
+.mobile-performance-mode .muted-link:hover,
+.mobile-performance-mode .qr-menu .category-pill:hover,
+.mobile-performance-mode .qr-menu .menu-row:hover,
+.mobile-performance-mode .digital-public-menu-tab:hover,
+.mobile-performance-mode .digital-public-menu-card:hover,
+.mobile-performance-mode .digital-public-menu-modal-action:hover,
+.mobile-performance-mode .digital-menu-category-pill:hover,
+.mobile-performance-mode .digital-menu-card:hover,
+.mobile-performance-mode .digital-menu-card:hover .digital-menu-card-image,
+.mobile-performance-mode .settings-module-card:hover,
+.mobile-performance-mode .settings-module-card:hover .settings-module-link,
+.mobile-performance-mode .canteen-settings-home-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .mobile-performance-mode.mobile-system-dark,
+  .mobile-performance-mode.mobile-system-dark body,
+  .mobile-performance-mode.mobile-system-dark #root {
+    background: #1f1f1f !important;
+    color: #ffffff !important;
+  }
+
+  .mobile-performance-mode.mobile-system-dark main,
+  .mobile-performance-mode.mobile-system-dark section,
+  .mobile-performance-mode.mobile-system-dark article,
+  .mobile-performance-mode.mobile-system-dark aside,
+  .mobile-performance-mode.mobile-system-dark header,
+  .mobile-performance-mode.mobile-system-dark footer {
+    color: #ffffff !important;
+  }
+}
+
+.mobile-performance-mode.mobile-system-light .pos-app-shell,
+.mobile-performance-mode.mobile-system-light .card,
+.mobile-performance-mode.mobile-system-light .salePanel,
+.mobile-performance-mode.mobile-system-light .saleCartPanelShell,
+.mobile-performance-mode.mobile-system-light .saleCartPanelContent,
+.mobile-performance-mode.mobile-system-light .kasaCartPanel,
+.mobile-performance-mode.mobile-system-light .kasaShowcasePanel,
+.mobile-performance-mode.mobile-system-light .kasaPaymentPanel,
+.mobile-performance-mode.mobile-system-light .kasaBottomBar,
+.mobile-performance-mode.mobile-system-light .productCard,
+.mobile-performance-mode.mobile-system-light .kasaProductCard,
+.mobile-performance-mode.mobile-system-light .kasaCategoryCard,
+.mobile-performance-mode.mobile-system-light .saleCategoryButton,
+.mobile-performance-mode.mobile-system-light .posDrawer,
+.mobile-performance-mode.mobile-system-light .topSheetPanel,
+.mobile-performance-mode.mobile-system-light .topSheetItem,
+.mobile-performance-mode.mobile-system-light .settings-ui-table-shell {
+  background: #ffffff !important;
+  background-image: none !important;
+  border-color: #d9dee5 !important;
+}
+
+.mobile-performance-mode.mobile-system-light .saleCartSectionLabel,
+.mobile-performance-mode.mobile-system-light .saleCartFooterSummaryMeta,
+.mobile-performance-mode.mobile-system-light .saleCartFooterSummaryMetaLine,
+.mobile-performance-mode.mobile-system-light .kasaCartPanelMeta,
+.mobile-performance-mode.mobile-system-light .kasaCartRowPrice,
+.mobile-performance-mode.mobile-system-light .kasaProductCardMeta,
+.mobile-performance-mode.mobile-system-light .sale-cart-line__meta,
+.mobile-performance-mode.mobile-system-light .sale-cart-line-status-note,
+.mobile-performance-mode.mobile-system-light .canteen-subtext,
+.mobile-performance-mode.mobile-system-light .product-name-subtext,
+.mobile-performance-mode.mobile-system-light .sale-cart-line__detail,
+.mobile-performance-mode.mobile-system-light .sale-cart-line__note {
+  color: #4b5563 !important;
+}
+
+.mobile-performance-mode.mobile-system-light .sale-cart-line__title,
+.mobile-performance-mode.mobile-system-light .sale-cart-line__name,
+.mobile-performance-mode.mobile-system-light .product-name-text,
+.mobile-performance-mode.mobile-system-light .kasaProductCardTitle,
+.mobile-performance-mode.mobile-system-light .kasaProductCardPrice,
+.mobile-performance-mode.mobile-system-light .kasaCategoryCardBody,
+.mobile-performance-mode.mobile-system-light .kasaCategoryCard span,
+.mobile-performance-mode.mobile-system-light .settings-ui-table-shell,
+.mobile-performance-mode.mobile-system-light .settings-ui-table-shell *[style*='rgb(15, 23, 42)'] {
+  color: #111827 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .pos-app-shell,
+.mobile-performance-mode.mobile-system-dark .card,
+.mobile-performance-mode.mobile-system-dark .salePanel,
+.mobile-performance-mode.mobile-system-dark .saleCartPanelShell,
+.mobile-performance-mode.mobile-system-dark .saleCartPanelContent,
+.mobile-performance-mode.mobile-system-dark .kasaCartPanel,
+.mobile-performance-mode.mobile-system-dark .kasaShowcasePanel,
+.mobile-performance-mode.mobile-system-dark .kasaPaymentPanel,
+.mobile-performance-mode.mobile-system-dark .kasaBottomBar,
+.mobile-performance-mode.mobile-system-dark .productCard,
+.mobile-performance-mode.mobile-system-dark .kasaProductCard,
+.mobile-performance-mode.mobile-system-dark .kasaCategoryCard,
+.mobile-performance-mode.mobile-system-dark .saleCategoryButton,
+.mobile-performance-mode.mobile-system-dark .posDrawer,
+.mobile-performance-mode.mobile-system-dark .topSheetPanel,
+.mobile-performance-mode.mobile-system-dark .topSheetItem {
+  background: #242424 !important;
+  background-image: none !important;
+  border-color: #3a3a3a !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .saleCartSectionLabel,
+.mobile-performance-mode.mobile-system-dark .saleCartFooterSummaryMeta,
+.mobile-performance-mode.mobile-system-dark .saleCartFooterSummaryMetaLine,
+.mobile-performance-mode.mobile-system-dark .kasaCartPanelMeta,
+.mobile-performance-mode.mobile-system-dark .kasaCartRowPrice,
+.mobile-performance-mode.mobile-system-dark .kasaProductCardMeta,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line__meta,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line-status-note {
+  color: #f1f1f1 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .productCard[data-has-image="false"] .productCard__name,
+.mobile-performance-mode.mobile-system-dark .productCard[data-has-image="false"] .productCard__price,
+.mobile-performance-mode.mobile-system-dark .productCard--photo .productCard__name,
+.mobile-performance-mode.mobile-system-dark .productCard--photo .productCard__price,
+.mobile-performance-mode.mobile-system-dark .kasaProductCardTitle,
+.mobile-performance-mode.mobile-system-dark .kasaProductCardPrice,
+.mobile-performance-mode.mobile-system-dark .kasaCartRowTitle,
+.mobile-performance-mode.mobile-system-dark .kasaCategoryCardBody,
+.mobile-performance-mode.mobile-system-dark .kasaCategoryCard span,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line__title,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line__name,
+.mobile-performance-mode.mobile-system-dark .product-name-text,
+.mobile-performance-mode.mobile-system-dark .settings-ui-table-shell,
+.mobile-performance-mode.mobile-system-dark .settings-ui-table-shell *[style*='rgb(15, 23, 42)'] {
+  color: #ffffff !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .kasaProductCardPrice,
+.mobile-performance-mode.mobile-system-dark .kasaProductCardStock {
+  background: transparent !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .canteen-subtext,
+.mobile-performance-mode.mobile-system-dark .product-name-subtext,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line__detail,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line__note,
+.mobile-performance-mode.mobile-system-dark .settings-ui-table-shell *[style*='rgb(100, 116, 139)'] {
+  color: #c7ccd4 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .saleCartModeBtn[aria-pressed="true"],
+.mobile-performance-mode.mobile-system-dark .saleCartModeChip[aria-pressed="true"],
+.mobile-performance-mode.mobile-system-dark .btn.btn--primary,
+.mobile-performance-mode.mobile-system-dark .btn.btn--success,
+.mobile-performance-mode.mobile-system-dark .btn-success,
+.mobile-performance-mode.mobile-system-dark .btn--success {
+  color: #111111 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark .btn.btn--danger,
+.mobile-performance-mode.mobile-system-dark .btn-danger,
+.mobile-performance-mode.mobile-system-dark .btn--danger,
+.mobile-performance-mode.mobile-system-dark .sale-cart-line__action-btn--cancel {
+  color: #ffffff !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .sale-cart-line-status,
+  .saleCartModeChip,
+  .btn.btn--toggle[aria-pressed="true"],
+  .btn.btn--toggle.active,
+  .btn.btn--toggle.is-active,
+  .btn.btn--toggle[data-active="true"],
+  .saleCartModeBtn[aria-pressed="true"],
+  .settings-ui-branch-all-btn.active,
+  .settings-ui-branch-pill.active,
+  .settings-ui-branch-pill,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .btn--danger-soft,
+  .light-button,
+  .button-light,
+  .surface-button,
+  .contrast-button
+) {
+  color: #111111 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .sale-cart-line-status,
+  .saleCartModeChip,
+  .btn.btn--toggle[aria-pressed="true"],
+  .btn.btn--toggle.active,
+  .btn.btn--toggle.is-active,
+  .btn.btn--toggle[data-active="true"],
+  .saleCartModeBtn[aria-pressed="true"],
+  .settings-ui-branch-all-btn.active,
+  .settings-ui-branch-pill.active,
+  .settings-ui-branch-pill,
+  .settings-ui-branch-all-btn,
+  .settings-ui-branch-clear-btn,
+  .btn--danger-soft,
+  .light-button,
+  .button-light,
+  .surface-button,
+  .contrast-button
+) :is(span, svg, svg *, i) {
+  color: inherit !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 
 /* Canteen QR public menu refresh */
@@ -10999,6 +12266,35 @@ body.tenant-dark-mode,
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+}
+
+.canteen-cashier-page .kasaProductCardStock {
+  color: var(--app-contrast-text, #111111) !important;
+}
+
+.canteen-cashier-page .kasaPaymentMethodButton {
+  background: var(--app-button-bg, #ffffff) !important;
+  border-color: var(--button-border, var(--app-border, #d9dee5)) !important;
+  color: var(--app-button-text, var(--app-text, #111111)) !important;
+  box-shadow: none !important;
+}
+
+.canteen-cashier-page .kasaPaymentMethodButton :is(span, svg, svg *, i) {
+  color: inherit !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.canteen-cashier-page .kasaPaymentMethodButton[data-active="true"] {
+  background: var(--app-button-active-bg, var(--button-active-bg, #111111)) !important;
+  border-color: var(--app-button-active-bg, var(--button-active-bg, #111111)) !important;
+  color: var(--app-button-active-text, var(--button-active-text, #ffffff)) !important;
+}
+
+.canteen-cashier-page .kasaPaymentMethodButton[data-active="true"] :is(span, svg, svg *, i) {
+  color: #ffffff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 
 @media (max-width: 768px) {

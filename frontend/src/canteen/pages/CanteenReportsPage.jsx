@@ -86,10 +86,10 @@ function ReportHero({ onExport, onRefresh, loading, exporting }) {
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, minWidth: 260 }}>
-          <button type="button" className="btn" onClick={onExport} disabled={loading || exporting} style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '14px 18px', fontWeight: 900 }}>
+          <button type="button" className="btn button-light" onClick={onExport} disabled={loading || exporting} style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--button-text)', padding: '14px 18px', fontWeight: 900 }}>
             {exporting ? 'Hazırlanıyor' : 'Excel Aktar'}
           </button>
-          <button type="button" className="btn" onClick={onRefresh} disabled={loading || exporting} style={{ borderRadius: 18, background: 'rgba(255,255,255,0.08)', color: '#ffffff', padding: '14px 18px', fontWeight: 900, borderColor: 'rgba(255,255,255,0.14)' }}>
+          <button type="button" className="btn" onClick={onRefresh} disabled={loading || exporting} style={{ borderRadius: 18, background: 'rgba(255,255,255,0.08)', color: 'var(--button-active-text)', padding: '14px 18px', fontWeight: 900, borderColor: 'rgba(255,255,255,0.14)' }}>
             {loading ? 'Yükleniyor' : 'Yenile'}
           </button>
         </div>
@@ -114,7 +114,7 @@ function ReportFilter({ period, setPeriod, rangeStart, setRangeStart, rangeEnd, 
           {tabs.map((tab) => {
             const active = period === tab.key
             return (
-              <button key={tab.key} type="button" className="btn" onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--theme-accent, #111827)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--theme-accent, #111827)' : 'var(--app-border, var(--border))', color: active ? '#ffffff' : 'var(--app-text, var(--text))', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
+              <button key={tab.key} type="button" className={`btn${active ? ' is-active' : ''}`} aria-pressed={active ? 'true' : 'false'} onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--button-active-bg)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--button-active-bg)' : 'var(--app-border, var(--border))', color: active ? 'var(--button-active-text)' : 'var(--button-text)', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
                 {tab.label}
               </button>
             )
@@ -126,10 +126,10 @@ function ReportFilter({ period, setPeriod, rangeStart, setRangeStart, rangeEnd, 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <button
           type="button"
-          className="btn"
+          className="btn button-light"
           onClick={onExport}
           disabled={loading || exporting}
-          style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '10px 16px', fontWeight: 900 }}
+          style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--button-text)', padding: '10px 16px', fontWeight: 900 }}
         >
           {exporting ? 'Haz?rlan?yor' : 'Excel Aktar'}
         </button>
@@ -257,10 +257,10 @@ function ReportFilterCompact({
 
           <button
             type="button"
-            className="btn"
+            className="btn button-light"
             onClick={onExport}
             disabled={loading || exporting}
-            style={{ minHeight: controlHeight, height: controlHeight, borderRadius: 14, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '0 12px', fontWeight: 900, fontSize: 12, alignSelf: 'end', whiteSpace: 'nowrap' }}
+            style={{ minHeight: controlHeight, height: controlHeight, borderRadius: 14, background: 'var(--app-surface)', color: 'var(--button-text)', padding: '0 12px', fontWeight: 900, fontSize: 12, alignSelf: 'end', whiteSpace: 'nowrap' }}
           >
             {exporting ? 'Hazirlaniyor' : 'Excel Aktar'}
           </button>
@@ -383,11 +383,13 @@ function ReportCatalog({ onSelect }) {
           key={item.key}
           type="button"
           onClick={() => onSelect(item.key)}
+          data-button-layout="card"
           style={{
             ...CARD_STYLE,
             textAlign: 'left',
             padding: 20,
-            cursor: 'pointer'
+            cursor: 'pointer',
+            gap: 8
           }}
         >
           <div style={{ fontWeight: 900, color: 'var(--text)', fontSize: 18 }}>{item.title}</div>

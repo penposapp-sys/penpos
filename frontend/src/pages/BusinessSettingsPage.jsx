@@ -6,19 +6,21 @@ import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import { toast } from '../lib/toast.js'
+import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
 import { useTheme } from '../theme/ThemeContext.jsx'
-import { themeKeys, themes } from '../theme/themeConfig.js'
+import { normalizeThemeId } from '../theme/themeConfig.js'
 import { buildSafeBusinessSettings, defaultBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
 import { resolveApiOrigin } from '../lib/runtimeApi.js'
+import { validateProductImageFile } from '../lib/productImage.js'
 
 const settingsTheme = {
-  pageBg: 'radial-gradient(circle at top left, color-mix(in srgb, var(--settings-accent-soft) 28%, transparent) 0, transparent 32%), radial-gradient(circle at bottom right, color-mix(in srgb, var(--settings-border) 62%, transparent) 0, transparent 28%), var(--app-bg)',
+  pageBg: 'var(--app-bg)',
   cardBorder: 'var(--app-border)',
   cardMuted: 'var(--app-text-muted)',
   green: 'var(--settings-accent)',
   green2: 'var(--settings-accent-text)',
   danger: '#dc2626',
-  shadow: 'var(--settings-accent-shadow)',
+  shadow: 'none',
 }
 
 const BUSINESS_TOGGLE_SECTIONS = {
@@ -134,16 +136,25 @@ function SettingsPageSurface({ title, description, actions, children }) {
     '--settings-accent-soft': theme.accentSoft,
     '--settings-accent-text': theme.accentText,
     '--settings-gradient': theme.gradient,
-    '--settings-accent-shadow': theme.activeGlow,
+    '--settings-accent-shadow': 'none',
+    '--settings-button-bg': 'var(--menu-active-bg)',
+    '--settings-button-bg-hover': 'var(--menu-active-bg)',
+    '--settings-button-bg-active': 'var(--menu-active-bg)',
+    '--settings-button-border': 'var(--border-hover)',
+    '--settings-button-text': 'var(--sidebar-nav-text-active, #ffffff)',
+    '--settings-button-disabled-bg': theme.darkMode ? '#2f2f2f' : '#d1d5db',
+    '--settings-button-disabled-border': theme.darkMode ? '#3f3f46' : '#d1d5db',
+    '--settings-button-disabled-text': theme.darkMode ? '#9ca3af' : '#6b7280',
   }
   return (
     <div
+      className="settings-scope"
       style={{
         background: settingsTheme.pageBg,
         borderRadius: 32,
         padding: 20,
         border: `1px solid ${settingsTheme.cardBorder}`,
-        boxShadow: '0 24px 70px rgba(15, 23, 42, 0.18)',
+        boxShadow: 'none',
         ...settingsCssVars,
       }}
     >
@@ -232,8 +243,8 @@ function SettingsDesignStyles() {
         height: 50px;
         border-radius: 18px;
         border: 0;
-        background: var(--app-button-bg);
-        color: var(--app-text);
+        background: var(--settings-button-bg);
+        color: var(--settings-button-text);
         font-size: 22px;
         font-weight: 900;
         cursor: pointer;
@@ -252,13 +263,13 @@ function SettingsDesignStyles() {
         font-weight: 950;
       }
       .settings-back-btn {
-        background: var(--app-button-bg);
-        color: var(--app-text);
-        border: 1px solid var(--app-border);
+        background: var(--settings-button-bg);
+        color: var(--settings-button-text);
+        border: 1px solid var(--settings-button-border);
       }
       .settings-save-btn {
-        color: white;
-        background: var(--settings-gradient);
+        color: var(--settings-button-text);
+        background: var(--settings-button-bg);
       }
       .settings-module-card {
         text-align: left;
@@ -267,13 +278,13 @@ function SettingsDesignStyles() {
         padding: 22px;
         background: linear-gradient(135deg, var(--app-surface), var(--app-surface-2));
         box-shadow: 0 12px 34px rgba(15,23,42,0.18);
-        transition: all .2s ease;
+        transition: border-color .2s ease, background-color .2s ease, color .2s ease;
         cursor: pointer;
       }
       .settings-module-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 24px 60px rgba(15,23,42,0.13);
-        border-color: var(--settings-accent);
+        transform: none;
+        box-shadow: 0 12px 34px rgba(15,23,42,0.18);
+        border-color: var(--settings-border);
       }
       .settings-module-top {
         display: flex;
@@ -630,41 +641,20 @@ function StatusNotice({ type, children }) {
 }
 
 function ThemeSelector({ selectedThemeName, onSelectThemeName }) {
-  const { setThemeKey } = useTheme()
+  const { themeKey, setThemeKey, darkMode, setDarkMode, isMobileRuntime } = useTheme()
+  const activeThemeName = normalizeThemeId(selectedThemeName || themeKey || 'white')
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-      {themeKeys.map((key) => {
-        const theme = themes[key]
-        const selected = selectedThemeName === key
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => {
-              setThemeKey(key)
-              onSelectThemeName(key)
-            }}
-            style={{
-              borderRadius: 24,
-              padding: 16,
-              textAlign: 'left',
-              border: `1px solid ${selected ? 'var(--settings-accent)' : 'var(--app-border)'}`,
-              background: selected ? 'var(--settings-gradient)' : 'var(--app-surface)',
-              color: selected ? '#ffffff' : 'var(--app-text)',
-              cursor: 'pointer',
-              boxShadow: selected ? 'var(--settings-accent-shadow)' : '0 12px 24px rgba(15, 23, 42, 0.05)',
-            }}
-          >
-            <div style={{ height: 48, borderRadius: 16, background: theme.gradient }} />
-            <div style={{ marginTop: 12, fontWeight: 900 }}>{theme.name}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: selected ? '#ffffff' : 'var(--app-text)' }}>
-              Yan menü, üst bar ve aktif vurgu renkleri bu temaya göre güncellenir.
-            </div>
-          </button>
-        )
-      })}
-    </div>
+    <ThemeSelectionCards
+      selectedThemeId={activeThemeName}
+      onSelectThemeId={(themeId) => {
+        setThemeKey(themeId)
+        onSelectThemeName(themeId)
+      }}
+      darkMode={typeof darkMode === 'boolean' ? darkMode : false}
+      onToggleDarkMode={(nextDarkMode) => setDarkMode(Boolean(nextDarkMode))}
+      isMobileRuntime={isMobileRuntime}
+    />
   )
 }
 
@@ -789,7 +779,7 @@ export function SettingsSystemContent() {
     setAllowedBranchIdsLocal(nextAllowed)
     setSettings(mergedSettings)
     setBranches(Array.isArray(branchPayload) ? branchPayload : [])
-    setThemeKey(mergedSettings.appearance.themeId || defaultBusinessSettings.appearance.themeId)
+    setThemeKey(normalizeThemeId(mergedSettings.appearance.themeId || defaultBusinessSettings.appearance.themeId))
     setInitialSnapshot(JSON.stringify({
       name: nextName,
       description: tenantPayload?.description || '',
@@ -894,7 +884,7 @@ export function SettingsSystemContent() {
       const mergedSettings = mergeBusinessSettings(settingsRes?.settings || safeSettings)
       setSettings(mergedSettings)
       setSettingsLocally(mergedSettings)
-      setThemeKey(mergedSettings.appearance.themeId || defaultBusinessSettings.appearance.themeId)
+      setThemeKey(normalizeThemeId(mergedSettings.appearance.themeId || defaultBusinessSettings.appearance.themeId))
 
       try {
         const nextAllowed = Array.isArray(settingsRes?.settings?.authorizedBranches?.branchIds)
@@ -922,6 +912,11 @@ export function SettingsSystemContent() {
 
   const uploadLogo = async () => {
     if (!logoFile) return
+    const validationMessage = validateProductImageFile(logoFile)
+    if (validationMessage) {
+      setError(validationMessage)
+      return
+    }
     setLogoLoading(true)
     setError('')
     setSuccess('')
@@ -1030,9 +1025,19 @@ export function SettingsSystemContent() {
               </div>
               <div style={{ display: 'grid', gap: 10 }}>
                 <SettingsField label="Dosya Seç">
-                  <input style={{ ...inputStyle(), paddingTop: 12, paddingBottom: 12 }} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                  <input
+                    style={{ ...inputStyle(), paddingTop: 12, paddingBottom: 12 }}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => {
+                      const nextFile = e.target.files?.[0] || null
+                      const validationMessage = validateProductImageFile(nextFile)
+                      setLogoFile(validationMessage ? null : nextFile)
+                      setError(validationMessage || '')
+                    }}
+                  />
                 </SettingsField>
-                <div style={{ fontSize: 12, color: settingsTheme.cardMuted }}>PNG, JPG veya WebP. Maksimum 2 MB.</div>
+                <div style={{ fontSize: 12, color: settingsTheme.cardMuted }}>PNG, JPG veya WebP. Maksimum 5 MB, sistem otomatik olarak 800x800 WebP optimize eder.</div>
               </div>
             </div>
           </SettingsCard>
@@ -1100,15 +1105,17 @@ export function SettingsSystemContent() {
 
         <SettingsCard
           title="Görünüm"
-          description="Tema adı, yazı boyutu ve ürün kartı tercihleri kaydedilir."
+          description="Bu seçim sadece vurgu rengi, kart kenarı ve menü rengini değiştirir. Açık/koyu mod ayrı ayardır."
           icon="🎨"
         >
           <div style={{ display: 'grid', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
               <SectionSelect label="Yazı Boyutu" value={settings.appearance.fontSize} onChange={(e) => setSectionValue('appearance', 'fontSize', e.target.value)} options={FONT_SIZE_OPTIONS} />
             </div>
-            <ToggleSection items={BUSINESS_TOGGLE_SECTIONS.appearance} values={settings.appearance} onToggle={(key, value) => setSectionValue('appearance', key, value)} />
-            <ThemeSelector selectedThemeName={settings.appearance.themeId} onSelectThemeName={(value) => setSectionValue('appearance', 'themeId', value)} />
+            <>
+              <ToggleSection items={BUSINESS_TOGGLE_SECTIONS.appearance} values={settings.appearance} onToggle={(key, value) => setSectionValue('appearance', key, value)} />
+              <ThemeSelector selectedThemeName={settings.appearance.themeId} onSelectThemeName={(value) => setSectionValue('appearance', 'themeId', value)} />
+            </>
           </div>
         </SettingsCard>
 

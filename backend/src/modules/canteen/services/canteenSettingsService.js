@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import { error } from '../../../utils/errors.js'
 import * as repo from '../repositories/canteenSettingsRepository.js'
 import * as branchRepo from '../repositories/canteenBranchRepository.js'
+import { normalizeThemeId } from '../../../utils/themeNormalization.js'
 
 export const DEFAULT_SETTINGS = Object.freeze({
   allowedBranchIds: [],
@@ -10,7 +11,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   receiptHeader: '',
   receiptFooter: '',
   appearance: {
-    themeId: 'default',
+    themeId: 'white',
     darkMode: false
   },
   qrTitle: '',
@@ -26,8 +27,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
 })
 
 const QR_THEME_IDS = new Set(['dark', 'blue', 'green', 'orange'])
-const SYSTEM_THEME_IDS = new Set(['default', 'ocean', 'slate', 'emerald', 'amber', 'ruby', 'coffee', 'indigo', 'mono'])
-
 export const DEFAULT_PAYMENT_SETTINGS = Object.freeze({
   cashEnabled: true,
   cardEnabled: true,
@@ -67,7 +66,7 @@ export const getSettings = async (tenantId) => {
     receiptHeader: String(doc.receiptHeader || ''),
     receiptFooter: String(doc.receiptFooter || ''),
     appearance: {
-      themeId: SYSTEM_THEME_IDS.has(String(doc.themeId || '').trim()) ? String(doc.themeId || '').trim() : DEFAULT_SETTINGS.appearance.themeId,
+      themeId: normalizeThemeId(doc.themeId || doc.appearance?.themeId),
       darkMode: doc.darkMode === true
     },
     qrTitle: String(doc.qrTitle || ''),
@@ -141,7 +140,7 @@ export const updateSettings = async (tenantId, input) => {
     receiptFooter: patch.receiptFooter === undefined ? undefined : String(patch.receiptFooter || ''),
     themeId: patch.appearance?.themeId === undefined && patch.themeId === undefined
       ? undefined
-      : (SYSTEM_THEME_IDS.has(String(patch.appearance?.themeId ?? patch.themeId ?? '').trim()) ? String(patch.appearance?.themeId ?? patch.themeId).trim() : DEFAULT_SETTINGS.appearance.themeId),
+      : normalizeThemeId(patch.appearance?.themeId ?? patch.themeId),
     darkMode: patch.appearance?.darkMode === undefined && patch.darkMode === undefined
       ? undefined
       : (patch.appearance?.darkMode ?? patch.darkMode) === true,

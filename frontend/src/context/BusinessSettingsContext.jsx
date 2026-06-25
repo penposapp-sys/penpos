@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/apiClient.js'
 import { mergeBusinessSettings } from '../lib/businessSettings.js'
-import { getScopedDarkModeStorageKey, getScopedThemeStorageKey, resolveThemeScope } from '../theme/themeConfig.js'
+import { getScopedDarkModeStorageKey, getScopedThemeStorageKey, normalizeThemeId, resolveThemeScope } from '../theme/themeConfig.js'
+import { isMobileRuntime as detectMobileRuntime } from '../utils/device.js'
 import { useAuth } from './AuthContext.jsx'
 import { useTheme } from '../theme/ThemeContext.jsx'
 
@@ -27,15 +28,31 @@ const readPath = (source, path) => {
   return current
 }
 
-const getInitialBusinessSettings = (scope = resolveThemeScope(window.location.pathname)) => {
+const getCurrentPathname = () => {
+  if (typeof window === 'undefined') return ''
+  return String(window.location?.pathname || '')
+}
+
+const isCanteenSystemType = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'canteen' || normalized === 'kantin'
+}
+
+const getInitialBusinessSettings = (scope = resolveThemeScope(getCurrentPathname())) => {
+  if (detectMobileRuntime() || typeof window === 'undefined') {
+    return mergeBusinessSettings()
+  }
+
   try {
-    const themeId = String(localStorage.getItem(getScopedThemeStorageKey(scope)) || 'default').trim() || 'default'
-    const darkMode = localStorage.getItem(getScopedDarkModeStorageKey(scope)) === 'true'
+    const scopedThemeId = String(localStorage.getItem(getScopedThemeStorageKey(scope)) || '').trim()
+    const themeId = normalizeThemeId(scopedThemeId || 'white')
+    const scopedDarkMode = localStorage.getItem(getScopedDarkModeStorageKey(scope))
+    const darkMode = scopedDarkMode === 'true'
     return mergeBusinessSettings({
       appearance: {
         themeId,
-        darkMode
-      }
+        darkMode,
+      },
     })
   } catch {
     return mergeBusinessSettings()
@@ -44,7 +61,7 @@ const getInitialBusinessSettings = (scope = resolveThemeScope(window.location.pa
 
 export function BusinessSettingsProvider({ children }) {
   const { user, loading: authLoading } = useAuth()
-  const { setThemeKey, setDarkMode, themeScope } = useTheme()
+  const { setThemeKey, setDarkMode, themeScope, isMobileRuntime } = useTheme()
   const [settings, setSettings] = useState(() => getInitialBusinessSettings())
   const [tenant, setTenant] = useState(null)
   const [branches, setBranches] = useState([])
@@ -54,9 +71,9 @@ export function BusinessSettingsProvider({ children }) {
   const canLoad = !!user?.tenantId && (user.role === 'tenant_admin' || user.role === 'staff')
   const storageScope = useMemo(() => {
     if (user?.role === 'platform_admin' || user?.role === 'superadmin') return 'platform'
-    if (user?.systemType === 'canteen') return 'canteen'
+    if (isCanteenSystemType(user?.systemType)) return 'canteen'
     if (user?.tenantId) return 'kermes'
-    return themeScope || resolveThemeScope(window.location.pathname)
+    return themeScope || resolveThemeScope(getCurrentPathname())
   }, [themeScope, user?.role, user?.systemType, user?.tenantId])
 
   const refresh = async () => {
@@ -71,13 +88,13 @@ export function BusinessSettingsProvider({ children }) {
     setLoading(true)
     setError('')
     try {
-      if (user?.systemType === 'canteen') {
+      if (isCanteenSystemType(user?.systemType)) {
         const settingsRes = await api('/api/canteen/settings', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
         const merged = mergeBusinessSettings({
           appearance: {
-            themeId: settingsRes?.settings?.appearance?.themeId || 'default',
-            darkMode: settingsRes?.settings?.appearance?.darkMode === true
-          }
+            themeId: normalizeThemeId(settingsRes?.settings?.appearance?.themeId || 'white'),
+            darkMode: settingsRes?.settings?.appearance?.darkMode === true,
+          },
         })
         setSettings(merged)
         setTenant(null)
@@ -108,17 +125,12 @@ export function BusinessSettingsProvider({ children }) {
   }, [authLoading, canLoad, storageScope, user?.tenantId, user?.role, user?.systemType])
 
   useEffect(() => {
-    const themeId = String(settings?.appearance?.themeId || 'default').trim() || 'default'
-    const darkMode = settings?.appearance?.darkMode === true
-    setThemeKey(themeId)
-    setDarkMode(darkMode)
-    try {
-      localStorage.setItem(getScopedThemeStorageKey(storageScope), themeId)
-      localStorage.setItem(getScopedDarkModeStorageKey(storageScope), String(darkMode))
-    } catch {}
+    if (typeof document === 'undefined') return
 
     const root = document.documentElement
     const body = document.body
+    const themeId = normalizeThemeId(settings?.appearance?.themeId || 'white')
+    const darkMode = settings?.appearance?.darkMode === true
     const fontSize = String(settings?.appearance?.fontSize || 'medium')
     const animationsEnabled = settings?.appearance?.animationsEnabled !== false
     const colorfulProducts = settings?.appearance?.colorfulProducts === true
@@ -126,21 +138,38 @@ export function BusinessSettingsProvider({ children }) {
 
     root.dataset.businessLanguage = language
     root.dataset.fontSize = fontSize
+    body?.classList.remove('tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
+    body?.classList.add(`tenant-font-${fontSize}`)
+
+    root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
+    body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
+
+    setThemeKey(themeId)
+    setDarkMode(darkMode)
+    try {
+      localStorage.setItem(getScopedThemeStorageKey(storageScope), themeId)
+      localStorage.setItem(getScopedDarkModeStorageKey(storageScope), String(darkMode))
+    } catch {}
+
+    if (isMobileRuntime) {
+      return () => {
+        body?.classList.remove(`tenant-font-${fontSize}`)
+      }
+    }
+
     root.classList.toggle('tenant-dark-mode', darkMode)
     root.classList.toggle('tenant-no-animations', !animationsEnabled)
     root.classList.toggle('tenant-colorful-products', colorfulProducts)
 
-    body.classList.toggle('tenant-dark-mode', darkMode)
-    body.classList.toggle('tenant-no-animations', !animationsEnabled)
-    body.classList.toggle('tenant-colorful-products', colorfulProducts)
-    body.classList.remove('tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
-    body.classList.add(`tenant-font-${fontSize}`)
+    body?.classList.toggle('tenant-dark-mode', darkMode)
+    body?.classList.toggle('tenant-no-animations', !animationsEnabled)
+    body?.classList.toggle('tenant-colorful-products', colorfulProducts)
 
     return () => {
       root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-      body.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products', `tenant-font-${fontSize}`)
+      body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products', `tenant-font-${fontSize}`)
     }
-  }, [settings, setDarkMode, setThemeKey, storageScope])
+  }, [isMobileRuntime, setDarkMode, setThemeKey, settings, storageScope])
 
   const value = useMemo(() => ({
     settings,

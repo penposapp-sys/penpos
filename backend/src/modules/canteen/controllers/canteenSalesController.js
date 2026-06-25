@@ -10,9 +10,27 @@ export const create = async (req, res) => {
   }
 }
 
+export const listCompleted = async (req, res) => {
+  try {
+    const sales = await service.listSales(req.user.tenantId, req.canteenBranchIds || [], req.query || {})
+    res.json({ success: true, ...sales })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const remove = async (req, res) => {
   try {
     const result = await service.deleteSale(req.user.tenantId, req.canteenBranchId, req.user.id, req.params.id)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const reopen = async (req, res) => {
+  try {
+    const result = await service.reopenSale(req.user.tenantId, req.canteenBranchId, req.user.id, req.params.id)
     res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)

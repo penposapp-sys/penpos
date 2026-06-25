@@ -82,7 +82,6 @@ const CashierProductCard = memo(function CashierProductCard({
   branchName,
   onAdd,
   style,
-  themeText,
   accentText,
   measureRef = null,
   showImage = true
@@ -120,14 +119,14 @@ const CashierProductCard = memo(function CashierProductCard({
         />
       ) : null}
       <div className="kasaProductCardBody">
-        <div className="kasaProductCardTitle" style={{ color: themeText }}>{product.name}</div>
+        <div className="kasaProductCardTitle" style={{ color: 'var(--app-text, var(--text))' }}>{product.name}</div>
         {product.categoryName ? (
-          <div className="kasaProductCardMeta" style={{ color: accentText }}>
+          <div className="kasaProductCardMeta" style={{ color: 'var(--app-text-secondary, var(--text-secondary, var(--muted)))' }}>
             {product.categoryName}
           </div>
         ) : null}
         {branchName ? (
-          <div className="kasaProductCardMeta" style={{ color: accentText }}>
+          <div className="kasaProductCardMeta" style={{ color: 'var(--app-text-secondary, var(--text-secondary, var(--muted)))' }}>
             {branchName}
           </div>
         ) : null}
@@ -146,7 +145,6 @@ const CashierProductCard = memo(function CashierProductCard({
   return (
     prev.onAdd === next.onAdd &&
     prev.style === next.style &&
-    prev.themeText === next.themeText &&
     prev.accentText === next.accentText &&
     prev.measureRef === next.measureRef &&
     prev.showImage === next.showImage &&
@@ -238,8 +236,8 @@ export default function CanteenCashierPage() {
     })()
     return {
       borderColor,
-      background: `linear-gradient(180deg, ${theme.accentSoft} 0%, rgba(${accentRgb}, ${themeKey === 'mono' ? '0.05' : '0.1'}) 100%)`,
-      boxShadow: `0 14px 34px rgba(${accentRgb}, ${themeKey === 'mono' ? '0.08' : '0.12'})`
+      background: `linear-gradient(180deg, ${theme.accentSoft} 0%, rgba(${accentRgb}, 0.1) 100%)`,
+      boxShadow: `0 14px 34px rgba(${accentRgb}, 0.12)`
     }
   }, [theme, themeKey])
 
@@ -1082,7 +1080,7 @@ export default function CanteenCashierPage() {
   if (!canPos) return <div className="card">403 – Bu sayfaya yetkin yok</div>
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="canteen-cashier-page" style={{ display: 'grid', gap: 12 }}>
       {!!error && <div className="card" style={{ borderColor: 'color-mix(in srgb, #ef4444 38%, var(--app-border, var(--border)))', background: 'color-mix(in srgb, #ef4444 10%, var(--app-surface, var(--panel)))', color: 'color-mix(in srgb, #ef4444 78%, var(--app-text, var(--text)))' }}>{error}</div>}
 
       <div className="kasaLayout kasaShowcaseLayout">
@@ -1138,8 +1136,7 @@ export default function CanteenCashierPage() {
                     branchName={branchNameById.get(normalizeId(p.branchId)) || ''}
                     onAdd={addToCart}
                     style={softProductCardStyle}
-                    themeText={theme.text}
-                    accentText={theme.accentText}
+                    accentText="var(--app-text, var(--text))"
                     measureRef={isMobilePortrait && index === 0 ? productCardMeasureRef : null}
                     showImage={showProductImages}
                   />

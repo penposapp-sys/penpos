@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
-import WebsiteLoadingScreen from '../components/WebsiteLoadingScreen.jsx'
 import { WebsitePreview } from '../components/website/WebsiteBuilder.jsx'
 
 function getHostSlug() {
@@ -58,26 +57,8 @@ export function RootPublicEntryPage({ fallback = null }) {
 
   if (!hostSlug) return fallback
 
-  if (loading && !payload) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS website"
-        title="Web sitesi hazirlaniyor"
-        message="Yayindaki sayfa ve tema ayarlari getiriliyor."
-      />
-    )
-  }
-
-  if (!payload) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS website"
-        title="Site henuz yayinda degil"
-        message="Bu web sitesi henuz yayina alinmadi veya gecici olarak kaldirildi."
-        compact
-      />
-    )
-  }
+  if (loading && !payload) return null
+  if (!payload) return null
 
   return <TenantPreviewScreen payload={payload} />
 }
@@ -115,37 +96,9 @@ export default function PublicTenantWebsitePage() {
     return () => { mounted = false }
   }, [slug])
 
-  if (loading) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS website"
-        title="Web sitesi hazirlaniyor"
-        message="Tema, bolumler ve icerik bilgileri getiriliyor."
-      />
-    )
-  }
-
-  if (error) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS website"
-        title="Site su anda acilamadi"
-        message={error}
-        compact
-      />
-    )
-  }
-
-  if (!payload) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS website"
-        title="Site henuz yayinda degil"
-        message="Bu web sitesi henuz yayina alinmadi veya gecici olarak kaldirildi."
-        compact
-      />
-    )
-  }
+  if (loading) return null
+  if (error) return null
+  if (!payload) return null
 
   return <TenantPreviewScreen payload={payload} />
 }

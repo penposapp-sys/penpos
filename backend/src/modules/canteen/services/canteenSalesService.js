@@ -20,6 +20,87 @@ const toInt = (v) => {
 
 const roundMoney = (value) => Number(toNumber(value).toFixed(2))
 
+const normalizeSaleStatus = (sale = {}) => {
+  const raw = String(sale?.status || '').trim().toLowerCase()
+  if (raw === 'cancelled' || raw === 'canceled') return 'cancelled'
+  if (raw === 'reopened' || raw === 'pending') return raw
+  if (raw === 'completed' || raw === 'closed') return 'completed'
+  if (sale?.isActive === false) return 'cancelled'
+  return 'completed'
+}
+
+const saleNoFromId = (id) => {
+  const raw = String(id || '').trim()
+  if (!raw) return '-'
+  return `#${raw.slice(-6).toUpperCase()}`
+}
+
+const saleItemCount = (sale = {}) =>
+  Array.isArray(sale?.items) ? sale.items.reduce((sum, item) => sum + toInt(item?.qty), 0) : 0
+
+const mapSaleRow = (sale = {}) => {
+  const branch = sale?.branchId && typeof sale.branchId === 'object' ? sale.branchId : null
+  const user = sale?.actorUserId && typeof sale.actorUserId === 'object' ? sale.actorUserId : null
+  const payment = sale?.payment || {}
+  const status = normalizeSaleStatus(sale)
+  return {
+    id: String(sale?._id || sale?.id || ''),
+    saleNo: saleNoFromId(sale?._id || sale?.id || ''),
+    branchId: branch?._id ? String(branch._id) : String(sale?.branchId || ''),
+    branchName: String(branch?.name || sale?.branchName || 'Şube'),
+    cashierId: user?._id ? String(user._id) : (sale?.actorUserId ? String(sale.actorUserId) : null),
+    cashierName: String(user?.name || sale?.cashierName || sale?.actorUserName || sale?.actorUsername || 'Bilinmeyen Personel'),
+    createdAt: sale?.createdAt || null,
+    total: Number(sale?.total || 0),
+    paymentType: String(payment?.methodName || payment?.method || payment?.methodType || '-'),
+    paymentMethod: String(payment?.method || ''),
+    paymentMethodType: String(payment?.methodType || ''),
+    itemCount: saleItemCount(sale),
+    status,
+    note: String(sale?.note || ''),
+    discountPercent: Number(sale?.discountPercent || 0),
+    discountTotal: Number(sale?.discountTotal || 0),
+    subTotal: Number(sale?.subTotal || 0),
+    payment: {
+      method: String(payment?.method || ''),
+      methodName: String(payment?.methodName || ''),
+      methodType: String(payment?.methodType || ''),
+      amount: Number(payment?.amount || 0),
+      note: String(payment?.note || '')
+    },
+    cancelledAt: sale?.cancelledAt || null,
+    cancelledBy: sale?.cancelledBy ? String(sale.cancelledBy) : null,
+    cancelReason: String(sale?.cancelReason || ''),
+    reopenedAt: sale?.reopenedAt || null,
+    reopenedBy: sale?.reopenedBy ? String(sale.reopenedBy) : null
+  }
+}
+
+const mapSaleDetail = (sale = {}) => {
+  const row = mapSaleRow(sale)
+  return {
+    ...row,
+    items: Array.isArray(sale?.items)
+      ? sale.items.map((item) => ({
+          productId: item?.productId ? String(item.productId) : null,
+          name: String(item?.name || ''),
+          qty: Number(item?.qty || 0),
+          unitPrice: Number(item?.unitPrice || 0),
+          lineTotal: Number(item?.lineTotal || 0),
+          vatRate: Number(item?.vatRate || 0),
+          note: String(item?.note || '')
+        }))
+      : [],
+    payment: row.payment,
+    details: {
+      discountPercent: Number(sale?.discountPercent || 0),
+      discountTotal: Number(sale?.discountTotal || 0),
+      subTotal: Number(sale?.subTotal || 0),
+      total: Number(sale?.total || 0)
+    }
+  }
+}
+
 export const createSale = async (tenantId, branchId, actorUserId, input) => {
   const items = Array.isArray(input?.items) ? input.items : []
   if (items.length === 0) throw error('invalid_request', 'Items required', 400)
@@ -167,6 +248,12 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
       payment: { method, methodName, methodType, amount: total, note },
       note: saleNote,
       isActive: true,
+      status: 'completed',
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: '',
+      reopenedAt: null,
+      reopenedBy: null,
       createdAt: new Date(),
       actorUserId
     })
@@ -200,36 +287,59 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
 
 export const deleteSale = async (tenantId, branchId, actorUserId, saleId) => {
   if (!mongoose.isValidObjectId(saleId)) throw error('invalid_request', 'Invalid id', 400)
-  const deleted = await saleRepo.softDeleteByIdAndScope(saleId, tenantId, branchId)
+  const deleted = await saleRepo.softDeleteByIdAndScope(saleId, tenantId, branchId, {
+    cancelledBy: actorUserId || null,
+    cancelReason: 'user_cancelled'
+  })
   if (!deleted) throw error('not_found', 'Satış bulunamadı', 404)
   return { success: true, id: deleted.id, actorUserId }
 }
 
+export const reopenSale = async (tenantId, branchId, actorUserId, saleId) => {
+  if (!mongoose.isValidObjectId(saleId)) throw error('invalid_request', 'Invalid id', 400)
+  const reopened = await saleRepo.reopenByIdAndScope(saleId, tenantId, branchId, {
+    reopenedBy: actorUserId || null
+  })
+  if (!reopened) throw error('not_found', 'Satış bulunamadı', 404)
+  return { success: true, id: reopened.id, actorUserId, status: normalizeSaleStatus(reopened) }
+}
+
+export const listSales = async (tenantId, branchIds, query = {}) => {
+  const limitRaw = Number(query?.limit || 20)
+  const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 20))
+  const pageRaw = Number(query?.page || 1)
+  const page = Math.max(1, Number.isFinite(pageRaw) ? pageRaw : 1)
+  const skip = (page - 1) * limit
+  const keyword = String(query?.q || '').trim().toLowerCase()
+  const includeCancelled = String(query?.status || '').trim().toLowerCase() === 'cancelled'
+  const items = await saleRepo.listByTenantAndBranchIds(tenantId, branchIds, { limit, skip, includeCancelled })
+  const total = await saleRepo.countByTenantAndBranchIds(tenantId, branchIds, { includeCancelled })
+  const rows = (items || [])
+    .map(mapSaleRow)
+    .filter((row) => {
+      if (!keyword) return true
+      const hay = [
+        row.saleNo,
+        row.branchName,
+        row.cashierName,
+        row.paymentType,
+        row.status,
+        row.note
+      ].join(' ').toLowerCase()
+      return hay.includes(keyword)
+    })
+  return {
+    items: rows,
+    total,
+    page,
+    limit,
+    pages: Math.max(1, Math.ceil(Number(total || 0) / Number(limit || 1)))
+  }
+}
+
 export const getSale = async (tenantId, branchId, saleId) => {
   if (!mongoose.isValidObjectId(saleId)) throw error('invalid_request', 'Invalid id', 400)
-  const s = await saleRepo.findByIdAndScope(saleId, tenantId, branchId)
+  const s = await saleRepo.findAnyByIdAndScope(saleId, tenantId, branchId)
   if (!s) throw error('not_found', 'Satış bulunamadı', 404)
-  return {
-    id: s.id,
-    branchId: s.branchId ? String(s.branchId) : null,
-    customerId: s.customerId ? String(s.customerId) : null,
-    subTotal: Number(s.subTotal || 0),
-    discountPercent: Number(s.discountPercent || 0),
-    discountTotal: Number(s.discountTotal || 0),
-    total: Number(s.total || 0),
-    payment: s.payment,
-    note: String(s.note || ''),
-    createdAt: s.createdAt,
-    items: Array.isArray(s.items)
-      ? s.items.map(it => ({
-        productId: it.productId ? String(it.productId) : null,
-        name: String(it.name || ''),
-        qty: Number(it.qty || 0),
-        unitPrice: Number(it.unitPrice || 0),
-        lineTotal: Number(it.lineTotal || 0),
-        vatRate: Number(it.vatRate || 0),
-        note: String(it.note || '')
-      }))
-      : []
-  }
+  return mapSaleDetail(s)
 }

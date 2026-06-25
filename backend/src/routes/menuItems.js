@@ -7,17 +7,18 @@ import { requirePermission } from '../middlewares/requirePermission.js'
 import { PERMISSIONS } from '../constants/permissions.js'
 import * as ctrl from '../controllers/menuItemController.js'
 import { error } from '../utils/errors.js'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../utils/imageUpload.js'
 
 const router = Router()
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 1024 * 1024 }
+  limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES }
 })
 
 const uploadSingleImage = (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (!err) return next()
-    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Görsel boyutu en fazla 1 MB olabilir.', 400))
+    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Gorsel boyutu en fazla 5 MB olabilir.', 400))
     return next(error('invalid_upload', 'Gorsel yukleme hatasi.', 400))
   })
 }

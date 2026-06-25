@@ -210,7 +210,7 @@ export function SettingsUiStyles() {
       }
       .settings-ui-toggle-switch.checked {
         justify-content: flex-end;
-        background: var(--theme-gradient);
+        background: linear-gradient(135deg, #22c55e, #16a34a);
       }
       .settings-ui-toggle-dot {
         width: 22px;

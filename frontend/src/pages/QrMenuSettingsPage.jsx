@@ -29,11 +29,11 @@ const qrThemeModes = [
 
 function cardStyle() {
   return {
-    borderRadius: 30,
+    borderRadius: 24,
     border: `1px solid ${pageTheme.cardBorder}`,
     background: 'var(--app-surface)',
     boxShadow: pageTheme.shadow,
-    padding: 20,
+    padding: 16,
   }
 }
 
@@ -50,7 +50,7 @@ function inputStyle() {
   }
 }
 
-function ToggleItem({ label, description, checked, onChange, disabled }) {
+function ToggleItem({ label, description, checked, onChange, disabled, compact = false }) {
   return (
     <label
       style={{
@@ -58,9 +58,10 @@ function ToggleItem({ label, description, checked, onChange, disabled }) {
         borderRadius: 26,
         padding: '14px 16px',
         display: 'flex',
+        flexDirection: compact ? 'column' : 'row',
         justifyContent: 'space-between',
         gap: 14,
-        alignItems: 'center',
+        alignItems: compact ? 'flex-start' : 'center',
         border: `1px solid ${checked ? 'var(--theme-accent)' : 'var(--app-border)'}`,
         background: checked
           ? 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 18%, var(--app-surface-2, var(--app-surface-soft))), var(--app-surface))'
@@ -147,6 +148,7 @@ function OptionCard({ title, description, active, onClick, disabled }) {
 
 export default function QrMenuSettingsPage() {
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
+  const isCompact = isMobilePortrait || isTablet
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -265,16 +267,16 @@ export default function QrMenuSettingsPage() {
   }
 
   return (
-    <div style={{ background: pageTheme.pageBg, borderRadius: 32, padding: 20, border: `1px solid ${pageTheme.cardBorder}`, boxShadow: '0 24px 70px rgba(15, 23, 42, 0.18)', display: 'grid', gap: 16, color: 'var(--app-text)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div>
+    <div style={{ background: pageTheme.pageBg, borderRadius: isCompact ? 18 : 32, padding: isCompact ? 10 : 20, border: `1px solid ${pageTheme.cardBorder}`, boxShadow: isCompact ? '0 14px 28px rgba(15, 23, 42, 0.12)' : '0 24px 70px rgba(15, 23, 42, 0.18)', display: 'grid', gap: isCompact ? 12 : 16, color: 'var(--app-text)', minWidth: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(0, 1fr) auto', gap: 16, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--app-text)' }}>QR Menü</div>
           <div style={{ marginTop: 6, fontSize: 13, color: 'var(--app-text)', maxWidth: 700 }}>
             Public link, QR görseli ve yayın tercihleri mevcut tenant ayarları üstüne geriye dönük uyumlu olarak kaydedilir.
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="btn" onClick={load} disabled={loading || saving}>{loading ? 'Yükleniyor...' : 'Yenile'}</button>
+        <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, max-content)', gap: 10, justifyContent: isCompact ? 'stretch' : 'end' }}>
+          <button className="btn" onClick={load} disabled={loading || saving} style={{ width: isCompact ? '100%' : undefined }}>{loading ? 'Yükleniyor...' : 'Yenile'}</button>
           <SaveButton onClick={save} disabled={saving}>{saving ? 'Kaydediliyor...' : 'QR Ayarlarını Kaydet'}</SaveButton>
         </div>
       </div>
@@ -285,7 +287,7 @@ export default function QrMenuSettingsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${isMobilePortrait ? 240 : 320}px, 1fr))`, gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         <section style={cardStyle()}>
           <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Yayın Ayarları</div>
           <div style={{ fontSize: 12, color: 'var(--app-text)', marginBottom: 16 }}>Logo, kapak, açıklama, masa QR ve garson çağır blokları bu kartta toplanır.</div>
@@ -298,6 +300,7 @@ export default function QrMenuSettingsPage() {
                 checked={!!settings.qrMenu?.[key]}
                 onChange={(e) => setQrValue(key, e.target.checked)}
                 disabled={saving}
+                compact={isCompact}
               />
             ))}
           </div>
@@ -308,7 +311,7 @@ export default function QrMenuSettingsPage() {
           <div style={{ fontSize: 12, color: 'var(--app-text)', marginBottom: 16 }}>
             Müşteri QR sayfasında beyaz veya dark görünüm kullanın. Dark mod kart, çerçeve ve modal yüzeylerini de koyulaştırır.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             {qrThemeModes.map(([value, label, description]) => (
               <OptionCard
                 key={value}
@@ -335,14 +338,14 @@ export default function QrMenuSettingsPage() {
               <input style={inputStyle()} value={link} readOnly />
             </label>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn" onClick={copyLink} disabled={!link}>Linki Kopyala</button>
-              <button className="btn" onClick={downloadQr} disabled={!qrDataUrl}>QR İndir</button>
+              <button className="btn" onClick={copyLink} disabled={!link} style={{ flex: isCompact ? '1 1 100%' : undefined }}>Linki Kopyala</button>
+              <button className="btn" onClick={downloadQr} disabled={!qrDataUrl} style={{ flex: isCompact ? '1 1 100%' : undefined }}>QR İndir</button>
             </div>
           </div>
         </section>
       </div>
 
-      <section style={{ ...cardStyle(), display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18, alignItems: 'center' }}>
+      <section style={{ ...cardStyle(), display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18, alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Önizleme</div>
           <div style={{ fontSize: 13, color: 'var(--app-text)', marginBottom: 12 }}>

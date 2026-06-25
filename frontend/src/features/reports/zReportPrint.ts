@@ -29,13 +29,15 @@ const buildFallbackText = (report: ZReportData) => {
 }
 
 export const buildZReportPrintHtml = (report: ZReportData) => {
-  const text = getThermalVariant(report, 'chars48')?.text || buildFallbackText(report)
+  const safeReport = report || ({} as ZReportData)
+  const text = getThermalVariant(safeReport, 'chars48')?.text || buildFallbackText(safeReport)
+  const titleDate = String(safeReport?.date || 'z-raporu')
 
   return `<!doctype html>
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>Z Raporu - ${escapeHtml(report.date)}</title>
+  <title>Z Raporu - ${escapeHtml(titleDate)}</title>
   <style>
     body { margin: 0; background: #e5e7eb; font-family: Consolas, "Courier New", monospace; color: #111827; }
     .page { min-height: 100vh; display: grid; place-items: start center; padding: 24px; box-sizing: border-box; }
@@ -75,7 +77,7 @@ export const buildZReportPrintHtml = (report: ZReportData) => {
 }
 
 export const openZReportPrintPreview = (report: ZReportData, autoPrint = true) => {
-  const html = buildZReportPrintHtml(report)
+  const html = buildZReportPrintHtml(report || ({} as ZReportData))
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const win = window.open(url, '_blank', 'noopener,noreferrer,width=480,height=900')
@@ -95,8 +97,9 @@ export const openZReportPrintPreview = (report: ZReportData, autoPrint = true) =
 }
 
 export const printZReport = async (report: ZReportData, options: { system?: string } = {}) => {
-  const thermal48 = getThermalVariant(report, 'chars48')
-  const thermal32 = getThermalVariant(report, 'chars32')
+  const safeReport = report || ({} as ZReportData)
+  const thermal48 = getThermalVariant(safeReport, 'chars48')
+  const thermal32 = getThermalVariant(safeReport, 'chars32')
   const system = String(options?.system || 'kermes').trim() || 'kermes'
 
   try {
@@ -107,13 +110,13 @@ export const printZReport = async (report: ZReportData, options: { system?: stri
         type: 'receipt',
         payload: {
           type: 'raw',
-          content: thermal48?.raw || thermal48?.text || buildFallbackText(report)
+          content: thermal48?.raw || thermal48?.text || buildFallbackText(safeReport)
         },
         meta: {
           title: 'Z Raporu',
-          reportDate: report.date,
-          branchId: report.branchId,
-          rawEncoding: report?.thermal?.encoding || 'cp857',
+          reportDate: safeReport?.date,
+          branchId: safeReport?.branchId,
+          rawEncoding: safeReport?.thermal?.encoding || 'cp857',
           thermalVariants: {
             chars48: thermal48 ? { raw: thermal48.raw, text: thermal48.text } : null,
             chars32: thermal32 ? { raw: thermal32.raw, text: thermal32.text } : null
@@ -127,6 +130,6 @@ export const printZReport = async (report: ZReportData, options: { system?: stri
   } catch {
   }
 
-  openZReportPrintPreview(report, true)
+  openZReportPrintPreview(safeReport, true)
   return { mode: 'browser' }
 }

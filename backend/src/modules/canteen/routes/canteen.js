@@ -27,18 +27,19 @@ import * as qrOrdersCtrl from '../controllers/canteenQrOrdersController.js'
 import multer from 'multer'
 import { error } from '../../../utils/errors.js'
 import { requireActiveSubscription } from '../../../middlewares/requireActiveSubscription.js'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../../../utils/imageUpload.js'
 
 const router = Router()
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 1024 * 1024 }
+  limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES }
 })
 
 const uploadSingleFile = (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (!err) return next()
-    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Görsel boyutu en fazla 1 MB olabilir.', 400))
+    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Gorsel boyutu en fazla 5 MB olabilir.', 400))
     return next(error('invalid_upload', 'Dosya yükleme hatası', 400))
   })
 }
@@ -161,7 +162,9 @@ router.delete('/products/:id/image', canteenBranchQueryGuard, requireRole(['tena
 router.delete('/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProduct)
 
 router.post('/sales', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_POS_ACCESS]), salesCtrl.create)
-router.get('/sales/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS]), salesCtrl.get)
+router.get('/sales/completed', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.listCompleted)
+router.post('/sales/:id/reopen', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.reopen)
+router.get('/sales/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.get)
 router.delete('/sales/:id', canteenBranchQueryGuard, requireRole(['tenant_admin']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), salesCtrl.remove)
 
 router.get('/customers', requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS]), customersCtrl.list)

@@ -31,6 +31,12 @@ const schema = new mongoose.Schema({
   payment: { type: paymentSchema, required: true },
   note: { type: String, default: '' },
   isActive: { type: Boolean, default: true, index: true },
+  status: { type: String, default: 'completed', index: true },
+  cancelledAt: { type: Date, default: null },
+  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  cancelReason: { type: String, default: '' },
+  reopenedAt: { type: Date, default: null },
+  reopenedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   createdAt: { type: Date, default: Date.now },
   actorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { collection: 'canteen_sales' })

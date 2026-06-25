@@ -331,10 +331,10 @@ export function TablesManagementContent({ embedded = false }) {
               onClick={() => setActiveCategory(category)}
               style={{
                 fontWeight: activeCategory === category ? 800 : 700,
-                borderColor: activeCategory === category ? 'var(--theme-accent, #111827)' : 'var(--app-border, var(--border))',
-                background: activeCategory === category ? 'var(--theme-accent, #111827)' : 'var(--app-surface, var(--panel))',
-                color: activeCategory === category ? '#ffffff' : 'var(--app-text, var(--text))',
-                boxShadow: activeCategory === category ? '0 6px 16px rgba(15, 23, 42, 0.22)' : 'var(--card-shadow)',
+                borderColor: activeCategory === category ? 'var(--border-hover)' : 'var(--app-border, var(--border))',
+                background: activeCategory === category ? 'var(--menu-active-bg, var(--card-hover))' : 'var(--app-surface, var(--panel))',
+                color: activeCategory === category ? 'var(--sidebar-nav-text-active, #ffffff)' : 'var(--app-text, var(--text))',
+                boxShadow: activeCategory === category ? 'none' : 'var(--card-shadow)',
                 borderWidth: 1.5,
                 borderStyle: 'solid',
                 borderRadius: 14,

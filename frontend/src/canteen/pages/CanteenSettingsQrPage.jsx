@@ -204,8 +204,8 @@ export default function CanteenSettingsQrPage() {
           color: var(--app-text) !important;
           border-color: var(--app-border, var(--border)) !important;
         }
-        .canteen-settings-qr-page button {
-          color: var(--app-text) !important;
+        .canteen-settings-qr-page button:not(.qr-theme-card) {
+          color: var(--settings-button-text, #ffffff) !important;
         }
         .canteen-settings-qr-page a {
           color: var(--app-text) !important;
@@ -301,7 +301,7 @@ export default function CanteenSettingsQrPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 14, minWidth: 0, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
             <label style={{ display: 'grid', gap: 6 }}>
               <span style={FIELD_LABEL_STYLE}>Firma Adi</span>
               <input className="input" value={settings.qrTitle} onChange={(event) => setSettings((current) => ({ ...current, qrTitle: event.target.value }))} />
@@ -352,7 +352,7 @@ export default function CanteenSettingsQrPage() {
 
           <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
             <div style={FIELD_LABEL_STYLE}>Musteri QR Siparis Sayfasi Tema Secimi</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 10 }}>
               {qrThemes.map((theme) => {
                 const selected = theme.id === settings.qrTheme
                 return (
@@ -408,7 +408,8 @@ export default function CanteenSettingsQrPage() {
                   key={branchCard.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    minWidth: 0,
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
                     gap: 18,
                     alignItems: 'center',
                     padding: 18,
@@ -431,8 +432,8 @@ export default function CanteenSettingsQrPage() {
                       </div>
                     </div>
 
-                    <div style={{ padding: '12px 14px', borderRadius: 18, background: 'color-mix(in srgb, var(--app-surface) 92%, transparent)', border: '1px solid color-mix(in srgb, var(--app-border) 86%, transparent)', display: 'grid', gap: 6 }}>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--app-text)', overflowWrap: 'anywhere' }}>
+                    <div style={{ minWidth: 0, maxWidth: '100%', padding: '12px 14px', borderRadius: 18, background: 'color-mix(in srgb, var(--app-surface) 92%, transparent)', border: '1px solid color-mix(in srgb, var(--app-border) 86%, transparent)', display: 'grid', gap: 6, overflow: 'hidden' }}>
+                      <div style={{ minWidth: 0, maxWidth: '100%', fontSize: 12, fontWeight: 800, color: 'var(--app-text)', overflowWrap: 'anywhere', wordBreak: 'break-all' }}>
                         {branchCard.publicUrl}
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--app-text-secondary)' }}>
@@ -440,7 +441,7 @@ export default function CanteenSettingsQrPage() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
                       <button
                         type="button"
                         onClick={async () => {
@@ -452,7 +453,8 @@ export default function CanteenSettingsQrPage() {
                           borderRadius: 16,
                           background: 'color-mix(in srgb, var(--app-surface) 94%, transparent)',
                           padding: '11px 14px',
-                          fontWeight: 900
+                          fontWeight: 900,
+                          maxWidth: '100%'
                         }}
                       >
                         Linki Kopyala
@@ -462,13 +464,18 @@ export default function CanteenSettingsQrPage() {
                         target="_blank"
                         rel="noreferrer"
                         style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           borderRadius: 16,
                           background: selectedTheme?.colors?.accent || 'var(--theme-accent)',
                           color: selectedTheme?.colors?.accentText || 'var(--surface-strong-contrast, #fff)',
                           padding: '12px 16px',
                           fontWeight: 900,
                           textDecoration: 'none',
-                          boxShadow: 'var(--theme-active-glow)'
+                          boxShadow: 'var(--theme-active-glow)',
+                          maxWidth: '100%',
+                          textAlign: 'center'
                         }}
                       >
                         Public QR Sayfasini Ac

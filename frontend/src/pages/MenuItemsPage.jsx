@@ -83,7 +83,7 @@ function PencilIcon() {
   )
 }
 
-function KebabMenu({ items = [] }) {
+function KebabMenu({ items = [], className = '' }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
   const menuRef = useRef(null)
@@ -141,7 +141,7 @@ function KebabMenu({ items = [] }) {
   }, [open])
 
   return (
-    <div className="product-kebab-portal">
+    <div className={`product-kebab-portal${className ? ` ${className}` : ''}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -652,11 +652,33 @@ export default function MenuItemsPage() {
   const deleteCategoryConfirmTitle = 'Kategoriyi Kalıcı Sil'
   const deleteCategoryConfirmMessage = `${categoryDeleteTarget?.name || 'Bu kategori'} kalıcı olarak silinecek.${Number(categoryDeleteTarget?.itemCount || 0) > 0 ? ` Altındaki ${Number(categoryDeleteTarget?.itemCount || 0)} ürün de birlikte silinecek.` : ''} Geçmiş sipariş ve raporlardaki isimler korunur. Emin misiniz?`
 
+  const formatCategoryBadge = (category) => {
+    if (!category) return 'Kategori yok'
+    const orderLabel = typeof category?.sortOrder === 'number' ? `#${category.sortOrder + 1}` : null
+    const nameLabel = String(category?.name || '').trim() || null
+    if (orderLabel && nameLabel) return `${orderLabel} · ${nameLabel}`
+    if (nameLabel) return nameLabel
+    if (orderLabel) return orderLabel
+    return 'Kategori yok'
+  }
+
+  const formatCategoryMeta = (category) => {
+    if (!category) return 'Kategori yok'
+    const orderLabel = typeof category?.sortOrder === 'number' ? `Kategori ${category.sortOrder + 1}` : null
+    const nameLabel = String(category?.name || '').trim() || null
+    if (orderLabel && nameLabel) return `${orderLabel} · ${nameLabel}`
+    if (nameLabel) return nameLabel
+    if (orderLabel) return orderLabel
+    return 'Kategori yok'
+  }
+
   const renderProductCard = (item) => {
     const settings = mergeProductSettings(item?.settings)
     const isSaving = savingRowId === String(item.id)
     const category = sortedCategories.find((entry) => String(entry.id) === String(item.categoryId))
     const thumbText = String(item?.name || 'U').slice(0, 2).toUpperCase()
+    const categoryBadgeText = formatCategoryBadge(category)
+    const categoryMetaText = formatCategoryMeta(category)
     const actionItems = [
       {
         key: 'settings',
@@ -693,10 +715,8 @@ export default function MenuItemsPage() {
     if (viewMode === 'card') {
       return (
         <article key={item.id} className="product-card product-card-grid">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-            <div className="product-card-meta-top">
-              {typeof category?.sortOrder === 'number' ? `#${category.sortOrder + 1}` : '#-'} Â· {category?.name || '-'}
-            </div>
+          <div className="product-card-header">
+            <div className="product-card-meta-top" title={categoryBadgeText}>{categoryBadgeText}</div>
             <KebabMenu items={actionItems} />
             <details className="product-kebab">
               <summary>...</summary>
@@ -708,13 +728,11 @@ export default function MenuItemsPage() {
             </details>
           </div>
           <div className="product-thumb product-thumb--card">
-            {item.imageUrl ? <ProductImage product={item} alt={item.name} /> : thumbText}
+            {item.imageUrl ? <ProductImage product={item} alt={item.name} fallbackText={thumbText} fallbackClassName="product-thumb-fallback" /> : thumbText}
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div className="product-card-title">{item.name}</div>
-            <div className="product-card-meta">
-              {typeof category?.sortOrder === 'number' ? `Kategori ${category.sortOrder + 1}` : 'Kategori -'} Â· {category?.name || '-'}
-            </div>
+          <div className="product-card-copy">
+            <div className="product-card-title" title={item.name}>{item.name}</div>
+            <div className="product-card-meta" title={categoryMetaText}>{categoryMetaText}</div>
           </div>
           <div className="product-card-stats">
             <div className="product-chip product-money-chip" style={{ width: '100%' }}>{Number(item.price || 0).toFixed(2)} TL</div>
@@ -729,31 +747,31 @@ export default function MenuItemsPage() {
       <article key={item.id} className="product-card">
         <div className="product-list-row-wrap scrollbar-hidden">
           <div className="product-card-list">
-            <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} />
-            <div className="product-thumb">{item.imageUrl ? <ProductImage product={item} alt={item.name} /> : thumbText}</div>
-            <div className="product-name-cell">
+            <input className="product-list-check" type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} />
+            <div className="product-thumb product-list-thumb">{item.imageUrl ? <ProductImage product={item} alt={item.name} fallbackText={thumbText} fallbackClassName="product-thumb-fallback" /> : thumbText}</div>
+            <div className="product-name-cell product-list-name">
               <div className="product-name-text">{item.name}</div>
-              <div className="product-name-subtext">{category?.name || '-'}</div>
+              <div className="product-name-subtext">{categoryMetaText}</div>
             </div>
-            <div className="product-chip">{category?.name || '-'}</div>
-            <div className="product-chip product-money-chip">{Number(item.price || 0).toFixed(2)} TL</div>
-            <div className="product-chip product-stock-chip">{Number(settings.stockQty || 0)}</div>
-            <div className="product-toggle-cell">
+            <div className="product-chip product-list-category-chip" title={categoryBadgeText}>{categoryBadgeText}</div>
+            <div className="product-chip product-money-chip product-list-price-chip">{Number(item.price || 0).toFixed(2)} TL</div>
+            <div className="product-chip product-stock-chip product-list-stock-chip">{Number(settings.stockQty || 0)}</div>
+            <div className="product-toggle-cell product-toggle-cell--active">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Toggle checked={item.isActive !== false} disabled={isExpired || isSaving} onChange={(checked) => updateItem(item, { isActive: checked })} />
                 <span className="product-toggle-label">Aktif</span>
               </div>
             </div>
-            <div className="product-toggle-cell">
+            <div className="product-toggle-cell product-toggle-cell--qr">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Toggle checked={!!settings.qrMenuVisible} disabled={isExpired || isSaving} onChange={(checked) => updateItem(item, {}, { qrMenuVisible: checked })} />
                 <span className="product-toggle-label">QR Menü</span>
               </div>
             </div>
-            <div className="product-row-actions">
+            <div className="product-row-actions product-list-actions">
               <button type="button" className="product-dark-btn" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
             </div>
-            <KebabMenu items={actionItems} />
+            <KebabMenu className="product-list-kebab" items={actionItems} />
             <details className="product-kebab">
               <summary>...</summary>
               <div className="product-kebab-menu">

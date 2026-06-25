@@ -88,6 +88,7 @@ function KpiCard({ title, value, note, trend, tone = 'neutral', onClick, clickab
   return (
     <button
       type="button"
+      data-button-layout="card"
       onClick={onClick}
       style={{
         ...CARD_STYLE,
@@ -98,19 +99,20 @@ function KpiCard({ title, value, note, trend, tone = 'neutral', onClick, clickab
         cursor: clickable ? 'pointer' : 'default',
         textAlign: 'left',
         width: '100%',
+        minWidth: 0,
         transition: 'transform 160ms ease, box-shadow 160ms ease'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 600 }}>{title}</div>
-        <span style={{ background: colors.bg, color: colors.fg, borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 900 }}>
+        <div className="responsive-card-note" style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 600 }}>{title}</div>
+        <span className="responsive-card-badge" style={{ background: colors.bg, color: colors.fg, borderRadius: 999, padding: '6px 10px', fontWeight: 900 }}>
           {trend}
         </span>
       </div>
-      <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
+      <div className="responsive-card-value" style={{ fontWeight: 900 }}>{value}</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: 12 }}>{note}</div>
-        {clickable && <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 11, fontWeight: 800 }}>Detay</div>}
+        <div className="responsive-card-note" style={{ color: 'var(--app-text-muted, var(--muted))' }}>{note}</div>
+        {clickable && <div className="responsive-card-badge" style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 800 }}>Detay</div>}
       </div>
     </button>
   )
@@ -120,6 +122,7 @@ function InfoCard({ title, value, note, onClick, clickable = false }) {
   return (
     <button
       type="button"
+      data-button-layout="card"
       onClick={onClick}
       style={{
         ...CARD_STYLE,
@@ -127,14 +130,16 @@ function InfoCard({ title, value, note, onClick, clickable = false }) {
         border: '1px solid var(--app-border, var(--border))',
         cursor: clickable ? 'pointer' : 'default',
         textAlign: 'left',
-        width: '100%'
+        width: '100%',
+        minWidth: 0,
+        gap: 8
       }}
     >
-      <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>{title}</div>
-      <div style={{ marginTop: 10, fontSize: 28, fontWeight: 900 }}>{value}</div>
+      <div className="responsive-card-note" style={{ color: 'var(--app-text-secondary, var(--text-secondary))' }}>{title}</div>
+      <div className="responsive-card-value" style={{ marginTop: 10, fontWeight: 900 }}>{value}</div>
       <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: 12 }}>{note}</div>
-        {clickable && <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 11, fontWeight: 800 }}>Detay</div>}
+        <div className="responsive-card-note" style={{ color: 'var(--app-text-muted, var(--muted))' }}>{note}</div>
+        {clickable && <div className="responsive-card-badge" style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 800 }}>Detay</div>}
       </div>
     </button>
   )
@@ -176,7 +181,7 @@ function DetailModal({ open, title, subtitle, items, renderContent, contentWidth
             <div style={{ fontSize: 28, fontWeight: 900 }}>{title}</div>
             {!!subtitle && <div style={{ marginTop: 6, color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 14 }}>{subtitle}</div>}
           </div>
-          <button className="btn" onClick={onClose}>Kapat</button>
+          <button className="btn button-light" onClick={onClose}>Kapat</button>
         </div>
 
         <div className="scrollbar-hidden" style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
@@ -187,10 +192,10 @@ function DetailModal({ open, title, subtitle, items, renderContent, contentWidth
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {item.dotColor && <span style={{ width: 10, height: 10, borderRadius: '50%', background: item.dotColor }} />}
-                  <div style={{ fontWeight: 900, fontSize: 18 }}>{item.title || item.label || item.name || 'Detay'}</div>
+            <div className="responsive-card-title" style={{ fontWeight: 900 }}>{item.title || item.label || item.name || 'Detay'}</div>
                 </div>
                 {item.badge && (
-                  <span style={{ borderRadius: 999, padding: '6px 10px', background: 'color-mix(in srgb, var(--theme-accent, #274066) 20%, var(--app-surface))', color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 11, fontWeight: 900 }}>
+                  <span className="responsive-card-badge" style={{ borderRadius: 999, padding: '6px 10px', background: 'color-mix(in srgb, var(--theme-accent, #274066) 20%, var(--app-surface))', color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 900 }}>
                     {item.badge}
                   </span>
                 )}
@@ -220,8 +225,8 @@ function DetailModal({ open, title, subtitle, items, renderContent, contentWidth
                         marginTop: detail.dividerBefore ? 6 : 0
                       }}
                     >
-                      <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: detail.emphasis ? 800 : 500 }}>{detail.label}</div>
-                      <div style={{ fontWeight: 800, fontSize: 13, textAlign: 'right' }}>{detail.value}</div>
+                      <div className="responsive-card-note" style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: detail.emphasis ? 800 : 500 }}>{detail.label}</div>
+                      <div className="responsive-card-note" style={{ fontWeight: 800, textAlign: 'right' }}>{detail.value}</div>
                     </div>
                   ))}
                 </div>
@@ -361,12 +366,13 @@ function SystemStatusPanel({ statuses, alerts, onOpenDetail }) {
             <button
               key={item.label}
               type="button"
+              data-button-layout="card"
               onClick={() => onOpenDetail?.({
                 title: item.label,
                 subtitle: 'Sistem durum detayi',
                 items: [{ title: item.label, value: item.value, note: item.note || 'Sistem durumu izleniyor.', badge: item.tone?.toUpperCase?.() || 'DURUM' }]
               })}
-              style={{ position: 'relative', borderRadius: 20, background: 'var(--app-surface-soft, var(--panelElevated))', padding: 18, border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              style={{ position: 'relative', borderRadius: 20, background: 'var(--app-surface-soft, var(--panelElevated))', padding: 18, border: 'none', cursor: 'pointer', textAlign: 'left', gap: 6 }}
             >
               <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 12 }}>{item.label}</div>
               <div style={{ marginTop: 6, fontSize: 22, fontWeight: 900 }}>{item.value}</div>
@@ -383,12 +389,13 @@ function SystemStatusPanel({ statuses, alerts, onOpenDetail }) {
             <button
               key={`${item.title}-${index}`}
               type="button"
+              data-button-layout="card"
               onClick={() => onOpenDetail?.({
                 title: item.title,
                 subtitle: 'Uyari detayi',
                 items: [{ ...item, note: item.message }]
               })}
-              style={{ border: `1px solid ${colors.bg}`, background: item.bg || '#fff7ed', borderRadius: 20, padding: 16, textAlign: 'left', cursor: 'pointer', width: '100%' }}
+              style={{ border: `1px solid ${colors.bg}`, background: item.bg || '#fff7ed', borderRadius: 20, padding: 16, textAlign: 'left', cursor: 'pointer', width: '100%', gap: 6 }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <div style={{ fontWeight: 900, color: colors.fg }}>{item.title}</div>
@@ -678,7 +685,7 @@ function ReportsOverviewDashboard({ loading, error, summary, datasets, isMobileP
   if (!datasets?.dashboard) return null
 
   const detailButton = (report) => (
-    <button className="btn" type="button" onClick={() => openReportDetail(report)}>Detay</button>
+    <button className="btn button-light" type="button" onClick={() => openReportDetail(report)}>Detay</button>
   )
 
   return (

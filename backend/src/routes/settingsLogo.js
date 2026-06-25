@@ -11,6 +11,7 @@ import * as businessCtrl from '../controllers/businessSettingsController.js'
 import * as paymentSettingsCtrl from '../controllers/paymentSettingsController.js'
 import * as printersCtrl from '../controllers/settingsPrintersController.js'
 import * as deliveryCustomersCtrl from '../controllers/deliveryCustomersController.js'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../utils/imageUpload.js'
 
 const router = Router()
 
@@ -23,14 +24,14 @@ router.use((req, res, next) => {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }
+  limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES }
 })
 
 const uploadSingleFile = (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (!err) return next()
-    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Dosya çok büyük (max 2MB)', 400))
-    return next(error('invalid_upload', 'Dosya yükleme hatası', 400))
+    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Gorsel boyutu en fazla 5 MB olabilir.', 400))
+    return next(error('invalid_upload', 'Dosya yukleme hatasi', 400))
   })
 }
 

@@ -19,10 +19,10 @@ export default function SidebarNav({ items, collapsed, onNavigate }) {
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            background: active ? 'var(--canteen-nav-active-bg, #e5e7eb)' : 'transparent',
-            color: active ? 'var(--canteen-nav-active-text, #111827)' : 'var(--canteen-nav-text, #6b7280)',
-            borderColor: active ? 'var(--canteen-nav-active-border, transparent)' : 'transparent',
-            boxShadow: active ? 'var(--canteen-nav-active-shadow, none)' : 'none'
+            background: active ? 'var(--menu-active-bg, var(--card-hover))' : 'transparent',
+            color: active ? 'var(--sidebar-nav-text-active, var(--text))' : 'var(--sidebar-nav-text, var(--muted))',
+            borderColor: active ? 'var(--border-hover, transparent)' : 'transparent',
+            boxShadow: 'none'
           }
         }
 
@@ -32,9 +32,9 @@ export default function SidebarNav({ items, collapsed, onNavigate }) {
               <span
                 className="nav-icon"
                 style={{
-                  background: active ? 'var(--canteen-nav-icon-active-bg, #111827)' : 'var(--canteen-nav-icon-bg, rgba(255,255,255,0.08))',
-                  color: active ? 'var(--canteen-nav-icon-active-text, #ffffff)' : 'var(--canteen-nav-icon-text, currentColor)',
-                  boxShadow: active ? 'var(--canteen-nav-icon-active-shadow, none)' : 'none'
+                  background: active ? 'var(--sidebar-nav-icon-active-bg, #111827)' : 'var(--sidebar-nav-icon-bg, rgba(255,255,255,0.08))',
+                  color: active ? 'var(--sidebar-nav-icon-active, #ffffff)' : 'var(--sidebar-nav-icon, currentColor)',
+                  boxShadow: 'none'
                 }}
               >
                 <Icon size={18} />

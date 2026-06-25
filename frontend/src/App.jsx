@@ -18,8 +18,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { BusinessSettingsProvider } from './context/BusinessSettingsContext.jsx'
 import StaffPage from './pages/StaffPage.jsx'
-import SettingsPage, { SettingsTablesContent, SettingsPaymentsContent } from './pages/SettingsPage.jsx'
-import { SettingsMenuHub, SettingsSystemContent } from './pages/BusinessSettingsPage.jsx'
+import SettingsPage, { SettingsTablesContent, SettingsPaymentsContent, SettingsSystemContent } from './pages/SettingsPage.jsx'
 import SettingsMePage from './pages/SettingsMePage.jsx'
 import SettingsDeliveryPage from './pages/SettingsDeliveryPage.jsx'
 import CategoriesPage from './pages/CategoriesPage.jsx'
@@ -50,7 +49,6 @@ import PublicTenantWebsitePage, { RootPublicEntryPage } from './pages/PublicTena
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
-import WebsiteLoadingScreen from './components/WebsiteLoadingScreen.jsx'
 import { hasAuthToken } from './lib/authStorage.js'
 
 import CanteenLayout from './canteen/layout/CanteenLayout.jsx'
@@ -58,6 +56,7 @@ import CanteenLogin from './canteen/pages/CanteenLogin.jsx'
 import CanteenCashierPage from './canteen/pages/CanteenCashierPage.jsx'
 import CanteenCustomersPage from './canteen/pages/CanteenCustomersPage.jsx'
 import CanteenCustomerDetailPage from './canteen/pages/CanteenCustomerDetailPage.jsx'
+import CanteenSalesPage from './canteen/pages/CanteenSalesPage.jsx'
 import CanteenReportsPage from './canteen/pages/CanteenReportsPage.jsx'
 import CanteenStockPage from './canteen/pages/CanteenStockPage.jsx'
 import CanteenSettingsLayout from './canteen/pages/CanteenSettingsLayout.jsx'
@@ -111,6 +110,7 @@ const resolveBackFallbackPath = (pathname) => {
   if (path.startsWith('/kermes/settings')) return '/kermes'
 
   if (path.startsWith('/canteen/cariler/')) return '/canteen/cariler'
+  if (path.startsWith('/canteen/yapilan-satislar/')) return '/canteen/yapilan-satislar'
   if (path.startsWith('/canteen/ayarlar')) return '/canteen/kasa'
   if (path.startsWith('/canteen/qr-siparisleri')) return '/canteen/kasa'
   if (path.startsWith('/canteen/stok')) return '/canteen/kasa'
@@ -261,13 +261,7 @@ const RootEntryRoute = () => {
   const { user, loading, tenantCtx } = useAuth()
 
   if (loading) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS"
-        title="Oturum kontrol ediliyor"
-        message="Acik oturum ve yonlendirme bilgileri hazirlaniyor."
-      />
-    )
+    return null
   }
 
   const nextPath = getDefaultRoute(user, tenantCtx)
@@ -279,13 +273,7 @@ const RootEntryRoute = () => {
 const KermesIndexRedirect = () => {
   const { user, loading, tenantCtx } = useAuth()
   if (loading) {
-    return (
-      <WebsiteLoadingScreen
-        badge="Restoran paneli"
-        title="Paneliniz hazirlaniyor"
-        message="Oturum ve abonelik bilgileri kontrol edilirken restoran akisiniz web sitesi temasi ile kuruluyor."
-      />
-    )
+    return null
   }
   if (!user) return <Navigate to="/login" replace />
 
@@ -324,6 +312,7 @@ export default function App() {
           <Route path="qr-siparisleri" element={<CanteenQrOrdersPage />} />
           <Route path="cariler" element={<CanteenCustomersPage />} />
           <Route path="cariler/:id" element={<CanteenCustomerDetailPage />} />
+          <Route path="yapilan-satislar" element={<CanteenSalesPage />} />
           <Route path="raporlar" element={<CanteenReportsPage />} />
           <Route path="stok" element={<CanteenStockPage />} />
           <Route path="print-station" element={<CanteenPrintStationPage />} />

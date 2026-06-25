@@ -2,21 +2,13 @@ import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getSubscriptionUpgradePath, isSubscriptionExpired } from '../lib/subscription.js'
-import WebsiteLoadingScreen from './WebsiteLoadingScreen.jsx'
 
 export default function ProtectedRoute({ roles, permissions, permissionsMode = 'all', system, allowExpired = false, children }) {
   const { user, loading, tenantCtx } = useAuth()
   const { pathname } = useLocation()
 
   if (loading) {
-    return (
-      <WebsiteLoadingScreen
-        badge="PenPOS girisi"
-        title="Oturum dogrulaniyor"
-        message="Yetkileriniz kontrol edilirken paneliniz web sitesi temasi ile hazirlaniyor."
-        compact
-      />
-    )
+    return null
   }
 
   if (!user) return <Navigate to="/login" replace />

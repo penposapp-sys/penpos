@@ -1,22 +1,17 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { error } from '../utils/errors.js'
+import { optimizeImageToWebp, validateImageUploadFile } from '../utils/imageUpload.js'
+import { resolveUploadDir } from '../utils/uploads.js'
 import { syncTenantLogoSettings, removeTenantLogoFiles } from '../services/businessSettingsService.js'
-
-const MAX_BYTES = 2 * 1024 * 1024
-const ALLOWED_MIME = new Map([
-  ['image/png', 'png'],
-  ['image/jpeg', 'jpg'],
-  ['image/webp', 'webp']
-])
 
 const ensureDir = async (dir) => {
   await fs.mkdir(dir, { recursive: true })
 }
 
-const getTenantDir = (tenantId) => path.join(process.cwd(), 'uploads', `tenant-${tenantId}`)
+const getTenantDir = (tenantId) => resolveUploadDir(`tenant-${tenantId}`)
 
-const normalizePublicLogoUrl = (tenantId, ext) => `/uploads/tenant-${tenantId}/logo.${ext}`
+const normalizePublicLogoUrl = (tenantId) => `/uploads/tenant-${tenantId}/logo.webp`
 
 export const uploadLogo = async (req, res) => {
   const tenantId = req.user?.tenantId
@@ -25,34 +20,24 @@ export const uploadLogo = async (req, res) => {
   const file = req.file
   if (!file) throw error('file_required', 'Dosya gerekli', 400)
 
-  const mime = String(file.mimetype || '').toLowerCase()
-  const ext = ALLOWED_MIME.get(mime)
-  if (!ext) throw error('invalid_file_type', 'Sadece png/jpg/webp kabul edilir', 400)
-  if (!file.buffer || file.buffer.length === 0) throw error('invalid_file', 'Dosya okunamadı', 400)
-  if (file.buffer.length > MAX_BYTES) throw error('file_too_large', 'Dosya çok büyük (max 2MB)', 400)
+  await validateImageUploadFile(file, { label: 'Logo' })
 
   const dir = getTenantDir(tenantId)
   await ensureDir(dir)
+  await removeTenantLogoFiles(tenantId)
 
-  await Promise.all([
-    safeUnlink(path.join(dir, 'logo.png')),
-    safeUnlink(path.join(dir, 'logo.jpg')),
-    safeUnlink(path.join(dir, 'logo.webp'))
-  ])
-
-  const filename = `logo.${ext}`
+  const optimized = await optimizeImageToWebp(file, { label: 'Logo' })
+  const filename = 'logo.webp'
   const target = path.join(dir, filename)
-  await fs.writeFile(target, file.buffer)
+  await fs.writeFile(target, optimized.buffer)
 
-  const logoUrl = normalizePublicLogoUrl(tenantId, ext)
+  const logoUrl = normalizePublicLogoUrl(tenantId)
   const logo = await syncTenantLogoSettings(tenantId, {
     url: logoUrl,
     fileName: filename,
-    mimeType: mime,
-    size: file.buffer.length,
+    mimeType: optimized.mimeType,
+    size: optimized.size
   })
-  const t = await Tenant.findById(tenantId).lean()
-  if (!t) throw error('not_found', 'Tenant not found', 404)
 
   return res.json({ success: true, logoUrl, logo })
 }
@@ -64,8 +49,6 @@ export const removeLogo = async (req, res) => {
   await removeTenantLogoFiles(tenantId)
 
   const logo = await syncTenantLogoSettings(tenantId, { url: '', fileName: '', mimeType: '', size: 0 })
-  const t = await Tenant.findById(tenantId).lean()
-  if (!t) throw error('not_found', 'Tenant not found', 404)
 
   return res.json({ success: true, logoUrl: '', logo })
 }

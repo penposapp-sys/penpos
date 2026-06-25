@@ -14,7 +14,7 @@ export default function ProductImageUploadField({
   onClearFile,
   onRemoveExisting,
   disabled = false,
-  helperText = 'JPG, PNG veya WEBP. Maksimum 1 MB.',
+  helperText = 'JPG, PNG veya WEBP. Maksimum 5 MB, otomatik olarak 800x800 WebP optimize edilir.',
   error = '',
   existingSizeLabel = ''
 }) {

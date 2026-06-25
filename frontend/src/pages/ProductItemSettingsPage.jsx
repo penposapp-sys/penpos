@@ -400,11 +400,11 @@ export default function ProductItemSettingsPage() {
                     return (
                       <div key={section.key} className="product-settings-section">
                         <button type="button" className={isOpen ? 'open' : ''} onClick={() => setOpenSection(isOpen ? '' : section.key)}>
-                          <div style={{ width: 42, height: 42, borderRadius: 14, background: isOpen ? '#f0a126' : '#fff4df', color: isOpen ? '#ffffff' : '#b7791f', display: 'grid', placeItems: 'center', fontWeight: 900 }}>{section.icon}</div>
+                          <div style={{ width: 42, height: 42, borderRadius: 14, background: isOpen ? 'var(--menu-active-bg, var(--card-hover))' : '#fff4df', color: isOpen ? 'var(--sidebar-nav-text-active, #ffffff)' : '#b7791f', display: 'grid', placeItems: 'center', fontWeight: 900 }}>{section.icon}</div>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ fontWeight: 950 }}>{section.title}</div>
                           </div>
-                          <div className="product-chip" style={{ background: isOpen ? 'rgba(255,255,255,0.15)' : '#f3f4f6', color: isOpen ? '#ffffff' : 'var(--app-text)' }}>{isOpen ? 'Kapat' : 'Aç'}</div>
+                          <div className="product-chip" style={{ background: isOpen ? 'rgba(255,255,255,0.15)' : 'var(--menu-active-bg, var(--card-hover))', color: isOpen ? '#ffffff' : 'var(--sidebar-nav-text-active, #ffffff)' }}>{isOpen ? 'Kapat' : 'Aç'}</div>
                         </button>
                         {isOpen ? <div className="product-settings-body">{renderSection(section.key)}</div> : null}
                       </div>
