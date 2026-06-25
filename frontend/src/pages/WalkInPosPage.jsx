@@ -40,8 +40,7 @@ export default function WalkInPosPage() {
   const { getSetting } = useBusinessSettings()
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
   const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
-  const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
-  const showProductImages = !isMobilePortrait || showMobileProductImages
+  const showProductImages = true
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const [categories, setCategories] = useState([])

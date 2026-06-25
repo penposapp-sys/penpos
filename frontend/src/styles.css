@@ -29,6 +29,10 @@
   --button-text: #111111;
   --button-active-bg: #111111;
   --button-active-text: #ffffff;
+  --button-selected-bg: #eef2f7;
+  --button-selected-border: #b8c1cc;
+  --button-selected-text: #111111;
+  --button-selected-shadow: 0 10px 24px rgba(107, 114, 128, 0.28);
   --button-border: #d1d5db;
   --button-disabled-bg: #e5e7eb;
   --button-disabled-text: #6b7280;
@@ -1863,18 +1867,19 @@ body.scroll-lock { overflow: hidden !important }
   }
 
   body.mobile-ui {
-    --ui-font-base: 10px;
-    --ui-font-sm: 8px;
-    --ui-font-lg: 10px;
+    --ui-font-base: 12.5px;
+    --ui-font-sm: 10px;
+    --ui-font-lg: 12.5px;
     --ui-btn-px: 10px;
     --ui-btn-py: 7px;
-    --ui-btn-minh: 38px;
-    --ui-card-pad: 10px;
+    --ui-btn-minh: 40px;
+    --ui-card-pad: 12px;
   }
 
   body.mobile-ui {
     font-size: var(--ui-font-base);
     line-height: 1.25;
+    font-weight: 500;
   }
 
   body.mobile-ui .title { font-size: var(--ui-font-lg) }
@@ -2966,7 +2971,7 @@ body.modal-open .qr-menu .menu-row:hover {
     max-width: 100%;
     color: var(--app-text, var(--text));
     opacity: 1;
-    font-size: 8.5px;
+    font-size: 10.5px;
     font-weight: 800;
     white-space: nowrap;
     overflow: hidden;
@@ -2983,7 +2988,7 @@ body.modal-open .qr-menu .menu-row:hover {
 
   .sale-cart-line__detail {
     display: block;
-    font-size: 8px;
+    font-size: 9.5px;
     white-space: nowrap;
     justify-self: end;
     text-align: right;
@@ -2993,11 +2998,11 @@ body.modal-open .qr-menu .menu-row:hover {
   }
 
   .sale-cart-line-status {
-    min-width: 60px;
-    height: 20px;
-    padding: 0 5px !important;
-    font-size: 8px !important;
-    line-height: 20px !important;
+    min-width: 68px;
+    height: 22px;
+    padding: 0 6px !important;
+    font-size: 10.5px !important;
+    line-height: 22px !important;
     justify-content: center;
     justify-self: start;
   }
@@ -3016,11 +3021,12 @@ body.modal-open .qr-menu .menu-row:hover {
 
   .sale-cart-line__action-btn {
     width: auto;
-    min-width: 22px;
-    height: 20px;
-    min-height: 20px;
-    padding: 0 3px;
-    font-size: 7px;
+    min-width: 26px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0 5px;
+    font-size: 9.5px;
+    font-weight: 700;
     line-height: 1;
   }
 
@@ -3037,19 +3043,19 @@ body.modal-open .qr-menu .menu-row:hover {
   }
 
   .sale-cart-line__actions .input {
-    width: 38px !important;
-    min-width: 38px;
-    height: 20px;
-    min-height: 20px;
+    width: 42px !important;
+    min-width: 42px;
+    height: 22px;
+    min-height: 22px;
     padding: 0 4px;
-    font-size: 8px;
+    font-size: 9.5px;
   }
 
   .sale-cart-line__price {
     justify-self: end;
     text-align: right;
     font-weight: 800;
-    font-size: 9px;
+    font-size: 11.5px;
     min-width: 0;
     overflow: visible;
     text-overflow: clip;
@@ -3929,10 +3935,11 @@ body.modal-open .qr-menu .menu-row:hover {
   }
 
   .saleCartModeBtn {
-    height: 32px;
-    min-height: 32px;
-    padding: 0 6px;
-    font-size: 8px !important;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 10.5px !important;
+    font-weight: 700;
     line-height: 1 !important;
     border-radius: 999px;
     display: inline-flex;
@@ -3945,9 +3952,10 @@ body.modal-open .qr-menu .menu-row:hover {
   }
 
   .saleCartModeChip {
-    min-height: 32px;
-    padding: 0 6px;
-    font-size: 8px !important;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 10.5px !important;
+    font-weight: 700;
     line-height: 1 !important;
     display: inline-flex;
     align-items: center;
@@ -5342,23 +5350,23 @@ textarea::placeholder {
 }
 
 .responsive-card-title {
-  font-size: clamp(14px, 1.45vw, 18px);
+  font-size: clamp(15px, 1.65vw, 19px);
   line-height: 1.2;
 }
 
 .responsive-card-value {
-  font-size: clamp(22px, 3.2vw, 28px);
+  font-size: clamp(26px, 3.6vw, 32px);
   line-height: 1.05;
 }
 
 .responsive-card-note {
-  font-size: clamp(11px, 1.15vw, 13px);
+  font-size: clamp(13px, 1.25vw, 15px);
   line-height: 1.45;
 }
 
 .responsive-card-badge {
   max-width: 100%;
-  font-size: clamp(10px, 1vw, 12px);
+  font-size: clamp(12px, 1.1vw, 14px);
   line-height: 1.2;
 }
 
@@ -5464,11 +5472,11 @@ button:hover::before {
   .filter-pill.active,
   .tab.active
 ) {
-  background: var(--button-active-bg) !important;
-  border-color: var(--button-active-bg) !important;
-  color: var(--button-active-text) !important;
+  background: var(--button-selected-bg, #ffffff) !important;
+  border-color: var(--button-selected-border, #d1d5db) !important;
+  color: var(--button-selected-text, #111111) !important;
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: var(--button-selected-shadow, 0 10px 24px rgba(107, 114, 128, 0.22)) !important;
 }
 
 :is(
@@ -5569,6 +5577,57 @@ html[data-theme="light"].theme-white :is(
   .theme-selection-card-selected
 ) :is(*, svg, svg *, path, circle, rect, g, use, span, i) {
   color: var(--button-active-text) !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white :is(
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  a.active,
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .theme-selection-card-selected
+) {
+  background: var(--button-selected-bg, #ffffff) !important;
+  border-color: var(--button-selected-border, #d1d5db) !important;
+  color: var(--button-selected-text, #111111) !important;
+  box-shadow: var(--button-selected-shadow, 0 10px 24px rgba(107, 114, 128, 0.22)) !important;
+}
+
+html[data-theme="light"].theme-white :is(
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  a.active,
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .theme-selection-card-selected
+) :is(*, svg, svg *, path, circle, rect, g, use, span, i) {
+  color: var(--button-selected-text, #111111) !important;
   fill: currentColor !important;
   stroke: currentColor !important;
 }
@@ -6245,9 +6304,10 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   [aria-pressed="true"],
   [aria-current="page"]
 ):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
-  background: #111111 !important;
-  color: #ffffff !important;
-  border-color: #111111 !important;
+  background: var(--button-selected-bg, #ffffff) !important;
+  color: var(--button-selected-text, #111111) !important;
+  border-color: var(--button-selected-border, #d1d5db) !important;
+  box-shadow: var(--button-selected-shadow, 0 10px 24px rgba(107, 114, 128, 0.22)) !important;
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
@@ -6302,9 +6362,16 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   [aria-pressed="true"],
   [aria-current="page"]
 ):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+  color: var(--button-selected-text, #111111) !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+body.app-shell-active button.productCard[data-has-image="true"]:is(:active, .active, .is-active, .selected, .is-selected, [aria-pressed="true"]) :is(.productCard__name, .productCard__price) {
   color: #ffffff !important;
   fill: currentColor !important;
   stroke: currentColor !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55) !important;
 }
 
 html[data-theme="light"].theme-white .nav-link .nav-icon {
@@ -7197,10 +7264,11 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 
   .saleCartModeBtn,
   .saleCartModeChip {
-    min-height: 28px;
-    height: 28px;
-    padding: 0 2px;
-    font-size: 8px;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 6px;
+    font-size: 10.5px;
+    font-weight: 700;
     line-height: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -7243,13 +7311,14 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   }
 
   .sale-cart-line__title {
-    font-size: 8px;
+    font-size: 10.5px;
+    font-weight: 800;
   }
 
   .sale-cart-line__detail {
     justify-self: start;
     text-align: left;
-    font-size: 7px;
+    font-size: 9.5px;
   }
 
   .sale-cart-line__meta {
@@ -7257,11 +7326,12 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   }
 
   .sale-cart-line-status {
-    min-width: 54px;
-    height: 18px;
-    padding: 0 4px !important;
-    font-size: 7px !important;
-    line-height: 18px !important;
+    min-width: 62px;
+    height: 22px;
+    padding: 0 6px !important;
+    font-size: 10.5px !important;
+    line-height: 22px !important;
+    font-weight: 800;
   }
 
   .sale-cart-line__actions {
@@ -7344,17 +7414,18 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .walkin-sales-page .saleCartFooterActions,
   .delivery-orders-page .delivery-detail-footer-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-auto-rows: 28px;
+    grid-auto-rows: 34px;
     gap: 4px 3px;
   }
 
   .saleCartFooterActionBtn,
   .walkin-sales-page .saleCartFooterActionBtn,
   .delivery-orders-page .saleCartFooterActionBtn {
-    height: 28px;
-    min-height: 28px;
-    padding: 0 4px;
-    font-size: 8px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 10.5px;
+    font-weight: 700;
     line-height: 1.05;
     border-radius: 10px;
     white-space: normal;
@@ -11769,6 +11840,16 @@ body.tenant-dark-mode,
   opacity: 0 !important;
 }
 
+.mobile-performance-mode .productCard[data-has-image="true"] .productCard__overlay {
+  opacity: 1 !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.76), rgba(0, 0, 0, 0.08)) !important;
+}
+
+.mobile-performance-mode .productCard[data-has-image="true"] :is(.productCard__name, .productCard__price) {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55) !important;
+}
+
 .mobile-performance-mode .productCard,
 .mobile-performance-mode .kasaProductCard,
 .mobile-performance-mode .kasaCategoryCard,
@@ -11890,6 +11971,11 @@ body.tenant-dark-mode,
   color: #111827 !important;
 }
 
+.mobile-performance-mode.mobile-system-light .productCard[data-has-image="true"] :is(.productCard__name, .productCard__price) {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55) !important;
+}
+
 .mobile-performance-mode.mobile-system-dark .pos-app-shell,
 .mobile-performance-mode.mobile-system-dark .card,
 .mobile-performance-mode.mobile-system-dark .salePanel,
@@ -11987,7 +12073,7 @@ body.tenant-dark-mode,
   .surface-button,
   .contrast-button
 ) {
-  color: #111111 !important;
+  color: #ffffff !important;
 }
 
 .mobile-performance-mode.mobile-system-dark :is(
@@ -12286,13 +12372,14 @@ body.tenant-dark-mode,
 }
 
 .canteen-cashier-page .kasaPaymentMethodButton[data-active="true"] {
-  background: var(--app-button-active-bg, var(--button-active-bg, #111111)) !important;
-  border-color: var(--app-button-active-bg, var(--button-active-bg, #111111)) !important;
-  color: var(--app-button-active-text, var(--button-active-text, #ffffff)) !important;
+  background: var(--button-selected-bg, #ffffff) !important;
+  border-color: var(--button-selected-border, #d1d5db) !important;
+  color: var(--button-selected-text, #111111) !important;
+  box-shadow: var(--button-selected-shadow, 0 10px 24px rgba(107, 114, 128, 0.22)) !important;
 }
 
 .canteen-cashier-page .kasaPaymentMethodButton[data-active="true"] :is(span, svg, svg *, i) {
-  color: #ffffff !important;
+  color: var(--button-selected-text, #111111) !important;
   fill: currentColor !important;
   stroke: currentColor !important;
 }
@@ -12348,4 +12435,57 @@ body.tenant-dark-mode,
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+.mobile-performance-mode :is(
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .category-pill.active,
+  .filter-pill.active,
+  .tab.active
+) {
+  background: var(--button-selected-bg, #ffffff) !important;
+  border-color: var(--button-selected-border, #d1d5db) !important;
+  color: var(--button-selected-text, #111111) !important;
+  box-shadow: var(--button-selected-shadow, 0 10px 24px rgba(107, 114, 128, 0.22)) !important;
+}
+
+.mobile-performance-mode :is(
+  button.active,
+  button.is-active,
+  button.selected,
+  button.is-selected,
+  .btn.active,
+  .btn.is-active,
+  .btn.selected,
+  .btn.is-selected,
+  .btn[aria-pressed="true"],
+  .btn[data-active="true"],
+  button[aria-pressed="true"],
+  button[data-active="true"],
+  [aria-current="page"],
+  .nav-link.active,
+  .sidebar-menu-button.active,
+  .sidebar-menu-button[aria-current="page"],
+  .category-pill.active,
+  .filter-pill.active,
+  .tab.active
+) :is(*, span, svg, svg *, i) {
+  color: var(--button-selected-text, #111111) !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
