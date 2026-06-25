@@ -1729,7 +1729,7 @@ export default function WalkInPosPage() {
                       infoStyle={isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
                       title={it?.nameSnapshot}
                       badge={badge ? (
-                        <span className="page-pill sale-cart-line-status" style={{ background: badge.bg, borderColor: badge.border, color: badge.color }}>
+                        <span className={`page-pill sale-cart-line-status${it?.status === 'open' ? ' sale-cart-line-status--open-dark' : ''}`} style={{ background: badge.bg, borderColor: badge.border, color: badge.color }}>
                           {badge.label}
                         </span>
                       ) : null}

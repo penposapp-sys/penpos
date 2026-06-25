@@ -1651,7 +1651,7 @@ export default function PosPage() {
                   </div>
                   <div className="sale-cart-line__meta">
                     {statusMeta && (
-                      <span className="page-pill sale-cart-line-status" style={{ background: statusMeta.bg, borderColor: statusMeta.border, color: statusMeta.color }}>
+                      <span className={`page-pill sale-cart-line-status${it?.status === 'open' ? ' sale-cart-line-status--open-dark' : ''}`} style={{ background: statusMeta.bg, borderColor: statusMeta.border, color: statusMeta.color }}>
                         {statusMeta.label}
                       </span>
                     )}

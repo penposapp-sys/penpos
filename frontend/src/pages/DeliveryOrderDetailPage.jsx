@@ -1434,7 +1434,7 @@ export default function DeliveryOrderDetailPage() {
                           style={{ opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1 }}
                           title={it?.nameSnapshot}
                           badge={m ? (
-                            <span className="page-pill sale-cart-line-status" style={{ background: m.bg, borderColor: m.border, color: m.color }}>
+                            <span className={`page-pill sale-cart-line-status${it?.status === 'open' ? ' sale-cart-line-status--open-dark' : ''}`} style={{ background: m.bg, borderColor: m.border, color: m.color }}>
                               {m.label}
                             </span>
                           ) : null}

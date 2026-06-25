@@ -1,90 +1,174 @@
 import WebsiteSettings from '../models/WebsiteSettings.js'
+import { error } from '../utils/errors.js'
 
 const withId = (prefix, index, value = {}) => ({
   ...value,
   id: String(value?.id || `${prefix}-${index + 1}`)
 })
 
+const INTERNAL_PATH_PATTERN = /^\/(?!\/)[^\s]*$/
+
 export const getDefaultWebsiteSettings = () => ({
   siteTitle: 'PenPOS',
-  siteDescription: 'Restoran, cafe, kantin ve marketler için ayri akisli modern bulut otomasyon sistemi.',
-  heroTitle: 'Restoran ve kantin sistemlerini ayri ayri yonet.',
-  heroDescription: 'PenPOS; restoran-cafe ve kantin-market için ayri girisleri, ayri ekran akislari olan modern otomasyon yapisidir. Restoran tarafinda QR menü standart olarak dahildir; her isletme istedigi kadar şube acabilir.',
+  siteDescription: 'Restoran, cafe, kantin ve marketler icin ayri akisli modern bulut otomasyon sistemi.',
+  heroTitle: 'Restoran ve kantin sistemlerini ayri ayri yonetin.',
+  heroSubtitle: 'YENI NESIL SATIS VE ADISYON YONETIMI',
+  heroDescription: 'PenPOS; restoran-cafe ve kantin-market icin ayri girisleri, ayri ekran akislari olan modern otomasyon yapisidir. Restoran tarafinda QR menu standart olarak dahildir; her isletme istedigi kadar sube acabilir.',
   trialDays: 7,
-  primaryCtaText: '1 Haftalik Ucretsiz Deneme Baslat',
-  secondaryCtaText: 'Uye Olmadan Önce Incele',
-  restaurantLoginUrl: '/login?type=restaurant',
-  marketLoginUrl: '/login?type=market',
+  primaryCtaText: '1 Haftalik Ucretsiz Deneme',
+  primaryCtaUrl: '/register',
+  secondaryCtaText: 'Giris Yap',
+  secondaryCtaUrl: '/login/restoran',
+  restaurantLoginText: 'Restoran Girisi',
+  restaurantLoginUrl: '/login/restoran',
+  canteenLoginText: 'Kantin Girisi',
+  canteenLoginUrl: '/canteen/login',
+  platformLoginText: 'Platform Girisi',
+  platformLoginUrl: '/platform/login',
+  marketLoginUrl: '/canteen/login',
   registerUrl: '/register',
-  whatsappUrl: '',
-  phone: '',
-  email: '',
+  whatsappUrl: 'https://wa.me/905313375562',
+  phone: '0531 337 55 62',
+  email: 'penpos.app@gmail.com',
   address: '',
+  androidButtonText: 'Android Uygulamasini Indir',
+  androidApkUrl: 'https://drive.google.com/uc?id=1_QZs8wYc0mtVSfPtBllJIXt5r-e9M9iv&export=download',
+  androidButtonActive: true,
+  footerText: '© 2026 PenPOS. Restoran, magaza ve market otomasyon sistemi.',
+  socialInstagramUrl: '',
+  socialFacebookUrl: '',
+  socialXUrl: '',
+  socialYoutubeUrl: '',
+  socialLinkedinUrl: '',
   features: [
-    { id: 'feature-1', icon: 'utensils', title: 'Restoran ve cafe adisyon sistemi', text: 'Masa, paket servis, gel-al, mutfak ciktisi ve QR menü dahil olacak sekilde restoran akislarini yonetin.', sortOrder: 1, active: true },
-    { id: 'feature-2', icon: 'store', title: 'Kantin ve market otomasyonu', text: 'Barkod okutun, hızlı satis yapin, cari hesaplari izleyin ve stok giris-cikislarini tek panelden takip edin.', sortOrder: 2, active: true },
-    { id: 'feature-3', icon: 'smartphone', title: 'Telefondan satis yapin', text: 'Kantin ve market sistemi telefon, tablet veya bilgisayardan online market mantigiyla satis yapmaya uygundur.', sortOrder: 3, active: true },
-    { id: 'feature-4', icon: 'qr', title: 'QR menü standart dahil', text: 'Restoran tarafinda QR menü ekstra modul degil, sistemin dogal parcasidir.', sortOrder: 4, active: true },
-    { id: 'feature-5', icon: 'layers', title: 'Sınırsız şube yapisi', text: 'Isletmenize ait istediginiz kadar şube acabilir ve hepsini ayni altyapidan yonetebilirsiniz.', sortOrder: 5, active: true },
-    { id: 'feature-6', icon: 'chart', title: 'Raporlama ve yazici desteği', text: 'Ciro, stok, cari ve satis raporlariyla birlikte fiş ve mutfak yazici akislari hazır gelir.', sortOrder: 6, active: true }
+    { id: 'feature-1', icon: 'store', title: 'Restoran / Cafe', text: 'Masa, adisyon, mutfak, paket servis, kurye ve QR menu akislari restoran tarafinda birlikte calisir.', sortOrder: 1, active: true },
+    { id: 'feature-2', icon: 'cart', title: 'Kantin / Market', text: 'Barkodlu hizli satis, urun fiyat listesi, stok ve online satis mantigi kantin tarafina uyarlanir.', sortOrder: 2, active: true },
+    { id: 'feature-3', icon: 'chart', title: 'Canli Raporlar', text: 'Z raporu, odeme tipleri, sube filtreleri ve cari bakiye gibi veriler tek panelde izlenir.', sortOrder: 3, active: true }
   ],
-  systemCards: [
-    { id: 'system-restaurant', type: 'restaurant', title: 'Restoran / Cafe Sistemi', description: 'Masa, adisyon, paket servis, mutfak ciktisi ve QR menü odakli ayri restoran paneli.', bullets: ['Masa ve adisyon', 'Mutfak ciktisi', 'Paket servis', 'QR menü dahil', 'Sınırsız şube acma'], active: true },
-    { id: 'system-market', type: 'market', title: 'Kantin / Market Sistemi', description: 'Online market programi gibi pratik calisir; telefon, tablet veya bilgisayardan satis yapilabilir.', bullets: ['Telefondan satis', 'Barkod okuma', 'Cari hesap', 'Stok giris-çıkış', 'Sınırsız şube acma'], active: true }
-  ],
-  pricingPlans: [
-    { id: 'plan-restaurant', name: 'Restoran / Cafe', price: '₺899', period: '/ ay', description: 'Masa, adisyon, paket servis, mutfak ve QR menü kullanimi için.', items: ['Masa ve adisyon', 'Paket servis', 'QR menü dahil', 'Sınırsız şube acma', 'Raporlar ve yazici'], popular: true, buttonText: 'Basvuru Yap / Uye Ol', buttonUrl: '/register?type=restaurant', active: true, sortOrder: 1 },
-    { id: 'plan-market', name: 'Kantin / Market', price: '₺399', period: '/ ay', description: 'Barkodlu satis, stok, cari ve hızlı kasa kullanimi için.', items: ['Telefondan satis', 'Barkod okuma', 'Cari hesap', 'Stok giris-çıkış', 'Sınırsız şube acma'], popular: false, buttonText: 'Basvuru Yap / Uye Ol', buttonUrl: '/register?type=market', active: true, sortOrder: 2 },
-    { id: 'plan-support', name: 'Kurulum & Destek', price: 'Ozel', period: '', description: 'Veri aktarma, yazici kurulumu veya ozel destek isteyen isletmeler için.', items: ['Ürün aktarimi', 'Şube kurulumu', 'Yazici kurulumu', 'Egitim destegi', 'Ozel yonlendirme'], popular: false, buttonText: 'Iletisime Gec', buttonUrl: '', active: true, sortOrder: 3 },
-    { id: 'plan-integration', name: 'Ozel Entegrasyon', price: 'Ozel', period: '', description: 'Ileri seviye bağlantı, ozel rapor veya isletmeye ozel gelistirme ihtiyaci olanlar için.', items: ['Ozel entegrasyon', 'Ek rapor gelistirme', 'Markaya ozel duzenleme', 'Teknik analiz', 'Proje bazli calisma'], popular: false, buttonText: 'Teklif Al', buttonUrl: '', active: true, sortOrder: 4 }
-  ],
+  systemCards: [],
+  pricingPlans: [],
   trainingVideos: [
     { id: 'video-1', title: 'Uyelik ve Ilk Kurulum', description: 'Ilk hesap acilisi ve panel tanitimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'general', active: true, sortOrder: 1 },
     { id: 'video-2', title: 'Restoran Satis Akisi', description: 'Masa ve adisyon akisinin temel kullanimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'restaurant', active: true, sortOrder: 2 },
-    { id: 'video-3', title: 'Kantin Barkodlu Satis', description: 'Hızlı kasa ve barkodlu satis ornegi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 3 },
-    { id: 'video-4', title: 'Stok Girisi / Cikisi', description: 'Stok hareketlerinin yönetimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 4 },
-    { id: 'video-5', title: 'Cari Hesap Kullanimi', description: 'Cari hesap takibi ve islemler.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'general', active: true, sortOrder: 5 },
-    { id: 'video-6', title: 'Raporlar ve Gün Sonu', description: 'Gün sonu ve raporlama ekranlari.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'general', active: true, sortOrder: 6 },
-    { id: 'video-7', title: 'Yazici Ayarlari', description: 'Fis ve mutfak yazıcısı ayarlari.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'general', active: true, sortOrder: 7 },
-    { id: 'video-8', title: 'QR Menü Kullanimi', description: 'QR menü paylasimi ve kullanimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'restaurant', active: true, sortOrder: 8 }
+    { id: 'video-3', title: 'Kantin Barkodlu Satis', description: 'Hizli kasa ve barkodlu satis ornegi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 3 }
   ],
-  integrations: [
-    { id: 'integration-1', name: 'Bulut Erisim', description: 'Telefon, tablet ve bilgisayardan ayni veri yapisina erisim.', active: true, sortOrder: 1 },
-    { id: 'integration-2', name: 'Yazici Altyapisi', description: 'Fis, mutfak ve hızlı kasa yazici akislarini destekler.', active: true, sortOrder: 2 },
-    { id: 'integration-3', name: 'Rapor Altyapisi', description: 'Şube, satis ve operasyon raporlarini birlikte sunar.', active: true, sortOrder: 3 }
-  ],
+  integrations: [],
   seoTitle: 'PenPOS | Restoran ve Kantin Otomasyonu',
   seoDescription: 'PenPOS ile restoran/cafe ve kantin/market akislari ayri girislerle yonetilir. QR menu dahil, sinirsiz sube ve raporlama hazir.',
-  seoKeywords: 'penpos,pos,restoran otomasyonu,kantin otomasyonu,market otomasyonu,qr menü',
+  seoKeywords: 'penpos,pos,restoran otomasyonu,kantin otomasyonu,market otomasyonu,qr menu',
   isPublished: true
 })
 
-const normalizeString = (value, fallback = '') => String(value ?? fallback).trim()
+const stripHtml = (value) => String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+const normalizeString = (value, fallback = '') => {
+  if (value === undefined || value === null) return fallback
+  return stripHtml(value)
+}
 const normalizeBoolean = (value, fallback = false) => value === undefined ? fallback : !!value
 const normalizeNumber = (value, fallback = 0) => {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
-const normalizeStringList = (list = []) => Array.isArray(list) ? list.map((item) => normalizeString(item)).filter(Boolean) : []
+const normalizeStringList = (list = []) => Array.isArray(list) ? list.map((item) => stripHtml(item)).filter(Boolean) : []
+
+const normalizeLink = (value, options = {}) => {
+  const {
+    fallback = '',
+    fieldLabel = 'Link',
+    allowInternal = true,
+    allowHttps = true,
+    allowMailto = false,
+    allowTel = false
+  } = options
+
+  const raw = stripHtml(value || fallback)
+  if (!raw) return ''
+
+  if (allowInternal && INTERNAL_PATH_PATTERN.test(raw)) return raw
+
+  try {
+    const url = new URL(raw)
+    const allowedProtocols = new Set([
+      ...(allowHttps ? ['https:'] : []),
+      ...(allowMailto ? ['mailto:'] : []),
+      ...(allowTel ? ['tel:'] : [])
+    ])
+    if (!allowedProtocols.has(url.protocol)) {
+      throw error('invalid_link', `${fieldLabel} gecersiz`, 400)
+    }
+    return url.toString()
+  } catch (err) {
+    if (err?.payload?.error === 'invalid_link') throw err
+    throw error('invalid_link', `${fieldLabel} gecersiz`, 400)
+  }
+}
 
 export const normalizeWebsiteSettings = (input = {}) => {
   const defaults = getDefaultWebsiteSettings()
   const source = { ...defaults, ...(input || {}) }
+
+  const restaurantLoginUrl = normalizeLink(source.restaurantLoginUrl, {
+    fallback: defaults.restaurantLoginUrl,
+    fieldLabel: 'Restoran giris linki'
+  })
+  const canteenLoginUrl = normalizeLink(source.canteenLoginUrl ?? source.marketLoginUrl, {
+    fallback: defaults.canteenLoginUrl,
+    fieldLabel: 'Kantin giris linki'
+  })
+  const platformLoginUrl = normalizeLink(source.platformLoginUrl, {
+    fallback: defaults.platformLoginUrl,
+    fieldLabel: 'Platform giris linki'
+  })
+  const primaryCtaUrl = normalizeLink(source.primaryCtaUrl ?? source.registerUrl, {
+    fallback: defaults.primaryCtaUrl,
+    fieldLabel: 'Ana buton linki'
+  })
+  const secondaryCtaUrl = normalizeLink(source.secondaryCtaUrl, {
+    fallback: defaults.secondaryCtaUrl,
+    fieldLabel: 'Ikinci buton linki'
+  })
+
   return {
     siteTitle: normalizeString(source.siteTitle, defaults.siteTitle),
     siteDescription: normalizeString(source.siteDescription, defaults.siteDescription),
     heroTitle: normalizeString(source.heroTitle, defaults.heroTitle),
+    heroSubtitle: normalizeString(source.heroSubtitle, defaults.heroSubtitle),
     heroDescription: normalizeString(source.heroDescription, defaults.heroDescription),
     trialDays: normalizeNumber(source.trialDays, defaults.trialDays),
     primaryCtaText: normalizeString(source.primaryCtaText, defaults.primaryCtaText),
+    primaryCtaUrl,
     secondaryCtaText: normalizeString(source.secondaryCtaText, defaults.secondaryCtaText),
-    restaurantLoginUrl: normalizeString(source.restaurantLoginUrl, defaults.restaurantLoginUrl),
-    marketLoginUrl: normalizeString(source.marketLoginUrl, defaults.marketLoginUrl),
-    registerUrl: normalizeString(source.registerUrl, defaults.registerUrl),
-    whatsappUrl: normalizeString(source.whatsappUrl, defaults.whatsappUrl),
+    secondaryCtaUrl,
+    restaurantLoginText: normalizeString(source.restaurantLoginText, defaults.restaurantLoginText),
+    restaurantLoginUrl,
+    canteenLoginText: normalizeString(source.canteenLoginText, defaults.canteenLoginText),
+    canteenLoginUrl,
+    platformLoginText: normalizeString(source.platformLoginText, defaults.platformLoginText),
+    platformLoginUrl,
+    marketLoginUrl: canteenLoginUrl,
+    registerUrl: normalizeLink(source.registerUrl ?? primaryCtaUrl, {
+      fallback: defaults.registerUrl,
+      fieldLabel: 'Kayit linki'
+    }),
+    whatsappUrl: normalizeLink(source.whatsappUrl, {
+      fallback: defaults.whatsappUrl,
+      fieldLabel: 'WhatsApp linki'
+    }),
     phone: normalizeString(source.phone, defaults.phone),
     email: normalizeString(source.email, defaults.email),
     address: normalizeString(source.address, defaults.address),
+    androidButtonText: normalizeString(source.androidButtonText, defaults.androidButtonText),
+    androidApkUrl: normalizeLink(source.androidApkUrl, {
+      fallback: defaults.androidApkUrl,
+      fieldLabel: 'APK indirme linki'
+    }),
+    androidButtonActive: normalizeBoolean(source.androidButtonActive, defaults.androidButtonActive),
+    footerText: normalizeString(source.footerText, defaults.footerText),
+    socialInstagramUrl: normalizeLink(source.socialInstagramUrl, { fieldLabel: 'Instagram linki' }),
+    socialFacebookUrl: normalizeLink(source.socialFacebookUrl, { fieldLabel: 'Facebook linki' }),
+    socialXUrl: normalizeLink(source.socialXUrl, { fieldLabel: 'X linki' }),
+    socialYoutubeUrl: normalizeLink(source.socialYoutubeUrl, { fieldLabel: 'YouTube linki' }),
+    socialLinkedinUrl: normalizeLink(source.socialLinkedinUrl, { fieldLabel: 'LinkedIn linki' }),
     features: (Array.isArray(source.features) ? source.features : defaults.features).map((item, index) => ({
       id: normalizeString(withId('feature', index, item).id),
       icon: normalizeString(item?.icon),
@@ -110,7 +194,7 @@ export const normalizeWebsiteSettings = (input = {}) => {
       items: normalizeStringList(item?.items),
       popular: normalizeBoolean(item?.popular, false),
       buttonText: normalizeString(item?.buttonText),
-      buttonUrl: normalizeString(item?.buttonUrl),
+      buttonUrl: normalizeLink(item?.buttonUrl, { fieldLabel: `${item?.name || 'Paket'} buton linki` }),
       active: normalizeBoolean(item?.active, true),
       sortOrder: normalizeNumber(item?.sortOrder, index + 1)
     })),
@@ -118,7 +202,7 @@ export const normalizeWebsiteSettings = (input = {}) => {
       id: normalizeString(withId('video', index, item).id),
       title: normalizeString(item?.title),
       description: normalizeString(item?.description),
-      youtubeUrl: normalizeString(item?.youtubeUrl),
+      youtubeUrl: normalizeLink(item?.youtubeUrl, { fieldLabel: `${item?.title || 'Video'} linki` }),
       category: ['general', 'restaurant', 'market'].includes(String(item?.category || '').trim()) ? String(item.category).trim() : 'general',
       active: normalizeBoolean(item?.active, true),
       sortOrder: normalizeNumber(item?.sortOrder, index + 1)

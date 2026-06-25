@@ -35,6 +35,7 @@ import { sendError } from './utils/errors.js'
 import { UPLOADS_STATIC_DIRS } from './utils/uploads.js'
 import debugRouter from './routes/debug.js'
 import canteenRouter from './modules/canteen/routes/canteen.js'
+import { getPublicWebsiteSettings } from './controllers/websiteSettingsController.js'
 
 export const createServer = () => {
   const app = express()
@@ -142,6 +143,7 @@ export const createServer = () => {
   app.use('/api/tenant/menu-items', requireAuth, tenantGuard, requireActiveSubscription, menuItemsRouter)
   app.use('/api/pos', requireAuth, tenantGuard, requireActiveSubscription, posRouter)
   app.use('/api/public', publicRouter)
+  app.get('/api/website-settings/public', getPublicWebsiteSettings)
   app.use('/api/debug', debugRouter)
   try { console.log('[DEBUG_STAMP]', 'branch_fix_v5', process.cwd()) } catch {}
   try {

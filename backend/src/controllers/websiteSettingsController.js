@@ -10,7 +10,7 @@ export const getPublicWebsiteSettings = async (_req, res) => {
   }
 }
 
-export const getPlatformWebsiteSettings = async (_req, res) => {
+export const getSuperadminWebsiteSettings = async (_req, res) => {
   try {
     const settings = await getWebsiteSettingsService()
     res.json({ success: true, settings })
@@ -19,7 +19,7 @@ export const getPlatformWebsiteSettings = async (_req, res) => {
   }
 }
 
-export const updatePlatformWebsiteSettings = async (req, res) => {
+export const updateSuperadminWebsiteSettings = async (req, res) => {
   try {
     const settings = await updateWebsiteSettingsService(req.body || {})
     res.json({ success: true, settings, message: 'Website settings updated' })

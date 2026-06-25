@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import SuperadminTenants from './pages/SuperadminTenants.jsx'
+import SuperadminWebsiteSettings from './pages/SuperadminWebsiteSettings.jsx'
 import PlatformAdminTenants from './pages/PlatformAdminTenants.jsx'
 import PlatformAdminPlans from './pages/PlatformAdminPlans.jsx'
 import PlatformAdminMembershipRequests from './pages/PlatformAdminMembershipRequests.jsx'
@@ -293,6 +294,7 @@ export default function App() {
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<LoginSelectionPage />} />
         <Route path="/platform-login" element={<PlatformLogin />} />
+        <Route path="/platform/login" element={<Navigate to="/platform-login" replace />} />
         <Route path="/login/platform" element={<Navigate to="/platform-login" replace />} />
         <Route path="/login/restoran" element={<SignIn portal="restaurant" />} />
         <Route path="/login/kantin" element={<Navigate to="/canteen/login" replace />} />
@@ -341,6 +343,7 @@ export default function App() {
           <Route path="platform/payments" element={<Navigate to="/platform/billing-requests" replace />} />
           <Route path="platform/settings/me" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><SettingsMePage apiBase="/api/platform" /></ProtectedRoute>} />
           <Route path="superadmin/tenants" element={<ProtectedRoute roles={['superadmin']}><SuperadminTenants /></ProtectedRoute>} />
+          <Route path="superadmin/website-settings" element={<ProtectedRoute roles={['superadmin']}><SuperadminWebsiteSettings /></ProtectedRoute>} />
         </Route>
 
         <Route path="/platform/tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />

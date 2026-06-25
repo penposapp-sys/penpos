@@ -10747,6 +10747,70 @@ body.public-site-layout .card.public-touch-card {
   --login-muted: #6f6258;
 }
 
+.system-login--platform .system-login__form-side {
+  background:
+    radial-gradient(circle at top left, rgba(217, 181, 111, 0.16), transparent 34%),
+    linear-gradient(180deg, #f7efe1 0%, #efe4d2 100%);
+}
+
+.system-login--platform .system-login__back,
+.system-login--platform .system-login__logo-sub,
+.system-login--platform .system-login__form-head p,
+.system-login--platform .system-login__field span,
+.system-login--platform .system-login__register-copy,
+.system-login--platform .system-login__register p,
+.system-login--platform .system-login__support-item,
+.system-login--platform .system-login__meta label,
+.system-login--platform .system-login__meta span {
+  color: #5f5248;
+}
+
+.system-login--platform .system-login__text-link,
+.system-login--platform .system-login__toggle {
+  color: #9a5b37;
+}
+
+.system-login--platform .system-login__text-link {
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
+.system-login--platform .system-login__input {
+  background: rgba(255, 251, 245, 0.88);
+  border-color: rgba(191, 151, 98, 0.34);
+  color: #1c1511;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.48);
+}
+
+.system-login--platform .system-login__input::placeholder {
+  color: #b5a695;
+}
+
+.system-login--platform .system-login__input:focus {
+  border-color: rgba(184, 115, 75, 0.62);
+  box-shadow: 0 0 0 4px rgba(184, 115, 75, 0.14);
+}
+
+.system-login--platform .system-login__submit {
+  background: linear-gradient(135deg, #fffaf3 0%, #f4eadb 100%);
+  color: #1b140f;
+  border: 1px solid rgba(191, 151, 98, 0.28);
+  box-shadow: 0 18px 32px rgba(191, 151, 98, 0.22);
+}
+
+.system-login--platform .system-login__support {
+  background: rgba(255, 249, 240, 0.55);
+  border-color: rgba(191, 151, 98, 0.2);
+}
+
+.system-login--platform .system-login__support strong {
+  color: #b8734b;
+}
+
+.system-login--platform .system-login__support-item b {
+  color: #221815;
+}
+
 .system-login__shell {
   height: calc(100dvh - 40px);
   min-height: calc(100dvh - 40px);
@@ -12073,7 +12137,45 @@ body.tenant-dark-mode,
   .surface-button,
   .contrast-button
 ) {
+  color: #111111 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .pos-layout,
+  .walkin-sales-page,
+  .delivery-orders-page
+) .sale-cart-line-status--open-dark {
   color: #ffffff !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .pos-layout,
+  .walkin-sales-page,
+  .delivery-orders-page
+) .sale-cart-line__action-btn--note {
+  background: #2a2d33 !important;
+  border-color: #4b5563 !important;
+  color: #f9fafb !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .pos-layout,
+  .walkin-sales-page,
+  .delivery-orders-page
+) .sale-cart-line__action-btn--ready {
+  background: #dcfce7 !important;
+  border-color: #22c55e !important;
+  color: #166534 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .pos-layout,
+  .walkin-sales-page,
+  .delivery-orders-page
+) .sale-cart-line__action-btn--cancel {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #991b1b !important;
 }
 
 .mobile-performance-mode.mobile-system-dark :is(

@@ -35,7 +35,7 @@ export default function RegisterPage() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const res = await api('/api/public/website-settings', {
+      const res = await api('/api/website-settings/public', {
         silent: true,
         skipBranchHeader: true,
         cacheTtlMs: 10000
@@ -169,7 +169,7 @@ export default function RegisterPage() {
             </button>
             <Link
               className="marketing-btn marketing-btn--ghost"
-              to={form.businessType === 'market' ? settings.marketLoginUrl || '/login?type=market' : settings.restaurantLoginUrl || '/login?type=restaurant'}
+              to={form.businessType === 'market' ? settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login' : settings.restaurantLoginUrl || '/login/restoran'}
             >
               Mevcut Hesabım Var
             </Link>

@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { api } from '../lib/apiClient.js'
 import { defaultWebsiteSettings } from '../constants/websiteSettings.js'
@@ -77,6 +77,18 @@ const scrollToSection = (event, targetId) => {
   if (!element) return
   const top = Math.max(0, window.scrollY + element.getBoundingClientRect().top - 84)
   window.scrollTo({ top, behavior: 'smooth' })
+}
+
+const isInternalLink = (value) => /^\/(?!\/)/.test(String(value || '').trim())
+
+const openWebsiteLink = (value, navigate) => {
+  const target = String(value || '').trim()
+  if (!target) return
+  if (isInternalLink(target)) {
+    navigate(target)
+    return
+  }
+  window.location.assign(target)
 }
 
 function Header({ settings, onOpenSystems, onRegister, onLogin }) {
@@ -276,7 +288,7 @@ function PricingCard({ title, text, highlight, buttonTo }) {
       </div>
       <div className="lp-pricing-price">Özel</div>
       <p>{text}</p>
-      <Link className={`lp-pricing-btn ${highlight ? 'is-highlight' : ''}`} to={buttonTo}>1 Hafta Ücretsiz Dene</Link>
+      <a className={`lp-pricing-btn ${highlight ? 'is-highlight' : ''}`} href={buttonTo}>1 Hafta Ücretsiz Dene</a>
       <div className="lp-pricing-list">
         {['QR menü dahil', 'Sınırsız şube mantığı', 'Restoran ve mağaza ayrı akış', 'Canlı raporlar', 'Eğitim videoları'].map((item) => (
           <div key={item}><Icon name="check" className="lp-pricing-check" />{item}</div>
@@ -293,9 +305,9 @@ export default function LandingPage() {
   const nav = useNavigate()
   const showAndroidDownload = (() => {
     try {
-      return !Capacitor.isNativePlatform()
+      return !Capacitor.isNativePlatform() && settings.androidButtonActive !== false && !!settings.androidApkUrl
     } catch {
-      return true
+      return settings.androidButtonActive !== false && !!settings.androidApkUrl
     }
   })()
 
@@ -308,7 +320,7 @@ export default function LandingPage() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const res = await api('/api/public/website-settings', {
+      const res = await api('/api/website-settings/public', {
         silent: true,
         skipBranchHeader: true,
         cacheTtlMs: 10000
@@ -327,11 +339,6 @@ export default function LandingPage() {
       metaDescription.setAttribute('content', settings?.seoDescription || settings?.siteDescription || '')
     }
   }, [settings?.seoDescription, settings?.siteDescription])
-
-  const featureCards = useMemo(() => {
-    const list = Array.isArray(settings.features) ? settings.features : []
-    return list.filter((item) => item?.active !== false).slice(0, 3)
-  }, [settings.features])
 
   const trainingVideos = useMemo(() => {
     const list = Array.isArray(settings.trainingVideos) ? settings.trainingVideos : []
@@ -1658,8 +1665,8 @@ export default function LandingPage() {
 
       <Header
         settings={settings}
-        onRegister={() => nav(`${settings.registerUrl || '/register'}?type=restaurant`)}
-        onLogin={() => nav('/login')}
+        onRegister={() => openWebsiteLink(settings.primaryCtaUrl || '/register', nav)}
+        onLogin={() => setLoginOpen(true)}
         onOpenSystems={(event) => {
           setActive('restaurant')
           scrollToSection(event, 'sistemler')
@@ -1672,21 +1679,24 @@ export default function LandingPage() {
           <div className="lp-hero-right-glow" />
           <div className="lp-hero-inner">
             <div className="lp-hero-copy">
-              <div className="lp-hero-badge"><span className="lp-hero-badge-dot" /> YENİ NESİL SATIŞ VE ADİSYON YÖNETİMİ</div>
+              <div className="lp-hero-badge"><span className="lp-hero-badge-dot" /> {settings.heroSubtitle || 'YENI NESIL SATIS VE ADISYON YONETIMI'}</div>
               <h1><span>{settings.heroTitle || 'Restoran ve mağaza sistemlerini ayrı ayrı yönetin.'}</span></h1>
               <p>{settings.heroDescription || 'PenPOS; Restoran-Cafe ve Mağaza-Market için ayrı girişleri, ayrı ekran akışları olan modern otomasyon yapısıdır.'}</p>
               <div className="lp-hero-actions">
-                <button className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => nav('/register')}>1 Haftalık Ücretsiz Deneme</button>
-                <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => nav('/login')}>Giriş Yap</button>
+                <button className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => openWebsiteLink(settings.primaryCtaUrl || '/register', nav)}>
+                  {settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}
+                </button>
+                <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => openWebsiteLink(settings.secondaryCtaUrl || '/login/restoran', nav)}>
+                  {settings.secondaryCtaText || 'Giris Yap'}
+                </button>
                 {showAndroidDownload ? (
-                  <a
+                  <button
                     className="lp-hero-download"
-                    href="https://drive.google.com/uc?id=1_QZs8wYc0mtVSfPtBllJIXt5r-e9M9iv&export=download"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    type="button"
+                    onClick={() => openWebsiteLink(settings.androidApkUrl, nav)}
                   >
-                    Android Uygulamasını İndir
-                  </a>
+                    {settings.androidButtonText || 'Android Uygulamasini Indir'}
+                  </button>
                 ) : null}
               </div>
               <div className="lp-hero-points">
@@ -1771,8 +1781,8 @@ export default function LandingPage() {
           <div className="lp-pricing-band-inner">
             <SectionTitle eyebrow="Fiyatlandırma" title="1 haftalık ücretsiz deneme ile başlayın." text="Demo talep etmek yerine kullanıcı doğrudan deneyebilir; giriş yap alanı mevcut üyeler için açık kalır." />
             <div className="lp-pricing-grid">
-              <PricingCard title="Başlangıç" text="İşletmenize, şube sayınıza ve kullanım yoğunluğunuza göre özelleştirilir." buttonTo={`${settings.registerUrl || '/register'}?type=restaurant`} />
-              <PricingCard title="Restoran + Mağaza" text="İşletmenize, şube sayınıza ve kullanım yoğunluğunuza göre özelleştirilir." highlight buttonTo={`${settings.registerUrl || '/register'}?type=market`} />
+              <PricingCard title="Başlangıç" text="İşletmenize, şube sayınıza ve kullanım yoğunluğunuza göre özelleştirilir." buttonTo={settings.primaryCtaUrl || '/register'} />
+              <PricingCard title="Restoran + Mağaza" text="İşletmenize, şube sayınıza ve kullanım yoğunluğunuza göre özelleştirilir." highlight buttonTo={settings.primaryCtaUrl || '/register'} />
             </div>
           </div>
         </section>
@@ -1794,22 +1804,22 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <a
-        href="https://wa.me/905313375562"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="lp-floating-whatsapp"
-        aria-label="WhatsApp hattı"
-      >
-        <span className="lp-floating-whatsapp-icon">
-          <Icon name="whatsapp" />
-        </span>
-        <span className="lp-floating-whatsapp-copy">
-          <strong>WhatsApp</strong>
-          <strong>Hattı</strong>
-          <span>Çevrimiçi</span>
-        </span>
-      </a>
+      {settings.whatsappUrl ? (
+        <a
+          href={settings.whatsappUrl}
+          className="lp-floating-whatsapp"
+          aria-label="WhatsApp hattı"
+        >
+          <span className="lp-floating-whatsapp-icon">
+            <Icon name="whatsapp" />
+          </span>
+          <span className="lp-floating-whatsapp-copy">
+            <strong>WhatsApp</strong>
+            <strong>Hatti</strong>
+            <span>Cevirimici</span>
+          </span>
+        </a>
+      ) : null}
 
       <footer className="lp-footer">
         <div className="lp-footer-inner">
@@ -1817,12 +1827,17 @@ export default function LandingPage() {
           <div className="lp-footer-contact">
             <div className="lp-footer-contact-title">İletişim</div>
             <div className="lp-footer-contact-links">
-              <a href="mailto:penpos.app@gmail.com">penpos.app@gmail.com</a>
-              <a href="tel:+905313375562">0531 337 55 62</a>
-              <a href="https://wa.me/905313375562" target="_blank" rel="noopener noreferrer">WhatsApp: 0531 337 55 62</a>
+              {settings.email ? <a href={`mailto:${settings.email}`}>{settings.email}</a> : null}
+              {settings.phone ? <a href={`tel:${settings.phone}`}>{settings.phone}</a> : null}
+              {settings.whatsappUrl ? <a href={settings.whatsappUrl}>WhatsApp</a> : null}
+              {settings.socialInstagramUrl ? <a href={settings.socialInstagramUrl}>Instagram</a> : null}
+              {settings.socialFacebookUrl ? <a href={settings.socialFacebookUrl}>Facebook</a> : null}
+              {settings.socialXUrl ? <a href={settings.socialXUrl}>X</a> : null}
+              {settings.socialYoutubeUrl ? <a href={settings.socialYoutubeUrl}>YouTube</a> : null}
+              {settings.socialLinkedinUrl ? <a href={settings.socialLinkedinUrl}>LinkedIn</a> : null}
             </div>
           </div>
-          <div className="lp-footer-copy">© 2026 PenPOS. Restoran, mağaza ve market otomasyon sistemi.</div>
+          <div className="lp-footer-copy">{settings.footerText || '© 2026 PenPOS. Restoran, mağaza ve market otomasyon sistemi.'}</div>
         </div>
       </footer>
 
@@ -1838,15 +1853,20 @@ export default function LandingPage() {
               <button className="lp-close" type="button" onClick={() => setLoginOpen(false)}>×</button>
             </div>
             <div className="lp-login-grid">
-              <button type="button" className="lp-login-card lp-login-card--dark public-touch-card" onClick={() => nav(settings.restaurantLoginUrl || '/login?type=restaurant')}>
+              <button type="button" className="lp-login-card lp-login-card--dark public-touch-card" onClick={() => openWebsiteLink(settings.restaurantLoginUrl || '/login/restoran', nav)}>
                 <Icon name="store" className="lp-login-icon" />
-                <strong>Restoran / Cafe Girişi</strong>
+                <strong>{settings.restaurantLoginText || 'Restoran Girisi'}</strong>
                 <p>Masa, adisyon, paket servis, mutfak ve QR menü akışı.</p>
               </button>
-              <button type="button" className="lp-login-card lp-login-card--accent public-touch-card" onClick={() => nav(settings.marketLoginUrl || '/login?type=market')}>
+              <button type="button" className="lp-login-card lp-login-card--accent public-touch-card" onClick={() => openWebsiteLink(settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login', nav)}>
                 <Icon name="cart" className="lp-login-icon" />
-                <strong>Mağaza / Market Girişi</strong>
+                <strong>{settings.canteenLoginText || 'Kantin Girisi'}</strong>
                 <p>Barkodlu hızlı satış, stok hareketi ve cari hesap akışı.</p>
+              </button>
+              <button type="button" className="lp-login-card lp-login-card--dark public-touch-card" onClick={() => openWebsiteLink(settings.platformLoginUrl || '/platform/login', nav)}>
+                <Icon name="chart" className="lp-login-icon" />
+                <strong>{settings.platformLoginText || 'Platform Girisi'}</strong>
+                <p>Platform ve super admin yonetim girisi.</p>
               </button>
             </div>
           </div>
@@ -1855,5 +1875,3 @@ export default function LandingPage() {
     </div>
   )
 }
-
-

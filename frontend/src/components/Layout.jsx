@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRef } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Users as IconTenant } from 'lucide-react'
+import { Globe2 as IconWebsite, Users as IconTenant } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import BranchSelectorModal from './BranchSelectorModal.jsx'
@@ -107,6 +107,7 @@ export default function Layout() {
     else if (pathname.startsWith('/login/restoran')) document.title = 'PenPOS - Restoran Girisi'
     else if (pathname.startsWith('/login/kantin')) document.title = 'PenPOS - Mağaza Girişi'
     else if (pathname === '/') document.title = 'PenPOS - Giris Secimi'
+    else if (pathname.startsWith('/superadmin/website-settings')) document.title = 'PenPOS - Web Site Ayarlari'
     else if (pathname.startsWith('/superadmin/tenants')) document.title = 'PenPOS - Uyeler'
     else if (pathname.startsWith('/platform/billing-requests')) document.title = 'PenPOS - Uyelik Talepleri'
     else if (pathname.startsWith('/platform/kermes-tenants')) document.title = 'PenPOS - Kermes Uyeler'
@@ -182,6 +183,7 @@ export default function Layout() {
     items.push({ path: '/', label: 'Giris', icon: IconLogin, show: true })
   } else if (user.role === 'superadmin') {
     items.push({ path: '/superadmin/tenants', label: 'Uyeler', icon: IconTenant, show: true })
+    items.push({ path: '/superadmin/website-settings', label: 'Web Site Ayarlari', icon: IconWebsite, show: true })
     items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
     items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })

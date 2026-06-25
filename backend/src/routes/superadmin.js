@@ -4,6 +4,7 @@ import { requireRole } from '../middlewares/requireRole.js'
 import { sendError } from '../utils/errors.js'
 import { createTenantService, listTenantsService, extendTrialService, endTrialService, editTenantService, softDeleteTenantService, createTenantAdminService } from '../services/superadminService.js'
 import { updateTenantStatusService, hardDeleteTenantService } from '../services/platformAdminService.js'
+import { getSuperadminWebsiteSettings, updateSuperadminWebsiteSettings } from '../controllers/websiteSettingsController.js'
 
 const router = Router()
 
@@ -89,5 +90,8 @@ router.put('/tenants/:tenantId/trial-end', requireAuth, requireRole(['superadmin
     sendError(res, err)
   }
 })
+
+router.get('/website-settings', requireAuth, requireRole(['superadmin']), getSuperadminWebsiteSettings)
+router.put('/website-settings', requireAuth, requireRole(['superadmin']), updateSuperadminWebsiteSettings)
 
 export default router
