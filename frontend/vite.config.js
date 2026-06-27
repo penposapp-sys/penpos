@@ -2,6 +2,10 @@ import { defineConfig } from 'vite'
 
 export default defineConfig(({ mode }) => {
   return {
+    define: {
+      'process.env': {},
+      process: { env: {} }
+    },
     server: {
       host: true,
       port: 5173

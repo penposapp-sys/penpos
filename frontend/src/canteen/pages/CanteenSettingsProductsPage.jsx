@@ -88,6 +88,8 @@ export default function CanteenSettingsProductsPage() {
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY_FORM)
+  const [categoryImageFile, setCategoryImageFile] = useState(null)
+  const [categoryImageError, setCategoryImageError] = useState('')
   const [categorySaving, setCategorySaving] = useState(false)
 
   const [branches, setBranches] = useState([])
@@ -393,6 +395,8 @@ export default function CanteenSettingsProductsPage() {
 
   const openNewCategory = () => {
     setCategoryForm(EMPTY_CATEGORY_FORM)
+    setCategoryImageFile(null)
+    setCategoryImageError('')
     setCategoryModalOpen(true)
   }
 
@@ -404,7 +408,39 @@ export default function CanteenSettingsProductsPage() {
       imageUrl: String(category?.imageUrl || ''),
       sortOrder: String(category?.sortOrder ?? '0')
     })
+    setCategoryImageFile(null)
+    setCategoryImageError('')
     setCategoryModalOpen(true)
+  }
+
+  const uploadCategoryImage = async (categoryIdToUpload, file, branchId) => {
+    if (!categoryIdToUpload || !file || !branchId) return null
+    const formData = new FormData()
+    formData.append('file', file)
+    return api(`/api/canteen/categories/${encodeURIComponent(categoryIdToUpload)}/image?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'POST',
+      body: formData,
+      silent: true
+    })
+  }
+
+  const removeCategoryImage = async () => {
+    const branchId = String(selectedBranchId || '').trim()
+    const id = String(categoryForm.id || '').trim()
+    if (!branchId || !id) return
+    const response = await api(`/api/canteen/categories/${encodeURIComponent(id)}/image?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'DELETE',
+      silent: true
+    })
+    if (!response?.ok) {
+      toast.error(response?.message || 'Kategori görseli kaldırılamadı')
+      return
+    }
+    setCategoryForm((current) => ({ ...current, imageUrl: '' }))
+    setCategoryImageFile(null)
+    setCategoryImageError('')
+    await loadCategories(branchId)
+    toast.success('Kategori görseli kaldırıldı')
   }
 
   const submitCategory = async () => {
@@ -412,6 +448,10 @@ export default function CanteenSettingsProductsPage() {
     const branchId = String(selectedBranchId || '').trim()
     if (!branchId) {
       toast.error('Önce şube seçin')
+      return
+    }
+    if (categoryImageError) {
+      toast.error(categoryImageError)
       return
     }
     if (!String(categoryForm.name || '').trim()) {
@@ -429,18 +469,31 @@ export default function CanteenSettingsProductsPage() {
         data: {
           name: categoryForm.name,
           description: categoryForm.description,
-          imageUrl: categoryForm.imageUrl,
+          imageUrl: categoryImageFile ? '' : categoryForm.imageUrl,
           sortOrder: parseLocaleNumber(categoryForm.sortOrder) || 0
         },
         silent: true
       }
     )
-    setCategorySaving(false)
     if (!response?.ok) {
+      setCategorySaving(false)
       toast.error(response?.message || 'Kategori kaydedilemedi')
       return
     }
+    const savedCategoryId = String(response?.category?.id || categoryForm.id || '').trim()
+    if (savedCategoryId && categoryImageFile) {
+      const uploadResponse = await uploadCategoryImage(savedCategoryId, categoryImageFile, branchId)
+      if (!uploadResponse?.ok) {
+        setCategorySaving(false)
+        toast.error(uploadResponse?.message || 'Kategori görseli yüklenemedi')
+        await loadCategories(branchId)
+        return
+      }
+    }
+    setCategorySaving(false)
     setCategoryModalOpen(false)
+    setCategoryImageFile(null)
+    setCategoryImageError('')
     await loadCategories(branchId)
     toast.success(isEdit ? 'Kategori güncellendi' : 'Kategori eklendi')
   }
@@ -665,7 +718,12 @@ export default function CanteenSettingsProductsPage() {
         </div>
       </div>
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Ürün Düzenle">
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Ürün Düzenle"
+        dialogStyle={{ width: 'min(920px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 24px)' }}
+      >
         <div style={{ display: 'grid', gap: 10 }}>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
@@ -729,7 +787,12 @@ export default function CanteenSettingsProductsPage() {
         </div>
       </Modal>
 
-      <Modal open={categoryModalOpen} onClose={() => setCategoryModalOpen(false)} title={categoryForm.id ? 'Kategori Düzenle' : 'Yeni Kategori'}>
+      <Modal
+        open={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        title={categoryForm.id ? 'Kategori Düzenle' : 'Yeni Kategori'}
+        dialogStyle={{ width: 'min(920px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 24px)' }}
+      >
         <div style={{ display: 'grid', gap: 10 }}>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori Adı</div>
@@ -740,8 +803,23 @@ export default function CanteenSettingsProductsPage() {
             <textarea className="input" value={categoryForm.description} onChange={(event) => setCategoryForm((current) => ({ ...current, description: event.target.value }))} disabled={!canManage} style={{ minHeight: 96, paddingTop: 12 }} />
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel URL</div>
-            <input className="input" value={categoryForm.imageUrl} onChange={(event) => setCategoryForm((current) => ({ ...current, imageUrl: event.target.value }))} disabled={!canManage} placeholder="https://..." />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel Yükle</div>
+            <ProductImageUploadField
+              currentImageUrl={categoryForm.imageUrl}
+              file={categoryImageFile}
+              error={categoryImageError}
+              disabled={!canManage || categorySaving}
+              helperText="JPG, PNG veya WEBP. Maksimum 5 MB, kategori kartı için optimize edilerek saklanır."
+              onFileChange={(nextFile, validationMessage) => {
+                setCategoryImageError(validationMessage || '')
+                setCategoryImageFile(validationMessage ? null : nextFile)
+              }}
+              onClearFile={() => {
+                setCategoryImageFile(null)
+                setCategoryImageError('')
+              }}
+              onRemoveExisting={categoryForm.id ? removeCategoryImage : undefined}
+            />
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sıralama</div>

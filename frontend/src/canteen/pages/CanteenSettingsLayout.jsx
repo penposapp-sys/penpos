@@ -1,10 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { CreditCard, Globe, Package, Printer, QrCode, Settings, Store, UserRound, Users, Warehouse } from 'lucide-react'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { isSubscriptionExpired } from '../../lib/subscription.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 
 const ROOT_PATH = '/canteen/ayarlar'
+
+const SETTINGS_ICONS = {
+  website: Globe,
+  account: UserRound,
+  system: Store,
+  branches: Warehouse,
+  staff: Users,
+  printers: Printer,
+  payments: CreditCard,
+  billing: Package,
+  products: Package,
+  qr: QrCode,
+  settings: Settings,
+}
+
+function SettingsGlyph({ icon, size = 20, strokeWidth = 2.1 }) {
+  const Icon = SETTINGS_ICONS[icon]
+  if (!Icon) return <Settings size={size} strokeWidth={strokeWidth} aria-hidden="true" />
+  return <Icon size={size} strokeWidth={strokeWidth} aria-hidden="true" />
+}
 
 function buildSettingsThemeVars(theme) {
   const dark = theme?.darkMode === true
@@ -36,21 +57,23 @@ function buildSettingsThemeVars(theme) {
 function getSettingsItems(isExpired) {
   if (isExpired) {
     return [
-      { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabım', icon: '👤', filterGroup: 'İşletme', section: 'Hesap', desc: 'Giriş bilgileri, şifre ve kullanıcı hesabı' },
-      { key: 'plan', path: '/canteen/ayarlar/paket', label: 'Üyelik ve Paket', icon: '🧾', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' }
+      { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
+      { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'Isletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
+      { key: 'plan', path: '/canteen/ayarlar/paket', label: 'Uyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
     ]
   }
 
   return [
-    { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabım', icon: '👤', filterGroup: 'İşletme', section: 'Hesap', desc: 'Giriş bilgileri, şifre ve kullanıcı hesabı' },
-    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'İşletme Ayarları', icon: '🏪', filterGroup: 'İşletme', section: 'İşletme', desc: 'Firma bilgileri, tema, fiş ve genel sistem tercihleri' },
-    { key: 'branches', path: '/canteen/ayarlar/subeler', label: 'Şube Ayarları', icon: '🏢', filterGroup: 'İşletme', section: 'İşletme', desc: 'Şube listesi, aktiflik ve şubeye bağlı personel' },
-    { key: 'staff', path: '/canteen/ayarlar/personel', label: 'Personel Ayarları', icon: '👥', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, şifre, yetki ve aktiflik yönetimi' },
-    { key: 'printers', path: '/canteen/ayarlar/yazicilar', label: 'Yazıcı Ayarları', icon: '🖨️', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fiş ve etiket yazıcıları' },
-    { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Ödeme Seçenekleri', icon: '💳', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat seçenekleri' },
-    { key: 'billing', path: '/canteen/ayarlar/paket', label: 'Paket ve Satın Alma', icon: '🧾', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanım ve faturalandırma' },
-    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Ürün Ayarları', icon: '🛒', filterGroup: 'Ürün', section: 'Ürün', desc: 'Ürün, kategori, stok ve görünüm düzeni' },
-    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'QR Ayarları', icon: '📱', filterGroup: 'Dijital', section: 'Dijital', desc: 'Müşteri QR sipariş sayfası ve yayın ayarları' }
+    { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
+    { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'Isletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
+    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Isletme Ayarlari', icon: 'system', filterGroup: 'Isletme', section: 'Isletme', desc: 'Firma bilgileri, tema, fis ve genel sistem tercihleri' },
+    { key: 'branches', path: '/canteen/ayarlar/subeler', label: 'Sube Ayarlari', icon: 'branches', filterGroup: 'Isletme', section: 'Isletme', desc: 'Sube listesi, aktiflik ve subeye bagli personel' },
+    { key: 'staff', path: '/canteen/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'Isletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
+    { key: 'printers', path: '/canteen/ayarlar/yazicilar', label: 'Yazici Ayarlari', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fis ve etiket yazicilari' },
+    { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satis', section: 'Satis', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
+    { key: 'billing', path: '/canteen/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
+    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Urun', section: 'Urun', desc: 'Urun, kategori, stok ve gorunum duzeni' },
+    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'QR Ayarlari', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri QR siparis sayfasi ve yayin ayarlari' },
   ]
 }
 
@@ -206,7 +229,7 @@ function SettingsTopHeader({ title, subtitle, icon, rightSlot, compact = false }
             flexShrink: 0
           }}
         >
-          {icon}
+          <SettingsGlyph icon={icon} size={compact ? 18 : 20} />
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: compact ? 18 : 24, fontWeight: 950, letterSpacing: '-0.03em', lineHeight: 1.05 }}>{title}</div>
@@ -368,7 +391,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           {settingsCards.map((item) => (
             <button key={item.key} type="button" className="canteen-settings-home-card" onClick={() => openSettingsPage(item.to)}>
               <div className="canteen-settings-home-cardtop">
-                <div className="canteen-settings-home-icon">{item.icon}</div>
+                <div className="canteen-settings-home-icon"><SettingsGlyph icon={item.icon} size={22} /></div>
                 <div className="canteen-settings-home-badge">{item.badge}</div>
               </div>
               <h3>{item.title}</h3>
@@ -522,7 +545,7 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
                         }}
                       >
                         <div className="canteen-settings-side-linkmain">
-                          <div className="canteen-settings-side-linkicon">{item.icon}</div>
+                          <div className="canteen-settings-side-linkicon"><SettingsGlyph icon={item.icon} size={18} /></div>
                           <div className="canteen-settings-side-linkmeta">
                             <div className="canteen-settings-side-linktitle">{item.label}</div>
                             <div className="canteen-settings-side-linkdesc">{item.desc}</div>

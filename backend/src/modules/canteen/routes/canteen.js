@@ -89,6 +89,8 @@ router.use(requireActiveSubscription)
 router.get('/catalog/categories', canteenBranchHeaderGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.MANAGE_MENU, PERMISSIONS.CANTEEN_POS_ACCESS]), catalogCtrl.listCategories)
 router.post('/catalog/categories', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createCategory)
 router.put('/catalog/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateCategory)
+router.post('/catalog/categories/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), uploadSingleFile, catalogCtrl.uploadCategoryImage)
+router.delete('/catalog/categories/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeCategoryImage)
 router.delete('/catalog/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeCategory)
 router.get('/catalog/products', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.MANAGE_MENU, PERMISSIONS.CANTEEN_POS_ACCESS]), catalogCtrl.listProducts)
 // Alias: products list should be accessible from POS / product view / settings
@@ -113,6 +115,8 @@ router.get(
 )
 router.post('/categories', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.createCategory)
 router.put('/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateCategory)
+router.post('/categories/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), uploadSingleFile, catalogCtrl.uploadCategoryImage)
+router.delete('/categories/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeCategoryImage)
 router.delete('/categories/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeCategory)
 
 router.get(

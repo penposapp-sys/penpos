@@ -3,6 +3,13 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getSubscriptionUpgradePath, isSubscriptionExpired } from '../lib/subscription.js'
 
+const normalizeSystemType = (value) => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'canteen' || raw === 'kantin') return 'canteen'
+  if (raw === 'restaurant' || raw === 'kermes') return 'kermes'
+  return raw
+}
+
 export default function ProtectedRoute({ roles, permissions, permissionsMode = 'all', system, allowExpired = false, children }) {
   const { user, loading, tenantCtx } = useAuth()
   const { pathname } = useLocation()
@@ -18,10 +25,14 @@ export default function ProtectedRoute({ roles, permissions, permissionsMode = '
   }
 
   if (system) {
-    if (user.systemType !== system) {
+    const expectedSystem = normalizeSystemType(system)
+    const userSystem = normalizeSystemType(user.systemType)
+    const tenantSystem = normalizeSystemType(tenantCtx?.tenant?.systemType)
+
+    if (userSystem !== expectedSystem) {
       return <div className="card">403 - Bu sistem icin yetkiniz yok</div>
     }
-    if (tenantCtx?.tenant?.systemType && tenantCtx.tenant.systemType !== system) {
+    if (tenantSystem && tenantSystem !== expectedSystem) {
       return <div className="card">403 - Bu sistem icin yetkiniz yok</div>
     }
   }

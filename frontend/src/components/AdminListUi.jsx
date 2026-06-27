@@ -36,8 +36,8 @@ export function AdminFilterField({ label, children }) {
   )
 }
 
-export function AdminTableCard({ children }) {
-  return <div className="admin-table-card">{children}</div>
+export function AdminTableCard({ children, className = '' }) {
+  return <div className={['admin-table-card', className].filter(Boolean).join(' ')}>{children}</div>
 }
 
 export function AdminStatusBadge({ tone = 'neutral', children }) {

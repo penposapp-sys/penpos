@@ -69,6 +69,7 @@ export function BusinessSettingsProvider({ children }) {
   const [error, setError] = useState('')
 
   const canLoad = !!user?.tenantId && (user.role === 'tenant_admin' || user.role === 'staff')
+  const isPublicScope = themeScope === 'public'
   const storageScope = useMemo(() => {
     if (user?.role === 'platform_admin' || user?.role === 'superadmin') return 'platform'
     if (isCanteenSystemType(user?.systemType)) return 'canteen'
@@ -77,7 +78,7 @@ export function BusinessSettingsProvider({ children }) {
   }, [themeScope, user?.role, user?.systemType, user?.tenantId])
 
   const refresh = async () => {
-    if (!canLoad) {
+    if (isPublicScope || !canLoad) {
       setSettings(getInitialBusinessSettings(storageScope))
       setTenant(null)
       setBranches([])
@@ -122,19 +123,38 @@ export function BusinessSettingsProvider({ children }) {
   useEffect(() => {
     if (authLoading) return
     refresh()
-  }, [authLoading, canLoad, storageScope, user?.tenantId, user?.role, user?.systemType])
+  }, [authLoading, canLoad, isPublicScope, storageScope, user?.tenantId, user?.role, user?.systemType])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
 
     const root = document.documentElement
     const body = document.body
+    const publicDefaults = mergeBusinessSettings()
     const themeId = normalizeThemeId(settings?.appearance?.themeId || 'white')
     const darkMode = settings?.appearance?.darkMode === true
     const fontSize = String(settings?.appearance?.fontSize || 'medium')
     const animationsEnabled = settings?.appearance?.animationsEnabled !== false
     const colorfulProducts = settings?.appearance?.colorfulProducts === true
     const language = String(settings?.notifications?.language || 'tr').trim() || 'tr'
+
+    if (isPublicScope) {
+      root.dataset.businessLanguage = String(publicDefaults?.notifications?.language || 'tr')
+      root.dataset.fontSize = String(publicDefaults?.appearance?.fontSize || 'medium')
+      body?.classList.remove('tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
+      body?.classList.add(`tenant-font-${String(publicDefaults?.appearance?.fontSize || 'medium')}`)
+
+      root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
+      body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
+
+      setThemeKey('white')
+      setDarkMode(false)
+
+      return () => {
+        root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
+        body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products', 'tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
+      }
+    }
 
     root.dataset.businessLanguage = language
     root.dataset.fontSize = fontSize
@@ -169,7 +189,7 @@ export function BusinessSettingsProvider({ children }) {
       root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
       body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products', `tenant-font-${fontSize}`)
     }
-  }, [isMobileRuntime, setDarkMode, setThemeKey, settings, storageScope])
+  }, [isMobileRuntime, isPublicScope, setDarkMode, setThemeKey, settings, storageScope])
 
   const value = useMemo(() => ({
     settings,

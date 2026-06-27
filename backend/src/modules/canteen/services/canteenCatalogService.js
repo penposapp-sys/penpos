@@ -92,9 +92,32 @@ export const updateCategory = async (tenantId, branchId, id, input) => {
 }
 
 export const removeCategory = async (tenantId, branchId, id) => {
+  const current = await catRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Kategori bulunamadi', 404)
   const deleted = await catRepo.softDeleteByIdAndScope(id, tenantId, branchId)
   if (!deleted) throw error('not_found', 'Kategori bulunamadi', 404)
+  await deleteProductImageFile(current.imageUrl)
   return { success: true }
+}
+
+export const uploadCategoryImage = async (tenantId, branchId, id, file) => {
+  const current = await catRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Kategori bulunamadi', 404)
+
+  const saved = await replaceProductImageFile(current.imageUrl, file)
+  const updated = await catRepo.updateByIdAndScope(id, tenantId, branchId, { imageUrl: saved.imageUrl, updatedAt: new Date() })
+  if (!updated) throw error('not_found', 'Kategori bulunamadi', 404)
+  return mapCategoryDto(updated)
+}
+
+export const removeCategoryImage = async (tenantId, branchId, id) => {
+  const current = await catRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Kategori bulunamadi', 404)
+
+  await deleteProductImageFile(current.imageUrl)
+  const updated = await catRepo.updateByIdAndScope(id, tenantId, branchId, { imageUrl: '', updatedAt: new Date() })
+  if (!updated) throw error('not_found', 'Kategori bulunamadi', 404)
+  return mapCategoryDto(updated)
 }
 
 export const listProducts = async (tenantId, branchIds) => {

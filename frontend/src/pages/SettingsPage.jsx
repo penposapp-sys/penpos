@@ -704,6 +704,14 @@ export default function SettingsPage() {
             group: 'Dijital',
             description: 'Public menü, QR indir, masa QR ve görünüm'
           },
+          {
+            key: 'website',
+            to: '/kermes/settings/website',
+            label: 'Web Site Ayarları',
+            icon: 'business',
+            group: 'Dijital',
+            description: 'Bu sayfa henüz hazırlanmadı'
+          },
         ]
       })
     }
@@ -718,6 +726,14 @@ export default function SettingsPage() {
           icon: 'billing',
           group: 'Finans',
           description: 'Plan yükseltme ve ödeme adımları'
+        },
+        {
+          key: 'website',
+          to: '/kermes/settings/website',
+          label: 'Web Site Ayarları',
+          icon: 'business',
+          group: 'Dijital',
+          description: 'Bu sayfa henüz hazırlanmadı'
         }]
       })
     }

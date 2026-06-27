@@ -65,7 +65,7 @@ function Logo({ settings }) {
     <a href="#top" className="lp-logo" aria-label="Sayfanın başına dön">
       <img src="/images/landing-logo.png" alt={settings.siteTitle || 'PenPOS'} className="lp-logo-image" />
       <div>
-        <div className="lp-logo-subtitle">Restoran • Mağaza • Market</div>
+        <div className="lp-logo-subtitle">{settings.brandSubtitle || 'Restoran • Mağaza • Market'}</div>
       </div>
     </a>
   )
@@ -99,14 +99,14 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
       <div className="lp-header">
         <Logo settings={settings} />
         <nav className="lp-nav">
-          <a href="#sistemler" onClick={onOpenSystems}>Sistemler <Icon name="chevron" className="lp-nav-icon" /></a>
-          <a href="#raporlar" onClick={(event) => scrollToSection(event, 'raporlar')}>Özellikler <Icon name="chevron" className="lp-nav-icon" /></a>
-          <a href="#fiyat">Fiyat</a>
-          <a href="#egitim">Eğitim Videoları</a>
+          <a href="#sistemler" onClick={onOpenSystems}>{settings.headerSystemsLabel || 'Sistemler'} <Icon name="chevron" className="lp-nav-icon" /></a>
+          <a href="#raporlar" onClick={(event) => scrollToSection(event, 'raporlar')}>{settings.headerFeaturesLabel || 'Ozellikler'} <Icon name="chevron" className="lp-nav-icon" /></a>
+          <a href="#fiyat">{settings.headerPricingLabel || 'Fiyat'}</a>
+          <a href="#egitim">{settings.headerTrainingLabel || 'Egitim Videolari'}</a>
         </nav>
         <div className="lp-header-actions">
-          <button className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={onLogin}>Giriş Yap</button>
-          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={onRegister}>1 Hafta Ücretsiz Dene</button>
+          <button className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={onLogin}>{settings.secondaryCtaText || 'Giris Yap'}</button>
+          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={onRegister}>{settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}</button>
         </div>
         <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü">
           <Icon name={open ? 'x' : 'menu'} className="lp-menu-icon" />
@@ -114,12 +114,12 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
       </div>
       {open ? (
         <div className="lp-mobile-nav">
-          <a href="#sistemler" onClick={(event) => { setOpen(false); onOpenSystems?.(event) }}>Sistemler</a>
-          <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>Özellikler</a>
-          <a href="#fiyat" onClick={() => setOpen(false)}>Fiyat</a>
-          <a href="#egitim" onClick={() => setOpen(false)}>Eğitim Videoları</a>
-          <button className="lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => { setOpen(false); onLogin?.() }}>Giriş Yap</button>
-          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => { setOpen(false); onRegister?.() }}>1 Hafta Ücretsiz Dene</button>
+          <a href="#sistemler" onClick={(event) => { setOpen(false); onOpenSystems?.(event) }}>{settings.headerSystemsLabel || 'Sistemler'}</a>
+          <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>{settings.headerFeaturesLabel || 'Ozellikler'}</a>
+          <a href="#fiyat" onClick={() => setOpen(false)}>{settings.headerPricingLabel || 'Fiyat'}</a>
+          <a href="#egitim" onClick={() => setOpen(false)}>{settings.headerTrainingLabel || 'Egitim Videolari'}</a>
+          <button className="lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => { setOpen(false); onLogin?.() }}>{settings.secondaryCtaText || 'Giris Yap'}</button>
+          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => { setOpen(false); onRegister?.() }}>{settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}</button>
         </div>
       ) : null}
     </header>
@@ -279,18 +279,18 @@ function FeatureCard({ icon, title, text }) {
   )
 }
 
-function PricingCard({ title, text, highlight, buttonTo }) {
+function PricingCard({ title, price, text, items = [], buttonText, highlight, buttonTo }) {
   return (
     <div className={`lp-pricing-card ${highlight ? 'is-highlight' : ''}`}>
       <div className="lp-pricing-head">
         <h3>{title}</h3>
         {highlight ? <span>Popüler</span> : null}
       </div>
-      <div className="lp-pricing-price">Özel</div>
+      <div className="lp-pricing-price">{price || 'Ozel'}</div>
       <p>{text}</p>
-      <a className={`lp-pricing-btn ${highlight ? 'is-highlight' : ''}`} href={buttonTo}>1 Hafta Ücretsiz Dene</a>
+      <a className={`lp-pricing-btn ${highlight ? 'is-highlight' : ''}`} href={buttonTo}>{buttonText || '1 Haftalik Ucretsiz Deneme'}</a>
       <div className="lp-pricing-list">
-        {['QR menü dahil', 'Sınırsız şube mantığı', 'Restoran ve mağaza ayrı akış', 'Canlı raporlar', 'Eğitim videoları'].map((item) => (
+        {items.map((item) => (
           <div key={item}><Icon name="check" className="lp-pricing-check" />{item}</div>
         ))}
       </div>
@@ -300,7 +300,6 @@ function PricingCard({ title, text, highlight, buttonTo }) {
 
 export default function LandingPage() {
   const [settings, setSettings] = useState(defaultWebsiteSettings)
-  const [loginOpen, setLoginOpen] = useState(false)
   const [active, setActive] = useState('restaurant')
   const nav = useNavigate()
   const showAndroidDownload = (() => {
@@ -341,33 +340,65 @@ export default function LandingPage() {
   }, [settings?.seoDescription, settings?.siteDescription])
 
   const trainingVideos = useMemo(() => {
-    const list = Array.isArray(settings.trainingVideos) ? settings.trainingVideos : []
+    const source = Array.isArray(settings.trainingVideos) && settings.trainingVideos.length ? settings.trainingVideos : defaultWebsiteSettings.trainingVideos
+    const list = Array.isArray(source) ? source : []
     return list
       .filter((item) => item?.active !== false)
       .slice(0, 3)
-      .map((item) => {
-        if (item?.id === 'video-1') {
-          return { ...item, title: 'Üyelik ve İlk Kurulum', description: 'İlk hesap açılışı ve panel tanıtımı.' }
-        }
-        if (item?.id === 'video-2') {
-          return { ...item, title: 'Restoran Satış Akışı', description: 'Masa ve adisyon akışının temel kullanımı.' }
-        }
-        if (item?.id === 'video-3') {
-          return { ...item, title: 'Mağaza Barkodlu Satış', description: 'Hızlı kasa ve barkodlu satış örneği.' }
-        }
-        return item
-      })
+      .sort((a, b) => (a?.sortOrder || 0) - (b?.sortOrder || 0))
   }, [settings.trainingVideos])
 
+  const features = useMemo(() => {
+    const source = Array.isArray(settings.features) && settings.features.length ? settings.features : defaultWebsiteSettings.features
+    const list = Array.isArray(source) ? source : []
+    return list
+      .filter((item) => item?.active !== false)
+      .sort((a, b) => (a?.sortOrder || 0) - (b?.sortOrder || 0))
+      .slice(0, 3)
+  }, [settings.features])
+
+  const pricingPlans = useMemo(() => {
+    const source = Array.isArray(settings.pricingPlans) && settings.pricingPlans.length ? settings.pricingPlans : defaultWebsiteSettings.pricingPlans
+    const list = Array.isArray(source) ? source : []
+    return list
+      .filter((item) => item?.active !== false)
+      .sort((a, b) => (a?.sortOrder || 0) - (b?.sortOrder || 0))
+      .slice(0, 3)
+  }, [settings.pricingPlans])
+
+  const heroPoints = [settings.heroPointOne, settings.heroPointTwo, settings.heroPointThree].filter(Boolean)
+  const pageThemeStyle = {
+    '--lp-bg-start': settings.themeBackgroundStart || '#1c1714',
+    '--lp-bg-end': settings.themeBackgroundEnd || '#000000',
+    '--lp-header-bg': settings.themeHeaderBackground || '#080706',
+    '--lp-surface': settings.themeSurfaceColor || '#11100f',
+    '--lp-accent': settings.themeAccentColor || '#b8734b',
+    '--lp-accent-text': settings.themeAccentTextColor || '#ffffff',
+    '--lp-text': settings.themeTextColor || '#ffffff',
+    '--lp-muted-text': settings.themeMutedTextColor || '#b7ada6',
+    '--lp-border': settings.themeBorderColor || '#6e625a',
+    '--lp-footer-bg': settings.themeFooterBackground || '#000000'
+  }
+
   return (
-    <div id="top" className="lp-page">
+    <div id="top" className="lp-page" style={pageThemeStyle}>
       <style>{`
         html { scroll-behavior: smooth; }
         .lp-page {
+          --lp-bg-start: #1c1714;
+          --lp-bg-end: #000000;
+          --lp-header-bg: #080706;
+          --lp-surface: #11100f;
+          --lp-accent: #b8734b;
+          --lp-accent-text: #ffffff;
+          --lp-text: #ffffff;
+          --lp-muted-text: #b7ada6;
+          --lp-border: #6e625a;
+          --lp-footer-bg: #000000;
           min-height: 100vh;
           background:
-            radial-gradient(circle at top, rgba(28,23,20,.95) 0%, rgba(9,8,7,.92) 38%, rgba(0,0,0,1) 100%);
-          color: #fff;
+            radial-gradient(circle at top, var(--lp-bg-start) 0%, var(--lp-bg-start) 38%, var(--lp-bg-end) 100%);
+          color: var(--lp-text);
         }
         .lp-shell {
           width: min(1280px, calc(100% - 40px));
@@ -378,9 +409,9 @@ export default function LandingPage() {
           top: 0;
           z-index: 50;
           padding: 0 20px;
-          background: rgba(8,7,6,.95);
+          background: color-mix(in srgb, var(--lp-header-bg) 95%, transparent);
           backdrop-filter: blur(20px);
-          border-bottom: 1px solid rgba(110,98,90,.2);
+          border-bottom: 1px solid color-mix(in srgb, var(--lp-border) 20%, transparent);
         }
         .lp-header {
           width: min(1280px, 100%);
@@ -408,7 +439,7 @@ export default function LandingPage() {
         .lp-logo-subtitle {
           margin-top: -2px;
           font-size: 11px;
-          color: rgba(183,173,166,.55);
+          color: color-mix(in srgb, var(--lp-muted-text) 55%, transparent);
           font-weight: 500;
         }
         .lp-nav {
@@ -416,7 +447,7 @@ export default function LandingPage() {
           align-items: center;
           justify-content: center;
           gap: 40px;
-          color: rgba(255,255,255,.9);
+          color: var(--lp-text);
           font-size: 14px;
           font-weight: 500;
           min-width: 0;
@@ -460,12 +491,12 @@ export default function LandingPage() {
         }
         .lp-btn--primary {
           border-radius: 10px;
-          background: #b8734b;
+          background: var(--lp-accent);
           padding: 12px 20px;
-          color: #fff;
+          color: var(--lp-accent-text);
           font-size: 14px;
           font-weight: 700;
-          box-shadow: 0 18px 50px rgba(184,115,75,.25);
+          box-shadow: 0 18px 50px color-mix(in srgb, var(--lp-accent) 25%, transparent);
         }
         .lp-menu-btn {
           display: none;
@@ -605,7 +636,7 @@ export default function LandingPage() {
           box-shadow: 0 18px 50px rgba(184,115,75,.25);
         }
         .lp-hero-secondary {
-          background: #000;
+          background: var(--lp-footer-bg);
           color: #fff;
           box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
         }
@@ -1666,7 +1697,7 @@ export default function LandingPage() {
       <Header
         settings={settings}
         onRegister={() => openWebsiteLink(settings.primaryCtaUrl || '/register', nav)}
-        onLogin={() => setLoginOpen(true)}
+        onLogin={() => openWebsiteLink(settings.secondaryCtaUrl || '/login', nav)}
         onOpenSystems={(event) => {
           setActive('restaurant')
           scrollToSection(event, 'sistemler')
@@ -1686,7 +1717,7 @@ export default function LandingPage() {
                 <button className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => openWebsiteLink(settings.primaryCtaUrl || '/register', nav)}>
                   {settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}
                 </button>
-                <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => openWebsiteLink(settings.secondaryCtaUrl || '/login/restoran', nav)}>
+                <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => openWebsiteLink(settings.secondaryCtaUrl || '/login', nav)}>
                   {settings.secondaryCtaText || 'Giris Yap'}
                 </button>
                 {showAndroidDownload ? (
@@ -1700,7 +1731,7 @@ export default function LandingPage() {
                 ) : null}
               </div>
               <div className="lp-hero-points">
-                {['QR menü dahil', 'Sınırsız şube', 'YouTube eğitim videoları'].map((item) => (
+                {heroPoints.map((item) => (
                   <span key={item}><Icon name="check" className="lp-point-icon" />{item}</span>
                 ))}
               </div>
@@ -1711,16 +1742,16 @@ export default function LandingPage() {
         </section>
 
         <section id="sistem-kartlari" className="lp-section">
-          <SectionTitle eyebrow="PenPOS Yapısı" title="Restoran ve mağaza aynı çatı altında, ayrı sistem mantığında." text="Her sistem kendi girişine ve ekran akışına sahip olur. Firma isterse restoran, isterse mağaza/market yapısıyla ilerler." />
+          <SectionTitle eyebrow={settings.systemsSectionEyebrow} title={settings.systemsSectionTitle} text={settings.systemsSectionText} />
           <div className="lp-feature-grid">
-            <FeatureCard icon="store" title="Restoran / Cafe" text="Masa, adisyon, mutfak, paket servis, kurye ve QR menü akışları restoran tarafında birlikte çalışır." />
-            <FeatureCard icon="cart" title="Mağaza / Market" text="Barkodlu hızlı satış, ürün fiyat listesi, stok ve online satış mantığı mağaza tarafına uyarlanır." />
-            <FeatureCard icon="chart" title="Canlı Raporlar" text="Z raporu, ödeme tipleri, şube filtreleri ve cari bakiye gibi veriler tek panelde izlenir." />
+            {features.map((item) => (
+              <FeatureCard key={item.id} icon={item.icon || 'store'} title={item.title} text={item.text} />
+            ))}
           </div>
         </section>
 
         <section id="raporlar" className="lp-section">
-          <SectionTitle eyebrow="Canlı İşletme Yönetimi" title="Tüm operasyonları tek panelden kontrol edin." text="Mutfak hazırlığından kurye akışına, cari hesaplardan canlı raporlara kadar tüm işletme süreçleri PenPOS içinde birleşir." />
+          <SectionTitle eyebrow={settings.operationsSectionEyebrow} title={settings.operationsSectionTitle} text={settings.operationsSectionText} />
           <div className="lp-operation-grid">
             <div className="lp-operation-main">
               <div className="lp-operation-label">CANLI İŞLEM AKIŞI</div>
@@ -1779,16 +1810,26 @@ export default function LandingPage() {
 
         <section id="fiyat" className="lp-pricing-band">
           <div className="lp-pricing-band-inner">
-            <SectionTitle eyebrow="Fiyatlandırma" title="1 haftalık ücretsiz deneme ile başlayın." text="Demo talep etmek yerine kullanıcı doğrudan deneyebilir; giriş yap alanı mevcut üyeler için açık kalır." />
+            <SectionTitle eyebrow={settings.pricingSectionEyebrow} title={settings.pricingSectionTitle} text={settings.pricingSectionText} />
             <div className="lp-pricing-grid">
-              <PricingCard title="Başlangıç" text="İşletmenize, şube sayınıza ve kullanım yoğunluğunuza göre özelleştirilir." buttonTo={settings.primaryCtaUrl || '/register'} />
-              <PricingCard title="Restoran + Mağaza" text="İşletmenize, şube sayınıza ve kullanım yoğunluğunuza göre özelleştirilir." highlight buttonTo={settings.primaryCtaUrl || '/register'} />
+              {pricingPlans.map((plan) => (
+                <PricingCard
+                  key={plan.id}
+                  title={plan.name}
+                  price={plan.price}
+                  text={plan.description}
+                  items={Array.isArray(plan.items) ? plan.items : []}
+                  buttonText={plan.buttonText}
+                  highlight={plan.popular}
+                  buttonTo={plan.buttonUrl || settings.primaryCtaUrl || '/register'}
+                />
+              ))}
             </div>
           </div>
         </section>
 
         <section id="egitim" className="lp-section">
-          <SectionTitle eyebrow="Eğitim Videoları" title="Sistemi kısa videolarla hızlı öğrenin." text="Kurulum, satış, cari hesap, QR menü ve raporlama akışlarını mevcut eğitim videolarıyla adım adım izleyebilirsiniz." />
+          <SectionTitle eyebrow={settings.trainingSectionEyebrow} title={settings.trainingSectionTitle} text={settings.trainingSectionText} />
           <div className="lp-video-grid">
             {trainingVideos.map((video) => (
               <div key={video.id} className="lp-video-card">
@@ -1797,7 +1838,9 @@ export default function LandingPage() {
                 </div>
                 <strong>{video.title}</strong>
                 <p>{video.description || 'Video açıklaması daha sonra eklenecek.'}</p>
-                <div className="lp-video-link">Video bağlantısı daha sonra eklenecek</div>
+                <a className="lp-video-link" href={video.youtubeUrl || '#'} target="_blank" rel="noreferrer">
+                  {video.youtubeUrl ? 'Videoyu Ac' : 'Video baglantisi daha sonra eklenecek'}
+                </a>
               </div>
             ))}
           </div>
@@ -1814,9 +1857,8 @@ export default function LandingPage() {
             <Icon name="whatsapp" />
           </span>
           <span className="lp-floating-whatsapp-copy">
-            <strong>WhatsApp</strong>
-            <strong>Hatti</strong>
-            <span>Cevirimici</span>
+            <strong>{settings.whatsappLabel || 'WhatsApp Hatti'}</strong>
+            <span>{settings.whatsappStatusText || 'Cevrimici'}</span>
           </span>
         </a>
       ) : null}
@@ -1825,7 +1867,7 @@ export default function LandingPage() {
         <div className="lp-footer-inner">
           <Logo settings={settings} />
           <div className="lp-footer-contact">
-            <div className="lp-footer-contact-title">İletişim</div>
+            <div className="lp-footer-contact-title">{settings.contactSectionTitle || 'Iletisim'}</div>
             <div className="lp-footer-contact-links">
               {settings.email ? <a href={`mailto:${settings.email}`}>{settings.email}</a> : null}
               {settings.phone ? <a href={`tel:${settings.phone}`}>{settings.phone}</a> : null}
@@ -1840,38 +1882,6 @@ export default function LandingPage() {
           <div className="lp-footer-copy">{settings.footerText || '© 2026 PenPOS. Restoran, mağaza ve market otomasyon sistemi.'}</div>
         </div>
       </footer>
-
-      {loginOpen ? (
-        <div className="lp-modal-backdrop" onClick={() => setLoginOpen(false)}>
-          <div className="lp-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="lp-modal-head">
-              <div>
-                <div className="lp-live-badge">Giriş seçimi</div>
-                <h3>Giriş yapmak istediğiniz sistemi seçin</h3>
-                <p>Mevcut sayfa bağlantıları, login akışları ve yönlendirmeler korunur.</p>
-              </div>
-              <button className="lp-close" type="button" onClick={() => setLoginOpen(false)}>×</button>
-            </div>
-            <div className="lp-login-grid">
-              <button type="button" className="lp-login-card lp-login-card--dark public-touch-card" onClick={() => openWebsiteLink(settings.restaurantLoginUrl || '/login/restoran', nav)}>
-                <Icon name="store" className="lp-login-icon" />
-                <strong>{settings.restaurantLoginText || 'Restoran Girisi'}</strong>
-                <p>Masa, adisyon, paket servis, mutfak ve QR menü akışı.</p>
-              </button>
-              <button type="button" className="lp-login-card lp-login-card--accent public-touch-card" onClick={() => openWebsiteLink(settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login', nav)}>
-                <Icon name="cart" className="lp-login-icon" />
-                <strong>{settings.canteenLoginText || 'Kantin Girisi'}</strong>
-                <p>Barkodlu hızlı satış, stok hareketi ve cari hesap akışı.</p>
-              </button>
-              <button type="button" className="lp-login-card lp-login-card--dark public-touch-card" onClick={() => openWebsiteLink(settings.platformLoginUrl || '/platform/login', nav)}>
-                <Icon name="chart" className="lp-login-icon" />
-                <strong>{settings.platformLoginText || 'Platform Girisi'}</strong>
-                <p>Platform ve super admin yonetim girisi.</p>
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

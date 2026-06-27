@@ -15,10 +15,15 @@
     "@capacitor/android": "^8.4.0",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
+    "@craftjs/core": "^0.2.12",
+    "@craftjs/utils": "^0.2.5",
     "lucide-react": "^0.542.0",
+    "lz-string": "^1.5.0",
     "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-rnd": "^10.5.3",
     "react-router-dom": "^6.26.0"
   },
   "devDependencies": {

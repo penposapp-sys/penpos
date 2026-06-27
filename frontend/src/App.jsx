@@ -46,7 +46,6 @@ import AccountDetailPage from './pages/AccountDetailPage.jsx'
 import PublicMenuPage from './pages/PublicMenuPage.jsx'
 import DigitalMenuPage from './pages/DigitalMenuPage.tsx'
 import QrMenuSettingsPage from './pages/QrMenuSettingsPage.jsx'
-import PublicTenantWebsitePage, { RootPublicEntryPage } from './pages/PublicTenantWebsitePage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
@@ -268,7 +267,7 @@ const RootEntryRoute = () => {
   const nextPath = getDefaultRoute(user, tenantCtx)
   if (nextPath) return <Navigate to={nextPath} replace />
   if (isNativeApp()) return <Navigate to="/login" replace />
-  return <RootPublicEntryPage fallback={<LandingPage />} />
+  return <LandingPage />
 }
 
 const KermesIndexRedirect = () => {
@@ -302,12 +301,37 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/menu/:tenantSlug" element={<PublicMenuPage />} />
-        <Route path="/site/:slug" element={<PublicTenantWebsitePage />} />
         <Route path="/qr/:slug" element={<CanteenQrPricePage />} />
         <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
         <Route path="/canteen/login" element={<CanteenLogin />} />
-
+        <Route
+          path="/canteen/ayarlar/website"
+          element={
+            <ProtectedRoute
+              roles={['tenant_admin', 'staff']}
+              permissions={['manage_settings']}
+              system="canteen"
+              allowExpired
+            >
+              <NotFound />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/kermes/settings/website"
+          element={
+            <ProtectedRoute
+              roles={['tenant_admin', 'staff']}
+              permissions={['manage_settings', 'manage_menu']}
+              permissionsMode="any"
+              system="kermes"
+              allowExpired
+            >
+              <NotFound />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/canteen" element={<CanteenLayout />}>
           <Route index element={<Navigate to="/canteen/kasa" replace />} />
           <Route path="kasa" element={<CanteenCashierPage />} />

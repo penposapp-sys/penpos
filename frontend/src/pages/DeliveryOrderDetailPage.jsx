@@ -31,7 +31,6 @@ export default function DeliveryOrderDetailPage() {
   const { getSetting } = useBusinessSettings()
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
   const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
-  const showProductImages = !isMobilePortrait || showMobileProductImages
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
   const canManageDelivery = hasPerm('manage_delivery')
@@ -50,6 +49,18 @@ export default function DeliveryOrderDetailPage() {
   // Detail Panel State
   const [categories, setCategories] = useState([])
   const [items, setItems] = useState([])
+  const hasProductImages = useMemo(() => (
+    Array.isArray(items) && items.some((item) => Boolean(
+      item?.imageUrl
+      || item?.photoUrl
+      || item?.image
+      || item?.photo
+      || item?.media?.imageUrl
+      || item?.media?.photoUrl
+      || item?.media?.image
+    ))
+  ), [items])
+  const showProductImages = !isMobilePortrait || showMobileProductImages || hasProductImages
   const [activeCategory, setActiveCategory] = useState('')
   const [order, setOrder] = useState(null)
   const [note, setNote] = useState('')

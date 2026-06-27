@@ -37,6 +37,24 @@ export const removeCategory = async (req, res) => {
   }
 }
 
+export const uploadCategoryImage = async (req, res) => {
+  try {
+    const category = await service.uploadCategoryImage(req.user.tenantId, req.canteenBranchId, req.params.id, req.file)
+    res.json({ success: true, category })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const removeCategoryImage = async (req, res) => {
+  try {
+    const category = await service.removeCategoryImage(req.user.tenantId, req.canteenBranchId, req.params.id)
+    res.json({ success: true, category })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const listProducts = async (req, res) => {
   try {
     const products = await service.listProducts(req.user.tenantId, req.canteenBranchIds || [])
