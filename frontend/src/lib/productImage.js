@@ -13,6 +13,7 @@ export const ACCEPTED_PRODUCT_IMAGE_TYPES = [
   'image/heif'
 ]
 export const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024
+export const TARGET_PRODUCT_UPLOAD_BYTES = 950 * 1024
 const API_ORIGIN = resolveApiOrigin()
 const API_UPLOADS_PREFIX = '/api/uploads/'
 
@@ -37,6 +38,91 @@ export function validateProductImageFile(file) {
     return 'Gorsel boyutu en fazla 5 MB olabilir.'
   }
   return ''
+}
+
+const loadImageElement = (file) => new Promise((resolve, reject) => {
+  const objectUrl = URL.createObjectURL(file)
+  const img = new Image()
+  img.onload = () => {
+    URL.revokeObjectURL(objectUrl)
+    resolve(img)
+  }
+  img.onerror = () => {
+    URL.revokeObjectURL(objectUrl)
+    reject(new Error('image_load_failed'))
+  }
+  img.src = objectUrl
+})
+
+const canvasToWebpBlob = (canvas, quality) => new Promise((resolve, reject) => {
+  canvas.toBlob((blob) => {
+    if (blob) resolve(blob)
+    else reject(new Error('image_encode_failed'))
+  }, 'image/webp', quality)
+})
+
+export async function optimizeProductImageForUpload(file, options = {}) {
+  if (!file) return null
+  const size = Number(file.size || 0)
+  const targetMaxBytes = Number(options.targetMaxBytes || TARGET_PRODUCT_UPLOAD_BYTES)
+  if (!Number.isFinite(size) || size <= 0) return file
+  if (size <= targetMaxBytes) return file
+
+  try {
+    const image = await loadImageElement(file)
+    const resizeSteps = [
+      800,
+      720,
+      640,
+      560,
+      480
+    ]
+    const qualitySteps = [
+      0.82,
+      0.76,
+      0.7,
+      0.64,
+      0.58,
+      0.52,
+      0.46,
+      0.4
+    ]
+
+    let bestBlob = null
+
+    for (const maxEdge of resizeSteps) {
+      const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth || image.width || 1, image.naturalHeight || image.height || 1))
+      const width = Math.max(1, Math.round((image.naturalWidth || image.width || 1) * scale))
+      const height = Math.max(1, Math.round((image.naturalHeight || image.height || 1) * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d', { alpha: true })
+      if (!context) continue
+      context.drawImage(image, 0, 0, width, height)
+
+      for (const quality of qualitySteps) {
+        const blob = await canvasToWebpBlob(canvas, quality)
+        if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob
+        if (blob.size <= targetMaxBytes) {
+          return new File([blob], `${String(file.name || 'image').replace(/\.[^.]+$/, '') || 'image'}.webp`, {
+            type: 'image/webp',
+            lastModified: Date.now()
+          })
+        }
+      }
+    }
+
+    if (bestBlob && bestBlob.size < size) {
+      return new File([bestBlob], `${String(file.name || 'image').replace(/\.[^.]+$/, '') || 'image'}.webp`, {
+        type: 'image/webp',
+        lastModified: Date.now()
+      })
+    }
+  } catch {
+  }
+
+  return file
 }
 
 export function resolveProductImageUrl(product) {

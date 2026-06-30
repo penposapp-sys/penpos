@@ -210,6 +210,15 @@ export default function CanteenSettingsQrPage() {
         .canteen-settings-qr-page a {
           color: var(--app-text) !important;
         }
+        .canteen-settings-qr-page .public-qr-open-link {
+          border: 1px solid color-mix(in srgb, var(--theme-accent) 14%, var(--app-border)) !important;
+          background: color-mix(in srgb, var(--app-surface) 94%, transparent) !important;
+          color: var(--app-text) !important;
+          box-shadow: none !important;
+        }
+        .canteen-settings-qr-page .public-qr-open-link:hover {
+          background: color-mix(in srgb, var(--theme-accent) 8%, var(--app-surface)) !important;
+        }
         .canteen-settings-qr-page .qr-theme-card {
           background: linear-gradient(
             180deg,
@@ -463,17 +472,19 @@ export default function CanteenSettingsQrPage() {
                         href={branchCard.publicUrl}
                         target="_blank"
                         rel="noreferrer"
+                        className="public-qr-open-link"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderRadius: 16,
-                          background: selectedTheme?.colors?.accent || 'var(--theme-accent)',
-                          color: selectedTheme?.colors?.accentText || 'var(--surface-strong-contrast, #fff)',
+                          border: '1px solid color-mix(in srgb, var(--theme-accent) 14%, var(--app-border))',
+                          background: 'color-mix(in srgb, var(--app-surface) 94%, transparent)',
+                          color: 'var(--app-text)',
                           padding: '12px 16px',
                           fontWeight: 900,
                           textDecoration: 'none',
-                          boxShadow: 'var(--theme-active-glow)',
+                          boxShadow: 'none',
                           maxWidth: '100%',
                           textAlign: 'center'
                         }}

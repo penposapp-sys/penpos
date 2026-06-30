@@ -86,14 +86,13 @@ const CashierProductCard = memo(function CashierProductCard({
   measureRef = null,
   showImage = true
 }) {
-  const hasImage = String(product?.imageUrl || '').trim().length > 0
+  const imageSource = String(product?.imageUrl || product?.categoryImageUrl || IMAGE_PLACEHOLDER).trim()
+  const hasImage = imageSource.length > 0
   const disableImages = isProductImagesDisabled()
   const productId = normalizeId(product?.id || product?._id)
   const handleClick = useCallback(() => onAdd(product), [onAdd, product])
   const handleImageError = useCallback((event) => {
-    event.currentTarget.style.display = 'none'
-    const placeholder = event.currentTarget.nextElementSibling
-    if (placeholder) placeholder.style.display = 'grid'
+    event.currentTarget.src = IMAGE_PLACEHOLDER
   }, [])
   incrementPerfCounter('cashierProductCardRenders', productId || 'unknown')
 
@@ -109,7 +108,7 @@ const CashierProductCard = memo(function CashierProductCard({
       {showImage && hasImage && !disableImages ? (
         <img
           className="kasaProductCardImage"
-          src={resolveProductImageUrl({ imageUrl: product.imageUrl })}
+          src={resolveProductImageUrl({ imageUrl: imageSource })}
           alt={product.name}
           loading="lazy"
           decoding="async"

@@ -4,6 +4,7 @@ import { api } from '../lib/apiClient.js'
 import ProductImage from '../components/ProductImage.jsx'
 import ProductImageUploadField from '../components/ProductImageUploadField.jsx'
 import BranchAccessField from '../components/settings/BranchAccessField.jsx'
+import { optimizeProductImageForUpload } from '../lib/productImage.js'
 import ProductCatalogStyles from './ProductCatalogStyles.jsx'
 import {
   PRODUCT_SETTING_GROUPS,
@@ -112,8 +113,9 @@ export default function ProductItemSettingsPage() {
 
   const uploadSelectedImage = async () => {
     if (!imageFile) return null
+    const preparedFile = await optimizeProductImageForUpload(imageFile)
     const formData = new FormData()
-    formData.append('file', imageFile)
+    formData.append('file', preparedFile || imageFile)
     return api(`/api/tenant/menu-items/${itemId}/image`, {
       method: 'POST',
       body: formData,

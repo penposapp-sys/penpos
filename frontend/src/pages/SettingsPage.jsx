@@ -1027,6 +1027,7 @@ export const SettingsSystemContent = () => {
   const [savedThemeId, setSavedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
   const [savedDarkMode, setSavedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
   const [loading, setLoading] = useState(false)
+  const [branchSaving, setBranchSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const { refresh, setAllowedBranchIds } = useAuth()
@@ -1045,9 +1046,9 @@ export const SettingsSystemContent = () => {
   const load = async () => {
     setError('')
     const [profileRes, businessRes, branchesRes] = await Promise.all([
-      api('/api/tenant/profile', { silent: true, skipBranchHeader: true }),
-      api('/api/settings/business', { silent: true, skipBranchHeader: true }),
-      api('/api/branches', { silent: true, skipBranchHeader: true }),
+      api('/api/tenant/profile', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+      api('/api/settings/business', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+      api('/api/branches', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
     ])
 
     if (profileRes?.success === false) {
@@ -1085,6 +1086,40 @@ export const SettingsSystemContent = () => {
     if (checked) set.add(String(branchId))
     else set.delete(String(branchId))
     setAllowedBranchIdsLocal(Array.from(set))
+  }
+
+  const persistAllowedBranches = async () => {
+    setBranchSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await api('/api/tenant/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ name, description, allowedBranchIds }),
+        silent: true,
+        skipBranchHeader: true
+      })
+
+      if (res?.success === false) {
+        setError(res.message || 'Yetkili şubeler kaydedilemedi')
+        return
+      }
+
+      try {
+        const nextAllowed = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+        setAllowedBranchIdsLocal(nextAllowed)
+        setAllowedBranchIds(nextAllowed)
+        window.dispatchEvent(new CustomEvent('allowed_branches_changed', { detail: { allowedBranchIds: nextAllowed } }))
+      } catch {}
+
+      setSuccess('Yetkili şubeler kaydedildi')
+      await load()
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBranchSaving(false)
+    }
   }
 
   const onSave = async (e) => {
@@ -1143,8 +1178,10 @@ export const SettingsSystemContent = () => {
       })
 
       try {
-        setAllowedBranchIds(Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : [])
-        window.dispatchEvent(new CustomEvent('allowed_branches_changed', { detail: { allowedBranchIds: Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds : [] } }))
+        const nextAllowed = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+        setAllowedBranchIdsLocal(nextAllowed)
+        setAllowedBranchIds(nextAllowed)
+        window.dispatchEvent(new CustomEvent('allowed_branches_changed', { detail: { allowedBranchIds: nextAllowed } }))
       } catch {}
       setSuccess('Kaydedildi')
       await load()
@@ -1290,6 +1327,11 @@ export const SettingsSystemContent = () => {
                 </label>
               ))
             )}
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={persistAllowedBranches} disabled={loading || branchSaving}>
+              {branchSaving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
           </div>
         </div>
 

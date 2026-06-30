@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../lib/apiClient.js'
 import { getSubscriptionStatus } from '../lib/subscription.js'
 import { normalizeBranchIdList } from '../lib/branchVisibility.js'
+import { optimizeProductImageForUpload } from '../lib/productImage.js'
 import { toast } from '../lib/toast.js'
 import { getAuthToken } from '../lib/authStorage.js'
 import ProductCatalogStyles from './ProductCatalogStyles.jsx'
@@ -449,8 +450,9 @@ export default function MenuItemsPage() {
       })
       let createdItem = response?.item || null
       if (createdItem?.id && createImageFile) {
+        const preparedFile = await optimizeProductImageForUpload(createImageFile)
         const formData = new FormData()
-        formData.append('file', createImageFile)
+        formData.append('file', preparedFile || createImageFile)
         const uploadResponse = await api(`/api/tenant/menu-items/${createdItem.id}/image`, {
           method: 'POST',
           body: formData,

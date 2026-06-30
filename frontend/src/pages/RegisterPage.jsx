@@ -6,6 +6,23 @@ import { defaultWebsiteSettings } from '../constants/websiteSettings.js'
 import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 
+const persistInitialBranchSelection = (portal, user) => {
+  const selectedBranchId = String(
+    user?.branchId ||
+    user?.branch?.id ||
+    (Array.isArray(user?.branchIds) ? user.branchIds[0] : '') ||
+    ''
+  ).trim()
+
+  if (!selectedBranchId) return
+
+  try {
+    if (portal === 'canteen') localStorage.setItem('selectedBranchId_canteen', selectedBranchId)
+    else localStorage.setItem('selectedBranchId', selectedBranchId)
+  } catch {
+  }
+}
+
 export default function RegisterPage() {
   const [searchParams] = useSearchParams()
   const initialType = String(searchParams.get('type') || '').trim().toLowerCase() === 'market' ? 'market' : 'restaurant'
@@ -85,6 +102,7 @@ export default function RegisterPage() {
     try {
       if (res.portal === 'canteen') setAuthToken('token_canteen', res.token, true)
       else setAuthToken('token_restaurant', res.token, true)
+      persistInitialBranchSelection(res.portal, res.user)
     } catch {}
 
     toast.success('Üyelik oluşturuldu. Deneme süresi başlatıldı.')

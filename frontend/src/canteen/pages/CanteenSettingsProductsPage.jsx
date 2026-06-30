@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import ProductImageUploadField from '../../components/ProductImageUploadField.jsx'
 import { api } from '../../lib/apiClient.js'
-import { resolveProductImageUrl } from '../../lib/productImage.js'
+import { optimizeProductImageForUpload, resolveProductImageUrl } from '../../lib/productImage.js'
 import { toast } from '../../lib/toast.js'
 import Modal from '../../components/Modal.jsx'
 import CanteenBulkProductsExcelCard from '../components/CanteenBulkProductsExcelCard.jsx'
@@ -210,8 +210,9 @@ export default function CanteenSettingsProductsPage() {
 
   const uploadProductImage = async (productId, file, branchId) => {
     if (!productId || !file || !branchId) return null
+    const preparedFile = await optimizeProductImageForUpload(file)
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', preparedFile || file)
     return api(`/api/canteen/products/${encodeURIComponent(productId)}/image?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       body: formData,
@@ -415,8 +416,9 @@ export default function CanteenSettingsProductsPage() {
 
   const uploadCategoryImage = async (categoryIdToUpload, file, branchId) => {
     if (!categoryIdToUpload || !file || !branchId) return null
+    const preparedFile = await optimizeProductImageForUpload(file)
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', preparedFile || file)
     return api(`/api/canteen/categories/${encodeURIComponent(categoryIdToUpload)}/image?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       body: formData,

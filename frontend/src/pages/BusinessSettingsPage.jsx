@@ -721,6 +721,7 @@ export function SettingsSystemContent() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [initialSnapshot, setInitialSnapshot] = useState('')
+  const [branchSaving, setBranchSaving] = useState(false)
   const { refresh, setAllowedBranchIds } = useAuth()
   const { setThemeKey } = useTheme()
   const {
@@ -839,13 +840,13 @@ export function SettingsSystemContent() {
     }))
   }
 
-  const onSave = async (event) => {
-    event.preventDefault()
+  const persistBusinessSettings = async ({ branchOnly = false } = {}) => {
     if (allowedBranchIds.length === 0) {
       toast.error('En az bir şube seçmelisiniz')
-      return
+      return false
     }
-    setLoading(true)
+    if (branchOnly) setBranchSaving(true)
+    else setLoading(true)
     setError('')
     setSuccess('')
 
@@ -896,18 +897,31 @@ export function SettingsSystemContent() {
 
       const nextLogoUrl = settingsRes?.settings?.logo?.url || settingsRes?.tenant?.logoUrl || logoUrl
       setLogoUrl(nextLogoUrl)
-      setSuccess('İşletme ayarları kaydedildi')
-      toast.success('İşletme ayarları kaydedildi')
+      const successMessage = branchOnly ? 'Yetkili şubeler kaydedildi' : 'İşletme ayarları kaydedildi'
+      setSuccess(successMessage)
+      toast.success(successMessage)
       applyLoadedState(settingsRes?.tenant, settingsRes?.settings, branches)
       await refreshBusinessSettings()
       await refresh()
+      return true
     } catch (err) {
       const message = err.message || 'Ayarlar kaydedilemedi'
       setError(message)
-      toast.error('Ayarlar kaydedilemedi')
+      toast.error(branchOnly ? 'Yetkili şubeler kaydedilemedi' : 'Ayarlar kaydedilemedi')
+      return false
     } finally {
-      setLoading(false)
+      if (branchOnly) setBranchSaving(false)
+      else setLoading(false)
     }
+  }
+
+  const onSave = async (event) => {
+    event.preventDefault()
+    await persistBusinessSettings()
+  }
+
+  const onSaveAuthorizedBranches = async () => {
+    await persistBusinessSettings({ branchOnly: true })
   }
 
   const uploadLogo = async () => {
@@ -1071,6 +1085,7 @@ export function SettingsSystemContent() {
             title="Yetkili Şubeler"
             description="POS, hızlı sipariş ve paket ekranlarının çalışacağı şubeleri yönetin."
             icon="🏢"
+            action={<SoftButton onClick={onSaveAuthorizedBranches} disabled={loading || branchSaving}>{branchSaving ? 'Kaydediliyor...' : 'Kaydet'}</SoftButton>}
           >
             <div style={{ display: 'grid', gap: 10 }}>
               {(branches || []).length === 0 ? (

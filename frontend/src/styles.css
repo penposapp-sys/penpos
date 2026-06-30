@@ -6160,7 +6160,7 @@ html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .ca
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.productCard):not(.kasaProductCard),
+  button:not(.productCard):not(.kasaProductCard):not(.qr-ref-category),
   .btn,
   .sidebar-menu-button,
   .saleCategoryButton,
@@ -6188,7 +6188,7 @@ html[data-theme="light"].theme-white :is(
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.productCard):not(.kasaProductCard),
+  button:not(.productCard):not(.kasaProductCard):not(.qr-ref-category),
   .btn,
   .sidebar-menu-button,
   .saleCategoryButton,
@@ -6231,7 +6231,7 @@ html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button),
+  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category),
   button:focus-visible,
   .btn:hover,
   .btn:focus-visible,
@@ -6263,13 +6263,13 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:active,
+  button:active:not(.qr-ref-category),
   .btn:active,
   .nav-link:active,
-  button.active,
-  button.is-active,
-  button.selected,
-  button.is-selected,
+  button.active:not(.qr-ref-category),
+  button.is-active:not(.qr-ref-category),
+  button.selected:not(.qr-ref-category),
+  button.is-selected:not(.qr-ref-category),
   .btn.active,
   .btn.is-active,
   .btn.selected,
@@ -6290,7 +6290,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button),
+  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category),
   button:focus-visible,
   .btn:hover,
   .btn:focus-visible,
@@ -6321,13 +6321,13 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:active,
+  button:active:not(.qr-ref-category),
   .btn:active,
   .nav-link:active,
-  button.active,
-  button.is-active,
-  button.selected,
-  button.is-selected,
+  button.active:not(.qr-ref-category),
+  button.is-active:not(.qr-ref-category),
+  button.selected:not(.qr-ref-category),
+  button.is-selected:not(.qr-ref-category),
   .btn.active,
   .btn.is-active,
   .btn.selected,
@@ -6444,10 +6444,10 @@ html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button):active {
 }
 
 html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] {
-  background: #111111 !important;
-  border: 1px solid #111111 !important;
-  box-shadow: var(--shadow-soft), var(--shadow-glow) !important;
-  color: #ffffff !important;
+  background: #ffffff !important;
+  border: 1px solid #d9dee5 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06) !important;
+  color: #111111 !important;
 }
 
 html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:first-child {
@@ -6467,7 +6467,7 @@ html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active .pos-sidebar nav :is(a, button)[aria-current="page"] > span:last-child > span:last-child {
-  color: #ffffff !important;
+  color: #111111 !important;
 }
 
 html[data-theme="light"].theme-white .pos-sidebar nav :is(a, button) > span:last-child > span:first-child,
