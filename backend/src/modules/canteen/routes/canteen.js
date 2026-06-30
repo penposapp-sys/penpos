@@ -70,6 +70,8 @@ router.delete('/staff/:id', requireRole(['tenant_admin']), requirePermission([PE
 router.get('/settings', requireRole(['tenant_admin', 'staff']), settingsCtrl.getSettings)
 router.put('/settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updateSettings)
 router.put('/settings/qr', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updateQrSettings)
+router.post('/settings/qr/:kind(logo|cover)', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), uploadSingleFile, settingsCtrl.uploadQrMedia)
+router.delete('/settings/qr/:kind(logo|cover)', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.removeQrMedia)
 
 router.get('/payment-settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.getPaymentSettings)
 router.put('/payment-settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updatePaymentSettings)

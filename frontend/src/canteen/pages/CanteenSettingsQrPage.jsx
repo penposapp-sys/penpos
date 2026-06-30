@@ -5,6 +5,8 @@ import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
 import { qrThemes } from '../components/CanteenQrPreview.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
+import ProductImageUploadField from '../../components/ProductImageUploadField.jsx'
+import { optimizeProductImageForUpload } from '../../lib/productImage.js'
 
 const getSelectedTheme = (themeId) => qrThemes.find((item) => item.id === themeId) || qrThemes[0]
 
@@ -53,6 +55,12 @@ export default function CanteenSettingsQrPage() {
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [message, setMessage] = useState('')
   const [qrCodeMap, setQrCodeMap] = useState({})
+  const [qrLogoFile, setQrLogoFile] = useState(null)
+  const [qrLogoError, setQrLogoError] = useState('')
+  const [qrLogoRemovePending, setQrLogoRemovePending] = useState(false)
+  const [qrCoverFile, setQrCoverFile] = useState(null)
+  const [qrCoverError, setQrCoverError] = useState('')
+  const [qrCoverRemovePending, setQrCoverRemovePending] = useState(false)
   const isCompact = isMobilePortrait || isTablet
 
   const visibleBranches = useMemo(() => {
@@ -105,12 +113,36 @@ export default function CanteenSettingsQrPage() {
     })
     setBranches(filteredBranches)
     setSelectedBranchId(initialBranchId)
+    setQrLogoFile(null)
+    setQrLogoError('')
+    setQrLogoRemovePending(false)
+    setQrCoverFile(null)
+    setQrCoverError('')
+    setQrCoverRemovePending(false)
     if (!background) setLoading(false)
   }
 
   useEffect(() => {
     load()
   }, [])
+
+  const uploadQrMedia = async (kind, file, branchId) => {
+    const optimizedFile = await optimizeProductImageForUpload(file)
+    const body = new FormData()
+    body.append('file', optimizedFile || file)
+    return api(`/api/canteen/settings/qr/${kind}?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'POST',
+      body,
+      silent: true
+    })
+  }
+
+  const removeQrMedia = async (kind, branchId) => (
+    api(`/api/canteen/settings/qr/${kind}?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'DELETE',
+      silent: true
+    })
+  )
 
   const save = async () => {
     const saveBranchId = String(selectedBranchId || visibleBranches[0]?.id || visibleBranches[0]?._id || '').trim()
@@ -145,6 +177,103 @@ export default function CanteenSettingsQrPage() {
     }
 
     setMessage('QR ayarları kaydedildi.')
+    toast.success('QR ayarlari kaydedildi')
+  }
+
+  const saveWithMedia = async () => {
+    const saveBranchId = String(selectedBranchId || visibleBranches[0]?.id || visibleBranches[0]?._id || '').trim()
+    if (!saveBranchId) {
+      toast.error('Once bir sube secmelisin')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+
+    let nextQrLogoUrl = settings.qrLogoUrl
+    let nextQrCoverImageUrl = settings.qrCoverImageUrl
+
+    try {
+      if (qrLogoRemovePending && !qrLogoFile && settings.qrLogoUrl) {
+        const removeLogoResponse = await removeQrMedia('logo', saveBranchId)
+        if (!removeLogoResponse?.ok) {
+          setSaving(false)
+          toast.error(removeLogoResponse?.message || 'QR logo kaldirilamadi')
+          return
+        }
+        nextQrLogoUrl = ''
+      }
+
+      if (qrCoverRemovePending && !qrCoverFile && settings.qrCoverImageUrl) {
+        const removeCoverResponse = await removeQrMedia('cover', saveBranchId)
+        if (!removeCoverResponse?.ok) {
+          setSaving(false)
+          toast.error(removeCoverResponse?.message || 'QR kapak gorseli kaldirilamadi')
+          return
+        }
+        nextQrCoverImageUrl = ''
+      }
+
+      if (qrLogoFile) {
+        const uploadLogoResponse = await uploadQrMedia('logo', qrLogoFile, saveBranchId)
+        if (!uploadLogoResponse?.ok) {
+          setSaving(false)
+          toast.error(uploadLogoResponse?.message || 'QR logo yuklenemedi')
+          return
+        }
+        nextQrLogoUrl = String(uploadLogoResponse?.imageUrl || uploadLogoResponse?.settings?.qrLogoUrl || '')
+      }
+
+      if (qrCoverFile) {
+        const uploadCoverResponse = await uploadQrMedia('cover', qrCoverFile, saveBranchId)
+        if (!uploadCoverResponse?.ok) {
+          setSaving(false)
+          toast.error(uploadCoverResponse?.message || 'QR kapak gorseli yuklenemedi')
+          return
+        }
+        nextQrCoverImageUrl = String(uploadCoverResponse?.imageUrl || uploadCoverResponse?.settings?.qrCoverImageUrl || '')
+      }
+    } catch (err) {
+      setSaving(false)
+      toast.error(err?.message || 'QR gorselleri yuklenemedi')
+      return
+    }
+
+    const response = await api(`/api/canteen/settings/qr?branchId=${encodeURIComponent(saveBranchId)}`, {
+      method: 'PUT',
+      data: {
+        qrTitle: settings.qrTitle,
+        qrDescription: settings.qrDescription,
+        qrLogoUrl: nextQrLogoUrl,
+        qrCoverImageUrl: nextQrCoverImageUrl,
+        qrPhone: settings.qrPhone,
+        qrWhatsapp: settings.qrWhatsapp,
+        qrEmail: settings.qrEmail,
+        qrAddress: settings.qrAddress,
+        qrWorkingHours: settings.qrWorkingHours,
+        qrTheme: settings.qrTheme
+      },
+      silent: true
+    })
+    setSaving(false)
+
+    if (!response?.ok) {
+      toast.error(response?.message || 'QR ayarlari kaydedilemedi')
+      return
+    }
+
+    setSettings((current) => ({
+      ...current,
+      qrLogoUrl: nextQrLogoUrl,
+      qrCoverImageUrl: nextQrCoverImageUrl
+    }))
+    setQrLogoFile(null)
+    setQrLogoError('')
+    setQrLogoRemovePending(false)
+    setQrCoverFile(null)
+    setQrCoverError('')
+    setQrCoverRemovePending(false)
+    setMessage('QR ayarlari kaydedildi.')
     toast.success('QR ayarlari kaydedildi')
   }
 
@@ -261,7 +390,7 @@ export default function CanteenSettingsQrPage() {
           </div>
           <button
             type="button"
-            onClick={save}
+            onClick={saveWithMedia}
             disabled={!canManage || saving}
             style={{
               border: 0,
@@ -315,14 +444,54 @@ export default function CanteenSettingsQrPage() {
               <span style={FIELD_LABEL_STYLE}>Firma Adi</span>
               <input className="input" value={settings.qrTitle} onChange={(event) => setSettings((current) => ({ ...current, qrTitle: event.target.value }))} />
             </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={FIELD_LABEL_STYLE}>Logo URL</span>
-              <input className="input" value={settings.qrLogoUrl} onChange={(event) => setSettings((current) => ({ ...current, qrLogoUrl: event.target.value }))} placeholder="https://..." />
-            </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={FIELD_LABEL_STYLE}>Kapak Gorsel URL</span>
-              <input className="input" value={settings.qrCoverImageUrl} onChange={(event) => setSettings((current) => ({ ...current, qrCoverImageUrl: event.target.value }))} placeholder="https://..." />
-            </label>
+            <div style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
+              <span style={FIELD_LABEL_STYLE}>QR Logo</span>
+              <ProductImageUploadField
+                currentImageUrl={qrLogoRemovePending ? '' : settings.qrLogoUrl}
+                file={qrLogoFile}
+                error={qrLogoError}
+                disabled={!canManage || saving}
+                helperText="JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, logo alani icin optimize edilerek saklanir."
+                onFileChange={(nextFile, validationMessage) => {
+                  setQrLogoError(validationMessage || '')
+                  setQrLogoFile(validationMessage ? null : nextFile)
+                  if (!validationMessage) setQrLogoRemovePending(false)
+                }}
+                onClearFile={() => {
+                  setQrLogoFile(null)
+                  setQrLogoError('')
+                }}
+                onRemoveExisting={settings.qrLogoUrl ? () => {
+                  setQrLogoRemovePending(true)
+                  setQrLogoFile(null)
+                  setQrLogoError('')
+                } : undefined}
+              />
+            </div>
+            <div style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
+              <span style={FIELD_LABEL_STYLE}>QR Kapak Gorseli</span>
+              <ProductImageUploadField
+                currentImageUrl={qrCoverRemovePending ? '' : settings.qrCoverImageUrl}
+                file={qrCoverFile}
+                error={qrCoverError}
+                disabled={!canManage || saving}
+                helperText="JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, kapak alani icin optimize edilerek saklanir."
+                onFileChange={(nextFile, validationMessage) => {
+                  setQrCoverError(validationMessage || '')
+                  setQrCoverFile(validationMessage ? null : nextFile)
+                  if (!validationMessage) setQrCoverRemovePending(false)
+                }}
+                onClearFile={() => {
+                  setQrCoverFile(null)
+                  setQrCoverError('')
+                }}
+                onRemoveExisting={settings.qrCoverImageUrl ? () => {
+                  setQrCoverRemovePending(true)
+                  setQrCoverFile(null)
+                  setQrCoverError('')
+                } : undefined}
+              />
+            </div>
             <label style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
               <span style={FIELD_LABEL_STYLE}>Kisa Aciklama</span>
               <textarea
