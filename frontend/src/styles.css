@@ -7607,6 +7607,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 .account-detail-scope .account-meta-note { font-size: 12px; color: var(--muted); }
 .account-detail-scope .account-balance-toprow { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .account-detail-scope .account-balance-left { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.account-detail-scope .account-balance-actions { min-width: 0; }
 .account-detail-scope .account-balance-label { color: var(--muted); }
 .account-detail-scope .account-balance-value { font-weight: 900; font-size: 19px; white-space: nowrap; }
 .account-detail-scope .account-collect-btn { padding: 6px 10px; font-size: 13px; }
@@ -7651,17 +7652,19 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .account-detail-scope { max-width: 100%; margin: 0; }
 
   .account-detail-scope .card { padding: 8px; border-radius: 12px; }
-  .account-detail-scope .account-balance-card { height: 60px; }
+  .account-detail-scope .account-balance-card { min-height: 60px; height: auto; align-items: stretch; }
 
   .account-detail-scope .account-balance-card { gap: 8px; }
   .account-detail-scope .account-balance-value { font-size: 17px; }
   .account-detail-scope .account-meta-phone { font-size: 13px; }
 
-  .account-detail-scope .account-balance-toprow { align-items: baseline; }
+  .account-detail-scope .account-balance-toprow { align-items: flex-start; flex-wrap: wrap; }
+  .account-detail-scope .account-balance-left { flex-wrap: wrap; }
+  .account-detail-scope .account-balance-actions { width: 100%; justify-content: flex-start; }
   .account-detail-scope .account-collect-btn {
     min-height: unset;
     width: fit-content;
-    min-width: 140px;
+    min-width: 0;
     padding: 8px 10px;
     font-size: 13px;
     white-space: nowrap;
@@ -7684,6 +7687,67 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .account-detail-scope .account-subcard { padding: 0; }
   .account-detail-scope .account-order-items { gap: 6px; }
   .account-detail-scope .account-order-item { padding: 8px; }
+  .account-detail-scope .saleCategoryPanel {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    min-width: 0;
+    padding: 10px;
+  }
+  .account-detail-scope .saleCategoryPanelTitle {
+    display: none;
+  }
+  .account-detail-scope .saleCategoryPanelScroll {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .account-detail-scope .saleCategoryPanelScroll > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .account-detail-scope .saleCategoryPanelScroll::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+  .account-detail-scope .saleCategoryButton {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: max-content;
+    max-width: none;
+    margin-bottom: 0;
+    padding: 7px 12px;
+    border-radius: 999px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 560px) {
+  .account-detail-scope .account-header-right {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .account-detail-scope .account-header-meta {
+    text-align: left;
+  }
 }
 
 @media (max-width: 768px) {

@@ -10,12 +10,31 @@ export const findByIdAndScope = (id, tenantId, branchId) =>
 export const findAnyByIdAndScope = (id, tenantId, branchId) =>
   CanteenSale.findOne({ _id: id, tenantId, branchId })
 
+export const findAnyByIdAndTenant = (id, tenantId) =>
+  CanteenSale.findOne({ _id: id, tenantId })
+
 export const updateByIdAndScope = (id, tenantId, branchId, update = {}, options = {}) =>
   CanteenSale.findOneAndUpdate({ _id: id, tenantId, branchId }, update, { new: true, ...(options || {}) })
 
 export const softDeleteByIdAndScope = (id, tenantId, branchId, update = {}) =>
   CanteenSale.findOneAndUpdate(
     { _id: id, tenantId, branchId },
+    {
+      $set: {
+        isActive: false,
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        reopenedAt: null,
+        reopenedBy: null,
+        ...update
+      }
+    },
+    { new: true }
+  )
+
+export const softDeleteByIdAndTenant = (id, tenantId, update = {}) =>
+  CanteenSale.findOneAndUpdate(
+    { _id: id, tenantId },
     {
       $set: {
         isActive: false,

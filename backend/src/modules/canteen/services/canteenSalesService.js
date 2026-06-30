@@ -285,9 +285,9 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
   }
 }
 
-export const deleteSale = async (tenantId, branchId, actorUserId, saleId) => {
+export const deleteSale = async (tenantId, actorUserId, saleId) => {
   if (!mongoose.isValidObjectId(saleId)) throw error('invalid_request', 'Invalid id', 400)
-  const deleted = await saleRepo.softDeleteByIdAndScope(saleId, tenantId, branchId, {
+  const deleted = await saleRepo.softDeleteByIdAndTenant(saleId, tenantId, {
     cancelledBy: actorUserId || null,
     cancelReason: 'user_cancelled'
   })

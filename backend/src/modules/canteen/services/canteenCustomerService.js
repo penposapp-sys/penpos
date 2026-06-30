@@ -98,8 +98,8 @@ const mapCustomerDto = (customer, balance = 0) => ({
 const computeBalanceForCustomer = async (tenantId, customerId) => {
   const sales = await saleRepo.listByTenantAndCustomer(tenantId, customerId, { limit: 10000 })
   const debt = (sales || []).reduce((sum, s) => sum + ((s.payment?.methodType === 'account' || s.payment?.method === 'account' || s.payment?.method === 'credit') ? Number(s.total || 0) : 0), 0)
-  const paid = await collectionRepo.sumByCustomerAllBranches(tenantId, customerId)
-  return Number(debt - paid)
+  const collectionNet = await collectionRepo.sumByCustomerAllBranches(tenantId, customerId)
+  return Number(debt - collectionNet)
 }
 
 export const listCustomerMovements = async (tenantId, customerId) => {
@@ -129,13 +129,15 @@ export const listCustomerMovements = async (tenantId, customerId) => {
   }
 
   for (const p of (collections || [])) {
+    const direction = String(p.direction || 'credit') === 'debit' ? 'debit' : 'credit'
     rows.push({
       id: String(p.id),
-      kind: 'payment',
-      type: 'credit',
+      kind: p.method === 'manual' ? 'adjustment' : 'payment',
+      type: direction,
       amount: Number(p.amount || 0),
       method: p.method || null,
       note: p.note || '',
+      direction,
       createdAt: p.createdAt,
       branchId: p.branchId ? String(p.branchId) : null,
       actorUserId: p.actorUserId ? String(p.actorUserId) : null,
@@ -174,8 +176,8 @@ export const deleteCustomerPayment = async (tenantId, actorUserId, customerId, p
   return { success: true, id: String(paymentId), balance }
 }
 
-export const listCustomers = async (tenantId) => {
-  const items = await customerRepo.listByTenant(tenantId)
+export const listCustomers = async (tenantId, { includeInactive = false } = {}) => {
+  const items = await customerRepo.listByTenant(tenantId, { includeInactive })
   const out = []
   for (const c of items) {
     const balance = await computeBalanceForCustomer(tenantId, c.id)
@@ -273,15 +275,7 @@ export const deleteCustomer = async (tenantId, actorUserId, customerId) => {
   if (!mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Invalid id', 400)
   const c = await customerRepo.findByIdAndTenant(customerId, tenantId)
   if (!c) throw error('not_found', 'Cari bulunamadı', 404)
-  const balance = await computeBalanceForCustomer(tenantId, c.id)
-  if (Number(balance) > 0.009) throw error('has_debt', 'Borcu olan cari silinemez', 409)
-
-  const anySale = await saleRepo.listByTenantAndCustomer(tenantId, c.id, { limit: 1 })
-  if (Array.isArray(anySale) && anySale.length > 0) throw error('has_transactions', 'Hareketi olan cari silinemez', 409)
-  const anyCol = await collectionRepo.listByCustomerAllBranches(tenantId, c.id, { limit: 1 })
-  if (Array.isArray(anyCol) && anyCol.length > 0) throw error('has_transactions', 'Hareketi olan cari silinemez', 409)
-
-  const deleted = await customerRepo.deleteByIdAndTenant(c.id, tenantId)
+  const deleted = await customerRepo.softDeleteByIdAndTenant(c.id, tenantId, actorUserId)
   if (!deleted) throw error('not_found', 'Cari bulunamadı', 404)
   return { success: true, id: deleted.id, actorUserId }
 }
@@ -325,6 +319,7 @@ export const collect = async (tenantId, actorUserId, customerId, input) => {
     branchId,
     customerId,
     method,
+    direction: 'credit',
     amount,
     note,
     createdAt: new Date(),
@@ -333,6 +328,72 @@ export const collect = async (tenantId, actorUserId, customerId, input) => {
   })
   const balance = await computeBalanceForCustomer(tenantId, customerId)
   return { id: created.id, success: true, balance }
+}
+
+export const adjustBalance = async (tenantId, actorUserId, customerId, input) => {
+  if (!mongoose.isValidObjectId(customerId)) throw error('invalid_request', 'Invalid id', 400)
+  const c = await customerRepo.findByIdAndTenant(customerId, tenantId)
+  if (!c) throw error('not_found', 'Cari bulunamadı', 404)
+
+  const action = String(input?.action || '').trim()
+  const amount = Number(input?.amount || 0)
+  if (action !== 'add' && action !== 'subtract') throw error('invalid_request', 'Invalid action', 400)
+  if (!Number.isFinite(amount) || amount <= 0) throw error('invalid_request', 'Invalid amount', 400)
+
+  const note = String(input?.note || '').trim()
+  const branchId = input?.branchId && mongoose.isValidObjectId(input.branchId) ? input.branchId : null
+  if (!branchId) throw error('invalid_request', 'Branch required', 400)
+
+  let createdId = null
+
+  if (action === 'add') {
+    const createdSale = await saleRepo.create({
+      tenantId,
+      branchId,
+      customerId,
+      items: [],
+      subTotal: amount,
+      discountPercent: 0,
+      discountTotal: 0,
+      total: amount,
+      channel: 'manual',
+      payment: {
+        method: 'account',
+        methodName: 'Cari / Veresiye',
+        methodType: 'account',
+        amount,
+        note: note || 'Manuel bakiye ekleme'
+      },
+      note: note ? `Manuel bakiye eklendi - ${note}` : 'Manuel bakiye eklendi',
+      isActive: true,
+      status: 'completed',
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: '',
+      reopenedAt: null,
+      reopenedBy: null,
+      createdAt: new Date(),
+      actorUserId
+    })
+    createdId = String(createdSale.id)
+  } else {
+    const created = await collectionRepo.create({
+      tenantId,
+      branchId,
+      customerId,
+      method: 'manual',
+      direction: 'credit',
+      amount,
+      note: note ? `Manuel bakiye dusuldu - ${note}` : 'Manuel bakiye dusuldu',
+      createdAt: new Date(),
+      actorUserId,
+      isActive: true
+    })
+    createdId = String(created.id)
+  }
+
+  const balance = await computeBalanceForCustomer(tenantId, customerId)
+  return { id: createdId, success: true, balance }
 }
 
 export const upsertPublicCustomerAccount = async (tenantId, input) => {

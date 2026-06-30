@@ -6,6 +6,14 @@ const toObjectId = (value) => {
   return mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null
 }
 
+const signedAmountExpr = {
+  $cond: [
+    { $eq: ['$direction', 'debit'] },
+    { $multiply: ['$amount', -1] },
+    '$amount'
+  ]
+}
+
 export const create = (data) => CanteenCustomerCollection.create(data)
 
 export const listByCustomer = (tenantId, branchId, customerId, { limit = 50 } = {}) =>
@@ -18,7 +26,7 @@ export const sumByCustomer = async (tenantId, branchId, customerId) => {
   if (!tid || !bid || !cid) return 0
   const rows = await CanteenCustomerCollection.aggregate([
     { $match: { tenantId: tid, branchId: bid, customerId: cid, isActive: true, isDeleted: { $ne: true } } },
-    { $group: { _id: null, total: { $sum: '$amount' } } }
+    { $group: { _id: null, total: { $sum: signedAmountExpr } } }
   ])
   return Number(rows?.[0]?.total || 0)
 }
@@ -62,7 +70,7 @@ export const sumByCustomerAllBranches = async (tenantId, customerId) => {
   if (!tid || !cid) return 0
   const rows = await CanteenCustomerCollection.aggregate([
     { $match: { tenantId: tid, customerId: cid, isActive: true, isDeleted: { $ne: true } } },
-    { $group: { _id: null, total: { $sum: '$amount' } } }
+    { $group: { _id: null, total: { $sum: signedAmountExpr } } }
   ])
   return Number(rows?.[0]?.total || 0)
 }

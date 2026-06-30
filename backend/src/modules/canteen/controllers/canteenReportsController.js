@@ -69,7 +69,7 @@ export const exportAll = async (req, res) => {
     const branchIds = req.canteenBranchIds || []
     const salesDaily = await service.salesDaily(req.user.tenantId, branchIds, query)
     const topProducts = await service.products(req.user.tenantId, branchIds, query)
-    const customers = await customerService.listCustomers(req.user.tenantId)
+    const customers = await customerService.listCustomers(req.user.tenantId, { includeInactive: true })
 
     const productIds = topProducts
       .map((item) => String(item.productId || '').trim())

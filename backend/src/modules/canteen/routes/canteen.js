@@ -169,7 +169,7 @@ router.post('/sales', canteenBranchQueryGuard, requireRole(['tenant_admin', 'sta
 router.get('/sales/completed', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.listCompleted)
 router.post('/sales/:id/reopen', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.reopen)
 router.get('/sales/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.get)
-router.delete('/sales/:id', canteenBranchQueryGuard, requireRole(['tenant_admin']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), salesCtrl.remove)
+router.delete('/sales/:id', requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.MANAGE_SETTINGS]), salesCtrl.remove)
 
 router.get('/customers', requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS]), customersCtrl.list)
 router.post('/customers', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_CUSTOMERS_CREATE]), customersCtrl.create)
@@ -184,7 +184,8 @@ router.get(
   requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS]),
   customersCtrl.sales
 )
-router.post('/customers/:id/collect', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]), customersCtrl.collect)
+router.post('/customers/:id/collect', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]), customersCtrl.collect)
+router.post('/customers/:id/adjust', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE]), customersCtrl.adjust)
 router.delete('/customers/:customerId/payments/:paymentId', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_CUSTOMER_PAYMENT_DELETE]), customersCtrl.deletePayment)
 
 router.get('/reports/summary', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.summary)

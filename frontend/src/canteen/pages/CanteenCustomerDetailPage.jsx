@@ -19,6 +19,21 @@ const dt = (value) => {
   try { return new Date(value).toLocaleString('tr-TR') } catch { return '' }
 }
 
+const getMovementTitle = (movement) => {
+  if (movement?.kind === 'adjustment') {
+    return movement?.type === 'debit' ? 'Bakiye Ekleme' : 'Bakiye Dusme'
+  }
+  return movement?.type === 'debit' ? 'Borc' : 'Tahsilat'
+}
+
+const getSelectedCanteenBranchId = () => {
+  try {
+    return String(localStorage.getItem('selectedBranchId_canteen') || localStorage.getItem('selectedBranchId') || '').trim()
+  } catch {
+    return ''
+  }
+}
+
 export default function CanteenCustomerDetailPage() {
   const nav = useNavigate()
   const { id } = useParams()
@@ -28,9 +43,6 @@ export default function CanteenCustomerDetailPage() {
   const [customer, setCustomer] = useState(null)
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(false)
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('cash')
-  const [note, setNote] = useState('')
   const [error, setError] = useState('')
 
   const [openSaleId, setOpenSaleId] = useState(null)
@@ -47,25 +59,38 @@ export default function CanteenCustomerDetailPage() {
   const [paymentDeleteReason, setPaymentDeleteReason] = useState('')
   const [paymentDeleteLoading, setPaymentDeleteLoading] = useState(false)
 
+  const [actionModalOpen, setActionModalOpen] = useState(false)
+  const [actionType, setActionType] = useState('collect')
+  const [actionSaving, setActionSaving] = useState(false)
+  const [actionAmount, setActionAmount] = useState('')
+  const [actionMethod, setActionMethod] = useState('cash')
+  const [actionNote, setActionNote] = useState('')
+
   const canView = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customers_view') || me.permissions.includes('canteen_customers_manage')))
   const canManage = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('canteen_customers_manage'))
   const canEdit = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customers_edit') || me.permissions.includes('canteen_customers_manage')))
   const canCollect = canManage
   const canDeletePayment = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customer_payment_delete') || me.permissions.includes('canteen_customers_manage')))
+  const canDeleteSale = canManage
 
   const load = async (options = {}) => {
     const background = options?.background === true
-    if (!background) setLoading(true)
-    if (!background) setError('')
-    const c = await api(`/api/canteen/customers/${id}`, { silent: true })
-    const s = await api(`/api/canteen/customers/${id}/sales`, { silent: true })
+    if (!background) {
+      setLoading(true)
+      setError('')
+    }
+
+    const customerResponse = await api(`/api/canteen/customers/${id}`, { silent: true })
+    const salesResponse = await api(`/api/canteen/customers/${id}/sales`, { silent: true })
+
     if (!background) setMovementsLoading(true)
-    const m = await getCustomerMovements(id)
-    setMovements(Array.isArray(m?.movements) ? m.movements : [])
+    const movementResponse = await getCustomerMovements(id)
+    setMovements(Array.isArray(movementResponse?.movements) ? movementResponse.movements : [])
     if (!background) setMovementsLoading(false)
-    setCustomer(c?.ok ? (c.customer || null) : null)
-    setSales(Array.isArray(s?.items) ? s.items : [])
-    if (!c?.ok) setError(c?.message || 'Cari bulunamadı')
+
+    setCustomer(customerResponse?.ok ? (customerResponse.customer || null) : null)
+    setSales(Array.isArray(salesResponse?.items) ? salesResponse.items : [])
+    if (!customerResponse?.ok) setError(customerResponse?.message || 'Cari bulunamadi')
     if (!background) setLoading(false)
   }
 
@@ -73,6 +98,7 @@ export default function CanteenCustomerDetailPage() {
     if (!id) return
     load()
   }, [id])
+
   useCanteenAutoRefresh(() => load({ background: true }), [id], { enabled: false })
 
   useEffect(() => {
@@ -98,18 +124,18 @@ export default function CanteenCustomerDetailPage() {
     const name = String(profileForm.name || '').trim()
     const phone = String(profileForm.phone || '').trim().replace(/\s+/g, '').replace(/[^0-9+]/g, '')
     if (name.length < 2) {
-      toast.error('İsim en az 2 karakter olmalı')
+      toast.error('Isim en az 2 karakter olmali')
       return
     }
     setProfileSaving(true)
     const res = await api(`/api/canteen/customers/${id}`, { method: 'PUT', data: { name, phone }, silent: true })
     if (!res?.ok || !res?.customer) {
-      toast.error(res?.message || 'Cari güncellenemedi')
+      toast.error(res?.message || 'Cari guncellenemedi')
       setProfileSaving(false)
       return
     }
     setCustomer(res.customer)
-    toast.success('Cari güncellendi')
+    toast.success('Cari guncellendi')
     setProfileSaving(false)
     await load()
   }
@@ -132,43 +158,71 @@ export default function CanteenCustomerDetailPage() {
   const toggleSale = (saleId) => {
     const sid = String(saleId || '').trim()
     if (!sid) return
-    setOpenSaleId(prev => (String(prev || '') === sid ? null : sid))
+    setOpenSaleId((prev) => (String(prev || '') === sid ? null : sid))
   }
 
-  const collect = async () => {
-    if (!canCollect) return
-    const amt = Number(String(amount || '').replace(',', '.'))
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setError('Geçerli bir tutar gir')
-      return
-    }
-    setLoading(true)
+  const openBalanceAction = (type) => {
+    setActionType(type)
+    setActionAmount('')
+    setActionMethod('cash')
+    setActionNote('')
     setError('')
-    const res = await api(`/api/canteen/customers/${id}/collect`, {
-      method: 'POST',
-      data: { method, amount: amt, note: String(note || '').trim() },
-      silent: true
-    })
-    if (!res?.ok) {
-      setError(res?.message || 'Tahsilat yapılamadı')
-      setLoading(false)
-      return
-    }
-    setAmount('')
-    setNote('')
-    await load()
-    setLoading(false)
+    setActionModalOpen(true)
   }
 
-  const canDeleteSale = me?.role === 'tenant_admin'
+  const submitBalanceAction = async () => {
+    if (!canCollect) return
+    const branchId = getSelectedCanteenBranchId()
+    if (!branchId) {
+      setError('Aktif sube secilmedi')
+      return
+    }
+    const amt = Number(String(actionAmount || '').replace(',', '.'))
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError('Gecerli bir tutar gir')
+      return
+    }
+
+    setActionSaving(true)
+    setError('')
+
+    const res = actionType === 'collect'
+      ? await api(`/api/canteen/customers/${id}/collect?branchId=${encodeURIComponent(branchId)}`, {
+          method: 'POST',
+          data: { method: actionMethod, amount: amt, note: String(actionNote || '').trim() },
+          silent: true
+        })
+      : await api(`/api/canteen/customers/${id}/adjust?branchId=${encodeURIComponent(branchId)}`, {
+          method: 'POST',
+          data: { action: actionType === 'add' ? 'add' : 'subtract', amount: amt, note: String(actionNote || '').trim() },
+          silent: true
+        })
+
+    if (!res?.ok) {
+      setError(res?.message || 'Islem basarisiz')
+      setActionSaving(false)
+      return
+    }
+
+    toast.success(
+      actionType === 'collect'
+        ? 'Tahsilat kaydedildi'
+        : actionType === 'add'
+          ? 'Bakiye eklendi'
+          : 'Bakiye dusuldu'
+    )
+    setActionSaving(false)
+    setActionModalOpen(false)
+    setActionAmount('')
+    setActionNote('')
+    await load()
+  }
 
   const deleteSale = async (saleId) => {
     if (!canDeleteSale) return
-    if (!window.confirm('İşlemi silmek istiyor musun?')) return
+    if (!window.confirm('Islemi silmek istiyor musun?')) return
     setLoading(true)
-    const sale = sales.find(x => String(x.orderId) === String(saleId))
-    const qs = sale?.branchId ? `?branchId=${encodeURIComponent(String(sale.branchId))}` : ''
-    const res = await api(`/api/canteen/sales/${saleId}${qs}`, { method: 'DELETE', silent: true })
+    const res = await api(`/api/canteen/sales/${saleId}`, { method: 'DELETE', silent: true })
     if (!res?.ok) {
       setError(res?.message || 'Silinemedi')
       setLoading(false)
@@ -178,8 +232,6 @@ export default function CanteenCustomerDetailPage() {
     setLoading(false)
   }
 
-  if (!canView) return <div className="card">403 – Bu sayfaya yetkin yok</div>
-
   const openDeletePayment = (paymentId) => {
     setPaymentDeleteId(String(paymentId || ''))
     setPaymentDeleteReason('')
@@ -187,19 +239,20 @@ export default function CanteenCustomerDetailPage() {
   }
 
   const confirmDeletePayment = async () => {
-    if (!canDeletePayment) return
-    if (!paymentDeleteId) return
+    if (!canDeletePayment || !paymentDeleteId) return
     setPaymentDeleteLoading(true)
     const res = await deleteCustomerPayment(id, paymentDeleteId, paymentDeleteReason)
     setPaymentDeleteLoading(false)
     if (!res?.ok) {
-      toast.error(res?.message || 'İşlem başarısız')
+      toast.error(res?.message || 'Islem basarisiz')
       return
     }
     toast.success('Tahsilat silindi')
     setPaymentDeleteOpen(false)
     await load()
   }
+
+  if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -219,41 +272,19 @@ export default function CanteenCustomerDetailPage() {
       <div className="detailSplit">
         <div style={{ display: 'grid', gap: 12 }}>
           <div className="card" style={{ display: 'grid', gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 700 }}>Bakiye</div>
-            <div style={{ fontWeight: 800, color: balance > 0 ? '#ef4444' : 'var(--text)' }}>{money(balance)} ₺</div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'grid', gap: 10 }}>
-            <div style={{ fontWeight: 700 }}>Borç tahsil et</div>
-            <div className="actionWrap">
-              {[
-                { key: 'cash', label: 'Nakit' },
-                { key: 'pos', label: 'POS' },
-                { key: 'bank', label: 'Banka' }
-              ].map(m => (
-                <button
-                  key={m.key}
-                  type="button"
-                  className="btn"
-                  onClick={() => setMethod(m.key)}
-                  disabled={!canCollect}
-                  aria-pressed={method === m.key}
-                >
-                  {m.label}
-                </button>
-              ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 700 }}>Bakiye</div>
+              <div style={{ fontWeight: 800, color: balance > 0 ? '#ef4444' : 'var(--text)' }}>{money(balance)} TL</div>
             </div>
-            <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
-              <input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" disabled={!canCollect} />
-            </label>
-            <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
-              <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Not" disabled={!canCollect} />
-            </label>
-            <button className="btn btn--primary btn--large" type="button" onClick={collect} disabled={!canCollect || loading}>Tahsilat Yap</button>
-          </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'grid', gap: 10 }}>
+              <div style={{ fontWeight: 700 }}>Hizli Islemler</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                <button className="btn btn--primary" type="button" onClick={() => openBalanceAction('add')} disabled={!canCollect}>+ Bakiye</button>
+                <button className="btn" type="button" onClick={() => openBalanceAction('subtract')} disabled={!canCollect}>- Bakiye</button>
+                <button className="btn" type="button" onClick={() => openBalanceAction('collect')} disabled={!canCollect}>Tahsilat Al</button>
+              </div>
+            </div>
           </div>
 
           <div className="card" style={{ display: 'grid', gap: 10 }}>
@@ -275,7 +306,7 @@ export default function CanteenCustomerDetailPage() {
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not: {String(customer.note).trim()}</div>
             )}
 
-            {(me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('canteen_customers_manage'))) && !!customer?.id && balance <= 0 && (
+            {canManage && !!customer?.id && (
               <button className="btn btn--danger btn--large" type="button" onClick={() => setDeleteOpen(true)} disabled={deleteLoading}>
                 Cariyi Sil
               </button>
@@ -286,27 +317,28 @@ export default function CanteenCustomerDetailPage() {
         <div className="card" style={{ display: 'grid', gap: 10, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <div style={{ fontWeight: 700 }}>Hareketler</div>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>{movementsLoading ? 'Yükleniyor...' : `${movements.length} kayıt`}</div>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>{movementsLoading ? 'Yukleniyor...' : `${movements.length} kayit`}</div>
           </div>
           <div style={isMobilePortrait ? { display: 'grid', gap: 8 } : { display: 'grid', gap: 8, maxHeight: '40vh', overflowY: 'auto', paddingRight: 6 }}>
-            {(movements || []).map((m) => {
-              const isPayment = m.kind === 'payment'
-              const canDeleteThis = isPayment && canDeletePayment
+            {(movements || []).map((movement) => {
+              const isPayment = movement.kind === 'payment'
+              const isAdjustment = movement.kind === 'adjustment'
+              const canDeleteThis = (isPayment || isAdjustment) && canDeletePayment && movement.paymentId
               return (
-                <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
+                <div key={movement.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div className="breakAny" style={{ fontWeight: 700 }}>
-                        {m.type === 'debit' ? 'Borç' : 'Tahsilat'}
-                        {paymentMethodLabel(m.method) ? ` • ${paymentMethodLabel(m.method)}` : ''}
+                        {getMovementTitle(movement)}
+                        {movement.kind !== 'adjustment' && paymentMethodLabel(movement.method) ? ` • ${paymentMethodLabel(movement.method)}` : ''}
                       </div>
-                      <div style={{ fontWeight: 800, color: m.type === 'debit' ? '#ef4444' : '#16a34a' }}>{money(m.amount)} ₺</div>
+                      <div style={{ fontWeight: 800, color: movement.type === 'debit' ? '#ef4444' : '#16a34a' }}>{money(movement.amount)} TL</div>
                     </div>
-                    <div className="canteen-subtext" style={{ fontSize: 12 }}>{m.createdAt ? new Date(m.createdAt).toLocaleString('tr-TR') : ''}</div>
-                    {!!String(m.note || '').trim() && <div className="breakAny canteen-subtext" style={{ fontSize: 12 }}>Not: {String(m.note || '').trim()}</div>}
+                    <div className="canteen-subtext" style={{ fontSize: 12 }}>{movement.createdAt ? new Date(movement.createdAt).toLocaleString('tr-TR') : ''}</div>
+                    {!!String(movement.note || '').trim() && <div className="breakAny canteen-subtext" style={{ fontSize: 12 }}>Not: {String(movement.note || '').trim()}</div>}
                   </div>
                   {canDeleteThis ? (
-                    <button className="btn btn--danger btn--compact" type="button" onClick={() => openDeletePayment(m.paymentId)} disabled={paymentDeleteLoading}>
+                    <button className="btn btn--danger btn--compact" type="button" onClick={() => openDeletePayment(movement.paymentId)} disabled={paymentDeleteLoading}>
                       Sil
                     </button>
                   ) : (
@@ -315,36 +347,36 @@ export default function CanteenCustomerDetailPage() {
                 </div>
               )
             })}
-            {!movementsLoading && movements.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Kayıt yok</div>}
+            {!movementsLoading && movements.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Kayit yok</div>}
           </div>
         </div>
 
         <div className="card" style={{ display: 'grid', gap: 10, minWidth: 0 }}>
-          <div style={{ fontWeight: 700 }}>Satışlar</div>
+          <div style={{ fontWeight: 700 }}>Satislar</div>
           <div style={isMobilePortrait ? { display: 'grid', gap: 8 } : { display: 'grid', gap: 8, maxHeight: '60vh', overflowY: 'auto', paddingRight: 6 }}>
-            {sales.map((s) => {
-              const isOpen = String(openSaleId || '') === String(s.orderId || '')
+            {sales.map((sale) => {
+              const isOpen = String(openSaleId || '') === String(sale.orderId || '')
               return (
                 <div
-                  key={s.orderId}
+                  key={sale.orderId}
                   className="saleRow"
-                  onClick={() => toggleSale(s.orderId)}
+                  onClick={() => toggleSale(sale.orderId)}
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="saleRowTop">
                     <div style={{ minWidth: 0 }}>
-                      <div className="saleAmount">{money(s.total)} ₺</div>
-                      <div className="canteen-subtext">{dt(s.createdAt)}</div>
-                      <div className="canteen-subtext">Ödeme: {paymentMethodLabel(s.paymentMethod) || '-'}</div>
+                      <div className="saleAmount">{money(sale.total)} TL</div>
+                      <div className="canteen-subtext">{dt(sale.createdAt)}</div>
+                      <div className="canteen-subtext">Odeme: {paymentMethodLabel(sale.paymentMethod) || '-'}</div>
                     </div>
 
                     <div className="saleActions">
                       <button
                         type="button"
                         className="btn btn--compact"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleSale(s.orderId)
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          toggleSale(sale.orderId)
                         }}
                       >
                         {isOpen ? '▲' : '▼'}
@@ -354,9 +386,9 @@ export default function CanteenCustomerDetailPage() {
                         <button
                           className="btn btn--danger btn--compact"
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteSale(s.orderId)
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            deleteSale(sale.orderId)
                           }}
                         >
                           Sil
@@ -367,15 +399,15 @@ export default function CanteenCustomerDetailPage() {
 
                   {isOpen && (
                     <div className="saleRowDetail">
-                      {(!Array.isArray(s.items) || s.items.length === 0) ? (
-                        <div className="canteen-subtext">Bu satışta ürün detayı yok.</div>
+                      {(!Array.isArray(sale.items) || sale.items.length === 0) ? (
+                        <div className="canteen-subtext">Bu satista urun detayi yok.</div>
                       ) : (
-                        (s.items || []).map((it, i) => (
-                          <div key={i} className="saleItemRow">
-                            <div style={{ minWidth: 0, fontWeight: 700 }} className="breakAny">{it.name}</div>
+                        (sale.items || []).map((item, index) => (
+                          <div key={index} className="saleItemRow">
+                            <div style={{ minWidth: 0, fontWeight: 700 }} className="breakAny">{item.name}</div>
                             <div style={{ textAlign: 'right' }}>
-                              <span className="canteen-subtext">{Number(it.qty || 0)} x {money(it.price)} ₺</span>
-                              <span style={{ marginLeft: 8, fontWeight: 800 }}>{money(it.lineTotal)} ₺</span>
+                              <span className="canteen-subtext">{Number(item.qty || 0)} x {money(item.price)} TL</span>
+                              <span style={{ marginLeft: 8, fontWeight: 800 }}>{money(item.lineTotal)} TL</span>
                             </div>
                           </div>
                         ))
@@ -385,7 +417,7 @@ export default function CanteenCustomerDetailPage() {
                 </div>
               )
             })}
-            {!loading && sales.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Satış yok</div>}
+            {!loading && sales.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Satis yok</div>}
           </div>
         </div>
       </div>
@@ -394,7 +426,7 @@ export default function CanteenCustomerDetailPage() {
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         title="Cari silinsin mi?"
-        description="Bu işlem geri alınamaz."
+        description="Cari aktif listeden kaldirilir. Gecmis satis ve rapor verileri korunur."
         danger
         confirmText={deleteLoading ? 'Siliniyor...' : 'Evet, Sil'}
         confirmDisabled={deleteLoading}
@@ -402,16 +434,68 @@ export default function CanteenCustomerDetailPage() {
         onConfirm={deleteCustomer}
       />
 
-      <Modal open={paymentDeleteOpen} onClose={() => setPaymentDeleteOpen(false)} title="Tahsilatı Sil">
+      <Modal open={paymentDeleteOpen} onClose={() => setPaymentDeleteOpen(false)} title="Islemi Sil">
         <div style={{ display: 'grid', gap: 10 }}>
-          <div>Bu tahsilatı silmek istiyor musunuz? İşlem geri alınır.</div>
+          <div>Bu islemi silmek istiyor musunuz? Islem geri alinir.</div>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Silme nedeni (opsiyonel)</div>
             <input className="input" value={paymentDeleteReason} onChange={(e) => setPaymentDeleteReason(e.target.value)} disabled={paymentDeleteLoading} />
           </label>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => setPaymentDeleteOpen(false)} disabled={paymentDeleteLoading}>Vazgeç</button>
+            <button className="btn" onClick={() => setPaymentDeleteOpen(false)} disabled={paymentDeleteLoading}>Vazgec</button>
             <button className="btn btn--danger" onClick={confirmDeletePayment} disabled={paymentDeleteLoading}>{paymentDeleteLoading ? 'Siliniyor...' : 'Evet, Sil'}</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={actionModalOpen}
+        onClose={() => !actionSaving && setActionModalOpen(false)}
+        title={actionType === 'add' ? '+ Bakiye' : actionType === 'subtract' ? '- Bakiye' : 'Tahsilat Al'}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          {actionType === 'collect' ? (
+            <div className="actionWrap">
+              {[
+                { key: 'cash', label: 'Nakit' },
+                { key: 'pos', label: 'POS' },
+                { key: 'bank', label: 'Banka' }
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className="btn"
+                  onClick={() => setActionMethod(item.key)}
+                  disabled={actionSaving}
+                  aria-pressed={actionMethod === item.key}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
+            <input className="input" value={actionAmount} onChange={(e) => setActionAmount(e.target.value)} placeholder="0" disabled={actionSaving} />
+          </label>
+
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
+            <input className="input" value={actionNote} onChange={(e) => setActionNote(e.target.value)} placeholder="Not" disabled={actionSaving} />
+          </label>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button className="btn" type="button" onClick={() => setActionModalOpen(false)} disabled={actionSaving}>Vazgec</button>
+            <button className="btn btn--primary" type="button" onClick={submitBalanceAction} disabled={actionSaving}>
+              {actionSaving
+                ? 'Kaydediliyor...'
+                : actionType === 'add'
+                  ? 'Bakiyeye Ekle'
+                  : actionType === 'subtract'
+                    ? 'Bakiyeden Dus'
+                    : 'Tahsilat Yap'}
+            </button>
           </div>
         </div>
       </Modal>

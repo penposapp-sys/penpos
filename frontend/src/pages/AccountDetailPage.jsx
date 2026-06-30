@@ -8,6 +8,7 @@ import { trStatusLabel } from '../i18n/tr.js'
 import Modal from '../components/Modal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import { pickInitialPaymentMethod } from '../lib/paymentMethods.js'
+import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
 const toNumberInput = (value) => {
@@ -22,7 +23,7 @@ export default function AccountDetailPage() {
   const nav = useNavigate()
   const { id } = useParams()
   const loc = useLocation()
-  const { isMobilePortrait } = useResponsiveFlags()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const { user, allowedBranchIds } = useAuth()
 
   const orderIdFromUrl = useMemo(() => {
@@ -429,7 +430,7 @@ export default function AccountDetailPage() {
           <div className="account-balance-label">Bakiye</div>
           <div className="account-balance-value">{money(account?.balance || 0)}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="account-balance-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canManageAccount && (
             <>
               <button className="btn" onClick={() => openManualModal('debit')}>+ Bakiye</button>
@@ -487,6 +488,18 @@ export default function AccountDetailPage() {
         ))}
       </div>
     </div>
+  ) : null
+
+  const mobileCategoriesPanel = canManageAccount && isMobilePortrait ? (
+    <SaleCategorySidebar
+      title="Kategoriler"
+      categories={categories.map((category) => ({
+        ...category,
+        name: `${category.name}${category.isActive === false ? ' (Pasif)' : ''}`
+      }))}
+      activeCategoryId={activeCategoryId}
+      onSelect={setActiveCategoryId}
+    />
   ) : null
 
   const debtPanel = (
@@ -765,13 +778,9 @@ export default function AccountDetailPage() {
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start', width: '100%' }
     : { display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(220px, 0.82fr) minmax(0, 1.8fr) minmax(300px, 0.9fr)', gap: 18, alignItems: 'start', width: '100%' }
 
-  const mobileCatalogTopStyle = {
-    display: 'grid',
-    gridTemplateColumns: '104px minmax(0, 1fr)',
-    gap: 12,
-    alignItems: 'start',
-    width: '100%'
-  }
+  const tabletCatalogGridStyle = canManageAccount && isTablet
+    ? { display: 'grid', gridTemplateColumns: 'minmax(220px, 0.9fr) minmax(0, 1.5fr) minmax(260px, 0.95fr)', gap: 18, alignItems: 'start', width: '100%' }
+    : null
 
   return (
     <div
@@ -802,13 +811,20 @@ export default function AccountDetailPage() {
 
           {canManageAccount && isMobilePortrait ? (
             <>
-              <div style={mobileCatalogTopStyle}>
-                {categoriesPanel}
-                {productsPanel}
-              </div>
+              {mobileCategoriesPanel}
+              {productsPanel}
               {debtPanel}
               {cartPanel}
             </>
+          ) : canManageAccount && isTablet ? (
+            <div style={tabletCatalogGridStyle}>
+              {categoriesPanel}
+              {productsPanel}
+              {cartPanel}
+              <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
+                {debtPanel}
+              </div>
+            </div>
           ) : (
             <div style={catalogGridStyle}>
               {debtPanel}

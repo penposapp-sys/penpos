@@ -32,9 +32,13 @@ export const get = async (req, res) => {
 
 export const sales = async (req, res) => {
   try {
-    const branchIds = Array.isArray(req.branchIds) ? req.branchIds : parseBranchIds(req.query?.branchId, req.query?.branchIds)
-    const bad = requireValidObjectIds(branchIds)
+    const requestedBranchIds = parseBranchIds(req.query?.branchId, req.query?.branchIds)
+    const bad = requireValidObjectIds(requestedBranchIds)
     if (bad.length > 0) return res.status(400).json({ success: false, code: 'invalid_request', message: 'Invalid branch id' })
+
+    const branchIds = requestedBranchIds.length > 0
+      ? (Array.isArray(req.branchIds) ? req.branchIds.filter((id) => requestedBranchIds.includes(String(id))) : requestedBranchIds)
+      : []
 
     const items = await service.listCustomerSales(req.user.tenantId, req.params.id, branchIds)
     res.json({ success: true, items })
@@ -45,8 +49,18 @@ export const sales = async (req, res) => {
 
 export const collect = async (req, res) => {
   try {
-    const branchId = req.user?.branchId ? String(req.user.branchId) : null
+    const branchId = req.canteenBranchId ? String(req.canteenBranchId) : null
     const result = await service.collect(req.user.tenantId, req.user.id, req.params.id, { ...(req.body || {}), branchId })
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const adjust = async (req, res) => {
+  try {
+    const branchId = req.canteenBranchId ? String(req.canteenBranchId) : null
+    const result = await service.adjustBalance(req.user.tenantId, req.user.id, req.params.id, { ...(req.body || {}), branchId })
     res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)

@@ -1,18 +1,20 @@
 import CanteenCustomer from '../models/CanteenCustomer.js'
 
-export const listByTenantAndBranch = (tenantId, branchId) =>
-  CanteenCustomer.find({ tenantId, branchId, isActive: true }).sort({ createdAt: -1 })
+const buildActiveFilter = (includeInactive = false) => (includeInactive ? {} : { isActive: true })
 
-export const listByTenant = (tenantId) =>
-  CanteenCustomer.find({ tenantId, isActive: true }).sort({ createdAt: -1 })
+export const listByTenantAndBranch = (tenantId, branchId, { includeInactive = false } = {}) =>
+  CanteenCustomer.find({ tenantId, branchId, ...buildActiveFilter(includeInactive) }).sort({ createdAt: -1 })
 
-export const searchByTenant = (tenantId, q, { limit = 50 } = {}) => {
+export const listByTenant = (tenantId, { includeInactive = false } = {}) =>
+  CanteenCustomer.find({ tenantId, ...buildActiveFilter(includeInactive) }).sort({ createdAt: -1 })
+
+export const searchByTenant = (tenantId, q, { limit = 50, includeInactive = false } = {}) => {
   const term = String(q || '').trim().toLowerCase()
-  if (!term) return CanteenCustomer.find({ tenantId, isActive: true }).sort({ createdAt: -1 }).limit(Number(limit || 50))
+  if (!term) return CanteenCustomer.find({ tenantId, ...buildActiveFilter(includeInactive) }).sort({ createdAt: -1 }).limit(Number(limit || 50))
   const rx = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
   return CanteenCustomer.find({
     tenantId,
-    isActive: true,
+    ...buildActiveFilter(includeInactive),
     $or: [
       { nameNormalized: { $regex: rx } },
       { phone: { $regex: rx } },
@@ -21,31 +23,35 @@ export const searchByTenant = (tenantId, q, { limit = 50 } = {}) => {
   }).sort({ createdAt: -1 }).limit(Number(limit || 50))
 }
 
-export const listByTenantAndBranches = (tenantId, branchIds) =>
-  CanteenCustomer.find({ tenantId, branchId: { $in: branchIds }, isActive: true }).sort({ createdAt: -1 })
+export const listByTenantAndBranches = (tenantId, branchIds, { includeInactive = false } = {}) =>
+  CanteenCustomer.find({ tenantId, branchId: { $in: branchIds }, ...buildActiveFilter(includeInactive) }).sort({ createdAt: -1 })
 
-export const findByIdAndTenantAndBranches = (id, tenantId, branchIds) =>
-  CanteenCustomer.findOne({ _id: id, tenantId, branchId: { $in: branchIds }, isActive: true })
+export const findByIdAndTenantAndBranches = (id, tenantId, branchIds, { includeInactive = false } = {}) =>
+  CanteenCustomer.findOne({ _id: id, tenantId, branchId: { $in: branchIds }, ...buildActiveFilter(includeInactive) })
 
-export const findByIdAndScope = (id, tenantId, branchId) =>
-  CanteenCustomer.findOne({ _id: id, tenantId, branchId, isActive: true })
+export const findByIdAndScope = (id, tenantId, branchId, { includeInactive = false } = {}) =>
+  CanteenCustomer.findOne({ _id: id, tenantId, branchId, ...buildActiveFilter(includeInactive) })
 
-export const findByIdAndTenant = (id, tenantId) =>
-  CanteenCustomer.findOne({ _id: id, tenantId, isActive: true })
+export const findByIdAndTenant = (id, tenantId, { includeInactive = false } = {}) =>
+  CanteenCustomer.findOne({ _id: id, tenantId, ...buildActiveFilter(includeInactive) })
 
-export const findByPhoneAndTenant = (tenantId, phone) =>
-  CanteenCustomer.findOne({ tenantId, phone, isActive: true })
+export const findByPhoneAndTenant = (tenantId, phone, { includeInactive = false } = {}) =>
+  CanteenCustomer.findOne({ tenantId, phone, ...buildActiveFilter(includeInactive) })
 
-export const findByPhoneAndTenantExcludingId = (tenantId, phone, excludedId) =>
-  CanteenCustomer.findOne({ tenantId, phone, isActive: true, _id: { $ne: excludedId } })
+export const findByPhoneAndTenantExcludingId = (tenantId, phone, excludedId, { includeInactive = false } = {}) =>
+  CanteenCustomer.findOne({ tenantId, phone, ...buildActiveFilter(includeInactive), _id: { $ne: excludedId } })
 
 export const create = (data) => CanteenCustomer.create(data)
 
 export const updateByIdAndTenant = (id, tenantId, update) =>
   CanteenCustomer.findOneAndUpdate({ _id: id, tenantId, isActive: true }, update, { new: true })
 
-export const deleteByIdAndTenant = (id, tenantId) =>
-  CanteenCustomer.findOneAndDelete({ _id: id, tenantId })
+export const softDeleteByIdAndTenant = (id, tenantId, actorUserId) =>
+  CanteenCustomer.findOneAndUpdate(
+    { _id: id, tenantId, isActive: true },
+    { $set: { isActive: false, deletedAt: new Date(), deletedBy: actorUserId } },
+    { new: true }
+  )
 
-export const listByIdsAndTenant = (tenantId, ids) =>
-  CanteenCustomer.find({ tenantId, _id: { $in: ids }, isActive: true })
+export const listByIdsAndTenant = (tenantId, ids, { includeInactive = false } = {}) =>
+  CanteenCustomer.find({ tenantId, _id: { $in: ids }, ...buildActiveFilter(includeInactive) })

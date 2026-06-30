@@ -221,6 +221,12 @@ const pushCollectionBreakdown = (map, collection = {}) => {
   map.set(methodId, current)
 }
 
+const isReportableCollection = (collection = {}) => {
+  const direction = String(collection?.direction || 'credit').trim()
+  const method = String(collection?.method || '').trim()
+  return direction !== 'debit' && method !== 'manual'
+}
+
 export const zReport = async (tenantId, branchIds, query = {}) => {
   const { from, to, label: reportDateLabel } = buildDateRangeForZReport(query)
   const allowedIds = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
@@ -372,6 +378,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
   }
 
   for (const collection of (collections || [])) {
+    if (!isReportableCollection(collection)) continue
     const amount = Number(collection?.amount || 0)
     summary.collectionsTotal += amount
     pushCollectionBreakdown(collectionBreakdownMap, collection)
@@ -537,7 +544,7 @@ export const products = async (tenantId, branchIds, query) => {
 }
 
 export const customers = async (tenantId, branchIds) => {
-  const items = await customerRepo.listByTenant(tenantId)
+  const items = await customerRepo.listByTenant(tenantId, { includeInactive: true })
   const out = []
   for (const c of items) {
     const balance = await computeBalanceForCustomer(tenantId, c.id)

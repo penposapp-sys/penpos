@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
+import { toast } from '../../lib/toast.js'
 import CreateCustomerModal from '../components/CreateCustomerModal.jsx'
 import EditCustomerModal from '../components/EditCustomerModal.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
@@ -20,6 +21,7 @@ export default function CanteenCustomersPage() {
   const canView = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customers_view') || me.permissions.includes('canteen_customers_manage')))
   const canCreate = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customers_create') || me.permissions.includes('canteen_customers_manage')))
   const canEdit = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_customers_edit') || me.permissions.includes('canteen_customers_manage')))
+  const canManage = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('canteen_customers_manage'))
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -36,10 +38,23 @@ export default function CanteenCustomersPage() {
   useEffect(() => { load() }, [])
   useCanteenAutoRefresh(() => load({ background: true }), [], { enabled: false })
 
+  const removeCustomer = async (customer) => {
+    if (!canManage || !customer?.id) return
+    const confirmed = window.confirm('Bu cari aktif listeden kaldirilacak. Gecmis satis ve rapor verileri korunur. Devam edilsin mi?')
+    if (!confirmed) return
+    const res = await api(`/api/canteen/customers/${customer.id}`, { method: 'DELETE', silent: true })
+    if (!res?.ok) {
+      toast.error(res?.message || 'Cari silinemedi')
+      return
+    }
+    toast.success('Cari silindi')
+    await load()
+  }
+
   const filtered = useMemo(() => {
     const nq = normalize(q)
     if (!nq) return items
-    return items.filter(c => normalize(c.name).includes(nq) || normalize(c.phone).includes(nq))
+    return items.filter((c) => normalize(c.name).includes(nq) || normalize(c.phone).includes(nq))
   }, [items, q])
 
   if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
@@ -53,15 +68,15 @@ export default function CanteenCustomersPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button className="btn" type="button" onClick={load} disabled={loading} style={{ padding: '0 10px', height: 34 }}>{loading ? '...' : 'Yenile'}</button>
               {canCreate && (
-                <button className="btn btn--primary" type="button" onClick={() => setCreateOpen(true)} style={{ padding: '0 10px', height: 34 }}>+ Cari Oluştur</button>
+                <button className="btn btn--primary" type="button" onClick={() => setCreateOpen(true)} style={{ padding: '0 10px', height: 34 }}>+ Cari Olustur</button>
               )}
             </div>
           </div>
-          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="İsim veya telefon" />
+          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Isim veya telefon" />
         </label>
 
         <div style={{ display: 'grid', gap: 8 }}>
-          {filtered.map(c => (
+          {filtered.map((c) => (
             <div key={c.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
               <Link
                 to={`/canteen/cariler/${c.id}`}
@@ -70,31 +85,43 @@ export default function CanteenCustomersPage() {
                 <div style={{ minWidth: 0 }}>
                   <div className="breakAny" style={{ fontWeight: 700 }}>{c.name}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{c.phone || ''}</div>
-                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Son İşlem: {c.lastActionAt ? new Date(c.lastActionAt).toLocaleString('tr-TR') : '-'}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Son Islem: {c.lastActionAt ? new Date(c.lastActionAt).toLocaleString('tr-TR') : '-'}</div>
                 </div>
               </Link>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: 120 }}>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Borç</div>
-                  <div style={{ whiteSpace: 'nowrap', fontWeight: 800, color: Number(c.balance || 0) > 0 ? '#ef4444' : 'var(--text)' }}>{money(c.balance)} ₺</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Borc</div>
+                  <div style={{ whiteSpace: 'nowrap', fontWeight: 800, color: Number(c.balance || 0) > 0 ? '#ef4444' : 'var(--text)' }}>{money(c.balance)} TL</div>
                 </div>
-                {canEdit && (
-                  <button
-                    className="btn btn--compact"
-                    type="button"
-                    onClick={() => {
-                      setEditing(c)
-                      setEditOpen(true)
-                    }}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    Düzenle
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {canEdit && (
+                    <button
+                      className="btn btn--compact"
+                      type="button"
+                      onClick={() => {
+                        setEditing(c)
+                        setEditOpen(true)
+                      }}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      Duzenle
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      className="btn btn--danger btn--compact"
+                      type="button"
+                      onClick={() => removeCustomer(c)}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      Sil
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
-          {!loading && filtered.length === 0 && <div style={{ color: 'var(--muted)' }}>Kayıt yok</div>}
+          {!loading && filtered.length === 0 && <div style={{ color: 'var(--muted)' }}>Kayit yok</div>}
         </div>
       </div>
 

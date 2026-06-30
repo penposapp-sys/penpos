@@ -21,7 +21,7 @@ export const listCompleted = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    const result = await service.deleteSale(req.user.tenantId, req.canteenBranchId, req.user.id, req.params.id)
+    const result = await service.deleteSale(req.user.tenantId, req.user.id, req.params.id)
     res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)
