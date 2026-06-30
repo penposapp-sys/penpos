@@ -66,6 +66,120 @@ const computeBalanceForCustomer = async (tenantId, customerId) => {
   return Number(debt - paid)
 }
 
+const buildBranchScopeMatch = (branchIds = []) => {
+  const ids = (Array.isArray(branchIds) ? branchIds : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value) => mongoose.isValidObjectId(value))
+    .map((value) => new mongoose.Types.ObjectId(value))
+
+  if (ids.length === 0) return null
+  return {
+    sale: { branchId: { $in: ids } },
+    collection: {
+      $or: [
+        { branchId: { $in: ids } },
+        { branchId: null },
+        { branchId: { $exists: false } }
+      ]
+    }
+  }
+}
+
+const safeToLowerStringExpr = (path) => ({
+  $toLower: {
+    $convert: {
+      input: { $ifNull: [path, ''] },
+      to: 'string',
+      onError: '',
+      onNull: ''
+    }
+  }
+})
+
+const computeCustomerBalanceTotalAt = async (tenantId, branchIds = [], toExclusive) => {
+  const tenantObjectId = new mongoose.Types.ObjectId(tenantId)
+  const saleMatch = {
+    tenantId: tenantObjectId,
+    isActive: true,
+    $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }]
+  }
+  const collectionMatch = {
+    tenantId: tenantObjectId,
+    isActive: true,
+    isDeleted: { $ne: true }
+  }
+
+  if (toExclusive instanceof Date) {
+    saleMatch.createdAt = { $lt: toExclusive }
+    collectionMatch.createdAt = { $lt: toExclusive }
+  }
+
+  const branchScope = buildBranchScopeMatch(branchIds)
+  if (branchScope?.sale) Object.assign(saleMatch, branchScope.sale)
+  if (branchScope?.collection) Object.assign(collectionMatch, branchScope.collection)
+
+  const [debtRows, collectionRows] = await Promise.all([
+    CanteenSale.aggregate([
+      { $match: saleMatch },
+      {
+        $addFields: {
+          paymentMethod: safeToLowerStringExpr('$payment.method'),
+          paymentMethodType: safeToLowerStringExpr('$payment.methodType'),
+          paymentMethodName: safeToLowerStringExpr('$payment.methodName')
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { paymentMethod: { $in: ['account', 'credit'] } },
+            { paymentMethodType: { $in: ['account', 'credit'] } },
+            { paymentMethodName: /veresiye|cari/i }
+          ]
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]),
+    CanteenCustomerCollection.aggregate([
+      { $match: collectionMatch },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: {
+              $cond: [
+                { $eq: ['$direction', 'debit'] },
+                { $multiply: ['$amount', -1] },
+                '$amount'
+              ]
+            }
+          }
+        }
+      }
+    ])
+  ])
+
+  const debt = Number(debtRows?.[0]?.total || 0)
+  const paid = Number(collectionRows?.[0]?.total || 0)
+  return Number(debt - paid)
+}
+
+const safeComputeCustomerBalanceTotalAt = async (tenantId, branchIds = [], toExclusive) => {
+  try {
+    return await computeCustomerBalanceTotalAt(tenantId, branchIds, toExclusive)
+  } catch (err) {
+    try {
+      console.error('[CANTEEN_REPORTS_BALANCE_TOTAL_ERR]', {
+        tenantId: String(tenantId || ''),
+        branchIds: Array.isArray(branchIds) ? branchIds.map(String) : [],
+        toExclusive: toExclusive instanceof Date ? toExclusive.toISOString() : null,
+        message: String(err?.message || err)
+      })
+    } catch {}
+    return 0
+  }
+}
+
 const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100
 
 const buildEmptyPaymentSummary = () => ({
@@ -298,7 +412,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     createdAt: { $gte: from, $lt: to }
   }
 
-  const [sales, branches, settings, tenant, collections] = await Promise.all([
+  const [sales, branches, settings, tenant, collections, customerBalanceTotal] = await Promise.all([
     CanteenSale.find(match)
       .select({
         branchId: 1,
@@ -316,7 +430,8 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     CanteenBranch.find({ tenantId, _id: { $in: branchObjectIds } }).select({ _id: 1, name: 1 }).lean(),
     CanteenTenantSettings.findOne({ tenantId }).lean(),
     Tenant.findById(tenantId).select({ name: 1, settings: 1 }).lean(),
-    collectionRepo.listRangeByTenantAndBranches(tenantId, finalBranchIds, from, to)
+    collectionRepo.listRangeByTenantAndBranches(tenantId, finalBranchIds, from, to),
+    safeComputeCustomerBalanceTotalAt(tenantId, finalBranchIds, to)
   ])
 
   const productIds = Array.from(new Set(
@@ -357,6 +472,8 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     payments: buildEmptyPaymentSummary(),
     cashIn: buildEmptyCashInSummary(),
     collectionsTotal: 0,
+    periodCreditBalance: 0,
+    customerBalanceTotal: roundMoney(customerBalanceTotal),
     salesChannels: buildEmptyChannelSummary(),
     vatBreakdown: []
   }
@@ -517,6 +634,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     cash: roundMoney(summary.cashIn.cash)
   }
   summary.collectionsTotal = roundMoney(summary.collectionsTotal)
+  summary.periodCreditBalance = roundMoney(summary.payments.credit - summary.collectionsTotal)
   summary.salesChannels = {
     qr: roundMoney(summary.salesChannels.qr),
     cashier: roundMoney(summary.salesChannels.cashier)
@@ -562,11 +680,12 @@ export const summary = async (tenantId, branchIds, query) => {
   const ids = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
   const match = { tenantId: new mongoose.Types.ObjectId(tenantId), branchId: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) }, isActive: true, $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }], createdAt: { $gte: from, $lt: to } }
 
-  const [sales, collections] = await Promise.all([
+  const [sales, collections, customerBalanceTotal] = await Promise.all([
     CanteenSale.find(match)
       .select({ total: 1, payment: 1 })
       .lean(),
-    collectionRepo.listRangeByTenantAndBranches(tenantId, ids, from, to)
+    collectionRepo.listRangeByTenantAndBranches(tenantId, ids, from, to),
+    safeComputeCustomerBalanceTotalAt(tenantId, ids, to)
   ])
 
   const totalRevenue = (sales || []).reduce((sum, sale) => sum + Number(sale?.total || 0), 0)
@@ -623,6 +742,16 @@ export const summary = async (tenantId, branchIds, query) => {
     totalRevenue: roundMoney(totalRevenue),
     saleCount,
     avgBasket: roundMoney(avgBasket),
+    periodCreditBalance: roundMoney(
+      (sales || []).reduce((sum, sale) => {
+        const payment = sale?.payment || {}
+        const total = Number(sale?.total || 0)
+        return classifyPaymentBucket(payment) === 'credit' ? sum + total : sum
+      }, 0) - (collections || []).reduce((sum, collection) => (
+        isReportableCollection(collection) ? sum + Number(collection?.amount || 0) : sum
+      ), 0)
+    ),
+    customerBalanceTotal: roundMoney(customerBalanceTotal),
     byMethod,
     methodBreakdown
   }

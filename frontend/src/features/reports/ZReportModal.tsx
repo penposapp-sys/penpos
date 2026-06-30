@@ -266,7 +266,7 @@ export default function ZReportModal({
                   <div>Toplam satis: <strong>{money(report.summary?.netSales || 0)}</strong></div>
                   <div>Indirim: <strong>{money(report.summary?.discountTotal || 0)}</strong></div>
                   <div>Kasadaki toplam: <strong>{money(report.summary?.cashIn?.total || 0)}</strong></div>
-                  <div>Veresiye / cari: <strong>{money(payments.credit || 0)}</strong></div>
+                  <div>Veresiye / cari: <strong>{money(report.summary?.periodCreditBalance || 0)}</strong></div>
                   <div>Veresiye tahsilati: <strong>{money(report.summary?.collectionsTotal || 0)}</strong></div>
                   <div>Toplam KDV: <strong>{money(totalVat)}</strong></div>
                 </div>

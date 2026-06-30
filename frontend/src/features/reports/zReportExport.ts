@@ -57,7 +57,7 @@ const buildExcelHtml = (report: ZReportData) => {
     <tr><td>Toplam satis</td><td>${toMoney(safeReport.summary?.netSales || 0)}</td></tr>
     <tr><td>Indirim</td><td>${toMoney(safeReport.summary?.discountTotal || 0)}</td></tr>
     <tr><td>Kasadaki toplam</td><td>${toMoney(safeReport.summary?.cashIn?.total || 0)}</td></tr>
-    <tr><td>Veresiye / cari</td><td>${toMoney(safeReport.summary?.payments?.credit || 0)}</td></tr>
+    <tr><td>Veresiye / cari</td><td>${toMoney(safeReport.summary?.periodCreditBalance || 0)}</td></tr>
     <tr><td>Veresiye tahsilati</td><td>${toMoney(safeReport.summary?.collectionsTotal || 0)}</td></tr>
   </table>
   <br />

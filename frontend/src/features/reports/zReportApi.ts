@@ -43,6 +43,8 @@ export type ZReportSummary = {
   paymentBreakdown?: ZReportPaymentBreakdownRow[]
   cashInBreakdown?: ZReportPaymentBreakdownRow[]
   collectionsTotal?: number
+  periodCreditBalance?: number
+  customerBalanceTotal?: number
   collectionBreakdown?: ZReportCollectionBreakdownRow[]
   salesChannels: {
     qr: number

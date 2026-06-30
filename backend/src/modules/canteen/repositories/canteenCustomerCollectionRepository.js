@@ -59,7 +59,8 @@ export const listRangeByTenantAndBranches = (tenantId, branchIds = [], from, to)
     tenantId: tid,
     $or: [
       { branchId: { $in: ids } },
-      { branchId: null }
+      { branchId: null },
+      { branchId: { $exists: false } }
     ],
     isActive: true,
     isDeleted: { $ne: true },

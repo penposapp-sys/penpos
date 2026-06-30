@@ -327,7 +327,7 @@ export const buildZReportThermalText = (report, options = {}) => {
     pairLine(TEXT.grossSales, formatMoney(summary?.grossSales || 0), width),
     pairLine(TEXT.discount, formatMoney(summary?.discountTotal || 0), width),
     pairLine(TEXT.cashInCash, formatMoney(cashIn?.total || 0), width),
-    pairLine(TEXT.creditAccount, formatMoney(payments?.credit || 0), width),
+    pairLine(TEXT.creditAccount, formatMoney(summary?.periodCreditBalance || 0), width),
     pairLine(TEXT.collections, formatMoney(summary?.collectionsTotal || 0), width),
     pairLine(TEXT.vat, formatMoney(vatBreakdown.reduce((sum, row) => sum + toMoneyNumber(row?.vat || 0), 0)), width)
   ], width)

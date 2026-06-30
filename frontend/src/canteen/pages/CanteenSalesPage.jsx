@@ -42,6 +42,8 @@ function DetailRow({ label, value }) {
 function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading }) {
   const status = statusMeta(sale?.status)
   const items = Array.isArray(sale?.items) ? sale.items : []
+  const isCreditSale = ['account', 'credit'].includes(String(sale?.payment?.methodType || sale?.paymentMethodType || '').trim().toLowerCase()) ||
+    ['account', 'credit', 'veresiye', 'cari'].includes(String(sale?.payment?.method || sale?.paymentMethod || '').trim().toLowerCase())
 
   return (
     <Modal open={open} onClose={onClose} title={sale?.saleNo ? `Satış Detayı ${sale.saleNo}` : 'Satış Detayı'}>
@@ -107,6 +109,9 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading }) {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'grid', gap: 6, fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
+              <div>Sube: <b>{sale.branchName || '-'}</b></div>
+              <div>Personel: <b>{sale.cashierName || '-'}</b></div>
+              {isCreditSale ? <div>Veresiye satisi yapilan cari: <b>{sale.customerName || '-'}</b></div> : null}
               <div>Ödeme yöntemi: <b>{sale.payment?.methodName || sale.payment?.method || '-'}</b></div>
               <div>Ödeme tutarı: <b>{money(sale.payment?.amount || sale.total || 0)} TL</b></div>
               {sale.payment?.note ? <div>Ödeme notu: <b>{sale.payment.note}</b></div> : null}

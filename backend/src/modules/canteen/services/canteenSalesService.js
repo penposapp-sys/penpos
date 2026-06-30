@@ -5,7 +5,9 @@ import * as saleRepo from '../repositories/canteenSaleRepository.js'
 import * as movementRepo from '../repositories/canteenStockMovementRepository.js'
 import { findTenantPaymentSettings } from '../repositories/canteenSettingsRepository.js'
 import { findByIdAndTenant as findCustomerById } from '../repositories/canteenCustomerRepository.js'
+import { findAnyByIdAndTenant as findAnyBranchById } from '../repositories/canteenBranchRepository.js'
 import { resolvePaymentMethodSelection } from '../../../services/paymentSettingsService.js'
+import User from '../../../models/User.js'
 
 const toNumber = (v) => {
   const n = Number(v)
@@ -80,6 +82,8 @@ const mapSaleDetail = (sale = {}) => {
   const row = mapSaleRow(sale)
   return {
     ...row,
+    customerId: sale?.customerId ? String(sale.customerId?._id || sale.customerId) : null,
+    customerName: String(sale?.customerId?.name || sale?.customerName || ''),
     items: Array.isArray(sale?.items)
       ? sale.items.map((item) => ({
           productId: item?.productId ? String(item.productId) : null,
@@ -341,5 +345,16 @@ export const getSale = async (tenantId, branchId, saleId) => {
   if (!mongoose.isValidObjectId(saleId)) throw error('invalid_request', 'Invalid id', 400)
   const s = await saleRepo.findAnyByIdAndScope(saleId, tenantId, branchId)
   if (!s) throw error('not_found', 'Satış bulunamadı', 404)
-  return mapSaleDetail(s)
+  const [branch, cashier, customer] = await Promise.all([
+    s?.branchId ? findAnyBranchById(s.branchId, tenantId) : Promise.resolve(null),
+    s?.actorUserId ? User.findById(s.actorUserId).select('name username').lean() : Promise.resolve(null),
+    s?.customerId ? findCustomerById(s.customerId, tenantId, { includeInactive: true }) : Promise.resolve(null)
+  ])
+  return mapSaleDetail({
+    ...(typeof s.toObject === 'function' ? s.toObject() : s),
+    branchId: branch || s.branchId,
+    actorUserId: cashier || s.actorUserId,
+    customerId: customer || s.customerId,
+    customerName: String(customer?.name || '')
+  })
 }

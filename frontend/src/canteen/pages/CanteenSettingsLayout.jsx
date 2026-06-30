@@ -672,10 +672,15 @@ export default function CanteenSettingsLayout() {
   const filterOptions = useMemo(() => ['Tümü', ...Array.from(new Set(items.map((item) => item.filterGroup)))], [items])
   const visibleCards = useMemo(() => {
     const normalized = searchValue.trim().toLocaleLowerCase('tr-TR')
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       const matchesFilter = activeFilter === 'Tümü' || item.filterGroup === activeFilter
       const matchesSearch = !normalized || [item.label, item.desc, item.filterGroup, item.section].some((value) => String(value || '').toLocaleLowerCase('tr-TR').includes(normalized))
       return matchesFilter && matchesSearch
+    })
+    return filtered.sort((left, right) => {
+      if (left.key === 'website' && right.key !== 'website') return 1
+      if (right.key === 'website' && left.key !== 'website') return -1
+      return 0
     })
   }, [activeFilter, items, searchValue])
 

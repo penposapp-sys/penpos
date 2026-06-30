@@ -228,7 +228,7 @@ export const buildZReportPdfHtml = (report: ZReportData) => {
             ['Toplam satis', toMoney(safeReport.summary?.netSales || 0)],
             ['Indirim', toMoney(safeReport.summary?.discountTotal || 0)],
             ['Kasadaki toplam', toMoney(safeReport.summary?.cashIn?.total || 0)],
-            ['Veresiye / cari', toMoney(payments.credit || 0)],
+            ['Veresiye / cari', toMoney(safeReport.summary?.periodCreditBalance || 0)],
             ['Veresiye tahsilati', toMoney(safeReport.summary?.collectionsTotal || 0)],
             ['Toplam KDV', toMoney(totalVat)]
           ])}
