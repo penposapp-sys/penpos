@@ -174,9 +174,55 @@ const buildDateRangeForReportDate = (reportDate) => {
   return { from, to }
 }
 
-export const zReport = async (tenantId, branchIds, query = {}) => {
+const buildDateRangeForZReport = (query = {}) => {
+  const hasPeriod = String(query?.period || '').trim()
+  if (hasPeriod) {
+    const { from, to, startYmd, endYmd } = getLocalRangeExclusive(query?.period, query?.start, query?.end)
+    const isSingleDay = startYmd === endYmd
+    return {
+      from,
+      to,
+      label: isSingleDay ? startYmd : `${startYmd} - ${endYmd}`,
+      startYmd,
+      endYmd
+    }
+  }
+
   const reportDate = String(query?.date || '').trim()
   const { from, to } = buildDateRangeForReportDate(reportDate)
+  return {
+    from,
+    to,
+    label: reportDate,
+    startYmd: reportDate,
+    endYmd: reportDate
+  }
+}
+
+const mapCollectionMethodName = (method) => {
+  const key = String(method || '').trim().toLocaleLowerCase('tr-TR')
+  if (key === 'cash' || key === 'nakit') return 'Nakit Tahsilat'
+  if (['pos', 'card', 'kart'].includes(key)) return 'Kart Tahsilat'
+  if (['bank', 'banka', 'eft', 'havale'].includes(key)) return 'Banka Tahsilat'
+  if (key === 'discount' || key === 'indirim') return 'Indirim Mahsup'
+  return String(method || 'Diger Tahsilat')
+}
+
+const pushCollectionBreakdown = (map, collection = {}) => {
+  const methodId = String(collection?.method || 'other').trim() || 'other'
+  const current = map.get(methodId) || {
+    methodId,
+    methodName: mapCollectionMethodName(collection?.method),
+    totalAmount: 0,
+    count: 0
+  }
+  current.totalAmount += Number(collection?.amount || 0)
+  current.count += 1
+  map.set(methodId, current)
+}
+
+export const zReport = async (tenantId, branchIds, query = {}) => {
+  const { from, to, label: reportDateLabel } = buildDateRangeForZReport(query)
   const allowedIds = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
   const requestedIds = parseBranchIds(query?.branchId, query?.branchIds)
   const finalBranchIds = requestedIds.length > 0
@@ -199,7 +245,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     createdAt: { $gte: from, $lt: to }
   }
 
-  const [sales, branches, settings, tenant] = await Promise.all([
+  const [sales, branches, settings, tenant, collections] = await Promise.all([
     CanteenSale.find(match)
       .select({
         branchId: 1,
@@ -216,7 +262,8 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
       .lean(),
     CanteenBranch.find({ tenantId, _id: { $in: branchObjectIds } }).select({ _id: 1, name: 1 }).lean(),
     CanteenTenantSettings.findOne({ tenantId }).lean(),
-    Tenant.findById(tenantId).select({ name: 1, settings: 1 }).lean()
+    Tenant.findById(tenantId).select({ name: 1, settings: 1 }).lean(),
+    collectionRepo.listRangeByTenantAndBranches(tenantId, finalBranchIds, from, to)
   ])
 
   const productIds = Array.from(new Set(
@@ -254,10 +301,12 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     cancelTotal: 0,
     netSales: 0,
     payments: buildEmptyPaymentSummary(),
+    collectionsTotal: 0,
     salesChannels: buildEmptyChannelSummary(),
     vatBreakdown: []
   }
   const paymentBreakdownMap = new Map()
+  const collectionBreakdownMap = new Map()
   const topProductMap = new Map()
   const staffTotalsMap = new Map()
   const branchTotalsMap = new Map()
@@ -322,11 +371,26 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     staffTotalsMap.set(staffName, staffRow)
   }
 
+  for (const collection of (collections || [])) {
+    const amount = Number(collection?.amount || 0)
+    summary.collectionsTotal += amount
+    pushCollectionBreakdown(collectionBreakdownMap, collection)
+  }
+
   const paymentBreakdown = Array.from(paymentBreakdownMap.values())
     .map((row) => ({
       methodId: String(row.methodId || ''),
       methodName: String(row.methodName || 'Diger'),
       methodType: String(row.methodType || ''),
+      totalAmount: roundMoney(row.totalAmount),
+      count: Number(row.count || 0)
+    }))
+    .sort((a, b) => (b.totalAmount - a.totalAmount) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
+
+  const collectionBreakdown = Array.from(collectionBreakdownMap.values())
+    .map((row) => ({
+      methodId: String(row.methodId || ''),
+      methodName: String(row.methodName || 'Diger Tahsilat'),
       totalAmount: roundMoney(row.totalAmount),
       count: Number(row.count || 0)
     }))
@@ -368,6 +432,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     online: roundMoney(summary.payments.online),
     credit: roundMoney(summary.payments.credit)
   }
+  summary.collectionsTotal = roundMoney(summary.collectionsTotal)
   summary.salesChannels = {
     qr: roundMoney(summary.salesChannels.qr),
     cashier: roundMoney(summary.salesChannels.cashier)
@@ -386,14 +451,15 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     : 'Tum Subeler'
 
   const report = {
-    date: reportDate,
+    date: reportDateLabel,
     branchId: singleBranchId,
     branchName: singleBranchName,
     businessName: toDisplayBusinessName(tenant, settings),
     generatedAt: new Date().toISOString(),
     summary: {
       ...summary,
-      paymentBreakdown
+      paymentBreakdown,
+      collectionBreakdown
     },
     topProducts,
     staffTotals,

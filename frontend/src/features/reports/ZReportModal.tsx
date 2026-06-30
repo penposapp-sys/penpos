@@ -111,19 +111,19 @@ export default function ZReportModal({
   const [busyAction, setBusyAction] = useState('')
 
   const paymentBreakdown = Array.isArray(report?.summary?.paymentBreakdown) ? report.summary.paymentBreakdown : []
+  const collectionBreakdown = Array.isArray(report?.summary?.collectionBreakdown) ? report.summary.collectionBreakdown : []
 
   const summaryCards = useMemo(() => {
     if (!report) return []
-    const primaryPayment = paymentBreakdown[0] || null
-    const secondaryPayment = paymentBreakdown[1] || null
     return [
       { label: 'Net Satış', value: money(report.summary?.netSales || 0) },
-      { label: paymentLabel(primaryPayment?.methodName) || 'Nakit', value: money(primaryPayment?.totalAmount || report.summary?.payments?.cash || 0) },
-      { label: paymentLabel(secondaryPayment?.methodName) || 'Kart', value: money(secondaryPayment?.totalAmount || report.summary?.payments?.card || 0) },
+      { label: 'Nakit Satış', value: money(report.summary?.payments?.cash || 0) },
+      { label: 'Veresiye Satış', value: money(report.summary?.payments?.credit || 0) },
+      { label: 'Veresiye Tahsilatı', value: money(report.summary?.collectionsTotal || 0) },
       { label: 'Adisyon', value: String(report.summary?.orderCount || 0) },
       { label: 'İndirim', value: money(report.summary?.discountTotal || 0) }
     ]
-  }, [paymentBreakdown, report])
+  }, [report])
 
   if (!open) return null
 
@@ -140,19 +140,20 @@ export default function ZReportModal({
     }
   }
 
-  const paymentRows = paymentBreakdown.length > 0
-    ? [
-        ...paymentBreakdown.map((row) => [paymentLabel(row.methodName), money(row.totalAmount)]),
-        ...(Number(report?.summary?.discountTotal || 0) > 0 ? [['İndirim', money(report?.summary?.discountTotal || 0)]] : [])
-      ]
-    : [
-        ['Nakit', money(payments.cash)],
-        ['Kart', money(payments.card)],
-        ['Yemek Kartı', money(payments.mealCard)],
-        ['Online Ödeme', money(payments.online)],
-        ['Veresiye / Cari', money(payments.credit)],
-        ...(Number(report?.summary?.discountTotal || 0) > 0 ? [['İndirim', money(report?.summary?.discountTotal || 0)]] : [])
-      ]
+  const paymentRows = [
+    ['Net Satış', money(report?.summary?.netSales || 0)],
+    ['Nakit Satış', money(payments.cash)],
+    ['Veresiye Satış', money(payments.credit)],
+    ...paymentBreakdown
+      .filter((row) => {
+        const key = String(row?.methodName || '').trim().toLocaleLowerCase('tr-TR')
+        return key !== 'nakit' && key !== 'veresiye / cari'
+      })
+      .map((row) => [paymentLabel(row.methodName), money(row.totalAmount)] as React.ReactNode[]),
+    ...(Number(report?.summary?.collectionsTotal || 0) > 0 ? [['Veresiye Tahsilatı', money(report?.summary?.collectionsTotal || 0)] as React.ReactNode[]] : []),
+    ...collectionBreakdown.map((row) => [`${paymentLabel(row.methodName)} (Tahsilat)`, money(row.totalAmount)] as React.ReactNode[]),
+    ...(Number(report?.summary?.discountTotal || 0) > 0 ? [['İndirim', money(report?.summary?.discountTotal || 0)] as React.ReactNode[]] : [])
+  ]
 
   return (
     <div
@@ -202,7 +203,7 @@ export default function ZReportModal({
                 <span
                   style={{
                     borderRadius: 999,
-                    background: 'var(--menu-active-bg, var(--card-hover))',
+                    background: 'var(--app-surface, #ffffff)',
                     border: '1px solid var(--border-soft, var(--app-border, var(--border)))',
                     color: 'var(--app-text, var(--text))',
                     padding: '6px 10px',
@@ -267,6 +268,7 @@ export default function ZReportModal({
                   <div>İndirim: <strong>{money(report.summary?.discountTotal || 0)}</strong></div>
                   <div>İptal / iade: <strong>{money(report.summary?.cancelTotal || 0)}</strong></div>
                   <div>Veresiye / cari: <strong>{money(payments.credit || 0)}</strong></div>
+                  <div>Veresiye tahsilatı: <strong>{money(report.summary?.collectionsTotal || 0)}</strong></div>
                   <div>Toplam KDV: <strong>{money(totalVat)}</strong></div>
                 </div>
               </div>

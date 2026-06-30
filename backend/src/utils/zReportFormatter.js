@@ -18,6 +18,9 @@ const TEXT = {
   netSalesSection: 'NET SATI\u015e',
   netSales: 'NET SATI\u015e',
   credit: 'VERES\u0130YE',
+  cashSales: 'NAKIT SATIS',
+  creditSales: 'VERESIYE SATIS',
+  collections: 'VERESIYE TAHSILATI',
   discount: '\u0130ND\u0130R\u0130M',
   orderCount: 'AD\u0130SYON',
   cancelRefund: '\u0130PTAL / \u0130ADE',
@@ -229,6 +232,38 @@ const normalizeBreakdownRows = (rows) => {
     .sort((a, b) => (b.totalAmount - a.totalAmount) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
 }
 
+const buildNetSalesBodyLines = (summary, width) => {
+  const payments = summary?.payments || {}
+  const paymentBreakdown = normalizeBreakdownRows(summary?.paymentBreakdown)
+  const collectionBreakdown = normalizeBreakdownRows(summary?.collectionBreakdown)
+  const otherPaymentRows = paymentBreakdown.filter((row) => {
+    const key = String(row?.methodName || '').trim().toLocaleLowerCase('tr-TR')
+    return key !== 'nakit' && key !== 'veresiye / cari'
+  })
+
+  const lines = [
+    pairLine(TEXT.netSales, formatMoney(summary?.netSales || 0), width),
+    pairLine(TEXT.cashSales, formatMoney(payments?.cash || 0), width),
+    pairLine(TEXT.creditSales, formatMoney(payments?.credit || 0), width)
+  ]
+
+  for (const row of otherPaymentRows) {
+    lines.push(pairLine(String(row?.methodName || TEXT.other).toLocaleUpperCase('tr-TR'), formatMoney(row?.totalAmount || 0), width))
+  }
+
+  if (Number(summary?.collectionsTotal || 0) > 0) {
+    lines.push(pairLine(TEXT.collections, formatMoney(summary?.collectionsTotal || 0), width))
+    for (const row of collectionBreakdown) {
+      lines.push(pairLine(String(row?.methodName || TEXT.other).toLocaleUpperCase('tr-TR'), formatMoney(row?.totalAmount || 0), width))
+    }
+  }
+
+  lines.push(pairLine(TEXT.discount, formatMoney(summary?.discountTotal || 0), width))
+  lines.push(pairLine(TEXT.orderCount, formatInteger(summary?.orderCount || 0), width))
+  lines.push(pairLine(TEXT.cancelRefund, formatMoney(summary?.cancelTotal || 0), width))
+  return lines
+}
+
 const buildProductRows = (products, layout) => {
   const rows = []
   const list = Array.isArray(products) ? products : []
@@ -291,19 +326,14 @@ export const buildZReportThermalText = (report, options = {}) => {
   lines.push(repeat('-', width))
   lines.push('')
 
-  appendSection(lines, TEXT.netSalesSection, [
-    pairLine(TEXT.netSales, formatMoney(summary?.netSales || 0), width),
-    pairLine(TEXT.credit, formatMoney(payments?.credit || 0), width),
-    pairLine(TEXT.discount, formatMoney(summary?.discountTotal || 0), width),
-    pairLine(TEXT.orderCount, formatInteger(summary?.orderCount || 0), width),
-    pairLine(TEXT.cancelRefund, formatMoney(summary?.cancelTotal || 0), width)
-  ], width)
+  appendSection(lines, TEXT.netSalesSection, buildNetSalesBodyLines(summary, width), width)
 
   appendSection(lines, TEXT.summarySection, [
     pairLine(TEXT.totalProductCount, formatInteger(summary?.productCount || 0), width),
     pairLine(TEXT.grossSales, formatMoney(summary?.grossSales || 0), width),
     pairLine(TEXT.cancelRefundLower, formatMoney(summary?.cancelTotal || 0), width),
-    pairLine(TEXT.creditAccount, formatMoney(payments?.credit || 0), width)
+    pairLine(TEXT.creditAccount, formatMoney(payments?.credit || 0), width),
+    pairLine(TEXT.collections, formatMoney(summary?.collectionsTotal || 0), width)
   ], width)
 
   appendSection(lines, TEXT.branchTotalSection, branchTotals.map((row) => pairLine(

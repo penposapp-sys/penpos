@@ -14,6 +14,13 @@ export type ZReportPaymentBreakdownRow = {
   count: number
 }
 
+export type ZReportCollectionBreakdownRow = {
+  methodId: string
+  methodName: string
+  totalAmount: number
+  count: number
+}
+
 export type ZReportSummary = {
   orderCount: number
   productCount: number
@@ -29,6 +36,8 @@ export type ZReportSummary = {
     credit: number
   }
   paymentBreakdown?: ZReportPaymentBreakdownRow[]
+  collectionsTotal?: number
+  collectionBreakdown?: ZReportCollectionBreakdownRow[]
   salesChannels: {
     qr: number
     cashier: number

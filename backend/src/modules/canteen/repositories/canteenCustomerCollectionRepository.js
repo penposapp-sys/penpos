@@ -40,6 +40,22 @@ export const listByCustomersAllBranches = (tenantId, customerIds = [], { limit =
   }).sort({ createdAt: -1 }).limit(Number(limit || 500))
 }
 
+export const listRangeByTenantAndBranches = (tenantId, branchIds = [], from, to) => {
+  const tid = toObjectId(tenantId)
+  const ids = (Array.isArray(branchIds) ? branchIds : [])
+    .map((value) => toObjectId(value))
+    .filter(Boolean)
+  if (!tid || ids.length === 0 || !(from instanceof Date) || !(to instanceof Date)) return Promise.resolve([])
+
+  return CanteenCustomerCollection.find({
+    tenantId: tid,
+    branchId: { $in: ids },
+    isActive: true,
+    isDeleted: { $ne: true },
+    createdAt: { $gte: from, $lt: to }
+  }).sort({ createdAt: -1 })
+}
+
 export const sumByCustomerAllBranches = async (tenantId, customerId) => {
   const tid = toObjectId(tenantId)
   const cid = toObjectId(customerId)

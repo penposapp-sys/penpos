@@ -9,17 +9,26 @@ export const DEFAULT_IMAGE_QUALITY = 75
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
   'image/png',
-  'image/webp'
+  'image/x-png',
+  'image/webp',
+  'image/avif',
+  'image/heic',
+  'image/heif'
 ])
 
-const ALLOWED_IMAGE_FORMATS = new Set(['jpeg', 'png', 'webp'])
+const ALLOWED_IMAGE_FORMATS = new Set(['jpeg', 'jpg', 'png', 'webp', 'avif', 'heif', 'heic'])
 
 const normalizeMimeToFormat = (mimeType) => {
   const value = String(mimeType || '').toLowerCase()
-  if (value === 'image/jpeg') return 'jpeg'
-  if (value === 'image/png') return 'png'
+  if (value === 'image/jpeg' || value === 'image/jpg' || value === 'image/pjpeg') return 'jpeg'
+  if (value === 'image/png' || value === 'image/x-png') return 'png'
   if (value === 'image/webp') return 'webp'
+  if (value === 'image/avif') return 'avif'
+  if (value === 'image/heic') return 'heif'
+  if (value === 'image/heif') return 'heif'
   return ''
 }
 
@@ -30,7 +39,7 @@ export const validateImageUploadFile = async (file, { label = 'Gorsel' } = {}) =
 
   const mimeType = String(file.mimetype || '').toLowerCase()
   if (!isAcceptedImageMimeType(mimeType)) {
-    throw error('invalid_file_type', 'Sadece JPG, JPEG, PNG ve WEBP dosyalari kabul edilir.', 400)
+    throw error('invalid_file_type', 'Sadece JPG, JPEG, PNG, WEBP, AVIF ve HEIC/HEIF dosyalari kabul edilir.', 400)
   }
 
   const size = Number(file.size || file.buffer?.length || 0)
@@ -51,11 +60,12 @@ export const validateImageUploadFile = async (file, { label = 'Gorsel' } = {}) =
 
   const detectedFormat = String(metadata?.format || '').toLowerCase()
   if (!ALLOWED_IMAGE_FORMATS.has(detectedFormat)) {
-    throw error('invalid_file_type', 'Sadece JPG, JPEG, PNG ve WEBP dosyalari kabul edilir.', 400)
+    throw error('invalid_file_type', 'Sadece JPG, JPEG, PNG, WEBP, AVIF ve HEIC/HEIF dosyalari kabul edilir.', 400)
   }
 
   const expectedFormat = normalizeMimeToFormat(mimeType)
-  if (expectedFormat && expectedFormat !== detectedFormat) {
+  const formatMatches = !expectedFormat || expectedFormat === detectedFormat || (expectedFormat === 'heif' && detectedFormat === 'heic')
+  if (!formatMatches) {
     throw error('mime_type_mismatch', 'Dosya uzantisi veya MIME tipi gorsel icerigiyle eslesmiyor.', 400)
   }
 

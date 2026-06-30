@@ -611,7 +611,13 @@ export default function CanteenReportsPage() {
     try {
       const branch = buildBranchQueryParams(selectedBranchIds)
       const params = new URLSearchParams()
-      params.set('date', zReportDate)
+      params.set('period', period)
+      if (period === 'range') {
+        params.set('start', start)
+        params.set('end', end)
+      } else {
+        params.set('date', zReportDate)
+      }
       if (branch.params) {
         for (const [key, value] of branch.params.entries()) params.set(key, value)
       }

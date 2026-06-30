@@ -14,7 +14,7 @@ export default function ProductImageUploadField({
   onClearFile,
   onRemoveExisting,
   disabled = false,
-  helperText = 'JPG, PNG veya WEBP. Maksimum 5 MB, otomatik olarak 800x800 WebP optimize edilir.',
+  helperText = 'JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, otomatik olarak 800x800 WebP optimize edilir.',
   error = '',
   existingSizeLabel = ''
 }) {
@@ -80,7 +80,7 @@ export default function ProductImageUploadField({
         <input
           id={inputId}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/jpg,image/pjpeg,image/png,image/x-png,image/webp,image/avif,image/heic,image/heif,.heic,.heif,.avif"
           disabled={disabled}
           style={{ display: 'none' }}
           onChange={(event) => {
