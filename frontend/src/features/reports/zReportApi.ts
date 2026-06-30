@@ -28,6 +28,7 @@ export type ZReportSummary = {
   discountTotal: number
   cancelTotal: number
   netSales: number
+  paidSalesTotal?: number
   payments: {
     cash: number
     card: number
@@ -35,7 +36,12 @@ export type ZReportSummary = {
     online: number
     credit: number
   }
+  cashIn?: {
+    total: number
+    cash: number
+  }
   paymentBreakdown?: ZReportPaymentBreakdownRow[]
+  cashInBreakdown?: ZReportPaymentBreakdownRow[]
   collectionsTotal?: number
   collectionBreakdown?: ZReportCollectionBreakdownRow[]
   salesChannels: {

@@ -76,6 +76,11 @@ const buildEmptyPaymentSummary = () => ({
   credit: 0
 })
 
+const buildEmptyCashInSummary = () => ({
+  total: 0,
+  cash: 0
+})
+
 const buildEmptyChannelSummary = () => ({
   qr: 0,
   cashier: 0
@@ -221,10 +226,52 @@ const pushCollectionBreakdown = (map, collection = {}) => {
   map.set(methodId, current)
 }
 
+const resolveCashInMethodMeta = ({ method, methodName, methodType } = {}) => {
+  const normalized = normalizePaymentMethod({
+    methodId: method,
+    methodName,
+    methodType
+  })
+  const methodId = String(normalized.methodId || method || 'other').trim() || 'other'
+  const payment = {
+    method: methodId,
+    methodName: String(normalized.methodName || methodName || methodId),
+    methodType: String(normalized.methodType || methodType || '')
+  }
+  const bucket = classifyPaymentBucket(payment)
+  return {
+    methodId,
+    methodName: toReportPaymentName(payment),
+    methodType: String(payment.methodType || ''),
+    bucket
+  }
+}
+
+const pushCashInBreakdown = (map, meta = {}, amount) => {
+  const totalAmount = Number(amount || 0)
+  if (totalAmount <= 0) return
+  const current = map.get(meta.methodId) || {
+    methodId: String(meta.methodId || 'other'),
+    methodName: String(meta.methodName || 'Diger'),
+    methodType: String(meta.methodType || ''),
+    totalAmount: 0,
+    count: 0
+  }
+  current.totalAmount += totalAmount
+  current.count += 1
+  map.set(meta.methodId, current)
+}
+
 const isReportableCollection = (collection = {}) => {
   const direction = String(collection?.direction || 'credit').trim()
   const method = String(collection?.method || '').trim()
   return direction !== 'debit' && method !== 'manual'
+}
+
+const isCashInCollection = (collection = {}) => {
+  if (!isReportableCollection(collection)) return false
+  const key = String(collection?.method || '').trim().toLocaleLowerCase('tr-TR')
+  return key !== 'discount' && key !== 'indirim'
 }
 
 export const zReport = async (tenantId, branchIds, query = {}) => {
@@ -306,13 +353,16 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     discountTotal: 0,
     cancelTotal: 0,
     netSales: 0,
+    paidSalesTotal: 0,
     payments: buildEmptyPaymentSummary(),
+    cashIn: buildEmptyCashInSummary(),
     collectionsTotal: 0,
     salesChannels: buildEmptyChannelSummary(),
     vatBreakdown: []
   }
   const paymentBreakdownMap = new Map()
   const collectionBreakdownMap = new Map()
+  const cashInBreakdownMap = new Map()
   const topProductMap = new Map()
   const staffTotalsMap = new Map()
   const branchTotalsMap = new Map()
@@ -368,6 +418,13 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     const bucket = classifyPaymentBucket(payment)
     summary.payments[bucket] += total
     pushPaymentBreakdown(paymentBreakdownMap, payment, total)
+    if (bucket !== 'credit') {
+      summary.paidSalesTotal += total
+      const cashInMeta = resolveCashInMethodMeta(payment)
+      pushCashInBreakdown(cashInBreakdownMap, cashInMeta, total)
+      summary.cashIn.total += total
+      if (cashInMeta.bucket === 'cash') summary.cashIn.cash += total
+    }
 
     const staffId = String(sale?.actorUserId || '')
     const staffName = String(userMap.get(staffId) || 'Bilinmeyen Personel')
@@ -382,6 +439,12 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     const amount = Number(collection?.amount || 0)
     summary.collectionsTotal += amount
     pushCollectionBreakdown(collectionBreakdownMap, collection)
+    if (isCashInCollection(collection)) {
+      const cashInMeta = resolveCashInMethodMeta({ method: collection?.method, methodName: collection?.method, methodType: collection?.method })
+      pushCashInBreakdown(cashInBreakdownMap, cashInMeta, amount)
+      summary.cashIn.total += amount
+      if (cashInMeta.bucket === 'cash') summary.cashIn.cash += amount
+    }
   }
 
   const paymentBreakdown = Array.from(paymentBreakdownMap.values())
@@ -403,6 +466,16 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     }))
     .sort((a, b) => (b.totalAmount - a.totalAmount) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
 
+  const cashInBreakdown = Array.from(cashInBreakdownMap.values())
+    .map((row) => ({
+      methodId: String(row.methodId || ''),
+      methodName: String(row.methodName || 'Diger'),
+      methodType: String(row.methodType || ''),
+      totalAmount: roundMoney(row.totalAmount),
+      count: Number(row.count || 0)
+    }))
+    .sort((a, b) => (b.totalAmount - a.totalAmount) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
+
   const topProducts = Array.from(topProductMap.values())
     .map((row) => ({
       name: String(row.name || '-'),
@@ -410,7 +483,6 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
       total: roundMoney(row.total)
     }))
     .sort((a, b) => (b.total - a.total) || (b.quantity - a.quantity))
-    .slice(0, 20)
 
   const staffTotals = Array.from(staffTotalsMap.values())
     .map((row) => ({
@@ -432,12 +504,17 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
   summary.discountTotal = roundMoney(summary.discountTotal)
   summary.cancelTotal = roundMoney(summary.cancelTotal)
   summary.netSales = roundMoney(summary.netSales)
+  summary.paidSalesTotal = roundMoney(summary.paidSalesTotal)
   summary.payments = {
     cash: roundMoney(summary.payments.cash),
     card: roundMoney(summary.payments.card),
     mealCard: roundMoney(summary.payments.mealCard),
     online: roundMoney(summary.payments.online),
     credit: roundMoney(summary.payments.credit)
+  }
+  summary.cashIn = {
+    total: roundMoney(summary.cashIn.total),
+    cash: roundMoney(summary.cashIn.cash)
   }
   summary.collectionsTotal = roundMoney(summary.collectionsTotal)
   summary.salesChannels = {
@@ -466,7 +543,8 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
     summary: {
       ...summary,
       paymentBreakdown,
-      collectionBreakdown
+      collectionBreakdown,
+      cashInBreakdown
     },
     topProducts,
     staffTotals,
@@ -484,42 +562,70 @@ export const summary = async (tenantId, branchIds, query) => {
   const ids = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
   const match = { tenantId: new mongoose.Types.ObjectId(tenantId), branchId: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) }, isActive: true, $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }], createdAt: { $gte: from, $lt: to } }
 
-  const totals = await CanteenSale.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: null,
-        totalRevenue: { $sum: '$total' },
-        saleCount: { $sum: 1 }
-      }
-    }
+  const [sales, collections] = await Promise.all([
+    CanteenSale.find(match)
+      .select({ total: 1, payment: 1 })
+      .lean(),
+    collectionRepo.listRangeByTenantAndBranches(tenantId, ids, from, to)
   ])
-  const totalRevenue = Number(totals?.[0]?.totalRevenue || 0)
-  const saleCount = Number(totals?.[0]?.saleCount || 0)
+
+  const totalRevenue = (sales || []).reduce((sum, sale) => sum + Number(sale?.total || 0), 0)
+  const saleCount = Number((sales || []).length)
   const avgBasket = saleCount > 0 ? totalRevenue / saleCount : 0
 
-  const by = await CanteenSale.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: '$payment.method',
-        total: { $sum: '$total' },
-        methodName: { $first: '$payment.methodName' },
-        methodType: { $first: '$payment.methodType' }
-      }
-    }
-  ])
   const methodTotals = new Map()
   const byMethod = {}
-  for (const r of by) {
-    const id = String(r?._id || '').trim()
-    if (!id) continue
-    const total = Number(r?.total || 0)
-    methodTotals.set(id, { total, name: String(r?.methodName || '').trim(), type: String(r?.methodType || '').trim() })
-    byMethod[id] = total
+
+  const appendMethodTotal = (paymentLike = {}, amount = 0) => {
+    const total = Number(amount || 0)
+    if (!Number.isFinite(total) || total <= 0) return
+    const normalized = normalizePaymentMethod({
+      methodId: paymentLike?.method,
+      methodName: paymentLike?.methodName,
+      methodType: paymentLike?.methodType
+    })
+    const methodId = String(normalized.methodId || paymentLike?.method || 'other').trim() || 'other'
+    const current = methodTotals.get(methodId) || {
+      total: 0,
+      name: String(normalized.methodName || paymentLike?.methodName || methodId),
+      type: String(normalized.methodType || paymentLike?.methodType || '')
+    }
+    current.total += total
+    methodTotals.set(methodId, current)
   }
+
+  for (const sale of (sales || [])) {
+    const payment = sale?.payment || {}
+    const total = Number(sale?.total || 0)
+    const bucket = classifyPaymentBucket(payment)
+    if (bucket === 'credit') {
+      appendMethodTotal({ method: 'account', methodName: 'Cari / Veresiye', methodType: 'account' }, total)
+      continue
+    }
+    appendMethodTotal(payment, total)
+  }
+
+  for (const collection of (collections || [])) {
+    if (!isCashInCollection(collection)) continue
+    appendMethodTotal({
+      method: collection?.method,
+      methodName: mapCollectionMethodName(collection?.method),
+      methodType: collection?.method
+    }, collection?.amount)
+  }
+
+  for (const [id, meta] of methodTotals.entries()) {
+    byMethod[id] = roundMoney(meta.total)
+  }
+
   const methodBreakdown = await buildMethodCatalog(tenantId, methodTotals)
-  return { totalRevenue, saleCount, avgBasket, byMethod, methodBreakdown }
+  return {
+    totalRevenue: roundMoney(totalRevenue),
+    saleCount,
+    avgBasket: roundMoney(avgBasket),
+    byMethod,
+    methodBreakdown
+  }
 }
 
 export const products = async (tenantId, branchIds, query) => {

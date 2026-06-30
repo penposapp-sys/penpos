@@ -15,40 +15,30 @@ const TEXT = {
   date: 'Tarih:',
   branch: '\u015eube:',
   createdAt: 'Olu\u015fturma:',
-  netSalesSection: 'NET SATI\u015e',
-  netSales: 'NET SATI\u015e',
-  credit: 'VERES\u0130YE',
-  cashSales: 'NAKIT SATIS',
+  netSalesSection: 'OZET',
+  netSales: 'NET TOPLAM SATIS',
+  paidSales: 'YAPILAN SATIS',
   creditSales: 'VERESIYE SATIS',
   collections: 'VERESIYE TAHSILATI',
+  cashIn: 'TOPLAM TAHSILAT',
+  cashInCash: 'KASADAKI TOPLAM',
   discount: '\u0130ND\u0130R\u0130M',
-  orderCount: 'AD\u0130SYON',
+  orderCount: 'YAPILAN SATIS ADEDI',
   cancelRefund: '\u0130PTAL / \u0130ADE',
   summarySection: '\u00d6ZET B\u0130LG\u0130LER',
   totalProductCount: 'Toplam \u00fcr\u00fcn adedi:',
-  grossSales: 'Br\u00fct sat\u0131\u015f:',
-  cancelRefundLower: '\u0130ptal / iade:',
+  grossSales: 'Toplam satis:',
   creditAccount: 'Veresiye / cari:',
-  branchTotalSection: '\u015eUBE TOPLAMI',
   paymentTypesSection: '\u00d6DEME T\u0130PLER\u0130',
   type: 'Tip',
   total: 'Toplam',
-  salesChannelsSection: 'SATI\u015e KANALLARI',
-  channel: 'Kanal',
-  qr: 'QR Siparis',
-  cashier: 'Kasa',
   vatSection: 'KDV DA\u011eILIMI',
   rate: 'Oran',
   base: 'Matrah',
   vat: 'KDV',
-  topProductsSection: 'EN \u00c7OK SATAN \u00dcR\u00dcNLER',
+  topProductsSection: 'SATILAN URUNLER',
   product: '\u00dcr\u00fcn',
   quantity: 'Adet',
-  staffSection: 'PERSONEL SATI\u015eLARI',
-  staff: 'Personel',
-  branchBreakdownSection: '\u015eUBE KIRILIMI',
-  branchCol: '\u015eube',
-  netSalesCol: 'Net Sat\u0131\u015f',
   brand: 'PenPOS',
   website: 'www.penpos.cloud'
 }
@@ -232,35 +222,41 @@ const normalizeBreakdownRows = (rows) => {
     .sort((a, b) => (b.totalAmount - a.totalAmount) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
 }
 
+const normalizePaymentTypeRows = (summary = {}) => {
+  const map = new Map()
+  const cashInBreakdown = normalizeBreakdownRows(summary?.cashInBreakdown)
+  for (const row of cashInBreakdown) {
+    const label = `Toplam ${String(row?.methodName || TEXT.other)}`
+    const key = label.toLocaleLowerCase('tr-TR')
+    const current = map.get(key) || { methodName: label, totalAmount: 0 }
+    current.totalAmount += toMoneyNumber(row?.totalAmount || 0)
+    map.set(key, current)
+  }
+
+  return Array.from(map.values())
+    .sort((a, b) => (b.totalAmount - a.totalAmount) || String(a.methodName).localeCompare(String(b.methodName), 'tr'))
+}
+
 const buildNetSalesBodyLines = (summary, width) => {
   const payments = summary?.payments || {}
-  const paymentBreakdown = normalizeBreakdownRows(summary?.paymentBreakdown)
-  const collectionBreakdown = normalizeBreakdownRows(summary?.collectionBreakdown)
-  const otherPaymentRows = paymentBreakdown.filter((row) => {
-    const key = String(row?.methodName || '').trim().toLocaleLowerCase('tr-TR')
-    return key !== 'nakit' && key !== 'veresiye / cari'
-  })
-
+  const cashIn = summary?.cashIn || {}
   const lines = [
     pairLine(TEXT.netSales, formatMoney(summary?.netSales || 0), width),
-    pairLine(TEXT.cashSales, formatMoney(payments?.cash || 0), width),
+    pairLine(TEXT.paidSales, formatMoney(summary?.paidSalesTotal || 0), width),
     pairLine(TEXT.creditSales, formatMoney(payments?.credit || 0), width)
   ]
 
-  for (const row of otherPaymentRows) {
-    lines.push(pairLine(String(row?.methodName || TEXT.other).toLocaleUpperCase('tr-TR'), formatMoney(row?.totalAmount || 0), width))
-  }
-
   if (Number(summary?.collectionsTotal || 0) > 0) {
     lines.push(pairLine(TEXT.collections, formatMoney(summary?.collectionsTotal || 0), width))
-    for (const row of collectionBreakdown) {
-      lines.push(pairLine(String(row?.methodName || TEXT.other).toLocaleUpperCase('tr-TR'), formatMoney(row?.totalAmount || 0), width))
-    }
+  }
+
+  if (Number(cashIn?.total || 0) > 0) {
+    lines.push(pairLine(TEXT.cashIn, formatMoney(cashIn?.total || 0), width))
+    lines.push(pairLine(TEXT.cashInCash, formatMoney(cashIn?.cash || 0), width))
   }
 
   lines.push(pairLine(TEXT.discount, formatMoney(summary?.discountTotal || 0), width))
   lines.push(pairLine(TEXT.orderCount, formatInteger(summary?.orderCount || 0), width))
-  lines.push(pairLine(TEXT.cancelRefund, formatMoney(summary?.cancelTotal || 0), width))
   return lines
 }
 
@@ -309,11 +305,9 @@ export const buildZReportThermalText = (report, options = {}) => {
   const width = layout.paperWidth
   const summary = report?.summary || {}
   const payments = summary?.payments || {}
-  const channels = summary?.salesChannels || {}
-  const paymentBreakdown = normalizeBreakdownRows(summary?.paymentBreakdown)
+  const cashIn = summary?.cashIn || {}
+  const paymentTypeRows = normalizePaymentTypeRows(summary)
   const vatBreakdown = Array.isArray(summary?.vatBreakdown) ? summary.vatBreakdown : []
-  const staffTotals = Array.isArray(report?.staffTotals) ? report.staffTotals : []
-  const branchTotals = Array.isArray(report?.branchTotals) ? report.branchTotals : []
   const lines = []
 
   lines.push(center(TEXT.title, width))
@@ -331,16 +325,12 @@ export const buildZReportThermalText = (report, options = {}) => {
   appendSection(lines, TEXT.summarySection, [
     pairLine(TEXT.totalProductCount, formatInteger(summary?.productCount || 0), width),
     pairLine(TEXT.grossSales, formatMoney(summary?.grossSales || 0), width),
-    pairLine(TEXT.cancelRefundLower, formatMoney(summary?.cancelTotal || 0), width),
+    pairLine(TEXT.discount, formatMoney(summary?.discountTotal || 0), width),
+    pairLine(TEXT.cashInCash, formatMoney(cashIn?.total || 0), width),
     pairLine(TEXT.creditAccount, formatMoney(payments?.credit || 0), width),
-    pairLine(TEXT.collections, formatMoney(summary?.collectionsTotal || 0), width)
+    pairLine(TEXT.collections, formatMoney(summary?.collectionsTotal || 0), width),
+    pairLine(TEXT.vat, formatMoney(vatBreakdown.reduce((sum, row) => sum + toMoneyNumber(row?.vat || 0), 0)), width)
   ], width)
-
-  appendSection(lines, TEXT.branchTotalSection, branchTotals.map((row) => pairLine(
-    String(row?.branchName || '-'),
-    formatMoney(row?.netSales || 0),
-    width
-  )), width)
 
   appendSection(lines, TEXT.paymentTypesSection, [
     tableRow([
@@ -348,68 +338,20 @@ export const buildZReportThermalText = (report, options = {}) => {
       { value: TEXT.total, width: layout.paymentTotal, align: 'right' }
     ]),
     repeat('-', width),
-    ...paymentBreakdown.map((row) => tableRow([
+    ...paymentTypeRows.map((row) => tableRow([
       { value: row.methodName, width: layout.paymentType, align: 'left' },
       { value: formatMoney(row.totalAmount), width: layout.paymentTotal, align: 'right' }
     ]))
   ], width)
 
-  appendSection(lines, TEXT.salesChannelsSection, [
+  appendSection(lines, TEXT.topProductsSection, [
     tableRow([
-      { value: TEXT.channel, width: layout.channelType, align: 'left' },
-      { value: TEXT.total, width: layout.channelTotal, align: 'right' }
+      { value: TEXT.product, width: layout.productName, align: 'left' },
+      { value: TEXT.quantity, width: layout.productQty, align: 'right' },
+      { value: TEXT.total, width: layout.productTotal, align: 'right' }
     ]),
     repeat('-', width),
-    tableRow([
-      { value: TEXT.qr, width: layout.channelType, align: 'left' },
-      { value: formatMoney(channels?.qr || 0), width: layout.channelTotal, align: 'right' }
-    ]),
-    tableRow([
-      { value: TEXT.cashier, width: layout.channelType, align: 'left' },
-      { value: formatMoney(channels?.cashier || 0), width: layout.channelTotal, align: 'right' }
-    ])
-  ], width)
-
-  appendSection(lines, TEXT.vatSection, [
-    tableRow([
-      { value: TEXT.rate, width: layout.vatRate, align: 'left' },
-      { value: TEXT.base, width: layout.vatBase, align: 'right' },
-      { value: TEXT.vat, width: layout.vatAmount, align: 'right' }
-    ]),
-    repeat('-', width),
-    ...vatBreakdown.map((row) => tableRow([
-      { value: `%${formatInteger(row?.rate || 0)}`, width: layout.vatRate, align: 'left' },
-      { value: formatMoney(row?.amount || 0), width: layout.vatBase, align: 'right' },
-      { value: formatMoney(row?.vat || 0), width: layout.vatAmount, align: 'right' }
-    ]))
-  ], width)
-
-  appendSection(lines, TEXT.staffSection, [
-    tableRow([
-      { value: TEXT.staff, width: layout.staffName, align: 'left' },
-      { value: TEXT.orderCount, width: layout.staffOrders, align: 'right' },
-      { value: TEXT.total, width: layout.staffTotal, align: 'right' }
-    ]),
-    repeat('-', width),
-    ...staffTotals.map((row) => tableRow([
-      { value: String(row?.staffName || '-'), width: layout.staffName, align: 'left' },
-      { value: formatInteger(row?.orderCount || 0), width: layout.staffOrders, align: 'right' },
-      { value: formatMoney(row?.total || 0), width: layout.staffTotal, align: 'right' }
-    ]))
-  ], width)
-
-  appendSection(lines, TEXT.branchBreakdownSection, [
-    tableRow([
-      { value: TEXT.branchCol, width: layout.branchName, align: 'left' },
-      { value: TEXT.orderCount, width: layout.branchOrders, align: 'right' },
-      { value: TEXT.netSalesCol, width: layout.branchTotal, align: 'right' }
-    ]),
-    repeat('-', width),
-    ...branchTotals.map((row) => tableRow([
-      { value: String(row?.branchName || '-'), width: layout.branchName, align: 'left' },
-      { value: formatInteger(row?.orderCount || 0), width: layout.branchOrders, align: 'right' },
-      { value: formatMoney(row?.netSales || 0), width: layout.branchTotal, align: 'right' }
-    ]))
+    ...buildProductRows(report?.topProducts, layout)
   ], width)
 
   lines.push(center(TEXT.brand, width))

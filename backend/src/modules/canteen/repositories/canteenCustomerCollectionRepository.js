@@ -57,7 +57,10 @@ export const listRangeByTenantAndBranches = (tenantId, branchIds = [], from, to)
 
   return CanteenCustomerCollection.find({
     tenantId: tid,
-    branchId: { $in: ids },
+    $or: [
+      { branchId: { $in: ids } },
+      { branchId: null }
+    ],
     isActive: true,
     isDeleted: { $ne: true },
     createdAt: { $gte: from, $lt: to }
