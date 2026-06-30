@@ -23,6 +23,7 @@ const roundMoney = (n) => Number(Number(n || 0).toFixed(2))
 
 const normalize = (s) => String(s || '').toLowerCase().trim()
 const normalizeId = (value) => String(value || '').trim()
+const getSalePrice = (product = {}) => Number(product?.salePrice ?? product?.price ?? 0)
 const normalizePaymentType = (method = {}) => {
   const type = String(method?.type || method?.bucket || method?.methodType || '').trim().toLowerCase()
   if (type === 'credit' || type === 'account') return 'account'
@@ -130,7 +131,7 @@ const CashierProductCard = memo(function CashierProductCard({
           </div>
         ) : null}
         <div className="kasaProductCardFooter">
-          <div className="kasaProductCardPrice" style={{ color: accentText }}>{money(product.price)} ₺</div>
+          <div className="kasaProductCardPrice" style={{ color: accentText }}>{money(getSalePrice(product))} ₺</div>
           <div className="kasaProductCardStock">
             {product.stockTrackingEnabled === true ? `Stok: ${Number(product.stockQty || 0)}` : 'Stok: —'}
           </div>
@@ -152,7 +153,7 @@ const CashierProductCard = memo(function CashierProductCard({
     String(prevProduct.name || '') === String(nextProduct.name || '') &&
     String(prevProduct.imageUrl || '') === String(nextProduct.imageUrl || '') &&
     String(prevProduct.categoryName || '') === String(nextProduct.categoryName || '') &&
-    Number(prevProduct.price || 0) === Number(nextProduct.price || 0) &&
+    Number((prevProduct.salePrice ?? prevProduct.price ?? 0)) === Number((nextProduct.salePrice ?? nextProduct.price ?? 0)) &&
     Number(prevProduct.stockQty || 0) === Number(nextProduct.stockQty || 0) &&
     prevProduct.stockTrackingEnabled === nextProduct.stockTrackingEnabled
   )
@@ -549,7 +550,7 @@ export default function CanteenCashierPage() {
       if (!product) return item
       const nextName = String(product?.name || item?.name || '')
       const nextBarcode = String(product?.barcode || item?.barcode || '')
-      const nextPrice = Number(product?.price ?? item?.unitPrice ?? 0)
+      const nextPrice = Number(product?.salePrice ?? product?.price ?? item?.unitPrice ?? 0)
       const nextBranchId = String(product?.branchId || item?.productBranchId || selectedBranchId || '')
       if (
         nextName === String(item?.name || '') &&
@@ -645,7 +646,7 @@ export default function CanteenCashierPage() {
         next[idx].qty += addQty
         return next
       }
-      next.unshift({ productId: id, name: p.name, barcode: String(p.barcode || ''), unitPrice: Number(p.price || 0), qty: addQty, productBranchId: p?.branchId ? String(p.branchId) : null })
+      next.unshift({ productId: id, name: p.name, barcode: String(p.barcode || ''), unitPrice: Number(p.salePrice ?? p.price ?? 0), qty: addQty, productBranchId: p?.branchId ? String(p.branchId) : null })
       return next
     })
   }, [])

@@ -62,6 +62,18 @@ const UNCATEGORIZED_CATEGORY = {
 const normalizeCanteenBranchQueryKey = (value) =>
   String(value || '').trim().toLocaleLowerCase('tr-TR')
 
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100
+
+const computeCanteenSalePrice = (price, vatRate, vatIncluded) => {
+  const basePrice = Number(price || 0)
+  const rate = Number(vatRate || 0)
+  if (!Number.isFinite(basePrice) || basePrice <= 0) return 0
+  if (vatIncluded === false && Number.isFinite(rate) && rate > 0) {
+    return roundMoney(basePrice * (1 + (rate / 100)))
+  }
+  return roundMoney(basePrice)
+}
+
 const resolvePrintAgentWindowsBinary = () => {
   const envPath = String(process.env.PRINT_AGENT_WINDOWS_FILE || '').trim()
   const version = getPrintAgentVersion()
@@ -298,7 +310,10 @@ export const getPublicCanteenQr = async (req, res) => {
       name: String(product.name || ''),
       description: '',
       imageUrl: String(product.imageUrl || ''),
-      price: Number(product.price || 0),
+      price: computeCanteenSalePrice(product.price, product.vatRate, product.vatIncluded !== false),
+      rawPrice: Number(product.price || 0),
+      vatRate: Number(product.vatRate || 0),
+      vatIncluded: product.vatIncluded !== false,
       stockTrackingEnabled: product.stockTrackingEnabled === true,
       stockQty: Number(product.stockQty || 0)
     }))

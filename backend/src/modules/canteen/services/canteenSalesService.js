@@ -21,6 +21,14 @@ const toInt = (v) => {
 }
 
 const roundMoney = (value) => Number(toNumber(value).toFixed(2))
+const resolveSaleUnitPrice = (product = {}) => {
+  const basePrice = toNumber(product?.price)
+  const vatRate = toNumber(product?.vatRate)
+  if (product?.vatIncluded === false && vatRate > 0) {
+    return roundMoney(basePrice * (1 + (vatRate / 100)))
+  }
+  return roundMoney(basePrice)
+}
 
 const normalizeSaleStatus = (sale = {}) => {
   const raw = String(sale?.status || '').trim().toLowerCase()
@@ -92,6 +100,7 @@ const mapSaleDetail = (sale = {}) => {
           unitPrice: Number(item?.unitPrice || 0),
           lineTotal: Number(item?.lineTotal || 0),
           vatRate: Number(item?.vatRate || 0),
+          vatIncluded: item?.vatIncluded !== false,
           note: String(item?.note || '')
         }))
       : [],
@@ -137,7 +146,7 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
     if (!pid || qty <= 0) continue
     const p = map.get(pid)
     if (!p) throw error('product_not_found', 'Ürün bulunamadı', 404)
-    const unitPrice = toNumber(p.price)
+    const unitPrice = resolveSaleUnitPrice(p)
     const lineTotal = unitPrice * qty
     lines.push({
       productId: p.id,
@@ -145,7 +154,8 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
       qty,
       unitPrice,
       lineTotal,
-      vatRate: toNumber(p.vatRate)
+      vatRate: toNumber(p.vatRate),
+      vatIncluded: p.vatIncluded !== false
     })
   }
   if (lines.length === 0) throw error('invalid_request', 'Items required', 400)

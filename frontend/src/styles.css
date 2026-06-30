@@ -6160,7 +6160,7 @@ html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .ca
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.productCard):not(.kasaProductCard):not(.qr-ref-category),
+  button:not(.productCard):not(.kasaProductCard):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn,
   .sidebar-menu-button,
   .saleCategoryButton,
@@ -6180,7 +6180,7 @@ html[data-theme="light"].theme-white :is(
   .canteen-settings-menu-toggle,
   .hamburger-btn,
   .nav-link,
-  [role="button"]
+  [role="button"]:not(.qr-ref-product-copy)
 ):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
   background: #ffffff !important;
   color: #111111 !important;
@@ -6188,7 +6188,7 @@ html[data-theme="light"].theme-white :is(
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.productCard):not(.kasaProductCard):not(.qr-ref-category),
+  button:not(.productCard):not(.kasaProductCard):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn,
   .sidebar-menu-button,
   .saleCategoryButton,
@@ -6208,7 +6208,7 @@ html[data-theme="light"].theme-white :is(
   .canteen-settings-menu-toggle,
   .hamburger-btn,
   .nav-link,
-  [role="button"]
+  [role="button"]:not(.qr-ref-product-copy)
 ):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
   color: #111111 !important;
   fill: currentColor !important;
@@ -6231,8 +6231,8 @@ html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category),
-  button:focus-visible,
+  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button:focus-visible:not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn:hover,
   .btn:focus-visible,
   .sidebar-menu-button:hover,
@@ -6263,13 +6263,13 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:active:not(.qr-ref-category),
+  button:active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn:active,
   .nav-link:active,
-  button.active:not(.qr-ref-category),
-  button.is-active:not(.qr-ref-category),
-  button.selected:not(.qr-ref-category),
-  button.is-selected:not(.qr-ref-category),
+  button.active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button.is-active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button.selected:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button.is-selected:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn.active,
   .btn.is-active,
   .btn.selected,
@@ -6290,8 +6290,8 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category),
-  button:focus-visible,
+  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button:focus-visible:not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn:hover,
   .btn:focus-visible,
   .sidebar-menu-button:hover,
@@ -6321,13 +6321,13 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:active:not(.qr-ref-category),
+  button:active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn:active,
   .nav-link:active,
-  button.active:not(.qr-ref-category),
-  button.is-active:not(.qr-ref-category),
-  button.selected:not(.qr-ref-category),
-  button.is-selected:not(.qr-ref-category),
+  button.active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button.is-active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button.selected:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button.is-selected:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn.active,
   .btn.is-active,
   .btn.selected,

@@ -12,6 +12,18 @@ const normalizeSortOrder = (value) => {
   return Number.isFinite(num) ? num : 0
 }
 
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100
+
+const computeSalePrice = (price, vatRate, vatIncluded) => {
+  const basePrice = Number(price || 0)
+  const rate = Number(vatRate || 0)
+  if (!Number.isFinite(basePrice) || basePrice <= 0) return 0
+  if (vatIncluded === false && Number.isFinite(rate) && rate > 0) {
+    return roundMoney(basePrice * (1 + (rate / 100)))
+  }
+  return roundMoney(basePrice)
+}
+
 const mapCategoryDto = (category) => ({
   id: category.id,
   name: category.name,
@@ -133,8 +145,10 @@ export const listProducts = async (tenantId, branchIds) => {
     stockTrackingEnabled: p.stockTrackingEnabled === true,
     stockQty: Number(p.stockQty || 0),
     price: Number(p.price || 0),
+    salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
     costPrice: Number(p.costPrice || 0),
     vatRate: Number(p.vatRate || 0),
+    vatIncluded: p.vatIncluded !== false,
     categoryId: p.categoryId ? String(p.categoryId) : null,
     categoryName: p.categoryId ? String(categoryById.get(String(p.categoryId))?.name || '') : '',
     categoryImageUrl: p.categoryId ? String(categoryById.get(String(p.categoryId))?.imageUrl || '') : '',
@@ -155,6 +169,7 @@ export const createProduct = async (tenantId, branchId, input) => {
   if (!Number.isFinite(price) || price < 0) throw error('validation_error', 'Satis fiyati gecersiz', 400)
   const costPrice = Number(input?.costPrice || 0)
   const vatRate = Number(input?.vatRate || 0)
+  const vatIncluded = input?.vatIncluded !== false
   const categoryId = input?.categoryId ? String(input.categoryId) : null
   if (categoryId) await ensureCategoryInScope(tenantId, branchId, categoryId)
   const stockTrackingEnabled = input?.stockTrackingEnabled === true
@@ -173,6 +188,7 @@ export const createProduct = async (tenantId, branchId, input) => {
       price: Number.isFinite(price) ? price : 0,
       costPrice: Number.isFinite(costPrice) ? costPrice : 0,
       vatRate: Number.isFinite(vatRate) ? vatRate : 0,
+      vatIncluded,
       imageUrl: '',
       isActive: true,
       createdAt: new Date()
@@ -184,8 +200,10 @@ export const createProduct = async (tenantId, branchId, input) => {
       stockTrackingEnabled: created.stockTrackingEnabled === true,
       stockQty: Number(created.stockQty || 0),
       price: Number(created.price || 0),
+      salePrice: computeSalePrice(created.price, created.vatRate, created.vatIncluded !== false),
       costPrice: Number(created.costPrice || 0),
       vatRate: Number(created.vatRate || 0),
+      vatIncluded: created.vatIncluded !== false,
       categoryId: created.categoryId ? String(created.categoryId) : null,
       imageUrl: String(created.imageUrl || '')
     }
@@ -226,6 +244,9 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
     const vatRate = Number(input?.vatRate || 0)
     update.vatRate = Number.isFinite(vatRate) ? vatRate : 0
   }
+  if (input?.vatIncluded !== undefined) {
+    update.vatIncluded = input?.vatIncluded !== false
+  }
   if (input?.categoryId !== undefined) {
     update.categoryId = input?.categoryId ? String(input.categoryId) : null
     if (update.categoryId) await ensureCategoryInScope(tenantId, branchId, update.categoryId)
@@ -240,8 +261,10 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
       stockTrackingEnabled: updated.stockTrackingEnabled === true,
       stockQty: Number(updated.stockQty || 0),
       price: Number(updated.price || 0),
+      salePrice: computeSalePrice(updated.price, updated.vatRate, updated.vatIncluded !== false),
       costPrice: Number(updated.costPrice || 0),
       vatRate: Number(updated.vatRate || 0),
+      vatIncluded: updated.vatIncluded !== false,
       categoryId: updated.categoryId ? String(updated.categoryId) : null,
       imageUrl: String(updated.imageUrl || '')
     }
@@ -263,7 +286,9 @@ export const getProductByBarcode = async (tenantId, branchId, barcodeRaw) => {
     barcode: p.barcode || '',
     stockTrackingEnabled: p.stockTrackingEnabled === true,
     price: Number(p.price || 0),
+    salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
     vatRate: Number(p.vatRate || 0),
+    vatIncluded: p.vatIncluded !== false,
     stockQty: Number(p.stockQty || 0)
   }
 }
@@ -278,6 +303,7 @@ export const searchProducts = async (tenantId, branchId, input) => {
     name: p.name,
     barcode: p.barcode || '',
     price: Number(p.price || 0),
+    salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
     stockQty: Number(p.stockQty || 0)
   }))
 }
@@ -306,8 +332,10 @@ export const uploadProductImage = async (tenantId, branchId, id, file) => {
     stockTrackingEnabled: updated.stockTrackingEnabled === true,
     stockQty: Number(updated.stockQty || 0),
     price: Number(updated.price || 0),
+    salePrice: computeSalePrice(updated.price, updated.vatRate, updated.vatIncluded !== false),
     costPrice: Number(updated.costPrice || 0),
     vatRate: Number(updated.vatRate || 0),
+    vatIncluded: updated.vatIncluded !== false,
     categoryId: updated.categoryId ? String(updated.categoryId) : null,
     imageUrl: String(updated.imageUrl || '')
   }
@@ -328,8 +356,10 @@ export const removeProductImage = async (tenantId, branchId, id) => {
     stockTrackingEnabled: updated.stockTrackingEnabled === true,
     stockQty: Number(updated.stockQty || 0),
     price: Number(updated.price || 0),
+    salePrice: computeSalePrice(updated.price, updated.vatRate, updated.vatIncluded !== false),
     costPrice: Number(updated.costPrice || 0),
     vatRate: Number(updated.vatRate || 0),
+    vatIncluded: updated.vatIncluded !== false,
     categoryId: updated.categoryId ? String(updated.categoryId) : null,
     imageUrl: String(updated.imageUrl || '')
   }

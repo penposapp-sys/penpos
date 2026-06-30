@@ -218,6 +218,13 @@ const resolveVatRate = (item = {}, productVatRateMap = new Map()) => {
   return Number.isFinite(fallbackRate) ? fallbackRate : 0
 }
 
+const resolveVatIncluded = (item = {}, productVatIncludedMap = new Map()) => {
+  if (item?.vatIncluded !== undefined) return item?.vatIncluded !== false
+  const productId = String(item?.productId || '')
+  if (!productId) return true
+  return productVatIncludedMap.get(productId) !== false
+}
+
 const toReportPaymentName = (payment = {}) => {
   const normalized = normalizePaymentMethod({
     methodId: payment?.method,
@@ -440,14 +447,16 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
       .map((item) => String(item?.productId || ''))
       .filter((id) => mongoose.Types.ObjectId.isValid(id))
   ))
-  const productVatRateMap = productIds.length > 0
+  const productMetaMap = productIds.length > 0
     ? new Map(
         (await CanteenProduct.find({ tenantId, _id: { $in: productIds } })
-          .select({ _id: 1, vatRate: 1 })
+          .select({ _id: 1, vatRate: 1, vatIncluded: 1 })
           .lean())
-          .map((product) => [String(product._id), Number(product.vatRate || 0)])
+          .map((product) => [String(product._id), { vatRate: Number(product.vatRate || 0), vatIncluded: product.vatIncluded !== false }])
       )
     : new Map()
+  const productVatRateMap = new Map(Array.from(productMetaMap.entries()).map(([id, meta]) => [id, Number(meta?.vatRate || 0)]))
+  const productVatIncludedMap = new Map(Array.from(productMetaMap.entries()).map(([id, meta]) => [id, meta?.vatIncluded !== false]))
 
   const staffIds = Array.from(new Set(
     (sales || [])
@@ -511,6 +520,7 @@ export const zReport = async (tenantId, branchIds, query = {}) => {
       const qty = Number(item?.qty || 0)
       const lineTotal = Number(item?.lineTotal || 0)
       const vatRate = resolveVatRate(item, productVatRateMap)
+      const vatIncluded = resolveVatIncluded(item, productVatIncludedMap)
       summary.productCount += qty
 
       if (lineTotal > 0 && vatRate >= 0) {

@@ -7,6 +7,7 @@ const itemSchema = new mongoose.Schema({
   unitPrice: { type: Number, required: true },
   lineTotal: { type: Number, required: true },
   vatRate: { type: Number, default: 0 },
+  vatIncluded: { type: Boolean, default: true },
   note: { type: String, default: '' }
 }, { _id: false })
 

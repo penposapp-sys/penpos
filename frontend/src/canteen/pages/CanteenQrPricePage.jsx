@@ -416,10 +416,17 @@ function getProductStockLabel(product) {
 function ProductCard({ product, favoriteIds, onToggleFavorite, onOpenDetail, onAddToCart }) {
   const isFavorite = favoriteIds.includes(String(product.id))
   const outOfStock = isProductOutOfStock(product)
+  const openDetail = () => onOpenDetail(product)
+  const handleCopyKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openDetail()
+    }
+  }
 
   return (
     <article className="qr-ref-product">
-      <button type="button" className="qr-ref-product-image-button qr-ref-product-media" onClick={() => onOpenDetail(product)}>
+      <button type="button" className="qr-ref-product-image-button qr-ref-product-media" onClick={openDetail}>
         <ProductImage
           product={product}
           alt={product.name}
@@ -429,13 +436,18 @@ function ProductCard({ product, favoriteIds, onToggleFavorite, onOpenDetail, onA
         />
       </button>
       <div className="qr-ref-product-body">
-        <button type="button" className="qr-ref-product-copy" onClick={() => onOpenDetail(product)}>
+        <div
+          className="qr-ref-product-copy"
+          tabIndex={0}
+          onClick={openDetail}
+          onKeyDown={handleCopyKeyDown}
+        >
           <div className="qr-ref-product-topline">
             <h3>{product.name}</h3>
           </div>
           <p>{safeText(product.description, 'Detaylar için dokunun.')}</p>
           <div className={`qr-ref-stock-pill${outOfStock ? ' is-empty' : ''}`}>{getProductStockLabel(product)}</div>
-        </button>
+        </div>
       </div>
       <div className="qr-ref-product-side">
         <div className="qr-ref-product-side-top">
@@ -1188,7 +1200,7 @@ export default function CanteenQrPricePage() {
         .qr-ref-menu-btn{width:42px;height:42px;border:1px solid var(--app-border, rgba(255,255,255,.12));border-radius:14px;background:var(--theme-menu-btn-bg, #fff);color:var(--theme-menu-btn-text, #0f1726);font-size:22px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.18)}
         .qr-ref-brand{position:relative;z-index:1;text-align:center;padding:0 22px 20px;transform:translateY(-10px)}
         .qr-ref-branch-pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:7px 14px;border-radius:999px;margin-top:12px;background:var(--theme-branch-pill-bg, rgba(12,16,28,.42));border:1px solid var(--app-border, rgba(255,255,255,.14));color:var(--theme-branch-pill-text, rgba(255,255,255,.92));font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 10px 22px rgba(0,0,0,.18)}
-        .qr-ref-brand h1{margin:0;font-size:clamp(28px,8vw,33px);line-height:.94;font-weight:900;fontStyle:italic;letter-spacing:-.05em;text-shadow:0 8px 26px rgba(0,0,0,.3);overflow-wrap:anywhere}
+        .qr-ref-brand h1{margin:0;font-size:clamp(28px,8vw,33px);line-height:.94;font-weight:900;fontStyle:italic;letter-spacing:-.05em;text-shadow:0 8px 26px rgba(0,0,0,.3);overflow-wrap:anywhere;color:#ffffff}
         .qr-ref-brand p{margin:10px 0 0;font-size:12px;font-weight:900;letter-spacing:.36em;text-transform:uppercase;color:rgba(255,255,255,.92)}
         .qr-ref-desktop-sidebar,.qr-ref-desktop-topbar{display:none}
         .qr-ref-content{padding:0 8px 96px}
@@ -1198,16 +1210,16 @@ export default function CanteenQrPricePage() {
         .qr-ref-search input::placeholder{color:var(--theme-placeholder, var(--app-muted, #98a5b9))}
         .qr-ref-section-title{display:flex;justify-content:space-between;align-items:center;margin:18px 0 12px}
         .qr-ref-section-title h2{margin:0;font-size:13px;font-weight:900;color:var(--app-text, #fff)}
-        .qr-ref-link{border:0;background:none;color:var(--theme-link, #ffcb54);font-size:12px;font-weight:700}
+        .qr-ref-link{border:0;background:none !important;color:var(--theme-link, #ffcb54) !important;font-size:12px;font-weight:700;border-color:transparent !important;box-shadow:none !important}
         .qr-ref-category-grid{display:grid;grid-template-columns:repeat(3,minmax(74px,101px));gap:8px;justify-content:start}
         .qr-ref-category{position:relative;width:100%;aspect-ratio:1 / 1;border:0;border-radius:18px;overflow:hidden;padding:0;background:var(--app-surface-soft, #20293a);color:#fff}
         .qr-ref-category img{width:100%;height:100%;object-fit:cover}
         .qr-ref-category::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.7))}
-        .qr-ref-category-label{position:absolute;left:8px;right:8px;bottom:8px;z-index:2;display:block;width:fit-content;max-width:calc(100% - 16px);padding:4px 6px;border-radius:10px;background:rgba(10,14,24,.66);text-align:left;color:#ffffff !important;font-size:11px;font-weight:900 !important;line-height:1.2;letter-spacing:.02em;text-shadow:0 2px 12px rgba(0,0,0,.48);overflow-wrap:break-word;word-break:normal;backdrop-filter:blur(3px)}
+        .qr-ref-category-label{position:absolute;left:8px;right:8px;bottom:8px;z-index:2;display:block;width:fit-content;max-width:calc(100% - 16px);padding:4px 0;border-radius:10px;background:transparent;text-align:left;color:#ffffff !important;font-size:11px;font-weight:900 !important;line-height:1.2;letter-spacing:.02em;text-shadow:0 2px 12px rgba(0,0,0,.48);overflow-wrap:break-word;word-break:normal;backdrop-filter:none;box-shadow:none;border-color:transparent}
         .qr-ref-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;cursor:grab}
         .qr-ref-tabs::-webkit-scrollbar{display:none}
-        .qr-ref-tab{border:0;border-radius:999px;padding:9px 13px;white-space:nowrap;background:var(--app-surface-elevated, #263246);color:var(--app-text-secondary, #d3d8e4);font-size:12px;font-weight:800}
-        .qr-ref-tab.is-active{background:var(--theme-accent, #ff6a00);color:var(--theme-accent-contrast, #fff)}
+        .qr-ref-tab{border:0;border-radius:999px;padding:9px 13px;white-space:nowrap;background:var(--app-surface-elevated, #263246) !important;color:var(--app-text-secondary, #d3d8e4) !important;font-size:12px;font-weight:800;border-color:transparent !important;box-shadow:none !important}
+        .qr-ref-tab.is-active{background:var(--theme-accent, #ff6a00) !important;color:var(--theme-accent-contrast, #fff) !important}
         .qr-ref-panel{margin-top:12px;background:linear-gradient(180deg,var(--app-panel-strong, #262626),var(--app-panel, #232323));color:var(--app-text, #f8fafc);border:1px solid var(--app-border, rgba(255,255,255,.08));border-radius:22px;padding:14px;display:grid;gap:12px;box-shadow:var(--theme-surface-shadow, 0 22px 40px rgba(0,0,0,.18))}
         .qr-ref-panel h2{margin:0;font-size:22px;font-weight:900;color:var(--app-text, #f8fafc)}
         .qr-ref-muted{margin:0;color:var(--app-muted, #93a4bd);font-size:12px;line-height:1.45}
@@ -1215,17 +1227,18 @@ export default function CanteenQrPricePage() {
         .qr-ref-product{position:relative;display:grid;grid-template-columns:90px minmax(0,1fr);grid-template-areas:"media body" "media side";column-gap:12px;row-gap:10px;padding:13px 14px;border:1px solid var(--app-border, rgba(255,255,255,.08));border-radius:17px;background:linear-gradient(180deg,var(--app-surface-soft, #18243a) 0%,var(--app-surface, #121d32) 100%);box-shadow:var(--theme-surface-shadow, 0 12px 23px rgba(0,0,0,.24));align-items:start}
         .qr-ref-heart{width:17px;height:17px;border:0;border-radius:999px;background:rgba(255,255,255,.06);color:#a5b4cb;font-size:8px;display:grid;place-items:center;flex-shrink:0}
         .qr-ref-heart.is-active{background:#ef4444;color:#fff}
-        .qr-ref-product-image-button,.qr-ref-product-copy{border:0;background:none;padding:0;text-align:left}
+        .qr-ref-product-image-button,.qr-ref-product-copy{border:0;background:none;padding:0;text-align:left;appearance:none;-webkit-appearance:none;box-shadow:none}
         .qr-ref-product-image-button{grid-area:media}
         .qr-ref-product-media{width:90px;height:90px;border-radius:26px;background:linear-gradient(180deg,#ffffff 0%,#f3f5fb 100%);display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 9px 18px rgba(7,10,18,.18)}
-        .qr-ref-product-body{grid-area:body;display:grid;gap:8px;min-width:0;align-content:start}
-        .qr-ref-product-copy{display:grid;gap:6px;width:100%;min-width:0}
+        .qr-ref-product-body{grid-area:body;display:grid;gap:8px;min-width:0;align-content:start;background:transparent !important;background-color:transparent !important}
+        .qr-ref-product-copy{display:grid;gap:6px;width:100%;min-width:0;background:transparent !important;background-color:transparent !important;border-radius:0 !important;box-shadow:none !important;color:inherit;cursor:pointer}
+        .qr-ref-product-copy:focus-visible{outline:2px solid color-mix(in srgb, var(--theme-accent, #ff6a00) 72%, white);outline-offset:4px}
         .qr-ref-product-side{grid-area:side;display:grid;gap:8px;min-width:0;align-self:start}
         .qr-ref-product-side-top{display:flex;justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap}
         .qr-ref-product-category{font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--theme-link, #ffcb54)}
-        .qr-ref-product-topline{display:flex;justify-content:flex-start;align-items:flex-start;gap:12px}
-        .qr-ref-product-copy h3{margin:0;font-size:14px;line-height:1.18;font-weight:900;color:#fff;flex:1;min-width:0;max-width:none;overflow-wrap:break-word;word-break:normal;letter-spacing:-.02em}
-        .qr-ref-product-copy p{margin:0;font-size:12px;line-height:1.42;color:rgba(255,255,255,.82);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:break-word;word-break:normal}
+        .qr-ref-product-topline{display:block;min-width:0;background:transparent !important;background-color:transparent !important}
+        .qr-ref-product-copy h3{margin:0;font-size:14px;line-height:1.24;font-weight:900;color:var(--app-text, #111111);min-width:0;max-width:none;overflow-wrap:anywhere;word-break:break-word;letter-spacing:-.02em;text-wrap:balance;background:transparent !important;background-color:transparent !important}
+        .qr-ref-product-copy p{margin:0;font-size:12px;line-height:1.42;color:var(--app-text-secondary, #525252);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;background:transparent !important;background-color:transparent !important}
         .qr-ref-stock-pill{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:fit-content;max-width:100%;padding:7px 12px;border-radius:999px;background:color-mix(in srgb, var(--theme-accent, #ff6a00) 14%, transparent);color:var(--app-text, #f8fafc);font-size:11px;line-height:1.2;font-weight:800;text-align:center;border:1px solid color-mix(in srgb, var(--theme-accent, #ff6a00) 24%, var(--app-border, rgba(255,255,255,.08)))}
         .qr-ref-stock-pill.is-empty{background:rgba(239,68,68,.12);color:#fca5a5;border-color:rgba(239,68,68,.28)}
         .qr-ref-price-pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:var(--app-surface-elevated, rgba(7,10,18,.96));color:var(--app-text, #fff);font-size:11px;font-weight:900;white-space:nowrap;flex-shrink:0;max-width:100%;border:1px solid var(--app-border, rgba(255,255,255,.08))}
@@ -1282,8 +1295,8 @@ export default function CanteenQrPricePage() {
         .qr-ref-nav-btn{border:0;background:none;color:var(--theme-bottom-nav-text, #fff);font-size:10px;font-weight:700;display:grid;gap:4px;justify-items:center;opacity:.88}
         .qr-ref-nav-btn.is-active{color:var(--theme-link, #ffcb54)}
         .qr-ref-nav-icon{font-size:18px;line-height:1}
-        .qr-ref-center-cart{position:relative;margin-top:-22px;width:58px;height:58px;border-radius:999px;border:4px solid var(--app-surface, #141c2c);background:var(--theme-accent, #ff6a00);color:var(--theme-accent-contrast, #fff);font-size:22px;font-weight:900}
-        .qr-ref-center-count{position:absolute;right:-3px;top:-3px;width:22px;height:22px;border-radius:999px;background:var(--theme-count-bg, #fff);color:var(--theme-count-text, var(--theme-accent, #ff6a00));display:grid;place-items:center;font-size:11px;font-weight:900}
+        .qr-ref-center-cart{position:relative;margin-top:-22px;width:58px;height:58px;border-radius:999px;border:4px solid var(--app-surface, #141c2c);background:var(--theme-accent, #ff6a00);color:var(--theme-accent-contrast, #fff);font-size:22px;font-weight:900;overflow:visible}
+        .qr-ref-center-count{position:absolute;right:-10px;top:-12px;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:var(--theme-count-bg, #fff);color:var(--theme-count-text, var(--theme-accent, #ff6a00));display:grid;place-items:center;font-size:11px;font-weight:900;line-height:1;border:2px solid var(--app-surface, #141c2c);box-shadow:0 8px 16px rgba(0,0,0,.22);z-index:2}
         .qr-ref-menu{position:absolute;right:14px;top:84px;z-index:4;width:188px;padding:10px;border-radius:18px;background:var(--theme-menu-popup-bg, rgba(20,28,44,.96));border:1px solid var(--app-border, rgba(255,255,255,.08));box-shadow:0 18px 40px rgba(0,0,0,.32);display:grid;gap:8px}
         .qr-ref-menu button{border:0;border-radius:12px;padding:12px 14px;background:var(--app-surface-soft, #1f2937);color:var(--app-text, #fff);text-align:left;font-size:13px;font-weight:800}
         @media (min-width:900px){
@@ -1298,8 +1311,8 @@ export default function CanteenQrPricePage() {
           .qr-ref-desktop-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,9,16,.18) 0%,rgba(7,10,18,.42) 44%,rgba(10,14,24,.92) 100%)}
           .qr-ref-desktop-hero > *{position:relative;z-index:1}
           .qr-ref-desktop-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-          .qr-ref-desktop-hero-status{padding:9px 14px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase}
-          .qr-ref-desktop-brand h1{margin:0;font-size:44px;line-height:.94;font-weight:900;font-style:italic;letter-spacing:-.05em}
+          .qr-ref-desktop-hero-status{padding:9px 14px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);font-size:11px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;color:#ffffff}
+          .qr-ref-desktop-brand h1{margin:0;font-size:44px;line-height:.94;font-weight:900;font-style:italic;letter-spacing:-.05em;color:#ffffff}
           .qr-ref-desktop-brand p{margin:10px 0 0;font-size:12px;font-weight:900;letter-spacing:.34em;text-transform:uppercase;color:rgba(255,255,255,.88)}
           .qr-ref-desktop-nav{display:grid;gap:10px;align-content:start;min-height:0;overflow-y:auto;padding-right:4px}
           .qr-ref-desktop-nav button{display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:18px;padding:14px 16px;background:var(--app-surface-elevated, #1c273a);color:var(--app-text, #e5e7eb);font-size:14px;font-weight:800;text-align:left}
@@ -1326,9 +1339,9 @@ export default function CanteenQrPricePage() {
           .qr-ref-product-side{gap:10px;align-self:start}
           .qr-ref-product-side-top{justify-content:flex-start}
           .qr-ref-product-category{font-size:11px}
-          .qr-ref-product-topline{gap:14px;align-items:flex-start}
-          .qr-ref-product-copy h3{font-size:18px;line-height:1.14}
-          .qr-ref-product-copy p{font-size:12px;line-height:1.5;-webkit-line-clamp:2;max-width:none}
+          .qr-ref-product-topline{display:block}
+          .qr-ref-product-copy h3{font-size:18px;line-height:1.18}
+          .qr-ref-product-copy p{font-size:12px;line-height:1.5;-webkit-line-clamp:3;max-width:none}
           .qr-ref-price-pill{padding:7px 12px;font-size:12px;min-width:88px;min-height:42px;border-radius:999px}
           .qr-ref-detail-link{font-size:12px}
           .qr-ref-round-cta{min-height:40px;font-size:11px;padding:0 16px}

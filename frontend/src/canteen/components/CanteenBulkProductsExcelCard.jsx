@@ -45,7 +45,7 @@ const fetchWithAuth = async (path, options = {}, { branchId } = {}) => {
   return fetch(url, { ...options, headers })
 }
 
-export default function CanteenBulkProductsExcelCard({ branchId, onImportDone }) {
+export default function CanteenBulkProductsExcelCard({ branchId, onImportDone, compact = false }) {
   const [importOpen, setImportOpen] = useState(false)
   const [resultOpen, setResultOpen] = useState(false)
   const [file, setFile] = useState(null)
@@ -114,21 +114,25 @@ export default function CanteenBulkProductsExcelCard({ branchId, onImportDone })
     return `/api/canteen/products/export?format=xlsx&branchId=${encodeURIComponent(bid)}`
   }, [branchId])
 
+  const actions = (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => setImportOpen(true)} disabled={busy || !String(branchId || '').trim()}>Excel ile Ürün Yükle</button>
+      <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => onDownload('/api/canteen/products/template?format=xlsx', 'canteen_products_template.xlsx')} disabled={busy}>Örnek Excel İndir</button>
+      <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => onDownload(exportPath, 'canteen_products_export.xlsx')} disabled={busy || !String(branchId || '').trim()}>Mevcut Ürünleri İndir</button>
+    </div>
+  )
+
   return (
     <>
-      <div className="card" style={{ display: 'grid', gap: 10 }}>
+      {compact ? actions : <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ fontWeight: 600 }}>Toplu Ürün İşlemleri (Excel/CSV)</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şablonu indir, mevcut ürünleri Excel’e aktar veya Excel/CSV ile toplu güncelle.</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => onDownload('/api/canteen/products/template?format=xlsx', 'canteen_products_template.xlsx')} disabled={busy}>Örnek Şablon İndir</button>
-            <button className="btn" onClick={() => onDownload(exportPath, 'canteen_products_export.xlsx')} disabled={busy || !String(branchId || '').trim()}>Mevcut Ürünleri İndir</button>
-            <button className="btn" onClick={() => setImportOpen(true)} disabled={busy || !String(branchId || '').trim()}>Excel/CSV Yükle</button>
-          </div>
+          {actions}
         </div>
-      </div>
+      </div>}
 
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Excel/CSV ile Toplu Ürün Yükle">
         <form onSubmit={onUpload} style={{ display: 'grid', gap: 10 }}>

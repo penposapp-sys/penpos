@@ -22,6 +22,14 @@ const toNumber = (value) => {
 }
 
 const roundMoney = (value) => Number(toNumber(value).toFixed(2))
+const resolveSaleUnitPrice = (product = {}) => {
+  const basePrice = toNumber(product?.price)
+  const vatRate = toNumber(product?.vatRate)
+  if (product?.vatIncluded === false && vatRate > 0) {
+    return roundMoney(basePrice * (1 + (vatRate / 100)))
+  }
+  return roundMoney(basePrice)
+}
 
 const normalizeText = (value) => String(value || '').trim()
 
@@ -212,7 +220,7 @@ const buildOrderLines = async (tenantId, branchId, itemsInput) => {
     if (!quantity) throw error('invalid_request', 'Ürün adedi en az 1 olmalıdır', 400)
 
     requestedQtyByProductId.set(productId, Number(requestedQtyByProductId.get(productId) || 0) + quantity)
-    const unitPrice = toNumber(product.price)
+    const unitPrice = resolveSaleUnitPrice(product)
     const totalPrice = Number((unitPrice * quantity).toFixed(2))
     return {
       productId,

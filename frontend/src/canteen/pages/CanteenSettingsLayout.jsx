@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { CreditCard, Globe, Package, Printer, QrCode, Settings, Store, UserRound, Users, Warehouse } from 'lucide-react'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
@@ -58,21 +58,21 @@ function getSettingsItems(isExpired) {
   if (isExpired) {
     return [
       { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-      { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'Isletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
+      { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'İşletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
       { key: 'plan', path: '/canteen/ayarlar/paket', label: 'Uyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
     ]
   }
 
   return [
     { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-    { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'Isletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
-    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Isletme Ayarlari', icon: 'system', filterGroup: 'Isletme', section: 'Isletme', desc: 'Firma bilgileri, tema, fis ve genel sistem tercihleri' },
-    { key: 'branches', path: '/canteen/ayarlar/subeler', label: 'Sube Ayarlari', icon: 'branches', filterGroup: 'Isletme', section: 'Isletme', desc: 'Sube listesi, aktiflik ve subeye bagli personel' },
-    { key: 'staff', path: '/canteen/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'Isletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
+    { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'İşletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
+    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Isletme Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Firma bilgileri, tema, fis ve genel sistem tercihleri' },
+    { key: 'branches', path: '/canteen/ayarlar/subeler', label: 'Sube Ayarlari', icon: 'branches', filterGroup: 'İşletme', section: 'İşletme', desc: 'Sube listesi, aktiflik ve subeye bagli personel' },
+    { key: 'staff', path: '/canteen/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
     { key: 'printers', path: '/canteen/ayarlar/yazicilar', label: 'Yazici Ayarlari', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fis ve etiket yazicilari' },
-    { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satis', section: 'Satis', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
+    { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
     { key: 'billing', path: '/canteen/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
-    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Urun', section: 'Urun', desc: 'Urun, kategori, stok ve gorunum duzeni' },
+    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
     { key: 'qr', path: '/canteen/ayarlar/qr', label: 'QR Ayarlari', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri QR siparis sayfasi ve yayin ayarlari' },
   ]
 }
@@ -198,7 +198,7 @@ function SettingsChromeStyle() {
   )
 }
 
-function SettingsTopHeader({ title, subtitle, icon, rightSlot, compact = false }) {
+function SettingsTopHeader({ title, subtitle, icon, rightSlot, leftSlot = null, compact = false }) {
   return (
     <div
       style={{
@@ -215,6 +215,7 @@ function SettingsTopHeader({ title, subtitle, icon, rightSlot, compact = false }
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+        {leftSlot}
         <div
           style={{
             width: compact ? 44 : 48,
@@ -416,6 +417,12 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
         title={current?.label || 'Ayarlar'}
         subtitle={current?.desc || 'Kantin ayarlarını buradan yönetin'}
         icon={current?.icon || 'AY'}
+        leftSlot={(
+          <button type="button" className="canteen-settings-menu-toggle" onClick={() => setMenuOpen((value) => !value)}>
+            <span className="canteen-settings-menu-toggleicon">☰</span>
+            <span>{menuOpen ? 'Menüyü Kapat' : 'Menüyü Aç'}</span>
+          </button>
+        )}
         rightSlot={(
           <button
             type="button"
@@ -522,11 +529,6 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
         <div style={{ position: 'relative', justifySelf: 'start' }}>
-          <button type="button" className="canteen-settings-menu-toggle" onClick={() => setMenuOpen((value) => !value)}>
-            <span className="canteen-settings-menu-toggleicon">☰</span>
-            <span>{menuOpen ? 'Menüyü Kapat' : 'Menüyü Aç'}</span>
-          </button>
-
           {menuOpen ? (
             <aside className="canteen-settings-side-popup">
               {sections.map((section) => (
@@ -562,12 +564,6 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
         </div>
 
         <section style={{ minWidth: 0, borderRadius: 30, border: '1px solid var(--settings-border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.008))', padding: 22, boxShadow: 'var(--settings-shadow)' }}>
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 30, fontWeight: 950, letterSpacing: '-0.03em' }}>{current?.label || 'Ayarlar'}</div>
-            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--settings-text-soft)', fontWeight: 700 }}>
-              {current?.desc || 'Bu bölümde ilgili ayarları düzenleyebilirsiniz.'}
-            </div>
-          </div>
           <div>{children}</div>
         </section>
       </div>
