@@ -90,27 +90,69 @@ export const optimizeImageToWebp = async (file, options = {}) => {
     65,
     60,
     55,
-    50
+    50,
+    45,
+    40,
+    35
   ].filter((value) => Number.isFinite(value) && value > 0 && value <= 100)))
+  const resizeSteps = Array.from(new Set([
+    { width, height },
+    { width: Math.min(width, 720), height: Math.min(height, 720) },
+    { width: Math.min(width, 640), height: Math.min(height, 640) },
+    { width: Math.min(width, 560), height: Math.min(height, 560) },
+    { width: Math.min(width, 480), height: Math.min(height, 480) }
+  ].filter((step) => Number.isFinite(step.width) && step.width > 0 && Number.isFinite(step.height) && step.height > 0)
+    .map((step) => `${step.width}x${step.height}`)))
+    .map((key) => {
+      const [stepWidth, stepHeight] = key.split('x').map(Number)
+      return { width: stepWidth, height: stepHeight }
+    })
 
   let optimizedBuffer = null
   let appliedQuality = requestedQuality
+  let appliedWidth = width
+  let appliedHeight = height
+  let smallestBuffer = null
+  let smallestQuality = requestedQuality
+  let smallestWidth = width
+  let smallestHeight = height
 
-  for (const quality of qualitySteps) {
-    const nextBuffer = await sharp(file.buffer, { failOn: 'error' })
-      .rotate()
-      .resize({
-        width,
-        height,
-        fit: 'inside',
-        withoutEnlargement: true
-      })
-      .webp({ quality })
-      .toBuffer()
+  for (const resizeStep of resizeSteps) {
+    for (const quality of qualitySteps) {
+      const nextBuffer = await sharp(file.buffer, { failOn: 'error' })
+        .rotate()
+        .resize({
+          width: resizeStep.width,
+          height: resizeStep.height,
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .webp({ quality })
+        .toBuffer()
 
-    optimizedBuffer = nextBuffer
-    appliedQuality = quality
-    if (nextBuffer.length <= targetMaxBytes) break
+      optimizedBuffer = nextBuffer
+      appliedQuality = quality
+      appliedWidth = resizeStep.width
+      appliedHeight = resizeStep.height
+
+      if (!smallestBuffer || nextBuffer.length < smallestBuffer.length) {
+        smallestBuffer = nextBuffer
+        smallestQuality = quality
+        smallestWidth = resizeStep.width
+        smallestHeight = resizeStep.height
+      }
+
+      if (nextBuffer.length <= targetMaxBytes) break
+    }
+
+    if (optimizedBuffer && optimizedBuffer.length <= targetMaxBytes) break
+  }
+
+  if (optimizedBuffer && optimizedBuffer.length > targetMaxBytes && smallestBuffer) {
+    optimizedBuffer = smallestBuffer
+    appliedQuality = smallestQuality
+    appliedWidth = smallestWidth
+    appliedHeight = smallestHeight
   }
 
   const metadata = await sharp(optimizedBuffer).metadata()
@@ -121,6 +163,8 @@ export const optimizeImageToWebp = async (file, options = {}) => {
     mimeType: 'image/webp',
     width: Number(metadata?.width || 0),
     height: Number(metadata?.height || 0),
-    quality: appliedQuality
+    quality: appliedQuality,
+    requestedWidth: appliedWidth,
+    requestedHeight: appliedHeight
   }
 }
