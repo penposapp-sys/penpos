@@ -70,10 +70,13 @@ const withAssetVersion = (url, versionSource) => {
 const toAbsoluteAssetUrl = (req, url, versionSource) => {
   const versioned = withAssetVersion(url, versionSource)
   if (!versioned) return ''
-  if (/^https?:\/\//i.test(versioned) || versioned.startsWith('//')) return versioned
+  const normalized = versioned.startsWith('/uploads/')
+    ? `/api${versioned}`
+    : versioned
+  if (/^https?:\/\//i.test(normalized) || normalized.startsWith('//')) return normalized
   const base = buildBaseUrl(req)
-  if (!base) return versioned
-  return `${base}${versioned.startsWith('/') ? versioned : `/${versioned}`}`
+  if (!base) return normalized
+  return `${base}${normalized.startsWith('/') ? normalized : `/${normalized}`}`
 }
 
 const normalizeCanteenBranchQueryKey = (value) =>

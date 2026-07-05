@@ -19,6 +19,30 @@ const API_UPLOADS_PREFIX = '/api/uploads/'
 
 const normalizeImageValue = (value) => String(value || '').trim().replace(/\\/g, '/')
 const toAbsoluteProductUrl = (value) => (API_ORIGIN ? `${API_ORIGIN}${value}` : value)
+const toApiUploadsPath = (value) => {
+  const raw = normalizeImageValue(value)
+  if (!raw) return raw
+  if (raw.startsWith('/api/uploads/')) return raw
+  if (raw.startsWith('api/uploads/')) return `/${raw}`
+  if (raw.startsWith('/uploads/')) return `${API_UPLOADS_PREFIX}${raw.slice('/uploads/'.length)}`
+  if (raw.startsWith('uploads/')) return `${API_UPLOADS_PREFIX}${raw.slice('uploads/'.length)}`
+  return raw
+}
+const normalizeAbsoluteUploadUrl = (value) => {
+  const raw = normalizeImageValue(value)
+  if (!raw) return raw
+  if (!/^https?:\/\//i.test(raw) && !raw.startsWith('//')) return raw
+  try {
+    const parsed = new URL(raw, API_ORIGIN || window.location.origin)
+    const apiOrigin = API_ORIGIN || parsed.origin
+    if (parsed.origin !== apiOrigin) return raw
+    const nextPath = toApiUploadsPath(parsed.pathname)
+    if (nextPath === parsed.pathname) return raw
+    return `${apiOrigin}${nextPath}${parsed.search || ''}${parsed.hash || ''}`
+  } catch {
+    return raw
+  }
+}
 
 export function formatProductImageSize(value) {
   const size = Number(value || 0)
@@ -139,7 +163,7 @@ export function resolveProductImageUrl(product) {
 
   if (!raw) return PRODUCT_PLACEHOLDER_SRC
   if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw
-  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) return raw
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) return normalizeAbsoluteUploadUrl(raw)
   if (raw.startsWith('/api/uploads/')) return toAbsoluteProductUrl(raw)
   if (raw.startsWith('api/uploads/')) return toAbsoluteProductUrl(`/${raw}`)
   if (raw.startsWith('/uploads/')) return toAbsoluteProductUrl(`${API_UPLOADS_PREFIX}${raw.slice('/uploads/'.length)}`)

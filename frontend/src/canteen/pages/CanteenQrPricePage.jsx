@@ -194,7 +194,18 @@ function resolvePublicQrAssetUrl(value, fallback = '') {
   const raw = safeText(value)
   if (!raw) return fallback
   if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw
-  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) return raw
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) {
+    try {
+      const parsed = new URL(raw, API_ORIGIN || window.location.origin)
+      const apiOrigin = API_ORIGIN || parsed.origin
+      if (parsed.origin === apiOrigin && parsed.pathname.startsWith('/uploads/')) {
+        return `${apiOrigin}/api${parsed.pathname}${parsed.search || ''}${parsed.hash || ''}`
+      }
+      return raw
+    } catch {
+      return raw
+    }
+  }
   if (!API_ORIGIN) return raw
   if (raw.startsWith('/api/uploads/')) return `${API_ORIGIN}${raw}`
   if (raw.startsWith('/uploads/')) return `${API_ORIGIN}/api${raw}`
