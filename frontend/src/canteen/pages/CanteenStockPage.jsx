@@ -257,7 +257,7 @@ export function CanteenStockWorkspace({
           border: 0;
         }
         .canteen-stock-page--embedded.is-mobile-shell .canteen-legacy-shell {
-          gap: 8px;
+          gap: 1px;
         }
         .canteen-legacy-window-title {
           display: flex;
@@ -488,6 +488,10 @@ export function CanteenStockWorkspace({
           align-items: center;
           min-width: 0;
         }
+        .canteen-legacy-footer-metric-row,
+        .canteen-legacy-footer-metric-row > * {
+          min-width: 0;
+        }
         .canteen-legacy-metric-label {
           font-size: 0.95rem;
         }
@@ -499,6 +503,11 @@ export function CanteenStockWorkspace({
           padding: 8px 12px;
           text-align: right;
           border: 1px solid #9b0000;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          overflow: hidden;
         }
         .canteen-legacy-count-box {
           background: var(--legacy-blue);
@@ -1214,11 +1223,11 @@ function StockMovementsPanel({
           <div className="canteen-legacy-footer">
             <div className="canteen-legacy-footer-metrics" style={{ display: 'grid', gap: 8 }}>
               <div className="canteen-legacy-footer-metric-row" style={{ display: 'grid', gridTemplateColumns: '1fr 200px', alignItems: 'center', gap: 12 }}>
-                <div className="canteen-legacy-metric-label">Marketinizdeki Ürünlerin Alış Fiyatından Değeri</div>
+                <div className="canteen-legacy-metric-label">Mağazanızdaki Ürünlerin Alış Fiyatından Değeri</div>
                 <div className="canteen-legacy-metric-box">{money(filteredTableItems.reduce((sum, item) => sum + (Number(item?.costPrice || 0) * Number(item?.stockQty || 0)), 0))} TL</div>
               </div>
               <div className="canteen-legacy-footer-metric-row" style={{ display: 'grid', gridTemplateColumns: '1fr 200px', alignItems: 'center', gap: 12 }}>
-                <div className="canteen-legacy-metric-label">Marketinizdeki Ürünlerin Satış Fiyatından Değeri</div>
+                <div className="canteen-legacy-metric-label">Mağazanızdaki Ürünlerin Satış Fiyatından Değeri</div>
                 <div className="canteen-legacy-metric-box">{money(filteredTableItems.reduce((sum, item) => sum + (Number(item?.price || 0) * Number(item?.stockQty || 0)), 0))} TL</div>
               </div>
             </div>
@@ -3372,7 +3381,7 @@ function StockHistoryPanelLegacy({ branchId, me, isCompact = false }) {
         </HistorySectionCard>
       </div>
 
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailKind === 'sale' ? 'Satış Detayı' : detailKind === 'count' ? 'Sayım Detayı' : 'Hareket Detayı'} dialogStyle={{ width: 'min(760px, calc(100vw - 20px))' }}>
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailKind === 'sale' ? 'Satış Detayı' : detailKind === 'count' ? 'Sayım Detayı' : 'Hareket Detayı'} dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(760px, calc(100vw - 20px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
         <div style={{ display: 'grid', gap: 12 }}>
           {detailLoading ? <div style={{ color: 'var(--muted)' }}>Yükleniyor...</div> : null}
           {!!detailError ? <div style={{ color: '#b91c1c' }}>{detailError}</div> : null}
@@ -3699,7 +3708,7 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
         </HistorySectionCard>
       </div>
 
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailKind === 'sale' ? 'Satış Detayı' : detailKind === 'count' ? 'Sayım Detayı' : 'Hareket Detayı'} dialogStyle={{ width: 'min(760px, calc(100vw - 20px))' }}>
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailKind === 'sale' ? 'Satış Detayı' : detailKind === 'count' ? 'Sayım Detayı' : 'Hareket Detayı'} dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(760px, calc(100vw - 20px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
         <div style={{ display: 'grid', gap: 12 }}>
           {detailLoading ? <div style={{ color: 'var(--muted)' }}>Yükleniyor...</div> : null}
           {!!detailError ? <div style={{ color: '#b91c1c' }}>{detailError}</div> : null}

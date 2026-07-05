@@ -40,14 +40,14 @@ function DetailRow({ label, value }) {
   )
 }
 
-function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading }) {
+function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading, isCompact = false }) {
   const status = statusMeta(sale?.status)
   const items = Array.isArray(sale?.items) ? sale.items : []
   const isCreditSale = ['account', 'credit'].includes(String(sale?.payment?.methodType || sale?.paymentMethodType || '').trim().toLowerCase()) ||
     ['account', 'credit', 'veresiye', 'cari'].includes(String(sale?.payment?.method || sale?.paymentMethod || '').trim().toLowerCase())
 
   return (
-    <Modal open={open} onClose={onClose} title={sale?.saleNo ? `Satış Detayı ${sale.saleNo}` : 'Satış Detayı'}>
+    <Modal open={open} onClose={onClose} title={sale?.saleNo ? `Satış Detayı ${sale.saleNo}` : 'Satış Detayı'} dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(760px, calc(100vw - 24px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
       {!sale ? (
         <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))' }}>Detay yükleniyor...</div>
       ) : (
@@ -548,6 +548,7 @@ export default function CanteenSalesPage() {
           setReopenConfirmOpen(true)
         }}
         loading={detailLoading || savingAction}
+        isCompact={isCompact}
       />
 
       {detailError ? (

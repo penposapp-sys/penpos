@@ -9,6 +9,7 @@ import { SettingsCard, SettingsField, SettingsToggle, SettingsUiStyles } from '.
 import BranchAccessField from '../../components/settings/BranchAccessField.jsx'
 import { formatBranchSummary, normalizeBranchIdList } from '../../lib/branchVisibility.js'
 import CanteenSettingsSection from '../components/CanteenSettingsSection.jsx'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const createAccessState = (branchIds = []) => {
   const normalized = normalizeBranchIdList(branchIds)
@@ -71,6 +72,8 @@ const CANTEEN_PERMISSION_GROUPS = [
 
 export default function CanteenSettingsStaffPage() {
   const { tenantCtx, user, refresh } = useAuth()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
+  const isCompact = isMobilePortrait || isTablet
   const [items, setItems] = useState([])
   const [branches, setBranches] = useState([])
   const [error, setError] = useState('')
@@ -409,7 +412,7 @@ export default function CanteenSettingsStaffPage() {
           </>
         )}
 
-        <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Personel" portalSelector=".canteen-settings-shell">
+        <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Personel" portalSelector=".canteen-settings-shell" dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(960px, calc(100vw - 32px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
           <form onSubmit={onCreate} className="settings-ui-modal-form">
             <div className="settings-ui-grid two">
               <SettingsField label="Ad">
@@ -446,7 +449,7 @@ export default function CanteenSettingsStaffPage() {
           </form>
         </Modal>
 
-        <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Personel Düzenle" portalSelector=".canteen-settings-shell">
+        <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Personel Düzenle" portalSelector=".canteen-settings-shell" dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(960px, calc(100vw - 32px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
           <form onSubmit={onEdit} className="settings-ui-modal-form">
             <div className="settings-ui-grid two">
               <SettingsField label="Ad">
@@ -482,7 +485,7 @@ export default function CanteenSettingsStaffPage() {
           </form>
         </Modal>
 
-        <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Şifre Sıfırla" portalSelector=".canteen-settings-shell">
+        <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Şifre Sıfırla" portalSelector=".canteen-settings-shell" dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(720px, calc(100vw - 32px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
           <form onSubmit={onPwd} className="settings-ui-modal-form">
             <SettingsField label="Yeni Şifre">
               <input className="settings-ui-input" type="password" value={pwdForm.password} onChange={(event) => setPwdForm({ password: event.target.value })} />

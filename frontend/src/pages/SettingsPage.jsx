@@ -1763,7 +1763,7 @@ export const SettingsTablesContent = () => {
   )
 }
 
-export const SettingsPaymentsContent = () => {
+export const SettingsPaymentsContent = ({ showHeading = true } = {}) => {
   const { isMobilePortrait } = useResponsiveFlags()
   const [methods, setMethods] = useState([])
   const [error, setError] = useState('')
@@ -1808,6 +1808,7 @@ export const SettingsPaymentsContent = () => {
       const index = next.findIndex((method) => String(method?.id) === String(id))
       if (index === -1) return list
       const target = next[index]
+      if (String(target?.id) === 'credit') return list
       target.enabled = !target.enabled
       return next
     })
@@ -1894,21 +1895,22 @@ export const SettingsPaymentsContent = () => {
 
   return (
     <div>
-      <h3 style={{ marginTop: 0 }}>Ödeme Seçenekleri Ayarları</h3>
+      {showHeading ? <h3 style={{ marginTop: 0 }}>Ödeme Seçenekleri Ayarları</h3> : null}
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
       <div style={{ display: 'grid', gap: 10, maxWidth: 860, width: '100%' }}>
         {(methods || []).map((method) => {
           const isEditing = editingId === method.id
+          const isFixedCredit = String(method?.id) === 'credit'
           return (
           <div key={method.id} className="card" style={{ display: 'grid', gap: 12, padding: 14, minWidth: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1.6fr) auto', gap: 12, alignItems: 'center', minWidth: 0 }}>
               <label style={{ display: 'flex', alignItems: isMobilePortrait ? 'flex-start' : 'center', gap: 12, minWidth: 0 }}>
-                <input type="checkbox" checked={!!method.enabled} onChange={() => toggleEnabled(method.id)} disabled={saving} />
+                <input type="checkbox" checked={!!method.enabled} onChange={() => toggleEnabled(method.id)} disabled={saving || isFixedCredit} />
                 {!isEditing ? (
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{method.name}</div>
                     <div style={{ color: 'var(--app-text-muted)', fontSize: 12 }}>
-                      {method.enabled ? 'Aktif odeme yontemi' : 'Pasif odeme yontemi'}
+                      {isFixedCredit ? 'Sabit odeme kaydedici. Silinemez, adi duzenlenebilir.' : (method.enabled ? 'Aktif odeme yontemi' : 'Pasif odeme yontemi')}
                     </div>
                   </div>
                 ) : (
@@ -1936,7 +1938,7 @@ export const SettingsPaymentsContent = () => {
                   type="button"
                   className="btn"
                   onClick={() => removeMethod(method)}
-                  disabled={saving}
+                  disabled={saving || isFixedCredit}
                   style={{ borderColor: '#fecaca', color: '#b91c1c', flex: isMobilePortrait ? '1 1 140px' : undefined }}
                 >
                   Sil

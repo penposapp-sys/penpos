@@ -1100,6 +1100,9 @@ export default function CanteenSettingsProductsPage() {
             padding: 14px;
             border-radius: 22px;
           }
+          .canteen-create-modal-shell {
+            gap: 12px;
+          }
           .canteen-product-list-row {
             grid-template-columns: 22px 48px minmax(0, 1fr) minmax(78px, auto);
             grid-template-areas:
@@ -1152,6 +1155,12 @@ export default function CanteenSettingsProductsPage() {
           }
           .canteen-create-modal-grid {
             grid-template-columns: 1fr;
+            gap: 2px;
+          }
+          .canteen-create-modal-form,
+          .canteen-create-modal-side {
+            padding: 12px;
+            border-radius: 20px;
           }
           .canteen-create-modal-row {
             grid-template-columns: 1fr;
@@ -1254,8 +1263,13 @@ export default function CanteenSettingsProductsPage() {
         open={stockModalOpen}
         onClose={() => setStockModalOpen(false)}
         title="Stoklar"
-        dialogStyle={{ width: 'min(1240px, calc(100vw - 24px))', maxHeight: 'calc(100dvh - 20px)' }}
-        bodyStyle={{ padding: 18 }}
+        dialogStyle={{
+          width: isMobilePortrait ? 'calc(100% - 2px)' : 'min(1240px, calc(100vw - 24px))',
+          maxWidth: '100%',
+          maxHeight: isMobilePortrait ? 'calc(100dvh - 2px)' : 'calc(100dvh - 20px)',
+          justifySelf: 'center'
+        }}
+        bodyStyle={{ padding: isMobilePortrait ? 1 : 18 }}
       >
         <Suspense fallback={<div style={{ color: 'var(--muted)', padding: 12 }}>Stok ekranı yükleniyor...</div>}>
           <LazyCanteenStockWorkspace
@@ -1310,7 +1324,13 @@ export default function CanteenSettingsProductsPage() {
         open={createOpen}
         onClose={closeCreateModal}
         title=""
-        dialogStyle={{ width: 'min(1040px, calc(100vw - 24px))', maxHeight: 'calc(100dvh - 20px)' }}
+        dialogStyle={{
+          width: isMobilePortrait ? 'calc(100% - 4px)' : 'min(1040px, calc(100vw - 24px))',
+          maxWidth: '100%',
+          maxHeight: isMobilePortrait ? 'calc(100dvh - 4px)' : 'calc(100dvh - 20px)',
+          justifySelf: 'center'
+        }}
+        bodyStyle={{ padding: isMobilePortrait ? 2 : 22 }}
       >
         <form className="canteen-create-modal-shell" onSubmit={create}>
           <div className="canteen-create-modal-header">
@@ -1428,8 +1448,18 @@ export default function CanteenSettingsProductsPage() {
         open={editOpen}
         onClose={() => setEditOpen(false)}
         title="Ürün Düzenle"
-        dialogStyle={{ width: 'min(920px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 24px)' }}
-        bodyStyle={{ maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', paddingBottom: 18 }}
+        dialogStyle={{
+          width: isMobilePortrait ? 'calc(100% - 4px)' : 'min(920px, calc(100vw - 32px))',
+          maxWidth: '100%',
+          maxHeight: isMobilePortrait ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)',
+          justifySelf: 'center'
+        }}
+        bodyStyle={{
+          maxHeight: 'calc(100dvh - 150px)',
+          overflowY: 'auto',
+          padding: isMobilePortrait ? 2 : 22,
+          paddingBottom: isMobilePortrait ? 2 : 18
+        }}
       >
         <div style={{ display: 'grid', gap: 10 }}>
           <label>
@@ -1527,7 +1557,13 @@ export default function CanteenSettingsProductsPage() {
         open={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
         title={categoryForm.id ? 'Kategori Düzenle' : 'Yeni Kategori'}
-        dialogStyle={{ width: 'min(920px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 24px)' }}
+        dialogStyle={{
+          width: isMobilePortrait ? 'calc(100% - 4px)' : 'min(920px, calc(100vw - 32px))',
+          maxWidth: '100%',
+          maxHeight: isMobilePortrait ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)',
+          justifySelf: 'center'
+        }}
+        bodyStyle={{ padding: isMobilePortrait ? 2 : 22 }}
       >
         <div style={{ display: 'grid', gap: 10 }}>
           <label>

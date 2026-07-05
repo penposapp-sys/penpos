@@ -28,8 +28,11 @@ const INITIAL_METHODS = [
   { id: 'cash', name: 'Nakit', type: 'cash', enabled: true, isDefault: true, isSystem: false, isDeleted: false, sortOrder: 1 },
   { id: 'card', name: 'Kart', type: 'card', enabled: true, isDefault: false, isSystem: false, isDeleted: false, sortOrder: 2 },
   { id: 'bank', name: 'Banka', type: 'bank', enabled: false, isDefault: false, isSystem: false, isDeleted: false, sortOrder: 3 },
-  { id: 'credit', name: 'Veresiye', type: 'credit', enabled: false, isDefault: false, isSystem: false, isDeleted: false, sortOrder: 4 },
+  { id: 'credit', name: 'Veresiye', type: 'credit', enabled: true, isDefault: false, isSystem: true, isDeleted: false, sortOrder: 1 },
 ]
+
+const FIXED_CREDIT_METHOD_ID = 'credit'
+const FIXED_CREDIT_METHOD_NAME = 'Veresiye'
 
 const normalizeText = (value) => String(value || '').trim()
 
@@ -63,12 +66,34 @@ const normalizeStoredType = (value, ...fallbackValues) => {
   return legacyBucketMap[raw] || 'custom'
 }
 
-const ensureSortOrder = (methods = []) => methods
+const buildFixedCreditMethod = (method = {}) => ({
+  ...method,
+  id: FIXED_CREDIT_METHOD_ID,
+  name: normalizeText(method.name) || FIXED_CREDIT_METHOD_NAME,
+  type: 'credit',
+  enabled: true,
+  isSystem: true,
+  isDeleted: false,
+})
+
+const ensureFixedMethods = (methods = []) => {
+  const items = Array.isArray(methods) ? methods.map((method) => ({ ...method })) : []
+  const existingCredit = items.find((method) => String(method?.id) === FIXED_CREDIT_METHOD_ID)
+  const rest = items.filter((method) => String(method?.id) !== FIXED_CREDIT_METHOD_ID)
+  return [buildFixedCreditMethod(existingCredit), ...rest]
+}
+
+const ensureSortOrder = (methods = []) => ensureFixedMethods(methods)
   .map((method, index) => ({
     ...method,
     sortOrder: Number.isFinite(Number(method?.sortOrder)) ? Number(method.sortOrder) : (index + 1),
   }))
-  .sort((a, b) => (Number(a.sortOrder || 0) - Number(b.sortOrder || 0)) || String(a.name || '').localeCompare(String(b.name || ''), 'tr'))
+  .sort((a, b) => {
+    const aPinned = String(a?.id) === FIXED_CREDIT_METHOD_ID ? 0 : 1
+    const bPinned = String(b?.id) === FIXED_CREDIT_METHOD_ID ? 0 : 1
+    if (aPinned !== bPinned) return aPinned - bPinned
+    return (Number(a.sortOrder || 0) - Number(b.sortOrder || 0)) || String(a.name || '').localeCompare(String(b.name || ''), 'tr')
+  })
   .map((method, index) => ({
     ...method,
     sortOrder: index + 1,
@@ -108,7 +133,7 @@ const normalizeIncomingMethod = (method = {}, fallback = {}) => {
     fallback.name,
     fallback.id
   )
-  return {
+  const normalized = {
     id: id || fallback.id || randomUUID(),
     name: name || fallback.name || '',
     type,
@@ -118,6 +143,10 @@ const normalizeIncomingMethod = (method = {}, fallback = {}) => {
     isDeleted: method.isDeleted ?? fallback.isDeleted ?? false,
     sortOrder: method.sortOrder ?? fallback.sortOrder ?? 0,
   }
+  if (String(normalized.id) === FIXED_CREDIT_METHOD_ID) {
+    return buildFixedCreditMethod(normalized)
+  }
+  return normalized
 }
 
 const validateMethods = (methods = []) => {
@@ -241,7 +270,7 @@ export const patchPaymentMethodService = async (tenantId, id, patch = {}, actorU
       ...method,
       ...patch,
       id: method.id,
-      isSystem: false,
+      isSystem: String(method.id) === FIXED_CREDIT_METHOD_ID ? true : false,
       isDeleted: method.isDeleted,
       type: patch.type || method.type,
     }, method)
@@ -255,6 +284,9 @@ export const patchPaymentMethodService = async (tenantId, id, patch = {}, actorU
 
 export const deletePaymentMethodService = async (tenantId, id, actorUserId = null) => {
   const methodId = normalizeText(id)
+  if (methodId === FIXED_CREDIT_METHOD_ID) {
+    throw error('protected_payment_method', 'Veresiye odeme secenegi silinemez', 400)
+  }
   const { methods } = await readTenantMethods(tenantId)
   const current = methods.find((method) => String(method.id) === methodId)
   if (!current) throw error('not_found', 'Payment method not found', 404)
