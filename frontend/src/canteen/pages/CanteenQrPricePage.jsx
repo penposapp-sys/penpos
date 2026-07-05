@@ -3,14 +3,16 @@ import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
 import { useBodyLayoutMode } from '../../hooks/useBodyLayoutMode.js'
-import { LOGO_PLACEHOLDER, qrThemes } from '../components/CanteenQrPreview.jsx'
+import { qrThemes } from '../components/CanteenQrPreview.jsx'
 import ProductImage from '../../components/ProductImage.jsx'
+import { resolveApiOrigin } from '../../lib/runtimeApi.js'
 
 const CUSTOMER_FORM = { name: '', phone: '', location: '', address: '', note: '' }
 const LOGIN_FORM = { phone: '', password: '' }
 const REGISTER_FORM = { name: '', phone: '', password: '', passwordRepeat: '', location: '', address: '' }
 const PROFILE_FORM = { name: '', phone: '', location: '', address: '' }
 const IMAGE_PLACEHOLDER = '/images/product-placeholder.png'
+const API_ORIGIN = resolveApiOrigin()
 const PUBLIC_QR_THEME_STYLES = {
   light: {
     appBg: '#f3f4f6',
@@ -186,6 +188,18 @@ function formatMoneyLegacy(value) {
 function safeText(value, fallback = '') {
   const text = fixMojibake(String(value || '')).trim()
   return text || fallback
+}
+
+function resolvePublicQrAssetUrl(value, fallback = '') {
+  const raw = safeText(value)
+  if (!raw) return fallback
+  if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) return raw
+  if (!API_ORIGIN) return raw
+  if (raw.startsWith('/api/uploads/')) return `${API_ORIGIN}${raw}`
+  if (raw.startsWith('/uploads/')) return `${API_ORIGIN}/api${raw}`
+  if (raw.startsWith('/')) return `${API_ORIGIN}${raw}`
+  return raw
 }
 
 function normalizePhone(value) {
@@ -387,14 +401,6 @@ function applyIconMarkup(element, name) {
     svg.style.height = '1em'
     svg.style.display = 'block'
   }
-}
-
-function LogoBadge({ src, alt }) {
-  const [failed, setFailed] = useState(false)
-  if (!String(src || '').trim() || failed) {
-    return <div className="qr-ref-logo qr-ref-logo--placeholder">QR</div>
-  }
-  return <img className="qr-ref-logo" src={src} alt={alt} onError={() => setFailed(true)} />
 }
 
 function getProductAvailableStock(product) {
@@ -773,8 +779,7 @@ export default function CanteenQrPricePage() {
 
   const title = safeText(payload?.settings?.qrTitle, payload?.tenant?.name || 'Sipariş')
   const activeBranchName = safeText(payload?.branch?.name)
-  const logoUrl = safeText(payload?.settings?.qrLogoUrl, payload?.tenant?.logoUrl || LOGO_PLACEHOLDER)
-  const coverUrl = safeText(payload?.settings?.qrCoverImageUrl, IMAGE_PLACEHOLDER)
+  const coverUrl = resolvePublicQrAssetUrl(payload?.settings?.qrCoverImageUrl, IMAGE_PLACEHOLDER)
   const qrPhone = safeText(payload?.settings?.qrPhone)
   const qrWhatsapp = safeText(payload?.settings?.qrWhatsapp)
   const qrEmail = safeText(payload?.settings?.qrEmail)
@@ -1366,12 +1371,9 @@ export default function CanteenQrPricePage() {
         <aside className="qr-ref-desktop-sidebar">
           <div className="qr-ref-desktop-hero">
             <div className="qr-ref-desktop-hero-top">
-              <LogoBadge src={logoUrl} alt={title} />
-              <div className="qr-ref-desktop-hero-status">Sipariş</div>
             </div>
             <div className="qr-ref-desktop-brand">
               <h1>{title.split(' ').map((part, index) => <React.Fragment key={`desktop-${part}-${index}`}>{index > 0 ? <br /> : null}{part}</React.Fragment>)}</h1>
-              <p>Sipariş</p>
             </div>
           </div>
 
@@ -1389,13 +1391,9 @@ export default function CanteenQrPricePage() {
 
         <header className="qr-ref-hero">
           <div className="qr-ref-hero-top">
-            <LogoBadge src={logoUrl} alt={title} />
-            <button type="button" className="qr-ref-menu-btn" onClick={() => setMenuOpen((current) => !current)}>☰</button>
           </div>
           <div className="qr-ref-brand">
             <h1>{title.split(' ').map((part, index) => <React.Fragment key={`${part}-${index}`}>{index > 0 ? <br /> : null}{part}</React.Fragment>)}</h1>
-            <p>Sipariş</p>
-            {activeBranchName ? <div className="qr-ref-branch-pill">{activeBranchName}</div> : null}
           </div>
           {menuOpen ? (
             <div className="qr-ref-menu">

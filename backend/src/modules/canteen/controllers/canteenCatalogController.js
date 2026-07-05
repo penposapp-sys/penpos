@@ -75,7 +75,7 @@ export const createProduct = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
   try {
-    const product = await service.updateProduct(req.user.tenantId, req.canteenBranchId, req.params.id, req.body || {})
+    const product = await service.updateProduct(req.user.tenantId, req.canteenBranchId, req.params.id, req.body || {}, req.user?.id || req.user?._id || null)
     res.json({ success: true, product })
   } catch (err) {
     sendError(res, err)

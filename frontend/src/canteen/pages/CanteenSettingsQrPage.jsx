@@ -42,7 +42,6 @@ export default function CanteenSettingsQrPage() {
   const [settings, setSettings] = useState({
     qrTitle: '',
     qrDescription: '',
-    qrLogoUrl: '',
     qrCoverImageUrl: '',
     qrPhone: '',
     qrWhatsapp: '',
@@ -55,9 +54,6 @@ export default function CanteenSettingsQrPage() {
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [message, setMessage] = useState('')
   const [qrCodeMap, setQrCodeMap] = useState({})
-  const [qrLogoFile, setQrLogoFile] = useState(null)
-  const [qrLogoError, setQrLogoError] = useState('')
-  const [qrLogoRemovePending, setQrLogoRemovePending] = useState(false)
   const [qrCoverFile, setQrCoverFile] = useState(null)
   const [qrCoverError, setQrCoverError] = useState('')
   const [qrCoverRemovePending, setQrCoverRemovePending] = useState(false)
@@ -102,7 +98,6 @@ export default function CanteenSettingsQrPage() {
     setSettings({
       qrTitle: String(nextSettings.qrTitle || nextTenant?.name || ''),
       qrDescription: String(nextSettings.qrDescription || nextTenant?.description || ''),
-      qrLogoUrl: String(nextSettings.qrLogoUrl || nextTenant?.logoUrl || ''),
       qrCoverImageUrl: String(nextSettings.qrCoverImageUrl || ''),
       qrPhone: String(nextSettings.qrPhone || ''),
       qrWhatsapp: String(nextSettings.qrWhatsapp || ''),
@@ -113,9 +108,6 @@ export default function CanteenSettingsQrPage() {
     })
     setBranches(filteredBranches)
     setSelectedBranchId(initialBranchId)
-    setQrLogoFile(null)
-    setQrLogoError('')
-    setQrLogoRemovePending(false)
     setQrCoverFile(null)
     setQrCoverError('')
     setQrCoverRemovePending(false)
@@ -158,7 +150,6 @@ export default function CanteenSettingsQrPage() {
       data: {
         qrTitle: settings.qrTitle,
         qrDescription: settings.qrDescription,
-        qrLogoUrl: settings.qrLogoUrl,
         qrCoverImageUrl: settings.qrCoverImageUrl,
         qrPhone: settings.qrPhone,
         qrWhatsapp: settings.qrWhatsapp,
@@ -190,20 +181,9 @@ export default function CanteenSettingsQrPage() {
     setSaving(true)
     setMessage('')
 
-    let nextQrLogoUrl = settings.qrLogoUrl
     let nextQrCoverImageUrl = settings.qrCoverImageUrl
 
     try {
-      if (qrLogoRemovePending && !qrLogoFile && settings.qrLogoUrl) {
-        const removeLogoResponse = await removeQrMedia('logo', saveBranchId)
-        if (!removeLogoResponse?.ok) {
-          setSaving(false)
-          toast.error(removeLogoResponse?.message || 'QR logo kaldirilamadi')
-          return
-        }
-        nextQrLogoUrl = ''
-      }
-
       if (qrCoverRemovePending && !qrCoverFile && settings.qrCoverImageUrl) {
         const removeCoverResponse = await removeQrMedia('cover', saveBranchId)
         if (!removeCoverResponse?.ok) {
@@ -212,16 +192,6 @@ export default function CanteenSettingsQrPage() {
           return
         }
         nextQrCoverImageUrl = ''
-      }
-
-      if (qrLogoFile) {
-        const uploadLogoResponse = await uploadQrMedia('logo', qrLogoFile, saveBranchId)
-        if (!uploadLogoResponse?.ok) {
-          setSaving(false)
-          toast.error(uploadLogoResponse?.message || 'QR logo yuklenemedi')
-          return
-        }
-        nextQrLogoUrl = String(uploadLogoResponse?.imageUrl || uploadLogoResponse?.settings?.qrLogoUrl || '')
       }
 
       if (qrCoverFile) {
@@ -244,7 +214,6 @@ export default function CanteenSettingsQrPage() {
       data: {
         qrTitle: settings.qrTitle,
         qrDescription: settings.qrDescription,
-        qrLogoUrl: nextQrLogoUrl,
         qrCoverImageUrl: nextQrCoverImageUrl,
         qrPhone: settings.qrPhone,
         qrWhatsapp: settings.qrWhatsapp,
@@ -264,12 +233,8 @@ export default function CanteenSettingsQrPage() {
 
     setSettings((current) => ({
       ...current,
-      qrLogoUrl: nextQrLogoUrl,
       qrCoverImageUrl: nextQrCoverImageUrl
     }))
-    setQrLogoFile(null)
-    setQrLogoError('')
-    setQrLogoRemovePending(false)
     setQrCoverFile(null)
     setQrCoverError('')
     setQrCoverRemovePending(false)
@@ -353,17 +318,27 @@ export default function CanteenSettingsQrPage() {
             180deg,
             color-mix(in srgb, var(--app-surface) 98%, transparent),
             color-mix(in srgb, var(--app-surface-soft, var(--panelElevated)) 96%, transparent)
-          );
-          color: var(--app-text);
-          box-shadow: 0 10px 22px color-mix(in srgb, #000 12%, transparent);
+          ) !important;
+          color: var(--app-text) !important;
+          box-shadow: 0 10px 22px color-mix(in srgb, #000 12%, transparent) !important;
+        }
+        .canteen-settings-qr-page .qr-theme-card::before {
+          display: none !important;
+          opacity: 0 !important;
         }
         .canteen-settings-qr-page .qr-theme-card.is-selected {
           background: linear-gradient(
             180deg,
             color-mix(in srgb, var(--theme-accent) 16%, var(--app-surface)),
             color-mix(in srgb, var(--theme-accent) 8%, var(--app-surface-soft, var(--panelElevated)))
-          );
-          box-shadow: var(--theme-active-glow);
+          ) !important;
+          color: var(--app-text) !important;
+          box-shadow: var(--theme-active-glow) !important;
+        }
+        .canteen-settings-qr-page .qr-theme-card.is-selected :is(div, span, small, svg, svg *) {
+          color: inherit !important;
+          fill: currentColor !important;
+          stroke: currentColor !important;
         }
         .canteen-settings-qr-page img[alt="QR Code"] {
           background: #ffffff !important;
@@ -444,30 +419,6 @@ export default function CanteenSettingsQrPage() {
               <span style={FIELD_LABEL_STYLE}>Firma Adi</span>
               <input className="input" value={settings.qrTitle} onChange={(event) => setSettings((current) => ({ ...current, qrTitle: event.target.value }))} />
             </label>
-            <div style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
-              <span style={FIELD_LABEL_STYLE}>QR Logo</span>
-              <ProductImageUploadField
-                currentImageUrl={qrLogoRemovePending ? '' : settings.qrLogoUrl}
-                file={qrLogoFile}
-                error={qrLogoError}
-                disabled={!canManage || saving}
-                helperText="JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, logo alani icin optimize edilerek saklanir."
-                onFileChange={(nextFile, validationMessage) => {
-                  setQrLogoError(validationMessage || '')
-                  setQrLogoFile(validationMessage ? null : nextFile)
-                  if (!validationMessage) setQrLogoRemovePending(false)
-                }}
-                onClearFile={() => {
-                  setQrLogoFile(null)
-                  setQrLogoError('')
-                }}
-                onRemoveExisting={settings.qrLogoUrl ? () => {
-                  setQrLogoRemovePending(true)
-                  setQrLogoFile(null)
-                  setQrLogoError('')
-                } : undefined}
-              />
-            </div>
             <div style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
               <span style={FIELD_LABEL_STYLE}>QR Kapak Gorseli</span>
               <ProductImageUploadField

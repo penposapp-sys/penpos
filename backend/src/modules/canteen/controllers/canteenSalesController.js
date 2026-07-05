@@ -10,6 +10,15 @@ export const create = async (req, res) => {
   }
 }
 
+export const preview = async (req, res) => {
+  try {
+    const preview = await service.previewSale(req.user.tenantId, req.canteenBranchId, req.body || {})
+    res.json({ success: true, preview })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const listCompleted = async (req, res) => {
   try {
     const sales = await service.listSales(req.user.tenantId, req.canteenBranchIds || [], req.query || {})

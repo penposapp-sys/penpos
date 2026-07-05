@@ -68,6 +68,7 @@ export function SettingsUiStyles() {
         resize: vertical;
       }
       .settings-ui-submit {
+        min-height: 52px;
         border: 0;
         border-radius: 18px;
         padding: 13px 18px;
@@ -75,6 +76,32 @@ export function SettingsUiStyles() {
         color: #ffffff;
         background: var(--theme-gradient);
         box-shadow: var(--theme-active-glow);
+      }
+      .app-modal .settings-ui-submit {
+        border: 1px solid var(--theme-accent, var(--app-border)) !important;
+        color: #ffffff !important;
+        background: var(--theme-gradient) !important;
+        box-shadow: var(--theme-active-glow) !important;
+      }
+      .settings-ui-submit:not(:disabled):hover {
+        filter: brightness(1.04);
+      }
+      .app-modal .settings-ui-submit:not(:disabled):hover {
+        filter: brightness(1.04);
+      }
+      .settings-ui-submit:disabled {
+        border: 1px solid var(--app-border) !important;
+        color: var(--app-text-muted) !important;
+        background: linear-gradient(135deg, var(--app-surface-soft), color-mix(in srgb, var(--app-surface) 88%, transparent)) !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
+      }
+      .app-modal .settings-ui-submit:disabled {
+        border: 1px solid var(--app-border) !important;
+        color: var(--app-text-muted) !important;
+        background: linear-gradient(135deg, var(--app-surface-soft), color-mix(in srgb, var(--app-surface) 88%, transparent)) !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
       }
       .settings-ui-btn {
         border: 1px solid var(--app-border);
@@ -84,6 +111,12 @@ export function SettingsUiStyles() {
         color: var(--app-text);
         background: var(--app-button-bg);
         box-shadow: var(--card-shadow);
+      }
+      .app-modal .modalCloseButton {
+        border: 1px solid var(--app-border) !important;
+        background: linear-gradient(135deg, var(--app-surface), var(--app-surface-soft)) !important;
+        color: var(--app-text) !important;
+        box-shadow: var(--card-shadow) !important;
       }
       .settings-ui-btn-danger {
         border: 1px solid #fecaca;

@@ -166,7 +166,6 @@ export default function CanteenCashierPage() {
   const { theme, themeKey } = useTheme()
   const { isMobilePortrait } = useResponsiveFlags()
   const showMobileProductImages = getSetting('catalogView.showProductImage', false) === true
-  const showProductImages = !isMobilePortrait || showMobileProductImages
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [q, setQ] = useState('')
@@ -191,6 +190,8 @@ export default function CanteenCashierPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [lastSale, setLastSale] = useState(null)
+  const [salePreviewMap, setSalePreviewMap] = useState({})
+  const [salePreviewLinesByProduct, setSalePreviewLinesByProduct] = useState({})
 
   const customerAbortRef = useRef(null)
   const lastCustomerKeyRef = useRef('')
@@ -223,6 +224,15 @@ export default function CanteenCashierPage() {
   const [branchModalOpen, setBranchModalOpen] = useState(false)
 
   incrementPerfCounter('pageRenders', 'CanteenCashierPage')
+
+  const hasCatalogImages = useMemo(() => {
+    return (products || []).some((product) => (
+      String(product?.imageUrl || '').trim().length > 0 ||
+      String(product?.categoryImageUrl || '').trim().length > 0
+    ))
+  }, [products])
+
+  const showProductImages = !isMobilePortrait || showMobileProductImages || hasCatalogImages
 
   const softProductCardStyle = useMemo(() => {
     const borderColor = theme.border
@@ -376,15 +386,29 @@ export default function CanteenCashierPage() {
     return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'tr'))
   }, [products])
 
+  const displayProducts = useMemo(() => {
+    if (!salePreviewMap || typeof salePreviewMap !== 'object') return products
+    return (products || []).map((product) => {
+      const preview = salePreviewMap[String(product?.id || product?._id || '')]
+      if (!preview) return product
+      return {
+        ...product,
+        stockQty: Number(preview.stockQty ?? product?.stockQty ?? 0),
+        salePrice: Number(preview.nextSalePrice ?? product?.salePrice ?? product?.price ?? 0),
+        price: Number(preview.nextBasePrice ?? product?.price ?? 0)
+      }
+    })
+  }, [products, salePreviewMap])
+
   const cartProductMap = useMemo(() => {
     const map = new Map()
-    products.forEach((product) => {
+    displayProducts.forEach((product) => {
       const id = String(product?.id || product?._id || '').trim()
       if (!id) return
       map.set(id, product)
     })
     return map
-  }, [products])
+  }, [displayProducts])
 
   useEffect(() => {
     if (!categories.length) {
@@ -397,7 +421,7 @@ export default function CanteenCashierPage() {
 
   const filteredProducts = useMemo(() => {
     const nq = normalize(q)
-    const nextProducts = products.filter((product) => {
+    const nextProducts = displayProducts.filter((product) => {
       const matchesCategory = !String(activeCategoryId || '').trim()
         ? true
         : activeCategoryId === 'uncategorized'
@@ -410,11 +434,11 @@ export default function CanteenCashierPage() {
     logPerf('CanteenCashierPage', 'filter-result', {
       activeCategoryId: String(activeCategoryId || ''),
       searchQuery: String(q || ''),
-      totalProducts: products.length,
+      totalProducts: displayProducts.length,
       filteredCount: nextProducts.length
     })
     return nextProducts
-  }, [activeCategoryId, products, q])
+  }, [activeCategoryId, displayProducts, q])
 
   const {
     containerRef: productScrollRef,
@@ -545,30 +569,91 @@ export default function CanteenCashierPage() {
   useEffect(() => {
     if (cartHydratedBranchRef.current !== String(selectedBranchId || '').trim()) return
     if (cartProductMap.size === 0) return
-    setCart((prev) => prev.map((item) => {
-      const product = cartProductMap.get(String(item?.productId || '').trim())
-      if (!product) return item
-      const nextName = String(product?.name || item?.name || '')
-      const nextBarcode = String(product?.barcode || item?.barcode || '')
-      const nextPrice = Number(product?.salePrice ?? product?.price ?? item?.unitPrice ?? 0)
-      const nextBranchId = String(product?.branchId || item?.productBranchId || selectedBranchId || '')
-      if (
-        nextName === String(item?.name || '') &&
-        nextBarcode === String(item?.barcode || '') &&
-        nextPrice === Number(item?.unitPrice || 0) &&
-        nextBranchId === String(item?.productBranchId || '')
-      ) {
-        return item
-      }
-      return {
-        ...item,
-        name: nextName,
-        barcode: nextBarcode,
-        unitPrice: nextPrice,
-        productBranchId: nextBranchId
-      }
-    }))
+    setCart((prev) => {
+      let changed = false
+      const next = prev.map((item) => {
+        const product = cartProductMap.get(String(item?.productId || '').trim())
+        if (!product) return item
+        const nextName = String(product?.name || item?.name || '')
+        const nextBarcode = String(product?.barcode || item?.barcode || '')
+        const nextPrice = Number(product?.salePrice ?? product?.price ?? item?.unitPrice ?? 0)
+        const nextBranchId = String(product?.branchId || item?.productBranchId || selectedBranchId || '')
+        if (
+          nextName === String(item?.name || '') &&
+          nextBarcode === String(item?.barcode || '') &&
+          nextPrice === Number(item?.unitPrice || 0) &&
+          nextBranchId === String(item?.productBranchId || '')
+        ) {
+          return item
+        }
+        changed = true
+        return {
+          ...item,
+          name: nextName,
+          barcode: nextBarcode,
+          unitPrice: nextPrice,
+          productBranchId: nextBranchId
+        }
+      })
+      return changed ? next : prev
+    })
   }, [cartProductMap, selectedBranchId])
+
+  useEffect(() => {
+    const saleCart = cart.filter((item) => Number(item?.qty || 0) > 0)
+    if (saleCart.length === 0) {
+      setSalePreviewMap({})
+      setSalePreviewLinesByProduct({})
+      return
+    }
+
+    let cancelled = false
+    const run = async () => {
+      const groups = new Map()
+      for (const item of saleCart) {
+        const bid = String(item?.productBranchId || '').trim()
+        const pid = String(item?.productId || '').trim()
+        const qty = Number(item?.qty || 0)
+        if (!bid || !pid || qty <= 0) continue
+        if (!groups.has(bid)) groups.set(bid, [])
+        groups.get(bid).push({ productId: pid, qty })
+      }
+
+      const nextPreview = {}
+      const nextLines = {}
+      for (const [bid, items] of groups.entries()) {
+        const res = await api(`/api/canteen/sales/preview?branchId=${encodeURIComponent(String(bid))}`, {
+          method: 'POST',
+          data: { items },
+          silent: true
+        })
+        if (!res?.ok || !res?.preview) continue
+        for (const row of (Array.isArray(res.preview.stockPreview) ? res.preview.stockPreview : [])) {
+          if (!row?.productId) continue
+          nextPreview[String(row.productId)] = row
+        }
+        for (const line of (Array.isArray(res.preview.items) ? res.preview.items : [])) {
+          const pid = String(line?.productId || '').trim()
+          if (!pid) continue
+          if (!nextLines[pid]) nextLines[pid] = []
+          nextLines[pid].push(line)
+        }
+      }
+
+      if (!cancelled) {
+        setSalePreviewMap(nextPreview)
+        setSalePreviewLinesByProduct(nextLines)
+      }
+    }
+
+    run().catch(() => {
+      if (!cancelled) {
+        setSalePreviewMap({})
+        setSalePreviewLinesByProduct({})
+      }
+    })
+    return () => { cancelled = true }
+  }, [cart])
 
   useEffect(() => {
     const branchId = String(selectedBranchId || '').trim()
@@ -616,8 +701,14 @@ export default function CanteenCashierPage() {
   }, [cart, visibleProducts])
 
   const total = useMemo(() => {
-    return cart.reduce((sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0), 0)
-  }, [cart])
+    return cart.reduce((sum, it) => {
+      const previewLines = salePreviewLinesByProduct[String(it?.productId || '')]
+      if (Array.isArray(previewLines) && previewLines.length > 0) {
+        return sum + previewLines.reduce((lineSum, line) => lineSum + Number(line?.lineTotal || 0), 0)
+      }
+      return sum + Number(it.unitPrice || 0) * Number(it.qty || 0)
+    }, 0)
+  }, [cart, salePreviewLinesByProduct])
   const discountInputValue = String(discountDraft ?? '').replace(',', '.').trim()
   const parsedDiscountPercent = Number(discountInputValue === '' ? '0' : discountInputValue)
   const discountPercent = Number.isFinite(parsedDiscountPercent)
@@ -973,9 +1064,17 @@ export default function CanteenCashierPage() {
     const branchIds = Array.from(groups.keys())
     if (branchIds.length === 0) return
 
-    const totalsByBranch = branchIds.map(bid => ({
+    const getCartItemEffectiveTotal = (item) => {
+      const previewLines = salePreviewLinesByProduct[String(item?.productId || '')]
+      if (Array.isArray(previewLines) && previewLines.length > 0) {
+        return roundMoney(previewLines.reduce((lineSum, line) => lineSum + Number(line?.lineTotal || 0), 0))
+      }
+      return roundMoney(Number(item?.unitPrice || 0) * Number(item?.qty || 0))
+    }
+
+    const totalsByBranch = branchIds.map((bid) => ({
       branchId: bid,
-      subTotal: groups.get(bid).reduce((sum, it) => sum + Number(it.unitPrice || 0) * Number(it.qty || 0), 0)
+      subTotal: roundMoney((groups.get(bid) || []).reduce((sum, it) => sum + getCartItemEffectiveTotal(it), 0))
     }))
 
     const grand = totalsByBranch.reduce((sum, x) => sum + Number(x.subTotal || 0), 0)
@@ -1160,7 +1259,22 @@ export default function CanteenCashierPage() {
                 <div key={it.productId} className="kasaCartRow" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: 10, border: '1px solid var(--border)', borderRadius: 10 }}>
                   <div className="kasaCartRowBody">
                     <div style={{ fontWeight: 700 }}>{it.name}</div>
-                    <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>{money(it.unitPrice)} ₺</div>
+                    {(() => {
+                      const previewLines = salePreviewLinesByProduct[String(it.productId || '')]
+                      if (Array.isArray(previewLines) && previewLines.length > 1) {
+                        return (
+                          <div style={{ display: 'grid', gap: 2 }}>
+                            {previewLines.map((line, index) => (
+                              <div key={`${it.productId}-${index}`} style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>
+                                {Number(line.qty || 0)} x {money(line.unitPrice)} TL
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      }
+                      const firstLine = Array.isArray(previewLines) && previewLines.length === 1 ? previewLines[0] : null
+                      return <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>{money(firstLine?.unitPrice ?? it.unitPrice)} TL</div>
+                    })()}
                   </div>
                   <div className="kasaCartRowActions" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button className="btn btn--compact" type="button" onClick={() => dec(it.productId)}>-</button>

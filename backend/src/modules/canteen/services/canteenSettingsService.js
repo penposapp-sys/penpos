@@ -27,6 +27,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
 })
 
 const QR_THEME_IDS = new Set(['dark', 'blue', 'green', 'orange'])
+const withAssetVersion = (url, versionSource) => {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  const version = versionSource ? new Date(versionSource).getTime() : 0
+  if (!version) return raw
+  return `${raw}${raw.includes('?') ? '&' : '?'}v=${version}`
+}
 export const DEFAULT_PAYMENT_SETTINGS = Object.freeze({
   cashEnabled: true,
   cardEnabled: true,
@@ -72,7 +79,7 @@ export const getSettings = async (tenantId) => {
     qrTitle: String(doc.qrTitle || ''),
     qrDescription: String(doc.qrDescription || ''),
     qrLogoUrl: String(doc.qrLogoUrl || ''),
-    qrCoverImageUrl: String(doc.qrCoverImageUrl || ''),
+    qrCoverImageUrl: withAssetVersion(doc.qrCoverImageUrl, doc.updatedAt),
     qrPhone: String(doc.qrPhone || ''),
     qrWhatsapp: String(doc.qrWhatsapp || ''),
     qrEmail: String(doc.qrEmail || ''),

@@ -2,12 +2,16 @@ import mongoose from 'mongoose'
 import { error } from '../../../utils/errors.js'
 import * as logger from '../../../utils/logger.js'
 import * as productRepo from '../repositories/canteenProductRepository.js'
+import * as categoryRepo from '../repositories/canteenCategoryRepository.js'
 import * as movementRepo from '../repositories/canteenStockMovementRepository.js'
 import * as countRepo from '../repositories/canteenStockCountRepository.js'
+import { addProductReceipt, consumeProductQtyFifo, ensureProductBatches, rebuildProductBatchesFromAbsoluteStock } from './canteenProductBatchService.js'
+import { createProduct as createCatalogProduct, updateProduct as updateCatalogProduct } from './canteenCatalogService.js'
 import CanteenProduct from '../models/CanteenProduct.js'
 import CanteenStockMovement from '../models/StockMovement.js'
 
 const normalizeBarcode = (v) => String(v || '').trim()
+const normalizeText = (v) => String(v || '').trim()
 
 const parseDate = (v) => {
   const s = String(v || '').trim()
@@ -15,6 +19,35 @@ const parseDate = (v) => {
   const d = new Date(s)
   if (Number.isNaN(d.getTime())) return null
   return d
+}
+
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100
+
+const buildStockMovementFinanceMeta = (product, type, qtyRaw, previousQty = null, nextQty = null, note = '') => {
+  const unitCost = roundMoney(product?.costPrice || 0)
+  const rawNote = String(note || '').trim().toLowerCase()
+  let deltaQty = null
+  let cashEffect = ''
+
+  if (type === 'in') {
+    deltaQty = Number(qtyRaw || 0)
+    cashEffect = 'expense'
+  } else if (type === 'adjust' && rawNote.startsWith('stock_count:') && Number.isFinite(previousQty) && Number.isFinite(nextQty)) {
+    deltaQty = roundMoney(Number(nextQty || 0) - Number(previousQty || 0))
+    if (deltaQty < -0.0001) cashEffect = 'expense'
+    else if (deltaQty > 0.0001) cashEffect = 'income'
+  }
+
+  const amountBaseQty = type === 'adjust' ? Math.abs(Number(deltaQty || 0)) : Math.abs(Number(qtyRaw || 0))
+  const totalAmount = roundMoney(unitCost * amountBaseQty)
+
+  return {
+    previousQty: Number.isFinite(previousQty) ? Number(previousQty) : null,
+    deltaQty: Number.isFinite(deltaQty) ? Number(deltaQty) : null,
+    unitCost,
+    totalAmount,
+    cashEffect
+  }
 }
 
 export const createMovementByBarcode = async (tenantId, branchId, actorUserId, input) => {
@@ -35,13 +68,31 @@ export const createMovementByBarcode = async (tenantId, branchId, actorUserId, i
   if (!product) throw error('not_found', productId ? 'Ürün bulunamadı' : 'Barkod bulunamadı', 404)
 
   const effectiveBarcode = barcode || String(product?.barcode || '').trim() || ''
+  const previousQty = Number(product?.stockQty || 0)
 
   let updated
   if (type === 'adjust') {
     updated = await productRepo.setStockQtyByIdAndScope(product.id, tenantId, branchId, qtyRaw)
+    if (updated?.stockTrackingEnabled === true) {
+      await rebuildProductBatchesFromAbsoluteStock({ ...updated.toObject?.() || updated, id: updated.id, tenantId, branchId }, qtyRaw, note || 'Manuel stok düzeltmesi', actorUserId)
+    }
+  } else if (type === 'in') {
+    const receipt = await addProductReceipt(tenantId, branchId, actorUserId, { ...product.toObject?.() || product, id: product.id, tenantId, branchId }, {
+      qty: qtyRaw,
+      salePrice: input?.salePrice ?? product?.price ?? 0,
+      costPrice: input?.costPrice ?? product?.costPrice ?? 0,
+      vatRate: input?.vatRate ?? product?.vatRate ?? 0,
+      vatIncluded: input?.vatIncluded !== undefined ? input.vatIncluded !== false : product?.vatIncluded !== false,
+      note
+    })
+    updated = receipt?.product
   } else {
-    const delta = type === 'in' ? qtyRaw : -qtyRaw
+    const delta = -qtyRaw
     updated = await productRepo.incStockQtyByIdAndScope(product.id, tenantId, branchId, delta)
+    if (updated?.stockTrackingEnabled === true) {
+      await ensureProductBatches({ ...product.toObject?.() || product, id: product.id, tenantId, branchId })
+      await consumeProductQtyFifo(tenantId, branchId, { ...product.toObject?.() || product, id: product.id, tenantId, branchId }, qtyRaw)
+    }
   }
   if (!updated) throw error('not_found', 'Ürün bulunamadı', 404)
 
@@ -53,6 +104,7 @@ export const createMovementByBarcode = async (tenantId, branchId, actorUserId, i
     barcode: effectiveBarcode,
     type,
     qty: qtyRaw,
+    ...buildStockMovementFinanceMeta(updated, type, qtyRaw, previousQty, Number(updated?.stockQty || 0), note),
     note,
     createdBy: actorUserId || null,
     createdAt: new Date()
@@ -63,6 +115,8 @@ export const createMovementByBarcode = async (tenantId, branchId, actorUserId, i
       id: movement.id,
       type: movement.type,
       qty: Number(movement.qty || 0),
+      totalAmount: Number(movement.totalAmount || 0),
+      cashEffect: String(movement.cashEffect || ''),
       barcode: movement.barcode || '',
       note: movement.note || '',
       createdAt: movement.createdAt
@@ -73,6 +127,123 @@ export const createMovementByBarcode = async (tenantId, branchId, actorUserId, i
 
 export const createMovement = createMovementByBarcode
 
+export const createReceipt = async (tenantId, branchId, actorUserId, input) => {
+  const productId = String(input?.productId || '').trim()
+  const barcode = normalizeBarcode(input?.barcode)
+  const name = normalizeText(input?.name)
+  const categoryName = normalizeText(input?.categoryName)
+  const minimumStockRaw = input?.minimumStock
+  const minimumStock = Number(minimumStockRaw)
+  if (!barcode) throw error('validation_error', 'Barkod zorunludur', 400)
+  if (!name) throw error('validation_error', 'Urun adi zorunludur', 400)
+
+  const qty = Number(input?.qty)
+  if (!Number.isFinite(qty) || qty <= 0) throw error('validation_error', 'Miktar zorunludur', 400)
+
+  const resolvedCategories = await categoryRepo.listByTenantAndBranch(tenantId, branchId)
+  const normalizedCategoryName = categoryName.toLocaleLowerCase('tr-TR')
+  let resolvedCategory = (resolvedCategories || []).find((item) => (
+    String(item?.name || '').trim().toLocaleLowerCase('tr-TR') === normalizedCategoryName
+  )) || null
+
+  if (!resolvedCategory && categoryName) {
+    resolvedCategory = await categoryRepo.create({
+      tenantId,
+      branchId,
+      name: categoryName,
+      nameNormalized: normalizedCategoryName,
+      description: '',
+      imageUrl: '',
+      sortOrder: Number(resolvedCategories?.length || 0),
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })
+  }
+
+  let product = productId
+    ? await productRepo.findByIdAndScope(productId, tenantId, branchId)
+    : await productRepo.findByBarcodeAndScope(barcode, tenantId, branchId)
+
+  if (!product) {
+    const created = await createCatalogProduct(tenantId, branchId, {
+      barcode,
+      name,
+      categoryId: resolvedCategory?.id ? String(resolvedCategory.id) : (resolvedCategory?._id ? String(resolvedCategory._id) : null),
+      price: Number(input?.salePrice || 0),
+      costPrice: Number(input?.costPrice || 0),
+      vatRate: Number(input?.vatRate || 0),
+      vatIncluded: input?.vatIncluded !== false,
+      stockTrackingEnabled: true,
+      stockQty: 0,
+      minimumStock: Number.isFinite(minimumStock) ? minimumStock : 5
+    })
+    product = await productRepo.findByIdAndScope(String(created?.id || ''), tenantId, branchId)
+  } else {
+    const patch = {
+      name,
+      barcode,
+      categoryId: resolvedCategory?.id ? String(resolvedCategory.id) : (resolvedCategory?._id ? String(resolvedCategory._id) : null),
+      minimumStock: Number.isFinite(minimumStock) ? minimumStock : Number(product?.minimumStock || 5)
+    }
+    await updateCatalogProduct(tenantId, branchId, String(product.id || product._id || ''), patch, actorUserId)
+    product = await productRepo.findByIdAndScope(String(product.id || product._id || ''), tenantId, branchId)
+  }
+
+  if (!product) throw error('not_found', 'Urun bulunamadi', 404)
+
+  const previousQty = Number(product?.stockQty || 0)
+  const receipt = await addProductReceipt(tenantId, branchId, actorUserId, { ...product.toObject?.() || product, id: product.id, tenantId, branchId }, {
+    ...input,
+    barcode,
+    name,
+    categoryId: resolvedCategory?.id ? String(resolvedCategory.id) : (resolvedCategory?._id ? String(resolvedCategory._id) : null),
+    minimumStock: Number.isFinite(minimumStock) ? minimumStock : Number(product?.minimumStock || 5)
+  })
+  const updated = receipt?.product
+  if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
+
+  const movement = await movementRepo.create({
+    tenantId,
+    branchId,
+    productId: updated.id,
+    productName: String(updated.name || ''),
+    barcode: String(updated.barcode || product?.barcode || ''),
+    type: 'in',
+    qty,
+    ...buildStockMovementFinanceMeta({
+      ...updated,
+      costPrice: Number(input?.costPrice ?? updated?.costPrice ?? product?.costPrice ?? 0)
+    }, 'in', qty, previousQty, Number(updated?.stockQty || 0), String(input?.note || '').trim()),
+    note: receipt?.batch?.id ? `purchase_batch:${String(receipt.batch.id)}` : String(input?.note || '').trim(),
+    createdBy: actorUserId || null,
+    createdAt: new Date()
+  })
+
+  return {
+    movement: {
+      id: movement.id,
+      type: movement.type,
+      qty: Number(movement.qty || 0),
+      totalAmount: Number(movement.totalAmount || 0),
+      cashEffect: String(movement.cashEffect || ''),
+      barcode: movement.barcode || '',
+      note: movement.note || '',
+      createdAt: movement.createdAt
+    },
+    batch: receipt?.batch
+      ? {
+          id: String(receipt.batch.id || receipt.batch._id || ''),
+          receivedQty: Number(receipt.batch.receivedQty || 0),
+          remainingQty: Number(receipt.batch.remainingQty || 0),
+          salePrice: Number(receipt.batch.salePrice || 0),
+          costPrice: Number(receipt.batch.costPrice || 0)
+        }
+      : null,
+    product: { id: updated.id, stockQty: Number(updated.stockQty || 0), price: Number(updated.price || 0), costPrice: Number(updated.costPrice || 0) }
+  }
+}
+
 export const listMovements = async (tenantId, branchId, query) => {
   const from = parseDate(query?.from)
   const to = parseDate(query?.to)
@@ -81,6 +252,11 @@ export const listMovements = async (tenantId, branchId, query) => {
     id: m.id,
     type: m.type,
     qty: Number(m.qty || 0),
+    previousQty: m.previousQty === null || m.previousQty === undefined ? null : Number(m.previousQty || 0),
+    deltaQty: m.deltaQty === null || m.deltaQty === undefined ? null : Number(m.deltaQty || 0),
+    unitCost: Number(m.unitCost || 0),
+    totalAmount: Number(m.totalAmount || 0),
+    cashEffect: String(m.cashEffect || ''),
     barcode: m.barcode || '',
     productName: String(m.productName || m.productId?.name || ''),
     productId: m.productId?._id ? String(m.productId._id) : (m.productId ? String(m.productId) : null),
@@ -148,6 +324,18 @@ export const finishStockCount = async (tenantId, branchId, actorUserId, sessionI
     await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, { status: 'finished', finishedAt: new Date() })
   }
   return await getStockCountSummary(tenantId, branchId, session.id)
+}
+
+export const cancelStockCount = async (tenantId, branchId, actorUserId, sessionId) => {
+  if (!mongoose.isValidObjectId(sessionId)) throw error('invalid_request', 'Invalid session id', 400)
+  const session = await countRepo.findSessionByIdAndScope(sessionId, tenantId, branchId)
+  if (!session) throw error('not_found', 'SayÄ±m bulunamadÄ±', 404)
+  if (session.status === 'closed') throw error('invalid_request', 'SayÄ±m zaten kapatÄ±ldÄ±', 409)
+  await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, {
+    status: 'closed',
+    closedAt: new Date()
+  })
+  return { cancelled: true, sessionId: String(session.id) }
 }
 
 export const updateStockCountItem = async (tenantId, branchId, actorUserId, sessionId, itemId, input) => {
@@ -247,8 +435,28 @@ export const applyStockCount = async (tenantId, branchId, actorUserId, sessionId
     try {
       await txSession.withTransaction(async () => {
         for (const t of targets) {
+          const financeMeta = buildStockMovementFinanceMeta(
+            { costPrice: Number((products || []).find((product) => String(product.id) === String(t.productId))?.costPrice || 0) },
+            'adjust',
+            t.to,
+            Number(t.from || 0),
+            Number(t.to || 0),
+            note
+          )
           await CanteenProduct.updateOne({ _id: t.productId, tenantId, branchId, isActive: true }, { $set: { stockQty: t.to } }, { session: txSession })
-          await CanteenStockMovement.create([{ tenantId, branchId, productId: t.productId, productName: String(t.productName || ''), barcode: String(t.barcode || ''), type: 'adjust', qty: t.to, note, createdBy: actorUserId || null, createdAt: new Date() }], { session: txSession })
+          await CanteenStockMovement.create([{
+            tenantId,
+            branchId,
+            productId: t.productId,
+            productName: String(t.productName || ''),
+            barcode: String(t.barcode || ''),
+            type: 'adjust',
+            qty: t.to,
+            ...financeMeta,
+            note,
+            createdBy: actorUserId || null,
+            createdAt: new Date()
+          }], { session: txSession })
           applied.push({ productId: t.productId, from: t.from, to: t.to })
         }
         await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, { status: 'closed', closedAt: new Date() }, { session: txSession })
@@ -261,8 +469,28 @@ export const applyStockCount = async (tenantId, branchId, actorUserId, sessionId
 
   const tryFallback = async () => {
     for (const t of targets) {
+      const financeMeta = buildStockMovementFinanceMeta(
+        { costPrice: Number((products || []).find((product) => String(product.id) === String(t.productId))?.costPrice || 0) },
+        'adjust',
+        t.to,
+        Number(t.from || 0),
+        Number(t.to || 0),
+        note
+      )
       await CanteenProduct.updateOne({ _id: t.productId, tenantId, branchId, isActive: true }, { $set: { stockQty: t.to } })
-      await movementRepo.create({ tenantId, branchId, productId: t.productId, productName: String(t.productName || ''), barcode: String(t.barcode || ''), type: 'adjust', qty: t.to, note, createdBy: actorUserId || null, createdAt: new Date() })
+      await movementRepo.create({
+        tenantId,
+        branchId,
+        productId: t.productId,
+        productName: String(t.productName || ''),
+        barcode: String(t.barcode || ''),
+        type: 'adjust',
+        qty: t.to,
+        ...financeMeta,
+        note,
+        createdBy: actorUserId || null,
+        createdAt: new Date()
+      })
       applied.push({ productId: t.productId, from: t.from, to: t.to })
     }
     await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, { status: 'closed', closedAt: new Date() })
@@ -281,6 +509,18 @@ export const applyStockCount = async (tenantId, branchId, actorUserId, sessionId
   } catch (err) {
     logger.error('[CANTEEN_STOCK_COUNT_APPLY_ERR]', { sessionId: String(session.id), tenantId: String(tenantId), branchId: String(branchId), message: String(err?.message || err) })
     throw error('internal_error', 'Internal server error', 500)
+  }
+
+  for (const t of targets) {
+    const product = (products || []).find((item) => String(item.id) === String(t.productId))
+    if (product?.stockTrackingEnabled !== true) continue
+    await rebuildProductBatchesFromAbsoluteStock({
+      ...product,
+      id: String(product.id),
+      tenantId,
+      branchId,
+      stockQty: t.to
+    }, t.to, 'Sayım stoğa uygulandı', actorUserId)
   }
 
   return { appliedCount: applied.length, applied }

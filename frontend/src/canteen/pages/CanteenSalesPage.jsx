@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import { buildBranchQueryParams } from '../../lib/branchQuery.js'
 import BranchFilterCard from '../../components/BranchFilterCard.jsx'
@@ -8,6 +8,7 @@ import ConfirmModal from '../../components/ConfirmModal.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const STORAGE_KEY = 'canteen_completed_sales_branches'
+const CASHIER_CART_STORAGE_KEY = 'canteen_cashier_cart_v1'
 
 const money = (value) => Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -32,9 +33,9 @@ const statusMeta = (status) => {
 
 function DetailRow({ label, value }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-      <span style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 700 }}>{label}</span>
-      <span style={{ color: 'var(--app-text, var(--text))', fontSize: 13, fontWeight: 900, textAlign: 'right' }}>{value}</span>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'start' }}>
+      <span style={{ minWidth: 0, color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 700 }}>{label}</span>
+      <span style={{ minWidth: 0, color: 'var(--app-text, var(--text))', fontSize: 13, fontWeight: 900, textAlign: 'right', whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   )
 }
@@ -81,7 +82,14 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading }) {
           ) : null}
 
           <div style={{ border: '1px solid var(--app-border, var(--border))', borderRadius: 18, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: 440, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '38%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '24%' }} />
+                  <col style={{ width: '24%' }} />
+                </colgroup>
               <thead>
                 <tr style={{ background: 'var(--app-surface-soft, var(--panelElevated))' }}>
                   <th style={{ textAlign: 'left', padding: '12px 14px', fontSize: 12 }}>Ürün</th>
@@ -97,14 +105,15 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading }) {
                   </tr>
                 ) : items.map((item, index) => (
                   <tr key={`${item.productId || item.name || index}`}>
-                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', fontWeight: 800 }}>{item.name || '-'}</td>
-                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', textAlign: 'right' }}>{Number(item.qty || 0)}</td>
-                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', textAlign: 'right' }}>{money(item.unitPrice || 0)} TL</td>
-                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', textAlign: 'right', fontWeight: 900 }}>{money(item.lineTotal || 0)} TL</td>
+                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', fontWeight: 800, overflowWrap: 'anywhere' }}>{item.name || '-'}</td>
+                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', textAlign: 'right', whiteSpace: 'nowrap' }}>{Number(item.qty || 0)}</td>
+                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(item.unitPrice || 0)} TL</td>
+                    <td style={{ padding: '10px 14px', borderTop: '1px solid var(--app-border, var(--border))', textAlign: 'right', fontWeight: 900, whiteSpace: 'nowrap' }}>{money(item.lineTotal || 0)} TL</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -130,6 +139,7 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading }) {
 
 export default function CanteenSalesPage() {
   const { me, session } = useOutletContext()
+  const navigate = useNavigate()
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const isCompact = isMobilePortrait || isTablet
 
@@ -349,8 +359,40 @@ export default function CanteenSalesPage() {
         portalOverride: 'canteen'
       })
       if (!res?.success && !res?.ok) throw new Error(String(res?.message || 'Geri açılamadı'))
+      try {
+        const branchId = String(actionTarget?.branchId || detailSale?.branchId || '').trim()
+        const saleSource = detailSale?.id === actionTarget?.id ? detailSale : actionTarget
+        const items = Array.isArray(saleSource?.items) ? saleSource.items : []
+        const restoredCart = items
+          .map((item) => {
+            const productId = String(item?.productId || '').trim()
+            const qty = Math.max(1, Number(item?.qty || 0))
+            if (!productId || qty <= 0) return null
+            return {
+              productId,
+              name: String(item?.name || item?.productName || ''),
+              barcode: String(item?.barcode || ''),
+              unitPrice: Number(item?.unitPrice || 0),
+              qty,
+              productBranchId: branchId || String(item?.productBranchId || '')
+            }
+          })
+          .filter(Boolean)
+
+        if (branchId) {
+          localStorage.setItem('selectedBranchId_canteen', branchId)
+          const raw = localStorage.getItem(CASHIER_CART_STORAGE_KEY)
+          const parsed = raw ? JSON.parse(raw) : {}
+          const next = parsed && typeof parsed === 'object' ? parsed : {}
+          next[branchId] = restoredCart
+          localStorage.setItem(CASHIER_CART_STORAGE_KEY, JSON.stringify(next))
+          try { window.dispatchEvent(new CustomEvent('canteen_branch_changed', { detail: { branchId } })) } catch {}
+        }
+      } catch {}
       setReopenConfirmOpen(false)
+      setDetailOpen(false)
       await refreshAfterAction()
+      navigate('/canteen/kasa')
     } catch (err) {
       setError(String(err?.message || 'Geri açılamadı'))
     } finally {

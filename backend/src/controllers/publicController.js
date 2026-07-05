@@ -59,6 +59,23 @@ const UNCATEGORIZED_CATEGORY = {
   sortOrder: 9999
 }
 
+const withAssetVersion = (url, versionSource) => {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  const version = versionSource ? new Date(versionSource).getTime() : 0
+  if (!version) return raw
+  return `${raw}${raw.includes('?') ? '&' : '?'}v=${version}`
+}
+
+const toAbsoluteAssetUrl = (req, url, versionSource) => {
+  const versioned = withAssetVersion(url, versionSource)
+  if (!versioned) return ''
+  if (/^https?:\/\//i.test(versioned) || versioned.startsWith('//')) return versioned
+  const base = buildBaseUrl(req)
+  if (!base) return versioned
+  return `${base}${versioned.startsWith('/') ? versioned : `/${versioned}`}`
+}
+
 const normalizeCanteenBranchQueryKey = (value) =>
   String(value || '').trim().toLocaleLowerCase('tr-TR')
 
@@ -233,7 +250,7 @@ export const getPublicCanteenQr = async (req, res) => {
         qrTitle: String(settings?.qrTitle || tenant.name || ''),
         qrDescription: String(settings?.qrDescription || tenant.description || ''),
         qrLogoUrl: String(settings?.qrLogoUrl || tenant.logoUrl || ''),
-        qrCoverImageUrl: String(settings?.qrCoverImageUrl || ''),
+        qrCoverImageUrl: toAbsoluteAssetUrl(req, settings?.qrCoverImageUrl, settings?.updatedAt),
         qrPhone: String(settings?.qrPhone || ''),
         qrWhatsapp: String(settings?.qrWhatsapp || ''),
         qrEmail: String(settings?.qrEmail || ''),
@@ -287,7 +304,7 @@ export const getPublicCanteenQr = async (req, res) => {
       qrTitle: String(settings?.qrTitle || tenant.name || ''),
       qrDescription: String(settings?.qrDescription || tenant.description || ''),
       qrLogoUrl: String(settings?.qrLogoUrl || tenant.logoUrl || ''),
-      qrCoverImageUrl: String(settings?.qrCoverImageUrl || ''),
+      qrCoverImageUrl: toAbsoluteAssetUrl(req, settings?.qrCoverImageUrl, settings?.updatedAt),
       qrPhone: String(settings?.qrPhone || ''),
       qrWhatsapp: String(settings?.qrWhatsapp || ''),
       qrEmail: String(settings?.qrEmail || ''),

@@ -9,6 +9,7 @@ import ZReportModal from '../../features/reports/ZReportModal.tsx'
 import BranchFilterCard from '../../components/BranchFilterCard.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { getAuthToken } from '../../lib/authStorage.js'
+import CanteenCashReportModal from '../components/CanteenCashReportModal.jsx'
 
 const REPORT_BRANCH_SELECTION_STORAGE_KEY = 'selectedReportBranchIds_canteen'
 
@@ -47,6 +48,36 @@ const toYmd = (d) => {
   const m = String(x.getMonth() + 1).padStart(2, '0')
   const day = String(x.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+const deriveDateRangeForPeriod = (period, start, end) => {
+  if (period === 'range') return { start, end }
+  const now = new Date()
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (period === 'today') {
+    const ymd = toYmd(base)
+    return { start: ymd, end: ymd }
+  }
+  if (period === 'week') {
+    const day = base.getDay()
+    const diffToMonday = day === 0 ? -6 : 1 - day
+    const weekStart = new Date(base)
+    weekStart.setDate(base.getDate() + diffToMonday)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    return { start: toYmd(weekStart), end: toYmd(weekEnd) }
+  }
+  if (period === 'month') {
+    const monthStart = new Date(base.getFullYear(), base.getMonth(), 1)
+    const monthEnd = new Date(base.getFullYear(), base.getMonth() + 1, 0)
+    return { start: toYmd(monthStart), end: toYmd(monthEnd) }
+  }
+  if (period === 'year') {
+    const yearStart = new Date(base.getFullYear(), 0, 1)
+    const yearEnd = new Date(base.getFullYear(), 11, 31)
+    return { start: toYmd(yearStart), end: toYmd(yearEnd) }
+  }
+  return { start, end }
 }
 
 const normalizeApiMessage = (message, fallback) => {
@@ -114,7 +145,7 @@ function ReportFilter({ period, setPeriod, rangeStart, setRangeStart, rangeEnd, 
           {tabs.map((tab) => {
             const active = period === tab.key
             return (
-              <button key={tab.key} type="button" className={`btn${active ? ' is-active' : ''}`} aria-pressed={active ? 'true' : 'false'} onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--button-active-bg)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--button-active-bg)' : 'var(--app-border, var(--border))', color: active ? 'var(--button-active-text)' : 'var(--button-text)', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
+              <button key={tab.key} type="button" className={`btn canteen-report-period-btn${active ? ' is-active' : ''}`} aria-pressed={active ? 'true' : 'false'} onClick={() => setPeriod(tab.key)} style={{ background: active ? 'var(--button-active-bg)' : 'var(--app-surface-soft, var(--panelElevated))', borderColor: active ? 'var(--button-active-bg)' : 'var(--app-border, var(--border))', color: active ? 'var(--button-active-text)' : 'var(--button-text)', fontWeight: active ? 900 : 600, padding: '10px 16px' }}>
                 {tab.label}
               </button>
             )
@@ -196,8 +227,9 @@ function ReportFilterCompact({
               <button
                 key={tab.key}
                 type="button"
-                className="btn"
+                className={`btn canteen-report-period-btn${active ? ' is-active' : ''}`}
                 onClick={() => setPeriod(tab.key)}
+                aria-pressed={active ? 'true' : 'false'}
                 style={{
                   minHeight: controlHeight,
                   height: controlHeight,
@@ -205,9 +237,9 @@ function ReportFilterCompact({
                   fontSize: 12,
                   fontWeight: active ? 900 : 600,
                   whiteSpace: 'nowrap',
-                  background: active ? 'var(--theme-accent, #111827)' : 'var(--app-surface-soft, var(--panelElevated))',
-                  borderColor: active ? 'var(--theme-accent, #111827)' : 'var(--app-border, var(--border))',
-                  color: active ? '#ffffff' : 'var(--app-text, var(--text))'
+                  background: active ? 'var(--button-active-bg)' : 'var(--app-surface-soft, var(--panelElevated))',
+                  borderColor: active ? 'var(--button-active-bg)' : 'var(--app-border, var(--border))',
+                  color: active ? 'var(--button-active-text)' : 'var(--app-text, var(--text))'
                 }}
               >
                 {tab.label}
@@ -371,6 +403,7 @@ function ListPanel({ title, rows, emptyText, renderRow }) {
 function ReportCatalog({ onSelect }) {
   const items = [
     { key: 'zreport', title: 'Z Raporu', desc: 'Tahsilat ve ödeme kırılımı özeti' },
+    { key: 'cash', title: 'Kasa Raporu', desc: 'Gelir, gider ve tahsilat hareketleri' },
     { key: 'summary', title: 'Satış Özeti', desc: 'Ciro, işlem ve ortalama sepet görünümü' },
     { key: 'products', title: 'Ürün Performansı', desc: 'En çok satan ürünler listesi' },
     { key: 'customers', title: 'Cari Görünümü', desc: 'Cari bakiyeler ve müşteri durumu' }
@@ -423,6 +456,7 @@ export default function CanteenReportsPage() {
   const [zReportLoading, setZReportLoading] = useState(false)
   const [zReportError, setZReportError] = useState('')
   const [zReportData, setZReportData] = useState(null)
+  const [cashReportOpen, setCashReportOpen] = useState(false)
   const [loadedBranchOptions, setLoadedBranchOptions] = useState([])
   const allowedBranchIds = useMemo(
     () => Array.isArray(session?.allowedBranchIds) ? session.allowedBranchIds.map(String).filter(Boolean) : [],
@@ -545,6 +579,11 @@ export default function CanteenReportsPage() {
     return start || toYmd(new Date())
   }, [period, start])
 
+  const cashReportRange = useMemo(
+    () => deriveDateRangeForPeriod(period, start, end),
+    [period, start, end]
+  )
+
   const downloadAllExcel = async () => {
     if (!canExport) return
     setExporting(true)
@@ -645,6 +684,10 @@ export default function CanteenReportsPage() {
       await loadZReport()
       return
     }
+    if (key === 'cash') {
+      setCashReportOpen(true)
+      return
+    }
     setTab(key)
   }
 
@@ -741,6 +784,13 @@ export default function CanteenReportsPage() {
           setZReportOpen(false)
           setZReportError('')
         }}
+      />
+      <CanteenCashReportModal
+        open={cashReportOpen}
+        onClose={() => setCashReportOpen(false)}
+        branchIds={selectedBranchIds}
+        initialStart={cashReportRange.start}
+        initialEnd={cashReportRange.end}
       />
     </div>
   )

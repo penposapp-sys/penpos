@@ -1,95 +1,166 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/apiClient.js'
 import Modal from '../../components/Modal.jsx'
-import { getPermissionLabel } from '../utils/permissionLabels.js'
-import CanteenSettingsSection, { CanteenSettingsCard } from '../components/CanteenSettingsSection.jsx'
-import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
+import ConfirmDialog from '../../components/ConfirmDialog.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { getSubscriptionStatus } from '../../lib/subscription.js'
+import { PERMISSIONS, canonicalizePermissions, normalizePermissions } from '../../constants/permissions.js'
+import { SettingsCard, SettingsField, SettingsToggle, SettingsUiStyles } from '../../components/settings/SettingsUi.jsx'
+import BranchAccessField from '../../components/settings/BranchAccessField.jsx'
+import { formatBranchSummary, normalizeBranchIdList } from '../../lib/branchVisibility.js'
+import CanteenSettingsSection from '../components/CanteenSettingsSection.jsx'
 
-const PERMS = [
-  { key: 'canteen_pos_access', label: 'Kasa' },
-  { key: 'canteen_customers_view', label: 'Carileri Görüntüle' },
-  { key: 'canteen_customers_manage', label: 'Carileri Yönet' },
-  { key: 'canteen_customers_create', label: 'Cari Oluştur' },
-  { key: 'canteen_customers_edit', label: 'Cari Düzenle' },
-  { key: 'canteen_customer_payment_delete', label: 'Cari Tahsilat Sil' },
-  { key: 'canteen_reports_view', label: 'Raporlar' },
-  { key: 'canteen_reports_export', label: 'Raporları Excel İndir' },
-  { key: 'canteen_billing_view', label: 'Üyelik Talepleri' },
-  { key: 'canteen_billing_manage', label: 'Üyelik Talebi Yönet' },
-  { key: 'canteen_stock_manage', label: 'Stok Hareketleri' },
-  { key: 'canteen_stock_count', label: 'Stok Sayım' },
-  { key: 'canteen_stock_count_view', label: 'Sayım Geçmişi Gör' },
-  { key: 'canteen_settings_manage', label: 'Ayarlar' },
-]
-
-function SelectionChip({ checked, label, onToggle }) {
-  return (
-    <label
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 12px',
-        border: '1px solid var(--app-border, var(--border))',
-        borderRadius: 999,
-        background: checked ? 'var(--theme-accent-soft)' : 'var(--app-surface)',
-        color: checked ? 'var(--theme-accent-text)' : 'var(--app-text)',
-        cursor: 'pointer',
-      }}
-    >
-      <input type="checkbox" checked={checked} onChange={onToggle} />
-      <span style={{ fontSize: 13, fontWeight: 700 }}>{label}</span>
-    </label>
-  )
+const createAccessState = (branchIds = []) => {
+  const normalized = normalizeBranchIdList(branchIds)
+  return {
+    allBranches: normalized.length === 0,
+    branchIds: normalized
+  }
 }
 
+const toBranchIds = (access) => access?.allBranches ? [] : normalizeBranchIdList(access?.branchIds)
+
+const CANTEEN_ROLE_PERMISSIONS = [
+  PERMISSIONS.CANTEEN_POS_ACCESS,
+  PERMISSIONS.CANTEEN_PRODUCTS_VIEW,
+  PERMISSIONS.CANTEEN_CATALOG_MANAGE,
+  PERMISSIONS.CANTEEN_CUSTOMERS_VIEW,
+  PERMISSIONS.CANTEEN_REPORTS_VIEW
+]
+
+const CANTEEN_PERMISSION_GROUPS = [
+  {
+    title: 'Kasa & Satış',
+    items: [
+      { permission: PERMISSIONS.CANTEEN_POS_ACCESS, label: 'Kasa erişimi', description: 'Kantin kasa ekranına giriş yapabilir.' },
+      { permission: PERMISSIONS.CANTEEN_SALES_VIEW, label: 'Satış raporları', description: 'Tamamlanan satış akışını ve satış raporlarını görüntüler.' },
+      { permission: PERMISSIONS.CANTEEN_REPORTS_VIEW, label: 'Raporlar', description: 'Mağaza rapor ekranını görüntüler.' },
+      { permission: PERMISSIONS.CANTEEN_REPORTS_EXPORT, label: 'Rapor dışa aktarma', description: 'Raporları Excel olarak indirebilir.' }
+    ]
+  },
+  {
+    title: 'Ürün & Stok',
+    items: [
+      { permission: PERMISSIONS.CANTEEN_PRODUCTS_VIEW, label: 'Ürünleri görüntüle', description: 'Ürün listelerini ve katalog verisini görür.' },
+      { permission: PERMISSIONS.CANTEEN_CATALOG_MANAGE, label: 'Katalog yönetimi', description: 'Ürün, kategori ve katalog düzenlemeleri yapar.' },
+      { permission: PERMISSIONS.CANTEEN_STOCK_MANAGE, label: 'Stok hareketleri', description: 'Stok giriş/çıkış hareketlerini yönetir.' },
+      { permission: PERMISSIONS.CANTEEN_STOCK_COUNT, label: 'Stok sayım', description: 'Sayım başlatabilir ve sayım işlemlerini yürütebilir.' },
+      { permission: PERMISSIONS.CANTEEN_STOCK_COUNT_VIEW, label: 'Sayım geçmişi', description: 'Geçmiş stok sayım kayıtlarını görüntüler.' }
+    ]
+  },
+  {
+    title: 'Cari & Tahsilat',
+    items: [
+      { permission: PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, label: 'Carileri görüntüle', description: 'Cari kartlarını ve hareketlerini görür.' },
+      { permission: PERMISSIONS.CANTEEN_CUSTOMERS_CREATE, label: 'Cari oluştur', description: 'Yeni cari hesap açabilir.' },
+      { permission: PERMISSIONS.CANTEEN_CUSTOMERS_EDIT, label: 'Cari düzenle', description: 'Cari bilgilerini güncelleyebilir.' },
+      { permission: PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, label: 'Cari yönetimi', description: 'Cari yönetim işlemlerinin tamamını yapabilir.' },
+      { permission: PERMISSIONS.CANTEEN_CUSTOMER_PAYMENT_DELETE, label: 'Tahsilat sil', description: 'Cari tahsilat kayıtlarını silebilir.' }
+    ]
+  },
+  {
+    title: 'Yönetim',
+    items: [
+      { permission: PERMISSIONS.CANTEEN_SETTINGS_MANAGE, label: 'Ayarlar', description: 'Kantin ayar ekranlarını yönetebilir.' },
+      { permission: PERMISSIONS.CANTEEN_STAFF_MANAGE, label: 'Personel', description: 'Personel hesaplarını ve yetkilerini yönetebilir.' },
+      { permission: PERMISSIONS.CANTEEN_BILLING_VIEW, label: 'Üyelik talepleri', description: 'Paket ve üyelik ekranlarını görüntüler.' },
+      { permission: PERMISSIONS.CANTEEN_BILLING_MANAGE, label: 'Üyelik yönetimi', description: 'Üyelik ve paket taleplerini yönetebilir.' }
+    ]
+  }
+]
+
 export default function CanteenSettingsStaffPage() {
-  const { isMobilePortrait, isTablet } = useResponsiveFlags()
+  const { tenantCtx, user, refresh } = useAuth()
   const [items, setItems] = useState([])
   const [branches, setBranches] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [name, setName] = useState('')
-  const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [permissions, setPermissions] = useState([])
-  const [branchIds, setBranchIds] = useState([])
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [includeInactive, setIncludeInactive] = useState(false)
-  const emailInputRef = useRef(null)
-
+  const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [editError, setEditError] = useState('')
-  const [editLoading, setEditLoading] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [editName, setEditName] = useState('')
-  const [editUsername, setEditUsername] = useState('')
-  const [editEmail, setEditEmail] = useState('')
-  const [editPassword, setEditPassword] = useState('')
-  const [editPermissions, setEditPermissions] = useState([])
-  const [editBranchIds, setEditBranchIds] = useState([])
-  const [editIsActive, setEditIsActive] = useState(true)
-  const editEmailInputRef = useRef(null)
+  const [pwdOpen, setPwdOpen] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const [createForm, setCreateForm] = useState({ name: '', username: '', email: '', password: '', permissions: [], branchAccess: createAccessState([]) })
+  const [editForm, setEditForm] = useState({ name: '', username: '', email: '', isActive: true, permissions: [], branchAccess: createAccessState([]) })
+  const [pwdForm, setPwdForm] = useState({ password: '' })
+  const [formError, setFormError] = useState('')
+  const [formLoading, setFormLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const permSet = useMemo(() => new Set(permissions), [permissions])
-  const branchSet = useMemo(() => new Set(branchIds), [branchIds])
-  const editPermSet = useMemo(() => new Set(editPermissions), [editPermissions])
-  const editBranchSet = useMemo(() => new Set(editBranchIds), [editBranchIds])
-  const isCompact = isMobilePortrait || isTablet
+  const branchNameById = useMemo(
+    () => Object.fromEntries((branches || []).map((branch) => [String(branch?._id || branch?.id || ''), branch?.name || '-'])),
+    [branches]
+  )
 
-  const load = async (options = {}) => {
-    const background = options?.background === true
-    if (!background) setLoading(true)
-    if (!background) setError('')
+  const stats = useMemo(() => {
+    const activeCount = items.filter((item) => item.isActive !== false).length
+    return [
+      { label: 'Toplam personel', value: String(items.length) },
+      { label: 'Aktif personel', value: String(activeCount) },
+      { label: 'Şube erişimi', value: String(branches.length) }
+    ]
+  }, [items, branches])
+
+  const togglePermission = (currentList, permission, checked) => {
+    const next = new Set(Array.isArray(currentList) ? currentList : [])
+    if (checked) next.add(permission)
+    else next.delete(permission)
+    return canonicalizePermissions(Array.from(next))
+  }
+
+  const renderPermissionsEditor = (value, onChange) => {
+    const selectedPermissions = new Set(Array.isArray(value) ? value : [])
+    return (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="button" className="settings-ui-btn" onClick={() => onChange(canonicalizePermissions(CANTEEN_ROLE_PERMISSIONS))}>
+            Standart Mağaza Rolünü Uygula
+          </button>
+        </div>
+        {CANTEEN_PERMISSION_GROUPS.map((group) => (
+          <SettingsCard
+            key={group.title}
+            title={group.title}
+            description="Kantin personelinin erişim kapsamını bu gruptan yönetin."
+            icon="🔐"
+            style={{ padding: 16 }}
+          >
+            <div style={{ display: 'grid', gap: 10 }}>
+              {(group.items || []).map((item) => (
+                <SettingsToggle
+                  key={item.permission}
+                  label={item.label}
+                  description={item.description}
+                  checked={selectedPermissions.has(item.permission)}
+                  onChange={(event) => onChange(togglePermission(value, item.permission, event.target.checked))}
+                />
+              ))}
+            </div>
+          </SettingsCard>
+        ))}
+      </div>
+    )
+  }
+
+  const loadBranches = async () => {
+    const response = await api('/api/canteen/branches', { silent: true })
+    setBranches(Array.isArray(response?.branches) ? response.branches : [])
+  }
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
     try {
-      const [staffRes, branchRes] = await Promise.all([
+      const [staffRes] = await Promise.all([
         api(`/api/canteen/staff${includeInactive ? '?includeInactive=true' : ''}`, { silent: true }),
-        api('/api/canteen/branches', { silent: true }),
+        loadBranches()
       ])
       setItems(Array.isArray(staffRes?.staff) ? staffRes.staff : [])
-      setBranches(Array.isArray(branchRes?.branches) ? branchRes.branches : [])
+    } catch (err) {
+      setError(err?.message || 'Personel listesi yüklenemedi.')
     } finally {
-      if (!background) setLoading(false)
+      setLoading(false)
     }
   }
 
@@ -97,150 +168,152 @@ export default function CanteenSettingsStaffPage() {
     load()
   }, [includeInactive])
 
-  const stats = useMemo(() => {
-    const activeCount = items.filter((item) => item.isActive !== false).length
-    return [
-      { label: 'Toplam personel', value: String(items.length) },
-      { label: 'Aktif personel', value: String(activeCount) },
-      { label: 'Şube erişimi', value: String(branches.length) },
-    ]
-  }, [items, branches])
-
-  const togglePerm = (permission) => {
-    setPermissions((current) => {
-      const next = new Set(current)
-      if (next.has(permission)) next.delete(permission)
-      else next.add(permission)
-      return Array.from(next)
-    })
+  const openCreate = () => {
+    setCreateForm({ name: '', username: '', email: '', password: '', permissions: [], branchAccess: createAccessState([]) })
+    setFormError('')
+    setCreateOpen(true)
   }
 
-  const toggleBranch = (id) => {
-    const branchId = String(id)
-    setBranchIds((current) => {
-      const next = new Set(current.map(String))
-      if (next.has(branchId)) next.delete(branchId)
-      else next.add(branchId)
-      return Array.from(next)
-    })
-  }
-
-  const toggleEditPerm = (permission) => {
-    setEditPermissions((current) => {
-      const next = new Set(current)
-      if (next.has(permission)) next.delete(permission)
-      else next.add(permission)
-      return Array.from(next)
-    })
-  }
-
-  const toggleEditBranch = (id) => {
-    const branchId = String(id)
-    setEditBranchIds((current) => {
-      const next = new Set(current.map(String))
-      if (next.has(branchId)) next.delete(branchId)
-      else next.add(branchId)
-      return Array.from(next)
-    })
-  }
-
-  const create = async (event) => {
+  const onCreate = async (event) => {
     event.preventDefault()
-    setError('')
-    const res = await api('/api/canteen/staff', {
-      method: 'POST',
-      data: { name, username, email, password, permissions, branchIds },
-      silent: true,
-    })
-    if (!res?.ok) {
-      const code = res?.code
-      if (code === 'duplicate_email') setError('Bu e-posta zaten kayıtlı.')
-      else if (code === 'duplicate_username') setError('Bu kullanıcı adı zaten kayıtlı.')
-      else setError(res?.message || 'Personel eklenemedi.')
-      try { emailInputRef.current?.focus() } catch {}
-      return
+    setFormLoading(true)
+    setFormError('')
+    try {
+      const payload = {
+        name: createForm.name,
+        username: createForm.username,
+        email: createForm.email,
+        password: createForm.password,
+        permissions: canonicalizePermissions(createForm.permissions || []),
+        branchIds: toBranchIds(createForm.branchAccess)
+      }
+      const res = await api('/api/canteen/staff', { method: 'POST', data: payload, silent: true })
+      if (!res?.ok) {
+        const code = res?.code
+        if (code === 'duplicate_email') setFormError('Bu e-posta zaten kayıtlı.')
+        else if (code === 'duplicate_username') setFormError('Bu kullanıcı adı zaten kayıtlı.')
+        else setFormError(res?.message || 'Personel oluşturulamadı.')
+        return
+      }
+      setCreateOpen(false)
+      await load()
+      try { await refresh?.() } catch {}
+    } catch (err) {
+      setFormError(err?.message || 'Personel oluşturulamadı.')
+    } finally {
+      setFormLoading(false)
     }
-    setName('')
-    setUsername('')
-    setEmail('')
-    setPassword('')
-    setPermissions([])
-    setBranchIds([])
-    await load()
   }
 
-  const openEdit = (user) => {
-    setEditing(user)
-    setEditName(String(user?.name || ''))
-    setEditUsername(String(user?.username || ''))
-    setEditEmail(String(user?.email || ''))
-    setEditPassword('')
-    setEditPermissions(Array.isArray(user?.permissions) ? user.permissions : [])
-    setEditBranchIds(Array.isArray(user?.branchIds) ? user.branchIds.map(String) : [])
-    setEditIsActive(user?.isActive !== false)
-    setEditError('')
+  const openEdit = (staff) => {
+    setSelected(staff)
+    setEditForm({
+      name: staff?.name || '',
+      username: staff?.username || '',
+      email: staff?.email || '',
+      isActive: staff?.isActive !== false,
+      permissions: canonicalizePermissions(normalizePermissions(staff?.permissions || [])),
+      branchAccess: createAccessState(staff?.branchIds || [])
+    })
+    setFormError('')
     setEditOpen(true)
-    setTimeout(() => {
-      try { editEmailInputRef.current?.focus() } catch {}
-    }, 50)
   }
 
-  const saveEdit = async (event) => {
+  const onEdit = async (event) => {
     event.preventDefault()
-    if (!editing?.id) return
-    setEditLoading(true)
-    setEditError('')
-    const body = {
-      name: editName,
-      username: editUsername,
-      email: editEmail,
-      permissions: editPermissions,
-      branchIds: editBranchIds,
-      isActive: !!editIsActive,
+    if (!selected?.id) return
+    setFormLoading(true)
+    setFormError('')
+    try {
+      const payload = {
+        name: editForm.name,
+        username: editForm.username,
+        email: editForm.email,
+        isActive: !!editForm.isActive,
+        permissions: canonicalizePermissions(editForm.permissions || []),
+        branchIds: toBranchIds(editForm.branchAccess)
+      }
+      const res = await api(`/api/canteen/staff/${selected.id}`, { method: 'PUT', data: payload, silent: true })
+      if (!res?.ok) {
+        const code = res?.code
+        if (code === 'duplicate_email') setFormError('Bu e-posta zaten kayıtlı.')
+        else if (code === 'duplicate_username') setFormError('Bu kullanıcı adı zaten kayıtlı.')
+        else setFormError(res?.message || 'Personel kaydedilemedi.')
+        return
+      }
+      setEditOpen(false)
+      await load()
+      if (String(selected?.id) === String(user?.id)) {
+        try { await refresh?.() } catch {}
+      }
+    } catch (err) {
+      setFormError(err?.message || 'Personel kaydedilemedi.')
+    } finally {
+      setFormLoading(false)
     }
-    const nextPassword = String(editPassword || '').trim()
-    if (nextPassword) body.password = nextPassword
-    const res = await api(`/api/canteen/staff/${editing.id}`, { method: 'PUT', data: body, silent: true })
-    setEditLoading(false)
-    if (!res?.ok) {
-      const code = res?.code
-      if (code === 'duplicate_email') setEditError('Bu e-posta zaten kayıtlı.')
-      else if (code === 'duplicate_username') setEditError('Bu kullanıcı adı zaten kayıtlı.')
-      else setEditError(res?.message || 'Personel kaydedilemedi.')
-      return
-    }
-    setEditOpen(false)
-    setEditing(null)
-    await load()
   }
 
-  const quickToggleActive = async (user) => {
-    if (!user?.id) return
-    const nextActive = !(user?.isActive !== false)
-    const res = await api(`/api/canteen/staff/${user.id}`, { method: 'PUT', data: { isActive: nextActive }, silent: true })
-    if (!res?.ok) {
-      setError(res?.message || 'Personel durumu güncellenemedi.')
-      return
-    }
-    await load()
+  const openPwd = (staff) => {
+    setSelected(staff)
+    setPwdForm({ password: '' })
+    setFormError('')
+    setPwdOpen(true)
   }
 
-  const remove = async (id) => {
-    if (!window.confirm('Personeli devre dışı bırakmak istiyor musunuz?')) return
+  const onPwd = async (event) => {
+    event.preventDefault()
+    if (!selected?.id) return
+    setFormLoading(true)
+    setFormError('')
+    try {
+      const res = await api(`/api/canteen/staff/${selected.id}`, {
+        method: 'PUT',
+        data: { password: pwdForm.password },
+        silent: true
+      })
+      if (!res?.ok) {
+        setFormError(res?.message || 'Şifre güncellenemedi.')
+        return
+      }
+      setPwdOpen(false)
+    } catch (err) {
+      setFormError(err?.message || 'Şifre güncellenemedi.')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const openDeleteConfirm = (staff) => {
+    setDeleteTarget(staff)
+  }
+
+  const onDelete = async () => {
+    const staff = deleteTarget
+    if (!staff?.id) return
+    setDeleteLoading(true)
     setError('')
-    const res = await api(`/api/canteen/staff/${id}`, { method: 'DELETE', silent: true })
-    if (!res?.ok) {
-      setError(res?.message || 'Personel silinemedi.')
-      return
+    try {
+      const res = await api(`/api/canteen/staff/${staff.id}`, { method: 'DELETE', silent: true })
+      if (!res?.ok) {
+        setError(res?.message || 'Personel silinemedi.')
+        return
+      }
+      setDeleteTarget(null)
+      await load()
+    } catch (err) {
+      setError(err?.message || 'Personel silinemedi.')
+    } finally {
+      setDeleteLoading(false)
     }
-    await load()
   }
+
+  const branchSummary = (staff) => formatBranchSummary(staff?.branchIds, branchNameById)
 
   return (
     <CanteenSettingsSection
       badge="Personel Yönetimi"
-      title="Yetki ve erişimleri modern kart yapısıyla yönetin"
-      description="Personel oluşturma, erişim kapsamı belirleme ve aktiflik yönetimini daha düzenli bir arayüzden takip edin."
+      title="Kantin personelini restoran panelindeki akışla yönetin"
+      description="Yeni personel ekleme, düzenleme, şifre sıfırlama ve şube erişimi atama işlemlerini tek panelden yönetin."
       stats={stats}
       actions={
         <>
@@ -252,143 +325,186 @@ export default function CanteenSettingsStaffPage() {
         </>
       }
     >
-      {error ? <CanteenSettingsCard style={{ padding: 16, borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>{error}</CanteenSettingsCard> : null}
+      <div style={{ display: 'grid', gap: 16 }}>
+        <SettingsUiStyles />
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'minmax(0, 1.05fr) minmax(0, 1fr)' }}>
-        <CanteenSettingsCard style={{ padding: 20 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Yeni Personel</div>
-          <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5, marginBottom: 14 }}>
-            Kasa, cari, rapor ve stok yetkileriyle birlikte yeni personel hesabı oluşturun.
+        <div className="settings-ui-toolbar">
+          <div>
+            <h3 style={{ margin: 0 }}>Personel</h3>
+            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--app-text-secondary)' }}>Kantin personel erişim, giriş ve şube görünürlüğünü bu panelden yönetin.</div>
           </div>
+          <button
+            className="settings-ui-btn"
+            onClick={openCreate}
+            disabled={getSubscriptionStatus(tenantCtx) === 'expired'}
+            title={getSubscriptionStatus(tenantCtx) === 'expired' ? 'Paket süreniz doldu. Plan yükseltin.' : undefined}
+          >
+            Yeni Personel
+          </button>
+        </div>
 
-          <form onSubmit={create} style={{ display: 'grid', gap: 14 }}>
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-              <label>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad soyad</div>
-                <input className="input" value={name} onChange={(event) => setName(event.target.value)} />
-              </label>
-              <label>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanıcı adı</div>
-                <input className="input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="ornek: magaza1" />
-              </label>
-              <label>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta</div>
-                <input ref={emailInputRef} className="input" value={email} onChange={(event) => setEmail(event.target.value)} />
-              </label>
-              <label>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şifre</div>
-                <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-              </label>
+        {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
+
+        {loading ? 'Yükleniyor...' : items.length === 0 ? (
+          <div className="settings-ui-table-shell" style={{ padding: 18 }}>Henüz personel yok. Başlamak için “Yeni Personel” ekleyin.</div>
+        ) : (
+          <>
+            <div className="desktop-only settings-ui-table-shell">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Ad</th>
+                    <th>Kullanıcı Adı</th>
+                    <th>E-posta</th>
+                    <th>Durum</th>
+                    <th>Şubeler</th>
+                    <th>İzinler</th>
+                    <th className="actions" style={{ width: 320 }}>Aksiyonlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((staff) => {
+                    const permCount = (staff.permissions || []).length
+                    return (
+                      <tr key={staff.id}>
+                        <td>{staff.name}</td>
+                        <td>{staff.username || '-'}</td>
+                        <td>{staff.email}</td>
+                        <td>{staff.isActive === false ? 'Pasif' : 'Aktif'}</td>
+                        <td style={{ minWidth: 220 }}>{branchSummary(staff)}</td>
+                        <td>{permCount > 0 ? `${permCount} izin` : '-'}</td>
+                        <td className="actions">
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="settings-ui-btn" type="button" onClick={() => openEdit(staff)}>Düzenle</button>
+                            <button className="settings-ui-btn" type="button" onClick={() => openPwd(staff)}>Şifre Sıfırla</button>
+                            <button className="settings-ui-btn-danger" type="button" onClick={() => openDeleteConfirm(staff)}>Sil</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yetkiler</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {PERMS.map((item) => (
-                  <SelectionChip key={item.key} checked={permSet.has(item.key)} label={item.label} onToggle={() => togglePerm(item.key)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Erişebileceği şubeler</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {branches.map((branch) => (
-                  <SelectionChip key={branch.id} checked={branchSet.has(String(branch.id))} label={branch.name} onToggle={() => toggleBranch(branch.id)} />
-                ))}
-                {branches.length === 0 ? <div style={{ color: 'var(--muted)' }}>Önce şube oluşturun.</div> : null}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn btn--primary" disabled={!name.trim() || !email.trim() || !password.trim()}>Personeli Oluştur</button>
-            </div>
-          </form>
-        </CanteenSettingsCard>
-
-        <CanteenSettingsCard style={{ padding: 20 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Personel Listesi</div>
-          <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5, marginBottom: 14 }}>
-            Mevcut personellerin yetkilerini, bağlı şubelerini ve aktiflik durumunu izleyin.
-          </div>
-
-          <div style={{ display: 'grid', gap: 12 }}>
-            {items.map((user) => (
-              <div key={user.id} style={{ border: '1px solid var(--app-border, var(--border))', borderRadius: 20, padding: 16, background: user.isActive === false ? 'color-mix(in srgb, var(--app-surface) 76%, transparent)' : 'var(--theme-accent-soft)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 17, fontWeight: 900, overflowWrap: 'anywhere' }}>{user.name}</div>
-                    <div style={{ marginTop: 4, color: 'var(--app-text-secondary)', fontSize: 13 }}>{user.username || '-'}</div>
-                    <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, overflowWrap: 'anywhere' }}>{user.email}</div>
+            <div className="mobile-only settings-mobile">
+              {items.map((staff) => (
+                <div key={staff.id} className="settings-ui-table-shell" style={{ padding: 16, marginBottom: 12 }}>
+                  <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>{staff.name}</div>
+                  <div style={{ marginTop: 8, display: 'grid', gap: 4, color: 'var(--app-text-secondary)', fontSize: 13 }}>
+                    <span>Kullanıcı adı: {staff.username || '-'}</span>
+                    <span>E-posta: {staff.email}</span>
+                    <span>Durum: {staff.isActive === false ? 'Pasif' : 'Aktif'}</span>
+                    <span>Şubeler: {branchSummary(staff)}</span>
+                    <span>İzin: {(staff.permissions || []).length}</span>
                   </div>
-                  <span style={{ borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 900, background: user.isActive === false ? 'rgba(148, 163, 184, 0.18)' : 'var(--app-surface)', color: user.isActive === false ? 'var(--app-text-secondary)' : 'var(--theme-accent-text)' }}>
-                    {user.isActive === false ? 'Pasif' : 'Aktif'}
-                  </span>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                    <button className="settings-ui-btn" type="button" onClick={() => openEdit(staff)}>Düzenle</button>
+                    <button className="settings-ui-btn" type="button" onClick={() => openPwd(staff)}>Şifre Sıfırla</button>
+                    <button className="settings-ui-btn-danger" type="button" onClick={() => openDeleteConfirm(staff)}>Sil</button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          </>
+        )}
 
-                <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {(Array.isArray(user.permissions) ? user.permissions : []).map((permission) => (
-                    <span key={permission} style={{ fontSize: 12, padding: '5px 10px', borderRadius: 999, border: '1px solid var(--app-border, var(--border))', background: 'var(--app-surface)' }}>
-                      {getPermissionLabel(permission)}
-                    </span>
-                  ))}
-                </div>
+        <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Personel" portalSelector=".canteen-settings-shell">
+          <form onSubmit={onCreate} className="settings-ui-modal-form">
+            <div className="settings-ui-grid two">
+              <SettingsField label="Ad">
+                <input className="settings-ui-input" value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} />
+              </SettingsField>
+              <SettingsField label="Kullanıcı Adı">
+                <input className="settings-ui-input" value={createForm.username} onChange={(event) => setCreateForm({ ...createForm, username: event.target.value })} placeholder="ornek: magaza1" />
+              </SettingsField>
+              <SettingsField label="E-posta">
+                <input className="settings-ui-input" type="email" value={createForm.email} onChange={(event) => setCreateForm({ ...createForm, email: event.target.value })} />
+              </SettingsField>
+              <SettingsField label="Şifre">
+                <input className="settings-ui-input" type="password" value={createForm.password} onChange={(event) => setCreateForm({ ...createForm, password: event.target.value })} />
+              </SettingsField>
+            </div>
 
-                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--app-text-secondary)' }}>
-                  Şube sayısı: {Array.isArray(user.branchIds) ? user.branchIds.length : 0}
-                </div>
+            <BranchAccessField
+              label="Görebileceği Şubeler"
+              hint="Şube seçmezseniz personel tüm şubeleri görebilir. Belirli şubeleri seçerseniz sadece onlar görünür."
+              branches={branches}
+              value={createForm.branchAccess}
+              onChange={(branchAccess) => setCreateForm({ ...createForm, branchAccess })}
+              allLabel="Tüm Şubeleri Görebilir"
+              emptyText="Önce şube oluşturun."
+            />
 
-                <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  <button className="btn" type="button" onClick={() => openEdit(user)}>Düzenle</button>
-                  <button className="btn" type="button" onClick={() => quickToggleActive(user)}>{user.isActive === false ? 'Aktifleştir' : 'Pasifleştir'}</button>
-                  <button className="btn btn--danger" type="button" onClick={() => remove(user.id)}>Sil</button>
-                </div>
-              </div>
-            ))}
-            {items.length === 0 ? <div style={{ color: 'var(--muted)' }}>Henüz personel kaydı bulunmuyor.</div> : null}
-          </div>
-        </CanteenSettingsCard>
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--app-text-secondary)', marginBottom: 8 }}>İzinler</div>
+              {renderPermissionsEditor(createForm.permissions, (permissions) => setCreateForm({ ...createForm, permissions }))}
+            </div>
+
+            {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
+            <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Oluştur'}</button>
+          </form>
+        </Modal>
+
+        <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Personel Düzenle" portalSelector=".canteen-settings-shell">
+          <form onSubmit={onEdit} className="settings-ui-modal-form">
+            <div className="settings-ui-grid two">
+              <SettingsField label="Ad">
+                <input className="settings-ui-input" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
+              </SettingsField>
+              <SettingsField label="Kullanıcı Adı">
+                <input className="settings-ui-input" value={editForm.username} onChange={(event) => setEditForm({ ...editForm, username: event.target.value })} placeholder="ornek: magaza1" />
+              </SettingsField>
+              <SettingsField label="E-posta">
+                <input className="settings-ui-input" type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} />
+              </SettingsField>
+            </div>
+
+            <BranchAccessField
+              label="Görebileceği Şubeler"
+              hint="Şube dropdownlarında bu personele izin verilen şubeler gösterilir."
+              branches={branches}
+              value={editForm.branchAccess}
+              onChange={(branchAccess) => setEditForm({ ...editForm, branchAccess })}
+              allLabel="Tüm Şubeleri Görebilir"
+              emptyText="Önce şube oluşturun."
+            />
+
+            <SettingsToggle label="Aktif" checked={!!editForm.isActive} onChange={(event) => setEditForm({ ...editForm, isActive: event.target.checked })} />
+
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--app-text-secondary)', marginBottom: 8 }}>İzinler</div>
+              {renderPermissionsEditor(editForm.permissions, (permissions) => setEditForm({ ...editForm, permissions }))}
+            </div>
+
+            {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
+            <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>
+          </form>
+        </Modal>
+
+        <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Şifre Sıfırla" portalSelector=".canteen-settings-shell">
+          <form onSubmit={onPwd} className="settings-ui-modal-form">
+            <SettingsField label="Yeni Şifre">
+              <input className="settings-ui-input" type="password" value={pwdForm.password} onChange={(event) => setPwdForm({ password: event.target.value })} />
+            </SettingsField>
+            {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
+            <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Güncelle'}</button>
+          </form>
+        </Modal>
+
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title="Personeli Listeden Kaldır"
+          message="Bu personel aktif listeden kaldırılacak. Geçmiş satış ve raporlardaki adı korunacaktır. Devam etmek istiyor musunuz?"
+          confirmText="Personeli Sil"
+          loading={deleteLoading}
+          onConfirm={onDelete}
+          onClose={() => {
+            if (deleteLoading) return
+            setDeleteTarget(null)
+          }}
+        />
       </div>
-
-      <Modal open={editOpen} onClose={() => { setEditOpen(false); setEditing(null) }} title="Personel Düzenle">
-        <form onSubmit={saveEdit} style={{ display: 'grid', gap: 12 }}>
-          {editError ? <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>{editError}</div> : null}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input type="checkbox" checked={!!editIsActive} onChange={(event) => setEditIsActive(event.target.checked)} />
-            <span>Personel aktif</span>
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad soyad</div>
-            <input className="input" value={editName} onChange={(event) => setEditName(event.target.value)} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanıcı adı</div>
-            <input className="input" value={editUsername} onChange={(event) => setEditUsername(event.target.value)} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta</div>
-            <input ref={editEmailInputRef} className="input" value={editEmail} onChange={(event) => setEditEmail(event.target.value)} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni şifre</div>
-            <input className="input" type="password" value={editPassword} onChange={(event) => setEditPassword(event.target.value)} />
-          </label>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {PERMS.map((item) => (
-              <SelectionChip key={item.key} checked={editPermSet.has(item.key)} label={item.label} onToggle={() => toggleEditPerm(item.key)} />
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {branches.map((branch) => (
-              <SelectionChip key={branch.id} checked={editBranchSet.has(String(branch.id))} label={branch.name} onToggle={() => toggleEditBranch(branch.id)} />
-            ))}
-          </div>
-
-          <button className="btn btn--primary" disabled={editLoading}>{editLoading ? 'Kaydediliyor...' : 'Kaydet'}</button>
-        </form>
-      </Modal>
     </CanteenSettingsSection>
   )
 }

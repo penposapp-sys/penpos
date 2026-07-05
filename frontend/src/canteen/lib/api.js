@@ -31,3 +31,15 @@ export const getStockCountDetail = async (branchId, id) => {
   const sid = String(id || '').trim()
   return api(`/api/canteen/stock-counts/${encodeURIComponent(sid)}`, { silent: true, headers: { 'x-branch-id': bid } })
 }
+
+export const getSaleDetail = async (branchId, id) => {
+  const bid = String(branchId || '').trim()
+  const sid = String(id || '').trim()
+  const qs = bid ? `?branchId=${encodeURIComponent(bid)}` : ''
+  return api(`/api/canteen/sales/${encodeURIComponent(sid)}${qs}`, {
+    silent: true,
+    skipBranchHeader: true,
+    suppressBranchModal: true,
+    portalOverride: 'canteen'
+  })
+}

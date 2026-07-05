@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import type { ZReportData } from './zReportApi.ts'
 import { printZReport } from './zReportPrint.ts'
 import { downloadZReportExcel, downloadZReportPdf } from './zReportExport.ts'
+import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 
 const money = (value: unknown) =>
   `${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
@@ -46,7 +47,17 @@ const cardStyle: React.CSSProperties = {
   padding: 16
 }
 
-function TableBlock({ title, columns, rows }: { title: string, columns: string[], rows: React.ReactNode[][] }) {
+function TableBlock({
+  title,
+  columns,
+  rows,
+  compact = false
+}: {
+  title: string
+  columns: string[]
+  rows: React.ReactNode[][]
+  compact?: boolean
+}) {
   return (
     <section style={{ display: 'grid', gap: 10 }}>
       <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--app-text, var(--text))' }}>{title}</div>
@@ -58,21 +69,31 @@ function TableBlock({ title, columns, rows }: { title: string, columns: string[]
           overflowX: 'auto',
           background: 'var(--card-bg)',
           backdropFilter: 'var(--glass-blur)',
-          boxShadow: 'var(--shadow-soft), var(--shadow-glow)'
+          boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
+          maxWidth: '100%'
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            minWidth: compact ? '100%' : 420,
+            tableLayout: compact ? 'fixed' : 'auto'
+          }}
+        >
           <thead>
             <tr style={{ background: 'color-mix(in srgb, var(--app-surface-soft, var(--panelElevated)) 72%, transparent)' }}>
-              {columns.map((column) => (
+              {columns.map((column, columnIndex) => (
                 <th
                   key={column}
                   style={{
-                    padding: '12px 14px',
-                    textAlign: 'left',
-                    fontSize: 12,
+                    padding: compact ? '10px 12px' : '12px 14px',
+                    textAlign: compact && columnIndex > 0 ? 'right' : 'left',
+                    fontSize: compact ? 11 : 12,
                     color: 'var(--app-text-secondary, var(--text-secondary))',
-                    borderBottom: '1px solid var(--border-soft, var(--app-border, var(--border)))'
+                    borderBottom: '1px solid var(--border-soft, var(--app-border, var(--border)))',
+                    whiteSpace: compact ? 'normal' : 'nowrap',
+                    overflowWrap: 'anywhere'
                   }}
                 >
                   {column}
@@ -87,10 +108,14 @@ function TableBlock({ title, columns, rows }: { title: string, columns: string[]
                   <td
                     key={`${title}-${rowIndex}-${cellIndex}`}
                     style={{
-                      padding: '12px 14px',
+                      padding: compact ? '10px 12px' : '12px 14px',
                       borderBottom: '1px solid var(--border-soft, var(--app-border, var(--border)))',
-                      fontSize: 13,
-                      color: 'var(--app-text, var(--text))'
+                      fontSize: compact ? 12 : 13,
+                      color: 'var(--app-text, var(--text))',
+                      textAlign: compact && cellIndex > 0 ? 'right' : 'left',
+                      whiteSpace: compact ? 'normal' : undefined,
+                      overflowWrap: 'anywhere',
+                      wordBreak: 'break-word'
                     }}
                   >
                     {cell}
@@ -99,7 +124,14 @@ function TableBlock({ title, columns, rows }: { title: string, columns: string[]
               </tr>
             )) : (
               <tr>
-                <td colSpan={columns.length} style={{ padding: '16px 14px', color: 'var(--app-text-muted, var(--muted))' }}>
+                <td
+                  colSpan={columns.length}
+                  style={{
+                    padding: compact ? '14px 12px' : '16px 14px',
+                    color: 'var(--app-text-muted, var(--muted))',
+                    fontSize: compact ? 12 : 13
+                  }}
+                >
                   Bu bolum icin veri bulunamadi.
                 </td>
               </tr>
@@ -127,6 +159,7 @@ export default function ZReportModal({
   printSystem?: string
 }) {
   const [busyAction, setBusyAction] = useState('')
+  const { isMobilePortrait } = useResponsiveFlags()
 
   const summaryCards = useMemo(() => {
     if (!report) return []
@@ -162,7 +195,7 @@ export default function ZReportModal({
         zIndex: 120,
         background: 'var(--modal-backdrop)',
         backdropFilter: 'blur(18px)',
-        padding: 16,
+        padding: isMobilePortrait ? 8 : 16,
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'flex-start',
@@ -177,19 +210,19 @@ export default function ZReportModal({
         onClick={(event) => event.stopPropagation()}
         style={{
           width: 'min(1180px, 100%)',
-          maxHeight: 'calc(100vh - 32px)',
+          maxHeight: isMobilePortrait ? 'calc(100vh - 16px)' : 'calc(100vh - 32px)',
           margin: 'auto 0',
           overflowY: 'auto',
           overflowX: 'hidden',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
-          borderRadius: 32,
+          borderRadius: isMobilePortrait ? 24 : 32,
           border: '1px solid var(--border-soft, var(--app-border, var(--border)))',
           background: 'var(--panel-shell-bg, var(--card-bg))',
           color: 'var(--app-text, var(--text))',
           backdropFilter: 'var(--glass-blur)',
           boxShadow: 'var(--shadow-soft), var(--shadow-glow)',
-          padding: 22,
+          padding: isMobilePortrait ? 14 : 22,
           display: 'grid',
           gap: 18
         }}
@@ -197,7 +230,7 @@ export default function ZReportModal({
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--app-text, var(--text))' }}>Z Raporu</div>
+              <div style={{ fontSize: isMobilePortrait ? 24 : 28, fontWeight: 900, color: 'var(--app-text, var(--text))' }}>Z Raporu</div>
               {!!report?.businessName && (
                 <span
                   style={{
@@ -214,12 +247,12 @@ export default function ZReportModal({
                 </span>
               )}
             </div>
-            <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 14 }}>
+            <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: isMobilePortrait ? 12 : 14, overflowWrap: 'anywhere' }}>
               Tarih: {report?.date || '-'} · Sube: {report?.branchName || '-'} · Olusturma: {report?.generatedAt ? new Date(report.generatedAt).toLocaleString('tr-TR') : '-'}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: isMobilePortrait ? '100%' : undefined }}>
             <button className="btn" onClick={() => runAction('print', async () => report && printZReport(report, { system: printSystem }))} disabled={!report || loading || !!busyAction}>
               {busyAction === 'print' ? 'Hazirlaniyor...' : 'Yazdir'}
             </button>
@@ -249,11 +282,11 @@ export default function ZReportModal({
 
         {!loading && !error && report && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${isMobilePortrait ? 140 : 190}px, 1fr))`, gap: 12 }}>
               {summaryCards.map((card) => (
                 <div key={card.label} style={cardStyle}>
                   <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 12, fontWeight: 700 }}>{card.label}</div>
-                  <div style={{ marginTop: 8, fontSize: 24, fontWeight: 900, color: 'var(--app-text, var(--text))' }}>{card.value}</div>
+                  <div style={{ marginTop: 8, fontSize: isMobilePortrait ? 20 : 24, fontWeight: 900, color: 'var(--app-text, var(--text))', overflowWrap: 'anywhere' }}>{card.value}</div>
                 </div>
               ))}
             </div>
@@ -273,24 +306,27 @@ export default function ZReportModal({
               </div>
             </div>
 
-            <TableBlock title="Odeme Tipleri" columns={['Tip', 'Toplam']} rows={paymentTypeRows} />
+            <TableBlock title="Odeme Tipleri" columns={['Tip', 'Toplam']} rows={paymentTypeRows} compact={isMobilePortrait} />
 
             <TableBlock
               title="KDV Dagilimi"
               columns={['Oran', 'Matrah', 'KDV']}
               rows={(report.summary?.vatBreakdown || []).map((row) => [`%${row.rate}`, money(row.amount), money(row.vat)])}
+              compact={isMobilePortrait}
             />
 
             <TableBlock
               title="Personel Satislari"
               columns={['Personel', 'Adisyon', 'Toplam']}
               rows={(report.staffTotals || []).map((row) => [row.staffName, String(row.orderCount), money(row.total)])}
+              compact={isMobilePortrait}
             />
 
             <TableBlock
               title="Satilan Urunler"
               columns={['Urun', 'Adet', 'Toplam']}
               rows={(report.topProducts || []).map((row) => [row.name, String(row.quantity), money(row.total)])}
+              compact={isMobilePortrait}
             />
           </>
         )}

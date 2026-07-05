@@ -3820,7 +3820,7 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
 }
 
 .kasaProductCard[data-has-image="true"] .kasaProductCardStock {
-  color: #111111 !important;
+  color: var(--app-text, #ffffff) !important;
   text-shadow: none;
 }
 
@@ -4546,8 +4546,9 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   font-size: 10px;
   padding: 3px 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--theme-accent, var(--accent)) 12%, var(--app-surface, var(--panel)));
-  color: var(--app-contrast-text, #111111) !important;
+  background: color-mix(in srgb, var(--app-surface-elevated, var(--panelElevated)) 92%, #000000);
+  border: 1px solid color-mix(in srgb, var(--app-border, var(--border)) 82%, #000000);
+  color: var(--app-text, #ffffff) !important;
 }
 .kasaProductGridScroll { max-height: 64vh; overflow-y: auto; padding-right: 2px }
 .kasaCartPanel { padding: 2mm; gap: 2mm !important }
@@ -4801,8 +4802,9 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   white-space: nowrap;
 }
 .kasaProductCardStock {
-  background: #ecfdf5;
-  color: #111111 !important;
+  background: color-mix(in srgb, var(--app-surface-elevated, var(--panelElevated)) 92%, #000000);
+  border: 1px solid color-mix(in srgb, var(--app-border, var(--border)) 82%, #000000);
+  color: var(--app-text, #ffffff) !important;
   font-size: 8px;
   padding: 2px 5px;
   white-space: nowrap;
@@ -5171,8 +5173,9 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
     font-size: 9px;
   }
   .kasaProductCardStock {
-    color: #111111 !important;
-    background: #ecfdf5;
+    color: var(--app-text, #ffffff) !important;
+    background: color-mix(in srgb, var(--app-surface-elevated, var(--panelElevated)) 92%, #000000);
+    border: 1px solid color-mix(in srgb, var(--app-border, var(--border)) 82%, #000000);
     font-size: 7px;
     padding: 1px 4px;
   }
@@ -5626,6 +5629,21 @@ html[data-theme="light"].theme-white :is(
   background: linear-gradient(135deg, #22c55e, #16a34a);
   border-color: #16a34a;
   color: #ffffff;
+}
+
+.canteen-report-period-btn.is-active,
+.canteen-report-period-btn[aria-pressed="true"] {
+  background: var(--button-active-bg) !important;
+  border-color: var(--button-active-bg) !important;
+  color: var(--button-active-text) !important;
+  box-shadow: none !important;
+}
+
+.canteen-report-period-btn.is-active :is(span, svg, svg *, i),
+.canteen-report-period-btn[aria-pressed="true"] :is(span, svg, svg *, i) {
+  color: inherit !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
 }
 
 :where(button, .btn):is(:disabled, [disabled], [aria-disabled="true"]) {
@@ -6392,7 +6410,7 @@ html[data-theme="light"].theme-white .kasaProductCard[data-has-image="true"] :is
 
 html[data-theme="light"].theme-white .kasaProductCard[data-has-image="true"] .kasaProductCardStock,
 html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true"] .kasaProductCardStock {
-  color: #111111 !important;
+  color: var(--app-text, #ffffff) !important;
   text-shadow: none !important;
 }
 
@@ -6599,16 +6617,17 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 }
 
 .canteen-subtext {
-  color: #374151;
+  color: var(--app-text-secondary, var(--text-secondary, #374151));
   font-weight: 500;
 }
 
 .saleRow {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border, var(--border, #e5e7eb));
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 10px;
-  background: #fff;
+  background: color-mix(in srgb, var(--app-surface, #ffffff) 90%, var(--app-surface-soft, #f8fafc) 10%);
+  color: var(--app-text, var(--text, inherit));
 }
 
 .saleRowTop {
@@ -6632,7 +6651,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 .saleRowDetail {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed #e5e7eb;
+  border-top: 1px dashed var(--app-border, var(--border, #e5e7eb));
 }
 
 .saleRowDetail .saleItemRow {
@@ -6667,6 +6686,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 
 .modalHeader { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex: 0 0 auto }
 .modalTitle { margin: 0; font-size: 18px; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.modalCloseButton { flex: 0 0 auto; white-space: nowrap; }
 .modalBody { margin-top: 12px; overflow: auto; flex: 1 1 auto; min-height: 0; padding-right: 4px }
 .app-modal-body {
   max-height: calc(100dvh - 140px);
@@ -6886,6 +6906,13 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .payment-actions > * { flex-basis: 100%; }
   .modal-backdrop { padding: 10px; place-items: start center; }
   .modal { width: min(100%, 620px); max-height: calc(100vh - 20px); }
+  .modalHeader { align-items: flex-start; flex-wrap: wrap; }
+  .modalTitle {
+    flex: 1 1 100%;
+    overflow: visible;
+    text-overflow: unset;
+  }
+  .modalCloseButton { margin-left: auto; }
   .onlyDesktop,
   .desktop-only,
   .desktop-row,
@@ -12553,7 +12580,7 @@ body.tenant-dark-mode,
 }
 
 .canteen-cashier-page .kasaProductCardStock {
-  color: var(--app-contrast-text, #111111) !important;
+  color: var(--app-text, #ffffff) !important;
 }
 
 .canteen-cashier-page .kasaPaymentMethodButton {

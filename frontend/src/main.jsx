@@ -8,7 +8,7 @@ import { ThemeProvider } from './theme/ThemeContext.jsx'
 import { AppDateProvider } from './context/AppDateContext.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+  <BrowserRouter future={{ v7_relativeSplatPath: true }}>
     <ThemeProvider>
       <AppDateProvider>
         <ScrollReset />

@@ -191,7 +191,6 @@ export default function CanteenLayout() {
   const canCustomers = isAdmin || perms.includes('canteen_customers_view') || perms.includes('canteen_customers_manage')
   const canReports = isAdmin || perms.includes('canteen_reports_view')
   const canSales = canReports || isAdmin || perms.includes('canteen_sales_view')
-  const canStock = isAdmin || perms.includes('canteen_stock_manage') || perms.includes('canteen_stock_count')
   const canSettings = isAdmin || perms.includes('manage_settings')
   const canQrOrders = canPos || canCustomers
 
@@ -246,15 +245,14 @@ export default function CanteenLayout() {
     }
 
     const base = []
+    if (canReports) base.push({ to: '/canteen/raporlar', label: 'Raporlar', icon: IconBarChart })
     if (canPos) base.push({ to: '/canteen/kasa', label: 'Kasa', icon: IconCart })
     if (canQrOrders) base.push({ to: '/canteen/qr-siparisleri', label: 'QR Siparişleri', icon: IconQrOrders })
-    if (canCustomers) base.push({ to: '/canteen/cariler', label: 'Cariler', icon: IconUsers })
-    if (canReports) base.push({ to: '/canteen/raporlar', label: 'Raporlar', icon: IconBarChart })
     if (canSales) base.push({ to: '/canteen/yapilan-satislar', label: 'Yapılan Satışlar', icon: IconHistory })
-    if (canStock) base.push({ to: '/canteen/stok', label: 'Stok', icon: IconBoxes })
+    if (canCustomers) base.push({ to: '/canteen/cariler', label: 'Cariler', icon: IconUsers })
     if (canSettings) base.push({ to: '/canteen/ayarlar', label: 'Ayarlar', icon: IconSettings })
     return base
-  }, [canCustomers, canPos, canQrOrders, canReports, canSales, canSettings, canStock, isExpired])
+  }, [canCustomers, canPos, canQrOrders, canReports, canSales, canSettings, isExpired])
 
   const items = useMemo(() => {
     return (itemsBase || []).map((i) => {
@@ -290,11 +288,11 @@ export default function CanteenLayout() {
   const navItemHeight = desktopCollapsed ? 42 : 44
   const navItemGap = 6
   const navStep = navItemHeight + navItemGap
-  const mobileShellPadding = 8
-  const mobileMainPadding = 8
-  const mobileMainRadius = 22
-  const mobileTopbarPadding = '12px 14px'
-  const mobileContentInset = 8
+  const mobileShellPadding = 2
+  const mobileMainPadding = 4
+  const mobileMainRadius = 18
+  const mobileTopbarPadding = '10px 10px'
+  const mobileContentInset = 2
   const activeIndex = items.findIndex((item) => item.to === current?.to)
 
   if (!getAuthToken(tokenKey) && !loading) {
@@ -341,7 +339,7 @@ export default function CanteenLayout() {
         style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
-          gap: 14,
+          gap: isMobilePortrait ? 6 : 14,
           height: '100%',
           minHeight: 0,
           padding: isMobilePortrait ? mobileShellPadding : 16,
@@ -387,7 +385,7 @@ export default function CanteenLayout() {
                   cursor: 'pointer',
                   transition: 'width 500ms ease'
                 }}
-                aria-label="Sidebar ac kapat"
+                aria-label="Sidebar aç kapat"
               >
                 <img
                   src={desktopCollapsed ? '/logo-1.png' : (effectiveDarkMode ? '/logo-3.png' : '/logo-2.png')}

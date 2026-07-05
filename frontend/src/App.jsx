@@ -111,11 +111,10 @@ const resolveBackFallbackPath = (pathname) => {
 
   if (path.startsWith('/canteen/cariler/')) return '/canteen/cariler'
   if (path.startsWith('/canteen/yapilan-satislar/')) return '/canteen/yapilan-satislar'
-  if (path.startsWith('/canteen/ayarlar')) return '/canteen/kasa'
-  if (path.startsWith('/canteen/qr-siparisleri')) return '/canteen/kasa'
-  if (path.startsWith('/canteen/stok')) return '/canteen/kasa'
-  if (path.startsWith('/canteen/raporlar')) return '/canteen/kasa'
-  if (path.startsWith('/canteen/') && path !== '/canteen/kasa') return '/canteen/kasa'
+  if (path.startsWith('/canteen/ayarlar/') && path !== '/canteen/ayarlar') return '/canteen/ayarlar'
+  if (path.startsWith('/canteen/qr-siparisleri/') && path !== '/canteen/qr-siparisleri') return '/canteen/qr-siparisleri'
+  if (path.startsWith('/canteen/stok/') && path !== '/canteen/stok') return '/canteen/stok'
+  if (path.startsWith('/canteen/raporlar/') && path !== '/canteen/raporlar') return '/canteen/raporlar'
 
   if (path.startsWith('/platform')) return '/platform/kermes-tenants'
   if (path.startsWith('/superadmin')) return '/superadmin/tenants'

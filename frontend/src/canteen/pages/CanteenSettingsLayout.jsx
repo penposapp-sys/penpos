@@ -49,6 +49,12 @@ function buildSettingsThemeVars(theme) {
     '--settings-button-disabled-bg': dark ? '#2f2f2f' : '#d1d5db',
     '--settings-button-disabled-border': dark ? '#3f3f46' : '#d1d5db',
     '--settings-button-disabled-text': dark ? '#9ca3af' : '#6b7280',
+    '--settings-side-link-active-bg': dark ? 'var(--menu-active-bg)' : 'linear-gradient(135deg, var(--settings-accent), var(--settings-accent-2))',
+    '--settings-side-link-active-border': dark ? 'var(--border-hover)' : 'transparent',
+    '--settings-side-link-active-text': dark ? 'var(--sidebar-nav-text-active, #ffffff)' : '#ffffff',
+    '--settings-side-link-active-shadow': dark ? 'none' : '0 18px 34px rgba(47,109,246,0.26)',
+    '--settings-side-link-active-icon-bg': dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.14)',
+    '--settings-side-link-active-icon-border': dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.18)',
     '--settings-shadow': dark ? '0 28px 80px rgba(0,0,0,0.38)' : '0 22px 56px rgba(15,23,42,0.10)',
     '--settings-card-shadow': dark ? '0 18px 40px rgba(0,0,0,0.24)' : '0 14px 34px rgba(15,23,42,0.08)'
   }
@@ -242,28 +248,28 @@ function SettingsTopHeader({ title, subtitle, icon, rightSlot, leftSlot = null, 
   )
 }
 
-function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilterChange, searchValue, onSearchChange, openSettingsPage, todayLabel }) {
+function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilterChange, searchValue, onSearchChange, openSettingsPage, todayLabel, isMobile = false }) {
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
-      <section style={{ borderRadius: 28, border: '1px solid var(--settings-border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))', padding: 18, boxShadow: 'var(--settings-shadow)' }}>
+    <div style={{ display: 'grid', gap: isMobile ? 10 : 18 }}>
+      <section style={{ borderRadius: isMobile ? 18 : 28, border: '1px solid var(--settings-border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))', padding: isMobile ? 10 : 18, boxShadow: 'var(--settings-shadow)' }}>
         <style>{`
           .canteen-settings-home-search {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
-            gap: 14px;
+            gap: 10px;
             align-items: center;
-            padding: 14px;
-            border-radius: 22px;
+            padding: 10px;
+            border-radius: 18px;
             border: 1px solid var(--settings-border);
             background: rgba(255,255,255,0.02);
           }
           .canteen-settings-home-searchbox {
-            min-height: 56px;
+            min-height: 48px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 0 18px;
-            border-radius: 18px;
+            gap: 10px;
+            padding: 0 14px;
+            border-radius: 16px;
             border: 1px solid var(--settings-border);
             background: rgba(255,255,255,0.02);
           }
@@ -359,16 +365,39 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             .canteen-settings-home-chips { justify-content: flex-start; }
           }
           @media (max-width: 760px) {
+            .canteen-settings-home-search {
+              padding: 8px;
+              border-radius: 16px;
+            }
+            .canteen-settings-home-searchbox {
+              min-height: 44px;
+              padding: 0 12px;
+              border-radius: 14px;
+            }
+            .canteen-settings-home-chips {
+              gap: 6px;
+            }
+            .canteen-settings-home-chips button {
+              min-height: 36px;
+              padding: 0 13px;
+              font-size: 11.5px;
+            }
             .canteen-settings-home-grid { grid-template-columns: 1fr; }
             .canteen-settings-home-card {
               min-height: 0;
-              padding: 15px;
+              padding: 14px;
+              border-radius: 18px;
             }
             .canteen-settings-home-cardtop {
               margin-bottom: 12px;
             }
             .canteen-settings-home-link {
               margin-top: 14px;
+            }
+            .canteen-settings-home-empty {
+              margin-top: 12px;
+              padding: 14px;
+              border-radius: 16px;
             }
           }
         `}</style>
@@ -480,13 +509,18 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
           margin-top: 10px;
         }
         .canteen-settings-side-link.is-active {
-          background: linear-gradient(135deg, var(--settings-accent), var(--settings-accent-2));
-          border-color: transparent;
-          box-shadow: 0 18px 34px rgba(47,109,246,0.26);
+          background: var(--settings-side-link-active-bg) !important;
+          border-color: var(--settings-side-link-active-border) !important;
+          box-shadow: var(--settings-side-link-active-shadow) !important;
         }
+        .canteen-settings-side-link.is-active .canteen-settings-side-linkicon {
+          background: var(--settings-side-link-active-icon-bg) !important;
+          border-color: var(--settings-side-link-active-icon-border) !important;
+        }
+        .canteen-settings-side-link.is-active .canteen-settings-side-linktitle,
         .canteen-settings-side-link.is-active .canteen-settings-side-linkmeta,
         .canteen-settings-side-link.is-active .canteen-settings-side-linkarrow {
-          color: #ffffff;
+          color: var(--settings-side-link-active-text) !important;
         }
         .canteen-settings-side-linkmain {
           display: flex;
@@ -579,7 +613,7 @@ function MobileSettingsDetail({ current, items, onOpen, children }) {
   }, [current?.key])
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gap: 10 }}>
       <SettingsTopHeader
         title={current?.label || 'Ayarlar'}
         subtitle={current?.desc || 'Kantin ayarlarını düzenleyin'}
@@ -602,7 +636,7 @@ function MobileSettingsDetail({ current, items, onOpen, children }) {
       />
 
       {menuOpen ? (
-        <div style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 22, border: '1px solid var(--settings-border)', background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ display: 'grid', gap: 8, padding: 10, borderRadius: 18, border: '1px solid var(--settings-border)', background: 'rgba(255,255,255,0.02)' }}>
           {items.map((item) => {
             const active = item.key === current?.key
             return (
@@ -611,9 +645,9 @@ function MobileSettingsDetail({ current, items, onOpen, children }) {
                 type="button"
                 onClick={() => onOpen(item.path)}
                 style={{
-                  minHeight: 48,
-                  padding: '0 14px',
-                  borderRadius: 16,
+                  minHeight: 46,
+                  padding: '0 12px',
+                  borderRadius: 14,
                   textAlign: 'left',
                   display: 'flex',
                   alignItems: 'center',
@@ -634,7 +668,7 @@ function MobileSettingsDetail({ current, items, onOpen, children }) {
         </div>
       ) : null}
 
-      <section style={{ borderRadius: 22, border: '1px solid var(--settings-border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.008))', padding: 14 }}>
+      <section style={{ borderRadius: 18, border: '1px solid var(--settings-border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.008))', padding: 10 }}>
         {children}
       </section>
     </div>
@@ -698,13 +732,14 @@ export default function CanteenSettingsLayout() {
       onSearchChange={setSearchValue}
       openSettingsPage={(path) => navigate(path)}
       todayLabel={todayLabel}
+      isMobile={isMobilePortrait}
     />
   )
 
   const shellStyle = {
     ...buildSettingsThemeVars(theme),
     display: 'grid',
-    gap: 18,
+    gap: isMobilePortrait ? 10 : 18,
     padding: isMobilePortrait ? 0 : 12,
     borderRadius: isMobilePortrait ? 0 : 30,
     border: isMobilePortrait ? '0' : '1px solid var(--settings-border)',

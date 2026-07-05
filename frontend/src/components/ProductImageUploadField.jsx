@@ -7,7 +7,7 @@ import {
 } from '../lib/productImage.js'
 
 export default function ProductImageUploadField({
-  label = 'Görsel Yükle',
+  label = 'Gorsel Yukle',
   currentImageUrl = '',
   file = null,
   onFileChange,
@@ -15,8 +15,10 @@ export default function ProductImageUploadField({
   onRemoveExisting,
   disabled = false,
   helperText = 'JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, otomatik olarak 800x800 WebP optimize edilir.',
+  descriptionText = 'Yuklenen gorsel ilgili alanda gosterilmek uzere kaydedilir.',
   error = '',
-  existingSizeLabel = ''
+  existingSizeLabel = '',
+  compact = false
 }) {
   const inputId = useId()
   const [dragActive, setDragActive] = useState(false)
@@ -45,6 +47,24 @@ export default function ProductImageUploadField({
 
   const fileSizeLabel = file ? formatProductImageSize(file.size) : existingSizeLabel
   const previewSrc = previewFailed ? PRODUCT_PLACEHOLDER_SRC : displaySrc
+  const rootStyle = compact ? { gap: 6, padding: 10, borderRadius: 18 } : undefined
+  const dropzoneStyle = compact
+    ? {
+        display: 'grid',
+        gridTemplateColumns: '120px minmax(0, 1fr)',
+        alignItems: 'center',
+        justifyItems: 'stretch',
+        gap: 12,
+        padding: 10,
+        borderRadius: 16,
+        minHeight: 0,
+        textAlign: 'left'
+      }
+    : undefined
+  const previewStyle = compact ? { width: '120px', borderRadius: 16, justifySelf: 'start' } : undefined
+  const copyStyle = compact ? { alignContent: 'center', textAlign: 'left', minWidth: 0 } : undefined
+  const strongStyle = compact ? { fontSize: 12, lineHeight: 1.25 } : undefined
+  const textStyle = compact ? { fontSize: 11, lineHeight: 1.35 } : undefined
 
   const commitFile = (nextFile) => {
     if (!nextFile) return
@@ -53,7 +73,7 @@ export default function ProductImageUploadField({
   }
 
   return (
-    <div className={`product-image-upload${dragActive ? ' is-drag-active' : ''}${disabled ? ' is-disabled' : ''}`}>
+    <div className={`product-image-upload${dragActive ? ' is-drag-active' : ''}${disabled ? ' is-disabled' : ''}`} style={rootStyle}>
       <div className="product-image-upload__head">
         <div>
           <div className="product-image-upload__label">{label}</div>
@@ -65,6 +85,7 @@ export default function ProductImageUploadField({
       <label
         htmlFor={inputId}
         className="product-image-upload__dropzone"
+        style={dropzoneStyle}
         onDragOver={(event) => {
           event.preventDefault()
           if (!disabled) setDragActive(true)
@@ -88,10 +109,10 @@ export default function ProductImageUploadField({
             event.target.value = ''
           }}
         />
-        <div className="product-image-upload__preview">
+        <div className="product-image-upload__preview" style={previewStyle}>
           <img
             src={previewSrc}
-            alt="Ürün önizleme"
+            alt="Urun onizleme"
             onError={(event) => {
               if (event.currentTarget.src.endsWith(PRODUCT_PLACEHOLDER_SRC)) return
               setPreviewFailed(true)
@@ -99,24 +120,24 @@ export default function ProductImageUploadField({
             }}
           />
         </div>
-        <div className="product-image-upload__copy">
-          <strong>Dosya seç veya sürükle bırak</strong>
-          <span>Ürün kartı görünümü değişmez, sadece görsel dosya olarak saklanır.</span>
+        <div className="product-image-upload__copy" style={copyStyle}>
+          <strong style={strongStyle}>Dosya sec veya surukle birak</strong>
+          <span style={textStyle}>{descriptionText}</span>
         </div>
       </label>
 
       <div className="product-image-upload__actions">
         <label htmlFor={inputId} className="product-secondary-btn" aria-disabled={disabled ? 'true' : 'false'}>
-          Dosya Seç
+          Dosya Sec
         </label>
         {file ? (
           <button type="button" className="product-secondary-btn" onClick={() => onClearFile?.()} disabled={disabled}>
-            Seçimi Temizle
+            Secimi Temizle
           </button>
         ) : null}
         {!file && currentImageUrl ? (
           <button type="button" className="product-secondary-btn" onClick={() => onRemoveExisting?.()} disabled={disabled || typeof onRemoveExisting !== 'function'}>
-            Görseli Kaldır
+            Gorseli Kaldir
           </button>
         ) : null}
       </div>

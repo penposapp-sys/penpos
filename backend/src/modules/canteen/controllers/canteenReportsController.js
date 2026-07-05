@@ -41,6 +41,15 @@ export const zReport = async (req, res) => {
   }
 }
 
+export const cashReport = async (req, res) => {
+  try {
+    const report = await service.cashReport(req.user.tenantId, req.canteenBranchIds || [], req.query || {})
+    res.json({ success: true, ok: true, ...report })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 const ymdToTr = (ymd) => {
   const s = String(ymd || '').trim()
   const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s)

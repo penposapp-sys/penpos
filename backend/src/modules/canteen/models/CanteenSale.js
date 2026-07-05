@@ -8,6 +8,8 @@ const itemSchema = new mongoose.Schema({
   lineTotal: { type: Number, required: true },
   vatRate: { type: Number, default: 0 },
   vatIncluded: { type: Boolean, default: true },
+  batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'CanteenProductBatch', default: null },
+  batchSourcePrice: { type: Number, default: 0 },
   note: { type: String, default: '' }
 }, { _id: false })
 

@@ -12,7 +12,7 @@ function syncBodyModalState(nextOpen) {
   else document.body.classList.remove('modal-open')
 }
 
-export default function Modal({ open, onClose, title, children, backdropClose = false, dialogStyle = null, bodyStyle = null }) {
+export default function Modal({ open, onClose, title, children, backdropClose = false, dialogStyle = null, bodyStyle = null, portalSelector = '' }) {
   useEffect(() => {
     if (!open) return undefined
     syncBodyModalState(true)
@@ -36,6 +36,12 @@ export default function Modal({ open, onClose, title, children, backdropClose = 
   }, [open])
 
   if (!open || typeof document === 'undefined') return null
+
+  const portalTarget = (() => {
+    const selector = String(portalSelector || '').trim()
+    if (!selector) return document.body
+    return document.querySelector(selector) || document.body
+  })()
 
   return createPortal(
     <div
@@ -65,11 +71,11 @@ export default function Modal({ open, onClose, title, children, backdropClose = 
       >
         <div className="modalHeader" style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--border-soft)', background: 'linear-gradient(135deg, color-mix(in srgb, var(--app-surface, var(--panel)) 78%, transparent), color-mix(in srgb, var(--app-surface-soft, var(--panelElevated)) 84%, transparent))', backdropFilter: 'var(--glass-blur)', position: 'sticky', top: 0, zIndex: 2 }}>
           <h3 className="modalTitle" style={{ fontSize: 24, fontWeight: 950, color: 'var(--app-text, var(--text))' }}>{title}</h3>
-          <button className="btn btn--compact" onClick={onClose} style={{ borderRadius: 16, fontWeight: 900 }}>Kapat</button>
+          <button className="btn btn--compact modalCloseButton" onClick={onClose} style={{ borderRadius: 16, fontWeight: 900 }}>Kapat</button>
         </div>
         <div className="modalBody app-modal-body scrollbar-hidden" style={{ padding: 22, ...(bodyStyle || {}) }}>{children}</div>
       </div>
     </div>,
-    document.body
+    portalTarget
   )
 }

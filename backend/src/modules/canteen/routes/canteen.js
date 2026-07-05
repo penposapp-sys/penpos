@@ -168,6 +168,7 @@ router.delete('/products/:id/image', canteenBranchQueryGuard, requireRole(['tena
 router.delete('/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProduct)
 
 router.post('/sales', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_POS_ACCESS]), salesCtrl.create)
+router.post('/sales/preview', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_POS_ACCESS]), salesCtrl.preview)
 router.get('/sales/completed', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.listCompleted)
 router.post('/sales/:id/reopen', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.reopen)
 router.get('/sales/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_CUSTOMERS_VIEW, PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE, PERMISSIONS.CANTEEN_POS_ACCESS, PERMISSIONS.CANTEEN_SALES_VIEW, PERMISSIONS.CANTEEN_REPORTS_VIEW]), salesCtrl.get)
@@ -194,6 +195,7 @@ router.get('/reports/summary', canteenBranchListGuard, requireRole(['tenant_admi
 router.get('/reports/products', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.products)
 router.get('/reports/customers', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.customers)
 router.get('/reports/z-report', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.zReport)
+router.get('/reports/cash', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.cashReport)
 router.get('/reports/export', canteenBranchListGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission([PERMISSIONS.CANTEEN_REPORTS_EXPORT, PERMISSIONS.CANTEEN_REPORTS_VIEW]), reportsCtrl.exportAll)
 
 router.get(
@@ -238,6 +240,13 @@ router.post(
   requireRole(['tenant_admin', 'staff']),
   requireAnyPermission([PERMISSIONS.CANTEEN_STOCK_MANAGE, PERMISSIONS.MANAGE_SETTINGS]),
   stockCtrl.createMovement
+)
+router.post(
+  '/stock/receipts',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_STOCK_MANAGE, PERMISSIONS.MANAGE_SETTINGS]),
+  stockCtrl.createReceipt
 )
 router.get(
   '/stock/movements',
@@ -288,6 +297,13 @@ router.post(
   requireRole(['tenant_admin', 'staff']),
   requireAnyPermission([PERMISSIONS.CANTEEN_STOCK_COUNT, PERMISSIONS.MANAGE_SETTINGS]),
   stockCtrl.finishCount
+)
+router.post(
+  '/stock-counts/:sessionId/cancel',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_STOCK_COUNT, PERMISSIONS.MANAGE_SETTINGS]),
+  stockCtrl.cancelCount
 )
 router.put(
   '/stock-counts/:sessionId/items/:itemId',

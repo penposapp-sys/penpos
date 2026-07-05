@@ -2,8 +2,10 @@ import mongoose from 'mongoose'
 import { getLocalRangeExclusive } from '../../../utils/dateRange.js'
 import CanteenSale from '../models/CanteenSale.js'
 import CanteenBranch from '../models/CanteenBranch.js'
+import CanteenCustomer from '../models/CanteenCustomer.js'
 import CanteenTenantSettings from '../models/CanteenTenantSettings.js'
 import CanteenProduct from '../models/CanteenProduct.js'
+import CanteenStockMovement from '../models/StockMovement.js'
 import * as customerRepo from '../repositories/canteenCustomerRepository.js'
 import * as saleRepo from '../repositories/canteenSaleRepository.js'
 import * as collectionRepo from '../repositories/canteenCustomerCollectionRepository.js'
@@ -393,6 +395,327 @@ const isCashInCollection = (collection = {}) => {
   if (!isReportableCollection(collection)) return false
   const key = String(collection?.method || '').trim().toLocaleLowerCase('tr-TR')
   return key !== 'discount' && key !== 'indirim'
+}
+
+const buildCashMovementDescription = (sale = {}, barcodeMap = new Map()) => {
+  const items = Array.isArray(sale?.items) ? sale.items : []
+  const itemNames = items
+    .map((item) => String(item?.name || '').trim())
+    .filter(Boolean)
+  const uniqueNames = Array.from(new Set(itemNames))
+  const firstNames = uniqueNames.slice(0, 2)
+  const moreCount = Math.max(0, uniqueNames.length - firstNames.length)
+  const itemSummary = firstNames.length > 0
+    ? `${firstNames.join(', ')}${moreCount > 0 ? ` +${moreCount}` : ''}`
+    : 'Satis islemi'
+  const note = String(sale?.note || '').trim()
+  const barcode = Array.from(new Set(
+    items
+      .map((item) => barcodeMap.get(String(item?.productId || '')))
+      .filter(Boolean)
+  )).slice(0, 3).join(', ')
+
+  return {
+    description: note ? `${itemSummary} - ${note}` : itemSummary,
+    barcode: barcode || '-'
+  }
+}
+
+const isStockCountMovementNote = (note = '') => String(note || '').trim().toLowerCase().startsWith('stock_count:')
+
+const resolveStockMovementAmount = (movement = {}, productMap = new Map()) => {
+  const directAmount = Number(movement?.totalAmount || 0)
+  if (directAmount > 0) return roundMoney(directAmount)
+  const product = productMap.get(String(movement?.productId || '')) || {}
+  const unitCost = Number(movement?.unitCost || product?.costPrice || 0)
+  const deltaQty = movement?.deltaQty === null || movement?.deltaQty === undefined
+    ? null
+    : Number(movement?.deltaQty || 0)
+  if (deltaQty !== null) return roundMoney(Math.abs(deltaQty) * unitCost)
+  return roundMoney(Math.abs(Number(movement?.qty || 0)) * unitCost)
+}
+
+const resolveStockMovementCashEffect = (movement = {}) => {
+  const direct = String(movement?.cashEffect || '').trim().toLowerCase()
+  if (direct === 'income' || direct === 'expense') return direct
+  const type = String(movement?.type || '').trim().toLowerCase()
+  if (type === 'in') return 'expense'
+  if (type === 'adjust' && isStockCountMovementNote(movement?.note)) {
+    const deltaQty = movement?.deltaQty === null || movement?.deltaQty === undefined
+      ? null
+      : Number(movement?.deltaQty || 0)
+    if (deltaQty !== null) {
+      if (deltaQty < -0.0001) return 'expense'
+      if (deltaQty > 0.0001) return 'income'
+    }
+  }
+  return ''
+}
+
+const resolveStockMovementReason = (movement = {}) => {
+  const type = String(movement?.type || '').trim().toLowerCase()
+  if (type === 'in') return 'Urun Girisi'
+  if (type === 'adjust' && isStockCountMovementNote(movement?.note)) {
+    const deltaQty = movement?.deltaQty === null || movement?.deltaQty === undefined
+      ? null
+      : Number(movement?.deltaQty || 0)
+    if (deltaQty !== null && deltaQty < -0.0001) return 'Sayim Eksigi'
+    if (deltaQty !== null && deltaQty > 0.0001) return 'Sayim Fazlasi'
+    return 'Sayim Duzeltmesi'
+  }
+  return ''
+}
+
+const normalizeCashMethodFilter = (value) => {
+  const raw = String(value || 'all').trim().toLocaleLowerCase('tr-TR')
+  if (['all', 'cash', 'pos', 'bank', 'sales', 'collection', 'stock'].includes(raw)) return raw
+  return 'all'
+}
+
+const normalizeCashMovementType = (value) => {
+  const raw = String(value || 'all').trim().toLocaleLowerCase('tr-TR')
+  if (['all', 'income', 'expense'].includes(raw)) return raw
+  return 'all'
+}
+
+const matchesCashFilter = ({ movementType, filterType, source, methodId, rowType = 'income' }) => {
+  const normalizedSource = String(source || '').trim().toLocaleLowerCase('tr-TR')
+  const normalizedMethod = String(methodId || '').trim().toLocaleLowerCase('tr-TR')
+  if (filterType === 'sales' && normalizedSource !== 'sale') return false
+  if (filterType === 'collection' && normalizedSource !== 'collection') return false
+  if (filterType === 'stock' && normalizedSource !== 'stock') return false
+  if (['cash', 'pos', 'bank'].includes(filterType) && normalizedMethod !== filterType) return false
+  if (movementType === 'income' && rowType === 'expense') return false
+  if (movementType === 'expense' && rowType !== 'expense') return false
+  return true
+}
+
+const toTimeStringTr = (value) => {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+}
+
+export const cashReport = async (tenantId, branchIds, query = {}) => {
+  const { from, to, startYmd, endYmd } = buildDateRangeForZReport(query)
+  const allowedIds = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
+  const requestedIds = parseBranchIds(query?.branchId, query?.branchIds)
+  const finalBranchIds = requestedIds.length > 0
+    ? requestedIds.filter((id) => allowedIds.includes(String(id)))
+    : allowedIds
+
+  if (finalBranchIds.length === 0) {
+    const err = new Error('Branch not allowed')
+    err.status = 403
+    err.payload = { error: 'branch_not_allowed', code: 'branch_not_allowed', message: 'Branch not allowed' }
+    throw err
+  }
+
+  const movementType = normalizeCashMovementType(query?.movementType)
+  const filterType = normalizeCashMethodFilter(query?.filterType)
+  const branchObjectIds = finalBranchIds.map((id) => new mongoose.Types.ObjectId(id))
+  const saleMatch = {
+    tenantId: new mongoose.Types.ObjectId(tenantId),
+    branchId: { $in: branchObjectIds },
+    isActive: true,
+    $or: [{ status: { $exists: false } }, { status: { $in: ['completed', 'closed'] } }, { status: null }],
+    createdAt: { $gte: from, $lt: to }
+  }
+
+  const [sales, collections, branches, stockMovements] = await Promise.all([
+    CanteenSale.find(saleMatch)
+      .select({
+        branchId: 1,
+        customerId: 1,
+        items: 1,
+        total: 1,
+        payment: 1,
+        note: 1,
+        createdAt: 1
+      })
+      .sort({ createdAt: -1 })
+      .lean(),
+    collectionRepo.listRangeByTenantAndBranches(tenantId, finalBranchIds, from, to),
+    CanteenBranch.find({ tenantId, _id: { $in: branchObjectIds } }).select({ _id: 1, name: 1 }).lean(),
+    CanteenStockMovement.find({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      branchId: { $in: branchObjectIds },
+      createdAt: { $gte: from, $lt: to }
+    })
+      .select({
+        branchId: 1,
+        productId: 1,
+        productName: 1,
+        barcode: 1,
+        type: 1,
+        qty: 1,
+        previousQty: 1,
+        deltaQty: 1,
+        unitCost: 1,
+        totalAmount: 1,
+        cashEffect: 1,
+        note: 1,
+        createdAt: 1
+      })
+      .sort({ createdAt: -1 })
+      .lean()
+  ])
+
+  const productIds = Array.from(new Set(
+    [
+      ...(sales || [])
+      .flatMap((sale) => Array.isArray(sale?.items) ? sale.items : [])
+      .map((item) => String(item?.productId || ''))
+      .filter((id) => mongoose.Types.ObjectId.isValid(id)),
+      ...(stockMovements || [])
+        .map((movement) => String(movement?.productId || ''))
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    ]
+  ))
+  const customerIds = Array.from(new Set(
+    (collections || [])
+      .map((collection) => String(collection?.customerId || ''))
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+  ))
+
+  const [products, customers] = await Promise.all([
+    productIds.length > 0
+      ? CanteenProduct.find({ tenantId, _id: { $in: productIds } }).select({ _id: 1, barcode: 1, name: 1, costPrice: 1 }).lean()
+      : [],
+    customerIds.length > 0
+      ? CanteenCustomer.find({ tenantId, _id: { $in: customerIds } }).select({ _id: 1, name: 1 }).lean()
+      : []
+  ])
+
+  const barcodeMap = new Map((products || []).map((product) => [String(product._id), String(product.barcode || '').trim()]))
+  const productMap = new Map((products || []).map((product) => [String(product._id), product]))
+  const customerMap = new Map((customers || []).map((customer) => [String(customer._id), String(customer.name || '').trim()]))
+  const branchMap = new Map((branches || []).map((branch) => [String(branch._id), String(branch.name || '').trim()]))
+
+  const rows = []
+  let incomeTotal = 0
+  let expenseTotal = 0
+
+  for (const sale of sales || []) {
+    const payment = sale?.payment || {}
+    const bucket = classifyPaymentBucket(payment)
+    if (bucket === 'credit') continue
+
+    const normalized = normalizePaymentMethod({
+      methodId: payment?.method,
+      methodName: payment?.methodName,
+      methodType: payment?.methodType
+    })
+    const methodId = String(normalized.methodId || payment?.method || '').trim().toLocaleLowerCase('tr-TR')
+    if (!matchesCashFilter({ movementType, filterType, source: 'sale', methodId, rowType: 'income' })) continue
+
+    const amount = roundMoney(sale?.total || 0)
+    if (amount <= 0) continue
+    incomeTotal += amount
+
+    const details = buildCashMovementDescription(sale, barcodeMap)
+    rows.push({
+      id: `sale:${String(sale?._id || '')}`,
+      createdAt: sale?.createdAt ? new Date(sale.createdAt).toISOString() : null,
+      date: sale?.createdAt ? new Date(sale.createdAt).toLocaleDateString('tr-TR') : '',
+      time: toTimeStringTr(sale?.createdAt),
+      type: 'Gelir',
+      source: 'sale',
+      reason: 'Satis Geliri',
+      description: details.description,
+      amount,
+      methodId,
+      methodName: toReportPaymentName(payment),
+      branchName: String(branchMap.get(String(sale?.branchId || '')) || ''),
+      barcode: details.barcode
+    })
+  }
+
+  for (const collection of collections || []) {
+    const methodKey = String(collection?.method || '').trim().toLocaleLowerCase('tr-TR')
+    if (!['cash', 'pos', 'bank'].includes(methodKey)) continue
+
+    const direction = String(collection?.direction || 'credit').trim().toLocaleLowerCase('tr-TR')
+    const type = direction === 'debit' ? 'Gider' : 'Gelir'
+    if (!matchesCashFilter({ movementType, filterType, source: 'collection', methodId: methodKey, rowType: direction === 'debit' ? 'expense' : 'income' })) continue
+
+    const amount = roundMoney(collection?.amount || 0)
+    if (amount <= 0) continue
+    if (direction === 'debit') expenseTotal += amount
+    else incomeTotal += amount
+
+    const customerName = String(customerMap.get(String(collection?.customerId || '')) || 'Cari')
+    const note = String(collection?.note || '').trim()
+    rows.push({
+      id: `collection:${String(collection?._id || '')}`,
+      createdAt: collection?.createdAt ? new Date(collection.createdAt).toISOString() : null,
+      date: collection?.createdAt ? new Date(collection.createdAt).toLocaleDateString('tr-TR') : '',
+      time: toTimeStringTr(collection?.createdAt),
+      type,
+      source: 'collection',
+      reason: direction === 'debit' ? 'Cari Cikis Hareketi' : 'Cari Tahsilati',
+      description: note ? `${customerName} - ${note}` : customerName,
+      amount,
+      methodId: methodKey,
+      methodName: mapCollectionMethodName(collection?.method),
+      branchName: String(branchMap.get(String(collection?.branchId || '')) || ''),
+      barcode: '-'
+    })
+  }
+
+  for (const movement of stockMovements || []) {
+    const cashEffect = resolveStockMovementCashEffect(movement)
+    if (!cashEffect) continue
+
+    const rowType = cashEffect === 'expense' ? 'expense' : 'income'
+    const methodId = 'stock'
+    if (!matchesCashFilter({ movementType, filterType, source: 'stock', methodId, rowType })) continue
+
+    const amount = resolveStockMovementAmount(movement, productMap)
+    if (amount <= 0) continue
+    if (cashEffect === 'expense') expenseTotal += amount
+    else incomeTotal += amount
+
+    rows.push({
+      id: `stock:${String(movement?._id || '')}`,
+      createdAt: movement?.createdAt ? new Date(movement.createdAt).toISOString() : null,
+      date: movement?.createdAt ? new Date(movement.createdAt).toLocaleDateString('tr-TR') : '',
+      time: toTimeStringTr(movement?.createdAt),
+      type: cashEffect === 'expense' ? 'Gider' : 'Gelir',
+      source: 'stock',
+      reason: resolveStockMovementReason(movement) || 'Stok Hareketi',
+      description: String(movement?.productName || productMap.get(String(movement?.productId || ''))?.name || 'Urun'),
+      amount,
+      methodId,
+      methodName: 'Stok Maliyeti',
+      branchName: String(branchMap.get(String(movement?.branchId || '')) || ''),
+      barcode: String(movement?.barcode || productMap.get(String(movement?.productId || ''))?.barcode || '-')
+    })
+  }
+
+  rows.sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return bTime - aTime
+  })
+
+  return {
+    dateRange: {
+      start: startYmd,
+      end: endYmd
+    },
+    filters: {
+      movementType,
+      filterType
+    },
+    summary: {
+      incomeTotal: roundMoney(incomeTotal),
+      expenseTotal: roundMoney(expenseTotal),
+      netTotal: roundMoney(incomeTotal - expenseTotal),
+      count: rows.length
+    },
+    rows
+  }
 }
 
 export const zReport = async (tenantId, branchIds, query = {}) => {

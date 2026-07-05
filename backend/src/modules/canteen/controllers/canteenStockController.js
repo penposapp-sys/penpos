@@ -19,6 +19,15 @@ export const listMovements = async (req, res) => {
   }
 }
 
+export const createReceipt = async (req, res) => {
+  try {
+    const result = await service.createReceipt(req.user.tenantId, req.canteenBranchId, req.user.id, req.body || {})
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const startCount = async (req, res) => {
   try {
     const result = await service.startStockCount(req.user.tenantId, req.canteenBranchId, req.user.id)
@@ -50,6 +59,15 @@ export const finishCount = async (req, res) => {
   try {
     const summary = await service.finishStockCount(req.user.tenantId, req.canteenBranchId, req.user.id, req.params.sessionId)
     res.json({ success: true, summary })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const cancelCount = async (req, res) => {
+  try {
+    const result = await service.cancelStockCount(req.user.tenantId, req.canteenBranchId, req.user.id, req.params.sessionId)
+    res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)
   }

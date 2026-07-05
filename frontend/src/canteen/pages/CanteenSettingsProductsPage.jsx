@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { Suspense } from 'react'
 import ProductImageUploadField from '../../components/ProductImageUploadField.jsx'
 import { api } from '../../lib/apiClient.js'
 import { optimizeProductImageForUpload, resolveProductImageUrl } from '../../lib/productImage.js'
@@ -9,6 +10,9 @@ import CanteenBulkProductsExcelCard from '../components/CanteenBulkProductsExcel
 import { PRODUCT_PLACEHOLDER } from '../components/CanteenQrPreview.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { useRef } from 'react'
+const LazyCanteenStockWorkspace = React.lazy(() =>
+  import('./CanteenStockPage.jsx').then((module) => ({ default: module.CanteenStockWorkspace }))
+)
 
 const normalize = (value) => String(value || '').toLowerCase().trim()
 const hasValue = (value) => String(value ?? '').trim() !== ''
@@ -55,10 +59,11 @@ export default function CanteenSettingsProductsPage() {
   const [imageFile, setImageFile] = useState(null)
   const [imageError, setImageError] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [vatRate, setVatRate] = useState('20')
+  const [vatRate, setVatRate] = useState('0')
   const [vatIncluded, setVatIncluded] = useState(true)
   const [stockTrackingEnabled, setStockTrackingEnabled] = useState(false)
   const [stockQty, setStockQty] = useState('')
+  const [minimumStock, setMinimumStock] = useState('5')
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [q, setQ] = useState('')
   const [error, setError] = useState('')
@@ -67,7 +72,8 @@ export default function CanteenSettingsProductsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState([])
   const [createOpen, setCreateOpen] = useState(false)
-
+  const [stockModalOpen, setStockModalOpen] = useState(false)
+  const [stockWorkspaceRefreshKey, setStockWorkspaceRefreshKey] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
@@ -82,8 +88,10 @@ export default function CanteenSettingsProductsPage() {
   const [editVatIncluded, setEditVatIncluded] = useState(true)
   const [editStockTrackingEnabled, setEditStockTrackingEnabled] = useState(false)
   const [editStockQty, setEditStockQty] = useState('')
+  const [editMinimumStock, setEditMinimumStock] = useState('5')
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const [categoryBrowserOpen, setCategoryBrowserOpen] = useState(false)
   const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY_FORM)
   const [categoryImageFile, setCategoryImageFile] = useState(null)
   const [categoryImageError, setCategoryImageError] = useState('')
@@ -221,7 +229,7 @@ export default function CanteenSettingsProductsPage() {
     Number.isFinite(parseLocaleNumber(sellPrice)) &&
     parseLocaleNumber(sellPrice) >= 0
 
-  const resetCreateForm = () => {
+  const resetCreateForm = ({ nextVatRate = '0' } = {}) => {
     setName('')
     setBarcode('')
     setBuyPrice('')
@@ -229,10 +237,21 @@ export default function CanteenSettingsProductsPage() {
     setImageFile(null)
     setImageError('')
     setCategoryId('')
-    setVatRate('20')
+    setVatRate(String(nextVatRate))
     setVatIncluded(true)
     setStockTrackingEnabled(false)
     setStockQty('')
+    setMinimumStock('5')
+  }
+
+  const openCreateModal = () => {
+    resetCreateForm({ nextVatRate: '0' })
+    setCreateOpen(true)
+  }
+
+  const closeCreateModal = () => {
+    setCreateOpen(false)
+    resetCreateForm({ nextVatRate: '0' })
   }
 
   const uploadProductImage = async (productId, file, branchId) => {
@@ -297,7 +316,8 @@ export default function CanteenSettingsProductsPage() {
         vatIncluded,
         categoryId: String(categoryId || '').trim() || null,
         stockTrackingEnabled: stockTrackingEnabled === true,
-        stockQty: Number(String(stockQty || '').replace(',', '.')) || 0
+        stockQty: Number(String(stockQty || '').replace(',', '.')) || 0,
+        minimumStock: Number(String(minimumStock || '').replace(',', '.')) || 0
       },
       silent: true
     })
@@ -317,7 +337,7 @@ export default function CanteenSettingsProductsPage() {
       }
     }
 
-    resetCreateForm()
+    resetCreateForm({ nextVatRate: vatRate })
     load(branchId)
     toast.success('Ürün eklendi')
     setTimeout(() => {
@@ -340,6 +360,7 @@ export default function CanteenSettingsProductsPage() {
     setEditVatIncluded(item?.vatIncluded !== false)
     setEditStockTrackingEnabled(item?.stockTrackingEnabled === true)
     setEditStockQty(String(item?.stockQty ?? ''))
+    setEditMinimumStock(String(item?.minimumStock ?? '5'))
     setEditOpen(true)
   }
 
@@ -373,7 +394,8 @@ export default function CanteenSettingsProductsPage() {
         vatIncluded: editVatIncluded,
         categoryId: String(editCategoryId || '').trim() || null,
         stockTrackingEnabled: editStockTrackingEnabled === true,
-        stockQty: Number.isFinite(nextStock) ? nextStock : 0
+        stockQty: Number.isFinite(nextStock) ? nextStock : 0,
+        minimumStock: Number(String(editMinimumStock || '').replace(',', '.')) || 0
       },
       silent: true
     })
@@ -395,7 +417,8 @@ export default function CanteenSettingsProductsPage() {
 
     toast.success('Ürün güncellendi')
     setEditOpen(false)
-    load(branchId)
+    await load(branchId)
+    setStockWorkspaceRefreshKey((value) => value + 1)
   }
 
   const removeEditImage = async () => {
@@ -432,6 +455,7 @@ export default function CanteenSettingsProductsPage() {
   }
 
   const openNewCategory = () => {
+    setCategoryBrowserOpen(false)
     setCategoryForm(EMPTY_CATEGORY_FORM)
     setCategoryImageFile(null)
     setCategoryImageError('')
@@ -439,6 +463,7 @@ export default function CanteenSettingsProductsPage() {
   }
 
   const openEditCategory = (category) => {
+    setCategoryBrowserOpen(false)
     setCategoryForm({
       id: String(category?.id || ''),
       name: String(category?.name || ''),
@@ -450,6 +475,10 @@ export default function CanteenSettingsProductsPage() {
     setCategoryImageFile(null)
     setCategoryImageError('')
     setCategoryModalOpen(true)
+  }
+
+  const openCategoryBrowser = () => {
+    setCategoryBrowserOpen(true)
   }
 
   const uploadCategoryImage = async (categoryIdToUpload, file, branchId) => {
@@ -642,6 +671,15 @@ export default function CanteenSettingsProductsPage() {
   return (
     <div className="canteen-settings-products-page" style={{ display: 'grid', gap: 12 }}>
       <style>{`
+        .canteen-settings-products-page {
+          --canteen-products-panel-bg: var(--card-bg);
+          --canteen-products-control-bg: var(--app-input, var(--app-surface, var(--panel)));
+          --canteen-products-item-bg: color-mix(in srgb, var(--app-surface, var(--panel)) 88%, var(--app-surface-soft, var(--panelElevated)) 12%);
+          --canteen-products-pill-bg: color-mix(in srgb, var(--app-surface-soft, var(--panelElevated)) 82%, var(--app-surface, var(--panel)) 18%);
+          --canteen-products-thumb-bg: color-mix(in srgb, var(--app-surface-3, var(--app-surface-soft, var(--panelElevated))) 74%, var(--app-surface, var(--panel)) 26%);
+          --canteen-products-toggle-bg: color-mix(in srgb, var(--app-surface-3, var(--app-surface-soft, var(--panelElevated))) 70%, var(--app-surface, var(--panel)) 30%);
+          --canteen-products-toggle-on-bg: var(--settings-button-bg, var(--menu-active-bg, var(--app-surface-3, #111827)));
+        }
         .canteen-settings-products-page .card {
           background: linear-gradient(180deg, var(--app-surface), var(--app-surface-soft, var(--panelElevated))) !important;
           color: var(--app-text) !important;
@@ -673,7 +711,7 @@ export default function CanteenSettingsProductsPage() {
           padding: 16px;
           border-radius: 28px;
           border: 1px solid var(--app-border, var(--border));
-          background: linear-gradient(180deg, rgba(255,255,255,0.48), rgba(255,255,255,0.18));
+          background: var(--canteen-products-panel-bg);
           box-shadow: 0 20px 48px rgba(15,23,42,0.08);
         }
         .canteen-products-toolbar-top,
@@ -694,7 +732,8 @@ export default function CanteenSettingsProductsPage() {
           border-radius: 999px;
           padding: 0 16px;
           border: 1px solid var(--app-border, var(--border));
-          background: rgba(255,255,255,0.72);
+          background: var(--canteen-products-control-bg);
+          color: var(--app-text, var(--text));
           font: inherit;
         }
         .canteen-products-action-btn,
@@ -704,7 +743,8 @@ export default function CanteenSettingsProductsPage() {
           border-radius: 999px;
           padding: 0 18px;
           border: 1px solid var(--app-border, var(--border));
-          background: rgba(255,255,255,0.72);
+          background: var(--canteen-products-control-bg);
+          color: var(--app-text, var(--text));
           font: inherit;
           font-weight: 800;
         }
@@ -719,7 +759,8 @@ export default function CanteenSettingsProductsPage() {
           height: 38px;
           border-radius: 999px;
           border: 1px solid var(--app-border, var(--border));
-          background: rgba(255,255,255,0.72);
+          background: var(--canteen-products-control-bg);
+          color: var(--app-text, var(--text));
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -743,7 +784,7 @@ export default function CanteenSettingsProductsPage() {
           padding: 12px 16px;
           border-radius: 24px;
           border: 1px solid var(--app-border, var(--border));
-          background: rgba(255,255,255,0.76);
+          background: var(--canteen-products-item-bg);
         }
         .canteen-product-list-media img,
         .canteen-product-card-grid-thumb img {
@@ -752,7 +793,7 @@ export default function CanteenSettingsProductsPage() {
           object-fit: cover;
           border-radius: 18px;
           display: block;
-          background: #f3f4f6;
+          background: var(--canteen-products-thumb-bg);
         }
         .canteen-product-list-media {
           width: 58px;
@@ -778,7 +819,7 @@ export default function CanteenSettingsProductsPage() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          background: #f3f4f6;
+          background: var(--canteen-products-pill-bg);
           font-weight: 900;
         }
         .canteen-product-list-toggle {
@@ -791,12 +832,12 @@ export default function CanteenSettingsProductsPage() {
           width: 26px;
           height: 26px;
           border-radius: 999px;
-          background: #e5e7eb;
+          background: var(--canteen-products-toggle-bg);
           border: 1px solid var(--app-border, var(--border));
           display: inline-block;
         }
         .canteen-toggle-dot.is-on {
-          background: #111827;
+          background: var(--canteen-products-toggle-on-bg);
         }
         .canteen-product-list-actions,
         .canteen-product-card-grid-actions,
@@ -813,6 +854,46 @@ export default function CanteenSettingsProductsPage() {
         .canteen-product-list-actions .btn {
           min-width: 0;
           white-space: nowrap;
+        }
+        .canteen-edit-image-field .product-image-upload {
+          gap: 6px;
+          padding: 10px;
+          border-radius: 18px;
+        }
+        .canteen-edit-image-field .product-image-upload__head {
+          gap: 8px;
+        }
+        .canteen-edit-image-field .product-image-upload__dropzone {
+          display: grid;
+          grid-template-columns: 112px minmax(0, 1fr);
+          align-items: center;
+          justify-items: stretch;
+          gap: 10px;
+          padding: 10px;
+          min-height: 0;
+          text-align: left;
+        }
+        .canteen-edit-image-field .product-image-upload__preview {
+          width: 112px;
+          border-radius: 16px;
+          justify-self: start;
+        }
+        .canteen-edit-image-field .product-image-upload__copy {
+          align-content: center;
+          text-align: left;
+          min-width: 0;
+          gap: 4px;
+        }
+        .canteen-edit-image-field .product-image-upload__copy strong {
+          font-size: 12px;
+          line-height: 1.25;
+        }
+        .canteen-edit-image-field .product-image-upload__copy span {
+          font-size: 11px;
+          line-height: 1.35;
+        }
+        .canteen-edit-image-field .product-image-upload__actions {
+          gap: 6px;
         }
         @media (max-width: 1280px) {
           .canteen-product-list-row {
@@ -912,7 +993,7 @@ export default function CanteenSettingsProductsPage() {
           padding: 18px;
           border: 1px solid var(--app-border, var(--border));
           border-radius: 24px;
-          background: rgba(255,255,255,0.7);
+          background: var(--canteen-products-item-bg);
         }
         .canteen-create-modal-row {
           display: grid;
@@ -952,7 +1033,7 @@ export default function CanteenSettingsProductsPage() {
           padding: 16px;
           border-radius: 24px;
           border: 1px solid var(--app-border, var(--border));
-          background: rgba(255,255,255,0.78);
+          background: var(--canteen-products-item-bg);
         }
         .canteen-product-card-grid-thumb {
           width: 72px;
@@ -964,7 +1045,7 @@ export default function CanteenSettingsProductsPage() {
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
-          background: #f3f4f6;
+          background: var(--canteen-products-pill-bg);
           font-weight: 900;
         }
         @media (max-width: 768px) {
@@ -1108,10 +1189,13 @@ export default function CanteenSettingsProductsPage() {
             <button className="canteen-products-action-btn" type="button" onClick={() => load(selectedBranchId)} disabled={loading}>Yenile</button>
           </div>
           <div className="canteen-products-toolbar-actions">
+            <button className="canteen-products-action-btn" type="button" onClick={() => setStockModalOpen(true)} disabled={!selectedBranchId}>
+              Stoklar
+            </button>
             <button
               className="canteen-products-action-btn"
               type="button"
-              onClick={() => setCreateOpen(true)}
+              onClick={openCreateModal}
               disabled={!canManage}
             >
               + Yeni Ürün Ekle
@@ -1167,8 +1251,64 @@ export default function CanteenSettingsProductsPage() {
       </div>
 
       <Modal
+        open={stockModalOpen}
+        onClose={() => setStockModalOpen(false)}
+        title="Stoklar"
+        dialogStyle={{ width: 'min(1240px, calc(100vw - 24px))', maxHeight: 'calc(100dvh - 20px)' }}
+        bodyStyle={{ padding: 18 }}
+      >
+        <Suspense fallback={<div style={{ color: 'var(--muted)', padding: 12 }}>Stok ekranı yükleniyor...</div>}>
+          <LazyCanteenStockWorkspace
+            me={me}
+            controlledBranchId={selectedBranchId}
+            showBranchSelector={false}
+            embedded
+            refreshToken={stockWorkspaceRefreshKey}
+            onCreateProduct={openCreateModal}
+            onEditProduct={openEdit}
+            onDeleteProduct={(item) => remove(item?.id)}
+            onOpenCategories={openCategoryBrowser}
+          />
+        </Suspense>
+      </Modal>
+      <Modal
+        open={categoryBrowserOpen}
+        onClose={() => setCategoryBrowserOpen(false)}
+        title="Ürün Grupları"
+        dialogStyle={{ width: 'min(760px, calc(100vw - 24px))', maxHeight: 'calc(100dvh - 24px)' }}
+        bodyStyle={{ maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto' }}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ color: 'var(--muted)', fontSize: 13 }}>Kategori seçip düzenleyebilirsin.</div>
+            <button className="btn btn--primary" type="button" onClick={openNewCategory} disabled={!canManage}>+ Yeni Kategori Ekle</button>
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {sortedCategories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className="btn btn--full btn--between"
+                onClick={() => openEditCategory(category)}
+                disabled={!canManage}
+                style={{ justifyContent: 'space-between', minHeight: 60 }}
+              >
+                <span style={{ display: 'grid', textAlign: 'left' }}>
+                  <span style={{ fontWeight: 800 }}>{category.name || '-'}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+                    Sıra: {Number(category?.sortOrder || 0)} • Durum: {category?.isActive === false ? 'Pasif' : 'Aktif'}
+                  </span>
+                </span>
+                <span style={{ color: 'var(--muted)', fontSize: 13 }}>Düzenle</span>
+              </button>
+            ))}
+            {sortedCategories.length === 0 ? <div className="card">Henüz kategori yok.</div> : null}
+          </div>
+        </div>
+      </Modal>
+      <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={closeCreateModal}
         title=""
         dialogStyle={{ width: 'min(1040px, calc(100vw - 24px))', maxHeight: 'calc(100dvh - 20px)' }}
       >
@@ -1236,6 +1376,17 @@ export default function CanteenSettingsProductsPage() {
                 />
               </div>
               <div className="canteen-create-modal-row">
+                <label htmlFor="create-min-stock">Asgari Stok</label>
+                <input
+                  id="create-min-stock"
+                  className="input"
+                  value={minimumStock}
+                  onChange={(event) => setMinimumStock(event.target.value)}
+                  disabled={!canManage || !stockTrackingEnabled}
+                  placeholder={stockTrackingEnabled ? 'Asgari stok girin' : 'Önce stok takibini açın'}
+                />
+              </div>
+              <div className="canteen-create-modal-row">
                 <label>Stok Takibi</label>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button className={`btn btn--compact ${stockTrackingEnabled ? 'btn--primary' : ''}`} type="button" onClick={() => setStockTrackingEnabled(true)} disabled={!canManage}>Stok Takibi Açık</button>
@@ -1245,15 +1396,12 @@ export default function CanteenSettingsProductsPage() {
             </div>
 
             <div className="canteen-create-modal-side">
-              <div style={{ fontWeight: 900, fontSize: 18 }}>Görsel Yükle</div>
-              <div className="canteen-create-modal-note">
-                JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, otomatik olarak optimize edilir.
-              </div>
               <ProductImageUploadField
                 currentImageUrl=""
                 file={imageFile}
                 error={imageError}
                 disabled={!canManage}
+                descriptionText="Yuklenen gorsel satis ekranlarinda bu urun icin gosterilir."
                 onFileChange={(nextFile, validationMessage) => {
                   setImageError(validationMessage || '')
                   setImageFile(validationMessage ? null : nextFile)
@@ -1269,7 +1417,7 @@ export default function CanteenSettingsProductsPage() {
           <div className="canteen-create-modal-footer">
             <div className="canteen-create-modal-status">* Girilmesi mecburi olan alanlar</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <button className="btn" type="button" onClick={() => setCreateOpen(false)}>Vazgeç</button>
+              <button className="btn" type="button" onClick={closeCreateModal}>Vazgeç</button>
               <button className="btn btn--primary" type="submit" disabled={!isCreateFormValid}>Kaydet</button>
             </div>
           </div>
@@ -1281,6 +1429,7 @@ export default function CanteenSettingsProductsPage() {
         onClose={() => setEditOpen(false)}
         title="Ürün Düzenle"
         dialogStyle={{ width: 'min(920px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 24px)' }}
+        bodyStyle={{ maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', paddingBottom: 18 }}
       >
         <div style={{ display: 'grid', gap: 10 }}>
           <label>
@@ -1315,13 +1464,45 @@ export default function CanteenSettingsProductsPage() {
               {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
           </label>
-          <label>
+          <div className="stackRow" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className={`btn btn--compact ${editStockTrackingEnabled ? 'btn--primary' : ''}`} type="button" onClick={() => setEditStockTrackingEnabled(true)} disabled={!canManage}>Stok Takibi Açık</button>
+              <button className={`btn btn--compact ${editStockTrackingEnabled ? '' : 'btn--primary'}`} type="button" onClick={() => setEditStockTrackingEnabled(false)} disabled={!canManage}>Stok Takibi Kapalı</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>Stok</span>
+                <input
+                  className="input"
+                  value={editStockQty}
+                  onChange={(event) => setEditStockQty(event.target.value)}
+                  disabled={!canManage || !editStockTrackingEnabled}
+                  placeholder={editStockTrackingEnabled ? 'Stok' : 'Takip kapalı'}
+                  style={{ width: '100%', maxWidth: 180, height: 38 }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>Asgari Stok</span>
+                <input
+                  className="input"
+                  value={editMinimumStock}
+                  onChange={(event) => setEditMinimumStock(event.target.value)}
+                  disabled={!canManage || !editStockTrackingEnabled}
+                  placeholder={editStockTrackingEnabled ? 'Asgari stok' : 'Takip kapalı'}
+                  style={{ width: '100%', maxWidth: 180, height: 38 }}
+                />
+              </label>
+            </div>
+          </div>
+          <label className="canteen-edit-image-field">
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel Yükle</div>
             <ProductImageUploadField
               currentImageUrl={editImageUrl}
               file={editImageFile}
               error={editImageError}
+              compact
               disabled={!canManage}
+              descriptionText="Yuklenen gorsel satis ekranlarinda bu urun icin gosterilir."
               onFileChange={(nextFile, validationMessage) => {
                 setEditImageError(validationMessage || '')
                 setEditImageFile(validationMessage ? null : nextFile)
@@ -1333,24 +1514,7 @@ export default function CanteenSettingsProductsPage() {
               onRemoveExisting={removeEditImage}
             />
           </label>
-          <div className="stackRow" style={{ justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <button className={`btn btn--compact ${editStockTrackingEnabled ? 'btn--primary' : ''}`} type="button" onClick={() => setEditStockTrackingEnabled(true)} disabled={!canManage}>Stok Takibi Açık</button>
-              <button className={`btn btn--compact ${editStockTrackingEnabled ? '' : 'btn--primary'}`} type="button" onClick={() => setEditStockTrackingEnabled(false)} disabled={!canManage}>Stok Takibi Kapalı</button>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>Stok</span>
-              <input
-                className="input"
-                value={editStockQty}
-                onChange={(event) => setEditStockQty(event.target.value)}
-                disabled={!canManage || !editStockTrackingEnabled}
-                placeholder={editStockTrackingEnabled ? 'Stok' : 'Takip kapalı'}
-                style={{ width: '100%', maxWidth: 180, height: 38 }}
-              />
-            </label>
-          </div>
-          <div className="actionWrap" style={{ justifyContent: 'flex-end' }}>
+          <div className="actionWrap" style={{ justifyContent: 'flex-end', position: 'sticky', bottom: 0, paddingTop: 10, background: 'linear-gradient(180deg, rgba(255,255,255,0), var(--app-surface, #fff) 38%)' }}>
             <button className="btn" type="button" onClick={() => setEditOpen(false)}>Vazgeç</button>
             <button className="btn btn--primary" type="button" onClick={submitEdit} disabled={!String(editName || '').trim() || !String(editBarcode || '').trim()}>
               Kaydet
@@ -1373,25 +1537,6 @@ export default function CanteenSettingsProductsPage() {
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
             <textarea className="input" value={categoryForm.description} onChange={(event) => setCategoryForm((current) => ({ ...current, description: event.target.value }))} disabled={!canManage} style={{ minHeight: 96, paddingTop: 12 }} />
-          </label>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel Yükle</div>
-            <ProductImageUploadField
-              currentImageUrl={categoryForm.imageUrl}
-              file={categoryImageFile}
-              error={categoryImageError}
-              disabled={!canManage || categorySaving}
-              helperText="JPG, PNG veya WEBP. Maksimum 5 MB, kategori kartı için optimize edilerek saklanır."
-              onFileChange={(nextFile, validationMessage) => {
-                setCategoryImageError(validationMessage || '')
-                setCategoryImageFile(validationMessage ? null : nextFile)
-              }}
-              onClearFile={() => {
-                setCategoryImageFile(null)
-                setCategoryImageError('')
-              }}
-              onRemoveExisting={categoryForm.id ? removeCategoryImage : undefined}
-            />
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sıralama</div>
@@ -1418,6 +1563,27 @@ export default function CanteenSettingsProductsPage() {
               Durum: {categoryForm.isActive === false ? 'Pasif' : 'Aktif'}
             </div>
           </div>
+          <label className="canteen-edit-image-field">
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Görsel Yükle</div>
+            <ProductImageUploadField
+              currentImageUrl={categoryForm.imageUrl}
+              file={categoryImageFile}
+              error={categoryImageError}
+              compact
+              disabled={!canManage || categorySaving}
+              helperText="JPG, PNG veya WEBP. Maksimum 5 MB, kategori kartı için optimize edilerek saklanır."
+              descriptionText="Yuklenen gorsel satis ekranlarinda bu kategori icin gosterilir."
+              onFileChange={(nextFile, validationMessage) => {
+                setCategoryImageError(validationMessage || '')
+                setCategoryImageFile(validationMessage ? null : nextFile)
+              }}
+              onClearFile={() => {
+                setCategoryImageFile(null)
+                setCategoryImageError('')
+              }}
+              onRemoveExisting={categoryForm.id ? removeCategoryImage : undefined}
+            />
+          </label>
           <div className="actionWrap" style={{ justifyContent: 'flex-end' }}>
             <button className="btn" type="button" onClick={() => setCategoryModalOpen(false)}>Vazgeç</button>
             <button className="btn btn--primary" type="button" onClick={submitCategory} disabled={categorySaving || !String(categoryForm.name || '').trim()}>

@@ -9,6 +9,7 @@ const schema = new mongoose.Schema({
   barcode: { type: String, default: '', index: true },
   stockTrackingEnabled: { type: Boolean, default: false },
   stockQty: { type: Number, default: 0 },
+  minimumStock: { type: Number, default: 5 },
   price: { type: Number, default: 0 },
   costPrice: { type: Number, default: 0 },
   vatRate: { type: Number, default: 0 },

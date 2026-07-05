@@ -1,6 +1,13 @@
 import { error } from '../../../utils/errors.js'
 import * as catRepo from '../repositories/canteenCategoryRepository.js'
 import * as prodRepo from '../repositories/canteenProductRepository.js'
+import * as movementRepo from '../repositories/canteenStockMovementRepository.js'
+import {
+  applyProductPriceToCurrentBatch,
+  ensureProductBatches,
+  rebuildProductBatchesFromAbsoluteStock,
+  syncProductFromOpenBatch
+} from './canteenProductBatchService.js'
 import { deleteProductImageFile, replaceProductImageFile } from '../../../utils/productImageStorage.js'
 
 const normalizeName = (name) => String(name || '').trim()
@@ -13,6 +20,11 @@ const normalizeSortOrder = (value) => {
 }
 
 const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100
+const normalizeMinimumStock = (value, fallback = 5) => {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return Number(fallback || 0)
+  return n
+}
 
 const computeSalePrice = (price, vatRate, vatIncluded) => {
   const basePrice = Number(price || 0)
@@ -22,6 +34,28 @@ const computeSalePrice = (price, vatRate, vatIncluded) => {
     return roundMoney(basePrice * (1 + (rate / 100)))
   }
   return roundMoney(basePrice)
+}
+
+const mapProductDto = (product, categoryById = new Map()) => {
+  const category = product?.categoryId ? categoryById.get(String(product.categoryId)) : null
+  return {
+    id: product.id,
+    name: product.name,
+    branchId: product.branchId ? String(product.branchId) : null,
+    barcode: product.barcode || '',
+    stockTrackingEnabled: product.stockTrackingEnabled === true,
+    stockQty: Number(product.stockQty || 0),
+    minimumStock: normalizeMinimumStock(product.minimumStock, 5),
+    price: Number(product.price || 0),
+    salePrice: computeSalePrice(product.price, product.vatRate, product.vatIncluded !== false),
+    costPrice: Number(product.costPrice || 0),
+    vatRate: Number(product.vatRate || 0),
+    vatIncluded: product.vatIncluded !== false,
+    categoryId: product.categoryId ? String(product.categoryId) : null,
+    categoryName: category ? String(category?.name || '') : '',
+    categoryImageUrl: category ? String(category?.imageUrl || '') : '',
+    imageUrl: String(product.imageUrl || '')
+  }
 }
 
 const mapCategoryDto = (category) => ({
@@ -137,23 +171,12 @@ export const listProducts = async (tenantId, branchIds) => {
   const items = await prodRepo.listByTenantAndBranches(tenantId, ids)
   const categories = ids.length > 0 ? await catRepo.listByTenantAndBranches(tenantId, ids) : []
   const categoryById = new Map((categories || []).map((item) => [String(item.id || item._id), item]))
-  return items.map((p) => ({
-    id: p.id,
-    name: p.name,
-    branchId: p.branchId ? String(p.branchId) : null,
-    barcode: p.barcode || '',
-    stockTrackingEnabled: p.stockTrackingEnabled === true,
-    stockQty: Number(p.stockQty || 0),
-    price: Number(p.price || 0),
-    salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
-    costPrice: Number(p.costPrice || 0),
-    vatRate: Number(p.vatRate || 0),
-    vatIncluded: p.vatIncluded !== false,
-    categoryId: p.categoryId ? String(p.categoryId) : null,
-    categoryName: p.categoryId ? String(categoryById.get(String(p.categoryId))?.name || '') : '',
-    categoryImageUrl: p.categoryId ? String(categoryById.get(String(p.categoryId))?.imageUrl || '') : '',
-    imageUrl: String(p.imageUrl || '')
+  const synced = await Promise.all((items || []).map(async (item) => {
+    if (item?.stockTrackingEnabled !== true) return item
+    await ensureProductBatches(item)
+    return syncProductFromOpenBatch(tenantId, String(item.branchId || ''), item.id, item)
   }))
+  return synced.map((p) => mapProductDto(p, categoryById))
 }
 
 export const createProduct = async (tenantId, branchId, input) => {
@@ -175,6 +198,7 @@ export const createProduct = async (tenantId, branchId, input) => {
   const stockTrackingEnabled = input?.stockTrackingEnabled === true
   const stockQtyRaw = input?.stockQty
   const stockQty = Number(stockQtyRaw || 0)
+  const minimumStock = normalizeMinimumStock(input?.minimumStock, 5)
   try {
     const created = await prodRepo.create({
       tenantId,
@@ -185,6 +209,7 @@ export const createProduct = async (tenantId, branchId, input) => {
       barcode,
       stockTrackingEnabled,
       stockQty: Number.isFinite(stockQty) ? stockQty : 0,
+      minimumStock,
       price: Number.isFinite(price) ? price : 0,
       costPrice: Number.isFinite(costPrice) ? costPrice : 0,
       vatRate: Number.isFinite(vatRate) ? vatRate : 0,
@@ -193,12 +218,16 @@ export const createProduct = async (tenantId, branchId, input) => {
       isActive: true,
       createdAt: new Date()
     })
+    if (created.stockTrackingEnabled === true && Number(created.stockQty || 0) > 0) {
+      await rebuildProductBatchesFromAbsoluteStock({ ...created.toObject?.() || created, id: created.id, tenantId, branchId }, Number(created.stockQty || 0), 'Yeni ürün açılış stoğu', null)
+    }
     return {
       id: created.id,
       name: created.name,
       barcode: created.barcode || '',
       stockTrackingEnabled: created.stockTrackingEnabled === true,
       stockQty: Number(created.stockQty || 0),
+      minimumStock: normalizeMinimumStock(created.minimumStock, 5),
       price: Number(created.price || 0),
       salePrice: computeSalePrice(created.price, created.vatRate, created.vatIncluded !== false),
       costPrice: Number(created.costPrice || 0),
@@ -214,7 +243,10 @@ export const createProduct = async (tenantId, branchId, input) => {
   }
 }
 
-export const updateProduct = async (tenantId, branchId, id, input) => {
+export const updateProduct = async (tenantId, branchId, id, input, actorUserId = null) => {
+  const current = await prodRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Urun bulunamadi', 404)
+
   const update = {}
   if (input?.name !== undefined) {
     const name = normalizeName(input?.name)
@@ -231,6 +263,9 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
   if (input?.stockQty !== undefined) {
     const stockQty = Number(input?.stockQty || 0)
     update.stockQty = Number.isFinite(stockQty) ? stockQty : 0
+  }
+  if (input?.minimumStock !== undefined) {
+    update.minimumStock = normalizeMinimumStock(input?.minimumStock, 5)
   }
   if (input?.price !== undefined) {
     const price = Number(input?.price || 0)
@@ -254,12 +289,60 @@ export const updateProduct = async (tenantId, branchId, id, input) => {
   try {
     const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, update)
     if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
+
+    if (updated.stockTrackingEnabled === true) {
+      if (update.stockQty !== undefined) {
+        await rebuildProductBatchesFromAbsoluteStock(updated, Number(updated.stockQty || 0), 'Ürün düzenleme ekranından stok güncellendi', actorUserId)
+      } else {
+        await ensureProductBatches(updated)
+        await applyProductPriceToCurrentBatch(tenantId, branchId, updated.id, {
+          price: update.price,
+          costPrice: update.costPrice,
+          vatRate: update.vatRate,
+          vatIncluded: update.vatIncluded
+        })
+        await syncProductFromOpenBatch(tenantId, branchId, updated.id, updated)
+      }
+    }
+
+    const previousStockQty = Number(current?.stockQty || 0)
+    const nextStockQty = Number(updated?.stockQty || 0)
+    const stockChanged = previousStockQty !== nextStockQty
+    if (stockChanged) {
+      const deltaQty = nextStockQty - previousStockQty
+      const unitCost = roundMoney(updated?.costPrice || 0)
+      const absDeltaQty = Math.abs(deltaQty)
+      const totalAmount = roundMoney(unitCost * absDeltaQty)
+      let cashEffect = ''
+      if (deltaQty < 0) cashEffect = 'expense'
+      else if (deltaQty > 0) cashEffect = 'income'
+
+      await movementRepo.create({
+        tenantId,
+        branchId,
+        productId: updated.id,
+        productName: String(updated.name || ''),
+        barcode: String(updated.barcode || ''),
+        type: 'adjust',
+        qty: nextStockQty,
+        previousQty: previousStockQty,
+        deltaQty,
+        unitCost,
+        totalAmount,
+        cashEffect,
+        note: 'Ürün düzenleme ekranından stok güncellendi',
+        createdBy: actorUserId || null,
+        createdAt: new Date()
+      })
+    }
+
     return {
       id: updated.id,
       name: updated.name,
       barcode: updated.barcode || '',
       stockTrackingEnabled: updated.stockTrackingEnabled === true,
       stockQty: Number(updated.stockQty || 0),
+      minimumStock: normalizeMinimumStock(updated.minimumStock, 5),
       price: Number(updated.price || 0),
       salePrice: computeSalePrice(updated.price, updated.vatRate, updated.vatIncluded !== false),
       costPrice: Number(updated.costPrice || 0),
@@ -280,16 +363,23 @@ export const getProductByBarcode = async (tenantId, branchId, barcodeRaw) => {
   if (!barcode) throw error('validation_error', 'Barkod zorunludur', 400)
   const p = await prodRepo.findByBarcodeAndScope(barcode, tenantId, branchId)
   if (!p) throw error('not_found', 'Barkod bulunamadi', 404)
+  if (p.stockTrackingEnabled === true) {
+    await ensureProductBatches(p)
+    await syncProductFromOpenBatch(tenantId, branchId, p.id, p)
+  }
+  const fresh = await prodRepo.findByIdAndScope(p.id, tenantId, branchId)
   return {
-    id: p.id,
-    name: p.name,
-    barcode: p.barcode || '',
-    stockTrackingEnabled: p.stockTrackingEnabled === true,
-    price: Number(p.price || 0),
-    salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
-    vatRate: Number(p.vatRate || 0),
-    vatIncluded: p.vatIncluded !== false,
-    stockQty: Number(p.stockQty || 0)
+    id: fresh.id,
+    name: fresh.name,
+    barcode: fresh.barcode || '',
+    stockTrackingEnabled: fresh.stockTrackingEnabled === true,
+    price: Number(fresh.price || 0),
+    salePrice: computeSalePrice(fresh.price, fresh.vatRate, fresh.vatIncluded !== false),
+    vatRate: Number(fresh.vatRate || 0),
+    vatIncluded: fresh.vatIncluded !== false,
+    stockQty: Number(fresh.stockQty || 0),
+    minimumStock: normalizeMinimumStock(fresh.minimumStock, 5),
+    costPrice: Number(fresh.costPrice || 0)
   }
 }
 
@@ -298,13 +388,19 @@ export const searchProducts = async (tenantId, branchId, input) => {
   const limit = Number(input?.limit || 20)
   if (q.length < 2) throw error('validation_error', 'En az 2 karakter yaz', 400)
   const items = await prodRepo.searchByNameAndScope(tenantId, branchId, escapeRegex(q), limit)
-  return items.map((p) => ({
+  const synced = await Promise.all((items || []).map(async (item) => {
+    if (item?.stockTrackingEnabled !== true) return item
+    await ensureProductBatches(item)
+    return syncProductFromOpenBatch(tenantId, branchId, item.id, item)
+  }))
+  return synced.map((p) => ({
     id: p.id,
     name: p.name,
     barcode: p.barcode || '',
     price: Number(p.price || 0),
     salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
-    stockQty: Number(p.stockQty || 0)
+    stockQty: Number(p.stockQty || 0),
+    minimumStock: normalizeMinimumStock(p.minimumStock, 5)
   }))
 }
 
@@ -331,6 +427,7 @@ export const uploadProductImage = async (tenantId, branchId, id, file) => {
     barcode: updated.barcode || '',
     stockTrackingEnabled: updated.stockTrackingEnabled === true,
     stockQty: Number(updated.stockQty || 0),
+    minimumStock: normalizeMinimumStock(updated.minimumStock, 5),
     price: Number(updated.price || 0),
     salePrice: computeSalePrice(updated.price, updated.vatRate, updated.vatIncluded !== false),
     costPrice: Number(updated.costPrice || 0),
@@ -355,6 +452,7 @@ export const removeProductImage = async (tenantId, branchId, id) => {
     barcode: updated.barcode || '',
     stockTrackingEnabled: updated.stockTrackingEnabled === true,
     stockQty: Number(updated.stockQty || 0),
+    minimumStock: normalizeMinimumStock(updated.minimumStock, 5),
     price: Number(updated.price || 0),
     salePrice: computeSalePrice(updated.price, updated.vatRate, updated.vatIncluded !== false),
     costPrice: Number(updated.costPrice || 0),
