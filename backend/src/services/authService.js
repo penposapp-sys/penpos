@@ -439,6 +439,7 @@ export const me = async (userId) => {
     systemType: user.systemType || null,
     branchIds: getUserAccessibleBranchIds(user),
     accessibleBranchIds: getUserAccessibleBranchIds(user),
+    pushNotificationsEnabled: Array.isArray(user.pushDevices) && user.pushDevices.some((device) => !device?.disabledAt && String(device?.token || '').trim()),
     tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status, systemType: tenant.systemType || null } : null,
     branch
   }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import Layout from './components/Layout.jsx'
@@ -36,6 +36,7 @@ import ReportsSales from './pages/ReportsSales.jsx'
 import ReportsPage from './pages/ReportsPage.jsx'
 import _ProductReportPage from './pages/ProductReportPage.jsx'
 import TablesPage from './pages/TablesPage.jsx'
+import WaiterCallsPage from './pages/WaiterCallsPage.jsx'
 import ReceiptPage from './pages/ReceiptPage.jsx'
 import AuditPage from './pages/AuditPage.jsx'
 import BranchesPage from './pages/BranchesPage.jsx'
@@ -46,10 +47,13 @@ import AccountDetailPage from './pages/AccountDetailPage.jsx'
 import PublicMenuPage from './pages/PublicMenuPage.jsx'
 import DigitalMenuPage from './pages/DigitalMenuPage.tsx'
 import QrMenuSettingsPage from './pages/QrMenuSettingsPage.jsx'
+import OnlineSalesSettingsPage from './pages/OnlineSalesSettingsPage.jsx'
+import OnlineSalesPage from './pages/OnlineSalesPage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
 import { hasAuthToken } from './lib/authStorage.js'
+import NativePushBridge from './components/NativePushBridge.jsx'
 
 import CanteenLayout from './canteen/layout/CanteenLayout.jsx'
 import CanteenLogin from './canteen/pages/CanteenLogin.jsx'
@@ -132,6 +136,13 @@ const canUseHistoryBack = () => {
   }
 }
 
+const buildRouteSnapshot = (location) => {
+  const pathname = String(location?.pathname || '')
+  const search = String(location?.search || '')
+  const hash = String(location?.hash || '')
+  return `${pathname}${search}${hash}`
+}
+
 const hasAnyAuthToken = () => (
   hasAuthToken('token_restaurant') ||
   hasAuthToken('token_canteen') ||
@@ -150,6 +161,18 @@ function CapacitorBackButtonHandler() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, tenantCtx, loading } = useAuth()
+  const routeStackRef = useRef([])
+
+  useEffect(() => {
+    const nextEntry = buildRouteSnapshot(location)
+    if (!nextEntry) return
+
+    const currentStack = Array.isArray(routeStackRef.current) ? routeStackRef.current : []
+    const lastEntry = currentStack.length > 0 ? currentStack[currentStack.length - 1] : ''
+    if (lastEntry === nextEntry) return
+
+    routeStackRef.current = [...currentStack, nextEntry].slice(-50)
+  }, [location])
 
   useEffect(() => {
     let isMounted = true
@@ -164,10 +187,23 @@ function CapacitorBackButtonHandler() {
           if (!isMounted) return
 
           const pathname = String(location.pathname || '')
+          const currentRoute = buildRouteSnapshot(location)
           const isPublicRoute = EXIT_ROUTES.has(pathname)
           const hasToken = hasAnyAuthToken()
           const isAuthenticated = !!user || hasToken
           const homePath = user ? resolveHomePath(user) : null
+
+          const routeStack = Array.isArray(routeStackRef.current) ? [...routeStackRef.current] : []
+          if (routeStack.length > 1) {
+            const lastEntry = routeStack[routeStack.length - 1]
+            if (lastEntry === currentRoute) routeStack.pop()
+            const previousRoute = routeStack[routeStack.length - 1]
+            if (previousRoute && previousRoute !== currentRoute) {
+              routeStackRef.current = routeStack
+              navigate(previousRoute, { replace: true })
+              return
+            }
+          }
 
           if (!isAuthenticated && isPublicRoute) {
             appPlugin.exitApp?.()
@@ -286,6 +322,7 @@ export default function App() {
     <AuthProvider>
       <BusinessSettingsProvider>
         <CapacitorBackButtonHandler />
+        <NativePushBridge />
         <Toast />
         <Routes>
         <Route path="/" element={<RootEntryRoute />} />
@@ -300,6 +337,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/menu/:tenantSlug" element={<PublicMenuPage />} />
+        <Route path="/online/:tenantSlug" element={<OnlineSalesPage />} />
+        <Route path="/online/:tenantSlug/:branchSlug" element={<OnlineSalesPage />} />
         <Route path="/qr/:slug" element={<CanteenQrPricePage />} />
         <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
@@ -379,6 +418,7 @@ export default function App() {
           <Route index element={<KermesIndexRedirect />} />
           <Route path="app/dashboard" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><Dashboard /></ProtectedRoute>} />
           <Route path="app/tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><TablesPage /></ProtectedRoute>} />
+          <Route path="app/waiter-calls" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><WaiterCallsPage /></ProtectedRoute>} />
           <Route path="app/kitchen" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['kitchen_access']} system="kermes"><KitchenPage /></ProtectedRoute>} />
           <Route path="app/kitchen/bulk" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['kitchen_access']} system="kermes"><KitchenBulkPage /></ProtectedRoute>} />
           <Route path="app/walkin" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />
@@ -409,6 +449,7 @@ export default function App() {
             <Route path="delivery" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsDeliveryPage /></ProtectedRoute>} />
             <Route path="billing" element={<ProtectedRoute roles={['tenant_admin']} system="kermes" allowExpired><UpgradePlan /></ProtectedRoute>} />
             <Route path="qr" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><QrMenuSettingsPage /></ProtectedRoute>} />
+            <Route path="online-sales" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><OnlineSalesSettingsPage /></ProtectedRoute>} />
             <Route path="menü" element={<Navigate to="/kermes/settings/catalog" replace />} />
             <Route path="menu/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
             <Route path="menu/items" element={<Navigate to="/kermes/settings/catalog/items" replace />} />

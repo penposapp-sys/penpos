@@ -74,6 +74,114 @@ const computeCustomerAccountBalance = async (tenantId, accountId, session = null
   return toMoney(debit) - toMoney(credit)
 }
 
+const computeOrderAccountChargeTotal = async (tenantId, orderId, accountId = null) => {
+  if (!mongoose.Types.ObjectId.isValid(String(orderId || ''))) return 0
+  const filter = {
+    tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+    orderId: new mongoose.Types.ObjectId(String(orderId)),
+    source: 'order_veresiye',
+    type: 'debit',
+    isDeleted: { $ne: true }
+  }
+  if (accountId && mongoose.Types.ObjectId.isValid(String(accountId))) {
+    filter.accountId = new mongoose.Types.ObjectId(String(accountId))
+  }
+  const rows = await AccountTransaction.aggregate([
+    { $match: filter },
+    { $group: { _id: null, sum: { $sum: '$amount' } } }
+  ])
+  return toMoney(rows?.[0]?.sum || 0)
+}
+
+const computeOrderCollectionTotal = async (tenantId, orderId, accountId = null) => {
+  if (!mongoose.Types.ObjectId.isValid(String(orderId || ''))) return 0
+  const filter = {
+    tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+    orderId: new mongoose.Types.ObjectId(String(orderId)),
+    source: 'collection',
+    type: 'credit',
+    isDeleted: { $ne: true }
+  }
+  if (accountId && mongoose.Types.ObjectId.isValid(String(accountId))) {
+    filter.accountId = new mongoose.Types.ObjectId(String(accountId))
+  }
+  const rows = await AccountTransaction.aggregate([
+    { $match: filter },
+    { $group: { _id: null, sum: { $sum: '$amount' } } }
+  ])
+  return toMoney(rows?.[0]?.sum || 0)
+}
+
+const computePersistedPaymentState = async (tenantId, order) => {
+  const summary = computePaymentSummary(order)
+  const collectionsTotal = await computeOrderCollectionTotal(tenantId, order?._id || order?.id || '', order?.publicCustomerAccountId || null)
+  const paidTotal = toMoney((summary.paymentsTotal || 0) + (summary.veresiyeTotal || 0) + collectionsTotal)
+  const balanceDue = toMoney(Math.max(0, toMoney(summary.netTotal) - paidTotal))
+  const isPaid = toMoney(summary.netTotal) > 0 && balanceDue <= 0.01
+  return {
+    netTotal: toMoney(summary.netTotal),
+    paidTotal,
+    balanceDue,
+    collectionsTotal,
+    isPaid
+  }
+}
+
+const syncPublicOnlineAccountChargeForOrder = async ({ tenantId, branchId, actorUserId, order }) => {
+  if (!order) return
+  if (String(order?.orderChannel || '').trim() !== 'online') return
+
+  const accountId = String(order?.publicCustomerAccountId || '').trim()
+  if (!mongoose.Types.ObjectId.isValid(accountId)) return
+
+  const desiredAmount = toMoney(computePaymentSummary(order).netTotal)
+  const existingTx = await AccountTransaction.findOne({
+    tenantId,
+    orderId: order._id || order.id,
+    accountId,
+    source: 'order_veresiye',
+    type: 'debit',
+    isDeleted: { $ne: true }
+  }).sort({ createdAt: 1 })
+  const currentAmount = await computeOrderAccountChargeTotal(tenantId, order._id || order.id, accountId)
+  const delta = toMoney(desiredAmount - currentAmount)
+  if (Math.abs(delta) <= 0.009) return
+
+  const account = await CustomerAccount.findOne({ _id: accountId, tenantId, isActive: true })
+  if (!account) return
+
+  await CustomerAccount.updateOne(
+    { _id: account._id, tenantId },
+    { $inc: { balance: delta } }
+  )
+
+  if (!existingTx && desiredAmount > 0) {
+    await AccountTransaction.create({
+      tenantId,
+      branchId,
+      accountId: account._id,
+      type: 'debit',
+      amount: desiredAmount,
+      method: 'other',
+      note: 'Online siparis otomatik cari borcu',
+      source: 'order_veresiye',
+      orderId: order._id || order.id
+    })
+  } else if (existingTx) {
+    const nextAmount = toMoney((Number(existingTx.amount || 0) + delta))
+    if (nextAmount <= 0.009) {
+      existingTx.amount = 0
+      existingTx.isDeleted = true
+      existingTx.deletedAt = new Date()
+      await existingTx.save()
+    } else {
+      existingTx.amount = nextAmount
+      await existingTx.save()
+    }
+  }
+  await (await import('./auditService.js')).log(tenantId, actorUserId || order?.createdBy || null, 'online_order_account_sync', 'Order', String(order?._id || order?.id || ''), { accountId, desiredAmount, delta })
+}
+
 const resolveVeresiyeTransactionFilter = (tenantId, orderId, removedEntry) => {
   const accountId = removedEntry?.accountId ? String(removedEntry.accountId) : ''
   const transactionId = removedEntry?.transactionId ? String(removedEntry.transactionId) : ''
@@ -788,6 +896,202 @@ export const createDeliveryOrderService = async (tenantId, userId, branchId, { c
   }
 }
 
+const resolvePublicOrderActor = async (tenantId, branchId) => {
+  const safeBranchId = String(branchId || '').trim()
+  const users = await User.find({
+    tenantId,
+    isDeleted: { $ne: true },
+    isActive: true,
+    role: { $in: ['tenant_admin', 'staff'] }
+  })
+    .select('_id role name branchId branchIds accessibleBranchIds')
+    .sort({ role: 1, createdAt: 1 })
+    .lean()
+
+  if (!Array.isArray(users) || users.length === 0) {
+    throw error('public_order_actor_missing', 'Public siparis icin aktif kullanici bulunamadi', 400)
+  }
+
+  const branchMatched = safeBranchId
+    ? users.find((user) => {
+        if (String(user?.role || '') === 'tenant_admin') return true
+        const userBranchIds = [
+          ...(Array.isArray(user?.accessibleBranchIds) ? user.accessibleBranchIds : []),
+          ...(Array.isArray(user?.branchIds) ? user.branchIds : []),
+          user?.branchId,
+        ].map(String).filter(Boolean)
+        return userBranchIds.includes(safeBranchId)
+      })
+    : null
+
+  const actor = branchMatched || users[0]
+  return {
+    userId: String(actor?._id || ''),
+    userName: String(actor?.name || 'Online Siparis').trim() || 'Online Siparis'
+  }
+}
+
+export const createPublicOnlineOrderService = async (
+  tenantId,
+  {
+    branchId,
+    customerId,
+    customerName,
+    customerLocation,
+    phone,
+    address,
+    note,
+    items,
+    deliveryPaymentStatus,
+    deliveryPaymentMethod
+  } = {}
+) => {
+  const resolvePortionSelection = (menuItem, portionKeyRaw) => {
+    const portionKey = String(portionKeyRaw || 'full').trim().toLowerCase()
+    const settings = menuItem?.settings && typeof menuItem.settings === 'object' && !Array.isArray(menuItem.settings)
+      ? menuItem.settings
+      : {}
+    if (!portionKey || portionKey === 'full') {
+      return {
+        portionKey: 'full',
+        nameOverride: String(menuItem?.name || ''),
+        priceOverride: Number(menuItem?.price || 0)
+      }
+    }
+    if (portionKey === 'half') {
+      if (settings.halfPortionEnabled !== true) throw error('invalid_portion', 'Secilen porsiyon bu urun icin kullanilamiyor', 400)
+      return {
+        portionKey,
+        nameOverride: `${String(menuItem?.name || '')} (Yarim Porsiyon)`,
+        priceOverride: Number(settings.halfPortionPrice || 0)
+      }
+    }
+    if (portionKey === 'one_and_half') {
+      if (settings.oneAndHalfPortionEnabled !== true) throw error('invalid_portion', 'Secilen porsiyon bu urun icin kullanilamiyor', 400)
+      return {
+        portionKey,
+        nameOverride: `${String(menuItem?.name || '')} (Bir Bucuk Porsiyon)`,
+        priceOverride: Number(settings.oneAndHalfPortionPrice || 0)
+      }
+    }
+    throw error('invalid_portion', 'Secilen porsiyon gecersiz', 400)
+  }
+
+  const safeItems = Array.isArray(items) ? items : []
+  if (safeItems.length === 0) throw error('items_required', 'Sipariste en az bir urun olmali', 400)
+
+  const normalizedItems = []
+  for (const row of safeItems) {
+    const menuItemId = String(row?.menuItemId || '').trim()
+    const quantity = Math.max(1, Number(row?.quantity || 1))
+    const note = String(row?.note || '').trim()
+    const rawWeightGrams = row?.weightGrams
+    if (!mongoose.Types.ObjectId.isValid(menuItemId)) {
+      throw error('invalid_menu_item', 'Gecersiz urun secimi', 400)
+    }
+    const menuItem = await findMenuItem(menuItemId, tenantId)
+    if (!menuItem || menuItem.isDeleted === true || menuItem.isActive === false || menuItem.active === false) {
+      throw error('menu_item_not_found', 'Secilen urun aktif degil', 404)
+    }
+    if (branchId && isVisibleInBranch(menuItem, branchId) === false) {
+      throw error('menu_item_branch_hidden', 'Secilen urun bu subede kullanilamiyor', 400)
+    }
+    const portion = resolvePortionSelection(menuItem, row?.portionKey)
+    const weightGrams = rawWeightGrams === undefined || rawWeightGrams === null || rawWeightGrams === ''
+      ? null
+      : Math.round(Number(rawWeightGrams))
+    if (menuItem?.isWeightBased === true && (!Number.isFinite(weightGrams) || weightGrams <= 0)) {
+      throw error('invalid_weight', 'Gram bilgisi gerekli', 400)
+    }
+    normalizedItems.push({
+      menuItemId,
+      quantity,
+      note,
+      weightGrams,
+      portionKey: portion.portionKey,
+      nameOverride: portion.nameOverride,
+      priceOverride: portion.priceOverride
+    })
+  }
+
+  const actor = await resolvePublicOrderActor(tenantId, branchId)
+  const safeCustomerId = String(customerId || '').trim()
+  const publicCustomer = safeCustomerId && mongoose.Types.ObjectId.isValid(safeCustomerId)
+    ? await CustomerAccount.findOne({ _id: safeCustomerId, tenantId, branchId, isActive: true }).lean()
+    : null
+  const safeCustomerName = String(customerName || publicCustomer?.name || '').trim()
+  const safePhone = String(phone || publicCustomer?.phone || '').trim()
+  const safeAddress = String(address || publicCustomer?.address || '').trim()
+  const safeCustomerLocation = String(customerLocation || publicCustomer?.publicLocation || '').trim()
+  const baseOrder = await createDeliveryOrderService(tenantId, actor.userId, branchId, {
+    customerName: safeCustomerName,
+    phone: safePhone,
+    address: safeAddress,
+    note,
+    createdByName: actor.userName,
+    deliveryPaymentStatus,
+    deliveryPaymentMethod
+  })
+
+  let lastOrder = null
+  for (const row of normalizedItems) {
+    const menuItemId = String(row?.menuItemId || '').trim()
+    const quantity = Math.max(1, Number(row?.quantity || 1))
+    const shouldCreateSeparately = !!(row?.weightGrams || row?.note || row?.portionKey !== 'full')
+    if (shouldCreateSeparately) {
+      for (let index = 0; index < quantity; index += 1) {
+        const result = await addItemService(tenantId, baseOrder.id, menuItemId, {
+          quantity: 1,
+          weightGrams: row?.weightGrams,
+          note: row?.note,
+          nameOverride: row?.nameOverride,
+          priceOverride: row?.priceOverride
+        })
+        lastOrder = result?.order || lastOrder
+      }
+      continue
+    }
+    const result = await addItemService(tenantId, baseOrder.id, menuItemId, {
+      quantity,
+      note: row?.note,
+      nameOverride: row?.nameOverride,
+      priceOverride: row?.priceOverride
+    })
+    lastOrder = result?.order || lastOrder
+  }
+
+  await Order.updateOne(
+    { _id: baseOrder.id, tenantId },
+    {
+      $set: {
+        orderChannel: 'online',
+        approvalStatus: 'pending',
+        publicCustomerAccountId: publicCustomer?._id || null,
+        publicCustomerLocation: safeCustomerLocation,
+        customerName: safeCustomerName,
+        customerPhone: safePhone,
+        customerAddress: safeAddress,
+        deliveryStatus: 'pending',
+        deliveryPaymentStatus: publicCustomer?._id ? 'veresiye' : 'odeme_bekliyor',
+        kitchenEnabled: false,
+        sendToKitchen: false
+      }
+    }
+  )
+
+  const fresh = await Order.findById(baseOrder.id).lean()
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId,
+    actorUserId: actor.userId,
+    order: fresh
+  })
+  const finalOrder = await Order.findById(baseOrder.id).lean()
+  lastOrder = decorateOrder(finalOrder)
+
+  return { order: lastOrder }
+}
+
 export const updateDeliveryStatusService = async (tenantId, id, deliveryStatus) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
@@ -925,10 +1229,60 @@ export const getDeliveryOrdersService = async (tenantId, branchFilter, { status,
     ? { deliveredAt: -1, deliveryAt: -1, updatedAt: -1 }
     : { createdAt: -1 }
 
-  const [orders, total] = await Promise.all([
+  const [rawOrders, total] = await Promise.all([
     Order.find(filter).sort(sort).skip(skip).limit(safeLimit).lean(),
     Order.countDocuments(filter)
   ])
+
+  const orderIds = rawOrders
+    .map((order) => String(order?._id || order?.id || '').trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+
+  let collectionsByOrderId = new Map()
+  if (orderIds.length > 0) {
+    const collectionRows = await AccountTransaction.find({
+      tenantId,
+      orderId: { $in: orderIds.map((id) => new mongoose.Types.ObjectId(id)) },
+      source: 'collection',
+      type: 'credit',
+      isDeleted: { $ne: true }
+    })
+      .select('_id orderId amount method methodId methodLabel methodName methodBucket methodType note createdAt')
+      .lean()
+
+    collectionsByOrderId = new Map()
+    for (const row of collectionRows) {
+      const key = String(row?.orderId || '').trim()
+      if (!key) continue
+      const current = collectionsByOrderId.get(key) || []
+      current.push({
+        id: String(row?._id || ''),
+        amount: Number(row?.amount || 0) || 0,
+        method: String(row?.method || 'other'),
+        methodId: String(row?.methodId || ''),
+        methodLabel: String(row?.methodLabel || row?.method || ''),
+        methodName: String(row?.methodName || ''),
+        methodBucket: String(row?.methodBucket || ''),
+        methodType: String(row?.methodType || ''),
+        note: String(row?.note || ''),
+        createdAt: row?.createdAt || null,
+        source: 'collection'
+      })
+      collectionsByOrderId.set(key, current)
+    }
+  }
+
+  const orders = rawOrders.map((order) => {
+    const decorated = decorateOrder({
+      ...order,
+      collectionEntries: collectionsByOrderId.get(String(order?._id || order?.id || '').trim()) || []
+    })
+    return {
+      ...decorated,
+      paidTotal: Number(decorated?.paidTotal ?? decorated?.totals?.paidTotal ?? 0),
+      balanceDue: Number(decorated?.balanceDue ?? decorated?.totals?.balanceDue ?? 0)
+    }
+  })
 
   return { orders, total }
 }
@@ -1010,6 +1364,9 @@ export const getOrderService = async (tenantId, id) => {
     linkedCollections,
     orderNo: obj.orderNo ?? null,
     orderDayKey: obj.orderDayKey || '',
+    orderChannel: String(obj.orderChannel || ''),
+    approvalStatus: String(obj.approvalStatus || ''),
+    cancelRequestStatus: String(obj.cancelRequestStatus || ''),
     createdBy: obj.createdBy,
     createdByUser,
     createdByName: createdByUser?.name || '',
@@ -1069,6 +1426,13 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
   }
   const price = typeof item.price === 'number' ? item.price : 0
   const isWeightBased = !!item.isWeightBased
+  const incomingNote = typeof input === 'object' && input !== null ? String(input.note || '').trim() : ''
+  const incomingNameOverride = typeof input === 'object' && input !== null ? String(input.nameOverride || '').trim() : ''
+  const rawPriceOverride = typeof input === 'object' && input !== null ? input.priceOverride : null
+  const priceSnapshot = rawPriceOverride === undefined || rawPriceOverride === null || rawPriceOverride === ''
+    ? price
+    : Math.max(0, Number(rawPriceOverride) || 0)
+  const nameSnapshot = incomingNameOverride || item.name || 'Unknown'
   const rawWeightGrams = typeof input === 'object' && input !== null ? input.weightGrams : null
   const weightGrams = rawWeightGrams === undefined || rawWeightGrams === null || rawWeightGrams === ''
     ? null
@@ -1080,12 +1444,13 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
     }
   }
 
-  const incomingNote = ''
   const existingOpen = isWeightBased
     ? null
     : order.items.find(it =>
       String(it.menuItemId) === String(menuItemId) &&
       it.status === 'open' &&
+      String(it.nameSnapshot || '') === String(nameSnapshot) &&
+      Number(it.priceSnapshot || 0) === Number(priceSnapshot || 0) &&
       String(it.note || '') === String(incomingNote)
     )
 
@@ -1095,8 +1460,8 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
     existingOpen.subtotal = existingOpen.qty * (existingOpen.priceSnapshot || 0)
   } else {
     const lineSubtotal = isWeightBased
-      ? toMoney((toMoney(weightGrams) / 1000) * price)
-      : toMoney(qty * price)
+      ? toMoney((toMoney(weightGrams) / 1000) * priceSnapshot)
+      : toMoney(qty * priceSnapshot)
     // const now = new Date() // Not needed for open item
     const newItem = {
       menuItemId: item.id,
@@ -1105,8 +1470,8 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
       categoryId: item.categoryId || null,
       categoryName: String(categoryDoc?.name || ''),
       imageUrl: String(item.imageUrl || ''),
-      nameSnapshot: item.name || 'Unknown',
-      priceSnapshot: price,
+      nameSnapshot,
+      priceSnapshot,
       qty: isWeightBased ? 1 : qty,
       subtotal: lineSubtotal,
       isWeightBased,
@@ -1128,14 +1493,16 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
   order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
 
-  const fin = computePaymentSummary(order)
-  if (fin.netTotal > 0 && fin.balanceDue > 0.01) {
-    order.paymentStatus = 'unpaid'
-    order.paidAt = null
-  } else {
-    order.paymentStatus = 'paid'
-    order.paidAt = order.paidAt || new Date()
-  }
+  const paymentState = await computePersistedPaymentState(tenantId, order)
+  order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+  order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
 
   await order.save()
   if (wasCompleted && order.tableId) {
@@ -1408,6 +1775,12 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
       order.paidAt = null
     }
   }
+    await syncPublicOnlineAccountChargeForOrder({
+      tenantId: user.tenantId,
+      branchId: order.branchId,
+      actorUserId: user.id || user._id || order.createdBy,
+      order
+    })
     await order.save()
     const freshOrder = await Order.findById(order.id).lean()
     const dto = decorateOrder(freshOrder)
@@ -1458,6 +1831,12 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
       order.paidAt = null
     }
   }
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId: user.tenantId,
+    branchId: order.branchId,
+    actorUserId: user.id || user._id || order.createdBy,
+    order
+  })
   await order.save()
   const freshOrder = await Order.findById(order.id).lean()
   return { order: decorateOrder(freshOrder) }
@@ -1549,16 +1928,15 @@ export const removeItemService = async (tenantId, id, menuItemId) => {
   }
   order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
-  {
-    const fin = computePaymentSummary(order)
-    if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
-      order.paymentStatus = 'paid'
-      order.paidAt = order.paidAt || new Date()
-    } else {
-      order.paymentStatus = 'unpaid'
-      order.paidAt = null
-    }
-  }
+  const paymentState = await computePersistedPaymentState(tenantId, order)
+  order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+  order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
   await order.save()
   const freshOrder = await Order.findById(order.id).lean()
   const dto = decorateOrder(freshOrder)
@@ -1594,16 +1972,15 @@ export const setItemQuantityService = async (tenantId, id, menuItemId, quantity)
   }
   order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
-  {
-    const fin = computePaymentSummary(order)
-    if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
-      order.paymentStatus = 'paid'
-      order.paidAt = order.paidAt || new Date()
-    } else {
-      order.paymentStatus = 'unpaid'
-      order.paidAt = null
-    }
-  }
+  const paymentState = await computePersistedPaymentState(tenantId, order)
+  order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+  order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
   await order.save()
   const freshOrder = await Order.findById(order.id).lean()
   const dto = decorateOrder(freshOrder)
@@ -1640,16 +2017,15 @@ export const setItemQuantityByItemIdService = async (tenantId, id, itemId, quant
   }
   order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
-  {
-    const fin = computePaymentSummary(order)
-    if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
-      order.paymentStatus = 'paid'
-      order.paidAt = order.paidAt || new Date()
-    } else {
-      order.paymentStatus = 'unpaid'
-      order.paidAt = null
-    }
-  }
+  const paymentState = await computePersistedPaymentState(tenantId, order)
+  order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+  order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
   await order.save()
   const freshOrder = await Order.findById(order.id).lean()
   const dto = decorateOrder(freshOrder)
@@ -1695,16 +2071,15 @@ export const setItemWeightByItemIdService = async (tenantId, id, itemId, weightG
 
   order.totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
-  {
-    const fin = computePaymentSummary(order)
-    if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
-      order.paymentStatus = 'paid'
-      order.paidAt = order.paidAt || new Date()
-    } else {
-      order.paymentStatus = 'unpaid'
-      order.paidAt = null
-    }
-  }
+  const paymentState = await computePersistedPaymentState(tenantId, order)
+  order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+  order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
   await order.save()
   const freshOrder = await Order.findById(order.id).lean()
   const dto = decorateOrder(freshOrder)
@@ -1878,6 +2253,12 @@ export const cancelOrderService = async (tenantId, id) => {
   order.paymentStatus = 'unpaid'
   order.paidAt = null
   normalizeLegacyItemStatuses(order)
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
   await order.save()
   if (order.tableId) {
     await (await import('../repositories/tableRepository.js')).updateById(order.tableId, { status: 'empty', activeOrderId: null })
@@ -2022,25 +2403,48 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
   if (!Number.isFinite(payAmount) || payAmount <= 0) {
     throw error('invalid_amount', 'Invalid payment amount', 400)
   }
-  const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, method)
-  order.payments.push({
-    method: resolvedMethod.method,
-    methodId: resolvedMethod.methodId,
-    methodLabel: resolvedMethod.methodLabel,
-    methodName: resolvedMethod.methodName,
-    methodBucket: resolvedMethod.methodBucket,
-    methodType: resolvedMethod.methodType,
-    amount: payAmount,
-    note: String(note || '')
-  })
-  const fin = computePaymentSummary(order)
-  if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
-    order.paymentStatus = 'paid'
-    order.paidAt = order.paidAt || new Date()
+
+  const accountId = String(order?.publicCustomerAccountId || '').trim()
+  const shouldUseAccountCollection = String(order?.orderChannel || '').trim() === 'online' && mongoose.Types.ObjectId.isValid(accountId)
+
+  if (shouldUseAccountCollection) {
+    const existingCollections = await computeOrderCollectionTotal(tenantId, order.id, accountId)
+    const maxCollectable = Math.max(0, toMoney(computePaymentSummary(order).netTotal) - existingCollections)
+    const collectAmount = Math.min(maxCollectable, payAmount)
+    if (collectAmount <= 0.009) {
+      throw error('invalid_amount', 'Kalan tahsilat tutari yok', 400)
+    }
+    const { collectDebtService } = await import('./accountsService.js')
+    await collectDebtService(tenantId, String(order?.branchId || ''), cashierId || order.createdBy || null, accountId, {
+      amount: collectAmount,
+      discountAmount: 0,
+      method,
+      note: String(note || 'Siparis uzerinden tahsil edildi'),
+      orderId: order.id
+    })
+    const paymentState = await computePersistedPaymentState(tenantId, order)
+    order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+    order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+    if (String(order?.saleType || '') === 'delivery') {
+      order.deliveryPaymentStatus = paymentState.isPaid ? 'odeme_alindi' : 'odeme_bekliyor'
+    }
   } else {
-    order.paymentStatus = 'unpaid'
-    order.paidAt = null
+    const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, method)
+    order.payments.push({
+      method: resolvedMethod.method,
+      methodId: resolvedMethod.methodId,
+      methodLabel: resolvedMethod.methodLabel,
+      methodName: resolvedMethod.methodName,
+      methodBucket: resolvedMethod.methodBucket,
+      methodType: resolvedMethod.methodType,
+      amount: payAmount,
+      note: String(note || '')
+    })
+    const paymentState = await computePersistedPaymentState(tenantId, order)
+    order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+    order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
   }
+
   await order.save()
   await maybeAutoClosePaidOrder(tenantId, order)
   const fresh = await Order.findById(order.id).lean()
@@ -2093,14 +2497,15 @@ export const setOrderDiscountService = async (tenantId, id, discountPercent) => 
     throw error('invalid_discount', 'Invalid discount percent', 400)
   }
   order.discountPercent = pct
-  const fin = computePaymentSummary(order)
-  if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
-    order.paymentStatus = 'paid'
-    order.paidAt = order.paidAt || new Date()
-  } else {
-    order.paymentStatus = 'unpaid'
-    order.paidAt = null
-  }
+  const paymentState = await computePersistedPaymentState(tenantId, order)
+  order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
+  order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+  await syncPublicOnlineAccountChargeForOrder({
+    tenantId,
+    branchId: order.branchId,
+    actorUserId: order.createdBy,
+    order
+  })
   await order.save()
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }
@@ -2752,6 +3157,9 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
         totals: o.totals,
         createdAt: o.createdAt,
         saleType: o.saleType,
+        orderChannel: String(o.orderChannel || ''),
+        approvalStatus: String(o.approvalStatus || ''),
+        cancelRequestStatus: String(o.cancelRequestStatus || ''),
         servingType: getEffectiveServingTypeForOrder(o),
         createdByName: String(o.createdByName || userNameById.get(String(o.createdByUserId || o.createdBy)) || ''),
         customerName: o.customerName,

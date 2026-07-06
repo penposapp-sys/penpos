@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/apiClient.js'
+import { clearApiCache } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import QRCode from 'qrcode'
 import { buildSafeBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
@@ -20,11 +21,6 @@ const qrSwitches = [
   ['waiterCall', 'Garson çağır', 'Desteklenen kurulumlarda garson çağır aksiyonunu açar.'],
   ['multiLanguage', 'Çoklu dil', 'Menü yüzeyinde çoklu dil deneyimini açar.'],
   ['tableQrEnabled', 'Masa QR oluştur', 'Masa bazlı QR akışına geçişi açar.'],
-]
-
-const qrThemeModes = [
-  ['light', 'Beyaz', 'Açık zeminli klasik QR müşteri görünümü.'],
-  ['dark', 'Dark', 'Kart ve çerçeveleri koyu QR temasıyla gösterir.'],
 ]
 
 function cardStyle() {
@@ -118,34 +114,6 @@ function SaveButton({ children, onClick, disabled }) {
   )
 }
 
-function OptionCard({ title, description, active, onClick, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        minHeight: 104,
-        borderRadius: 24,
-        border: `1px solid ${active ? 'var(--theme-accent)' : 'var(--app-border)'}`,
-        background: active
-          ? 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 16%, var(--app-surface-soft)), var(--app-surface))'
-          : 'linear-gradient(135deg, var(--app-surface), var(--app-surface-2, var(--app-surface-soft)))',
-        color: 'var(--app-text)',
-        textAlign: 'left',
-        padding: '16px 18px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        boxShadow: active ? 'var(--theme-active-glow)' : 'none',
-        display: 'grid',
-        gap: 6,
-      }}
-    >
-      <span style={{ fontSize: 16, fontWeight: 900 }}>{title}</span>
-      <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-secondary, var(--app-text))' }}>{description}</span>
-    </button>
-  )
-}
-
 export default function QrMenuSettingsPage() {
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const isCompact = isMobilePortrait || isTablet
@@ -155,12 +123,26 @@ export default function QrMenuSettingsPage() {
   const [tenant, setTenant] = useState(null)
   const [settings, setSettings] = useState(() => mergeBusinessSettings())
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const [qrTables, setQrTables] = useState([])
+  const [products, setProducts] = useState([])
+  const [selectedTableId, setSelectedTableId] = useState('')
+  const [tablePickerOpen, setTablePickerOpen] = useState(false)
+
+  const selectedTable = useMemo(
+    () => qrTables.find((table) => String(table?.id || '') === String(selectedTableId || '')) || null,
+    [qrTables, selectedTableId]
+  )
 
   const link = useMemo(() => {
     const slug = String(tenant?.slug || '').trim()
     if (!slug) return ''
-    return `${window.location.origin}/menu/${slug}`
-  }, [tenant?.slug])
+    const next = new URL(`${window.location.origin}/menu/${slug}`)
+    if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
+      next.searchParams.set('tableId', String(selectedTable.id))
+      next.searchParams.set('table', String(selectedTable.name || ''))
+    }
+    return next.toString()
+  }, [tenant?.slug, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   useEffect(() => {
     if (!link) {
@@ -176,16 +158,35 @@ export default function QrMenuSettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await api('/api/tenant/profile', { silent: true, skipBranchHeader: true })
-      if (res?.success === false) {
+      const [profileRes, businessRes, tablesRes, productsRes] = await Promise.all([
+        api('/api/tenant/profile', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api('/api/settings/business', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api('/api/settings/business/qr-tables', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api('/api/tenant/menu-items?active=true', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+      ])
+      if (profileRes?.success === false) {
         setTenant(null)
         setSettings(mergeBusinessSettings())
-        setError(res?.message || 'Bu işlem için yetkiniz yok')
+        setError(profileRes?.message || 'Bu işlem için yetkiniz yok')
         return
       }
-      const nextTenant = res?.tenant || null
+      if (businessRes?.success === false) {
+        setTenant(null)
+        setSettings(mergeBusinessSettings())
+        setError(businessRes?.message || 'QR ayarları yüklenemedi')
+        return
+      }
+      const nextTenant = profileRes?.tenant || null
       setTenant(nextTenant)
-      setSettings(mergeBusinessSettings(nextTenant?.settings || {}))
+      setSettings(mergeBusinessSettings(businessRes?.settings || nextTenant?.settings || {}))
+      const nextTables = Array.isArray(tablesRes?.tables) ? tablesRes.tables : []
+      const nextProducts = Array.isArray(productsRes?.items) ? productsRes.items : []
+      setQrTables(nextTables)
+      setProducts(nextProducts)
+      setSelectedTableId((prev) => {
+        if (prev && nextTables.some((table) => String(table?.id || '') === String(prev))) return prev
+        return ''
+      })
     } catch (err) {
       setTenant(null)
       setSettings(mergeBusinessSettings())
@@ -217,9 +218,13 @@ export default function QrMenuSettingsPage() {
       const safeSettings = buildSafeBusinessSettings(settings, {
         qrMenu: settings.qrMenu,
       })
-      const res = await api('/api/tenant/settings', {
+      const res = await api('/api/settings/business', {
         method: 'PUT',
-        body: JSON.stringify({ settings: safeSettings }),
+        body: JSON.stringify({
+          name: tenant?.name || '',
+          description: tenant?.description || '',
+          settings: safeSettings,
+        }),
         silent: true,
         skipBranchHeader: true,
       })
@@ -227,7 +232,8 @@ export default function QrMenuSettingsPage() {
         setError(res?.message || 'QR ayarları kaydedilemedi')
         return
       }
-      setSettings(mergeBusinessSettings(res?.tenant?.settings || safeSettings))
+      clearApiCache()
+      setSettings(mergeBusinessSettings(res?.settings || safeSettings))
       toast.success('QR ayarları kaydedildi')
     } catch (err) {
       setError(err?.message || 'QR ayarları kaydedilemedi')
@@ -235,6 +241,11 @@ export default function QrMenuSettingsPage() {
       setSaving(false)
     }
   }
+
+  const featuredProduct = useMemo(
+    () => products.find((item) => String(item?.id || '') === String(settings.qrMenu?.featuredProductId || '')) || null,
+    [products, settings.qrMenu?.featuredProductId]
+  )
 
   const copyLink = async () => {
     if (!link) return
@@ -260,7 +271,12 @@ export default function QrMenuSettingsPage() {
     if (!qrDataUrl) return
     const anchor = document.createElement('a')
     anchor.href = qrDataUrl
-    anchor.download = `qr-menü-${tenant?.slug || 'tenant'}.png`
+    const safeTableName = String(selectedTable?.name || '')
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '-')
+      .toLocaleLowerCase('tr-TR')
+    anchor.download = `qr-menu-${tenant?.slug || 'tenant'}${safeTableName ? `-${safeTableName}` : ''}.png`
     document.body.appendChild(anchor)
     anchor.click()
     document.body.removeChild(anchor)
@@ -287,11 +303,11 @@ export default function QrMenuSettingsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-        <section style={cardStyle()}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, alignItems: 'start' }}>
+        <section style={{ ...cardStyle(), minWidth: 0 }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Yayın Ayarları</div>
           <div style={{ fontSize: 12, color: 'var(--app-text)', marginBottom: 16 }}>Logo, kapak, açıklama, masa QR ve garson çağır blokları bu kartta toplanır.</div>
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
             {qrSwitches.map(([key, label, description]) => (
               <ToggleItem
                 key={key}
@@ -306,44 +322,53 @@ export default function QrMenuSettingsPage() {
           </div>
         </section>
 
-        <section style={cardStyle()}>
-          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Tema Modu</div>
-          <div style={{ fontSize: 12, color: 'var(--app-text)', marginBottom: 16 }}>
-            Müşteri QR sayfasında beyaz veya dark görünüm kullanın. Dark mod kart, çerçeve ve modal yüzeylerini de koyulaştırır.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            {qrThemeModes.map(([value, label, description]) => (
-              <OptionCard
-                key={value}
-                title={label}
-                description={description}
-                active={(settings.qrMenu?.themeMode || 'light') === value}
-                onClick={() => setQrValue('themeMode', value)}
+        <section style={{ ...cardStyle(), minWidth: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
+            <div style={{ borderRadius: 22, border: `1px solid ${pageTheme.cardBorder}`, background: 'linear-gradient(135deg, var(--app-surface), var(--app-surface-2, var(--app-surface-soft)))', padding: 14, display: 'grid', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Tema Modu</div>
+                <div style={{ fontSize: 12, color: 'var(--app-text)' }}>
+                  Tek butonla koyu modu aktif veya pasif yapin. Koyu mod kart, cerceve ve modal yuzeylerini de koyulastirir.
+                </div>
+              </div>
+              <ToggleItem
+                label="Koyu mod"
+                description={settings.qrMenu?.themeMode === 'dark' ? 'Koyu mod aktif.' : 'Koyu mod pasif.'}
+                checked={(settings.qrMenu?.themeMode || 'light') === 'dark'}
+                onChange={(e) => setQrValue('themeMode', e.target.checked ? 'dark' : 'light')}
                 disabled={saving}
+                compact={false}
               />
-            ))}
-          </div>
-        </section>
+            </div>
 
-        <section style={cardStyle()}>
-          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>Public Link & Kod</div>
-          <div style={{ fontSize: 12, color: 'var(--app-text)', marginBottom: 16 }}>İşletme kodu, paylaşılan menü adresi ve indirme/kopyalama aksiyonları korunur.</div>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--app-text)', fontWeight: 900 }}>İşletme Kodu</span>
-              <input style={inputStyle()} value={String(tenant?.slug || '')} readOnly />
-            </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--app-text)', fontWeight: 900 }}>Public Link</span>
-              <input style={inputStyle()} value={link} readOnly />
-            </label>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn" onClick={copyLink} disabled={!link} style={{ flex: isCompact ? '1 1 100%' : undefined }}>Linki Kopyala</button>
-              <button className="btn" onClick={downloadQr} disabled={!qrDataUrl} style={{ flex: isCompact ? '1 1 100%' : undefined }}>QR İndir</button>
+            <div style={{ borderRadius: 22, border: `1px solid ${pageTheme.cardBorder}`, background: 'linear-gradient(135deg, var(--app-surface), var(--app-surface-2, var(--app-surface-soft)))', padding: 14, display: 'grid', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>Bugunun Onerisi</div>
+                <div style={{ fontSize: 12, color: 'var(--app-text)' }}>
+                  QR menu acilisinda gorunen oneri urununu buradan secin.
+                </div>
+              </div>
+              <select
+                value={String(settings.qrMenu?.featuredProductId || '')}
+                onChange={(event) => setQrValue('featuredProductId', String(event.target.value || ''))}
+                disabled={saving}
+                style={{ ...inputStyle(), fontWeight: 800 }}
+              >
+                <option value="">Otomatik secim</option>
+                {products.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 700 }}>
+                {featuredProduct ? `Secili urun: ${featuredProduct.name}` : 'Secim yapilmazsa listedeki ilk uygun urun kullanilir.'}
+              </div>
             </div>
           </div>
         </section>
-      </div>
+
+        </div>
 
       <section style={{ ...cardStyle(), display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18, alignItems: 'center' }}>
         <div>
@@ -352,27 +377,48 @@ export default function QrMenuSettingsPage() {
             Kaydetmeden önce linkin doğru tenant'a ve doğru slug'a gittiğini kontrol edebilirsiniz.
           </div>
           <div style={{ display: 'grid', gap: 10 }}>
-            <div style={{ padding: 14, borderRadius: 20, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface-2, var(--app-surface-soft))' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--app-text)', fontWeight: 900 }}>Durum</div>
-              <div style={{ marginTop: 6, fontWeight: 900, color: settings.qrMenu?.enabled ? 'var(--theme-accent)' : '#b91c1c' }}>
-                {settings.qrMenu?.enabled ? 'QR Menü Yayında' : 'QR Menü Kapalı'}
+            <button className="btn" onClick={copyLink} disabled={!link} style={{ justifySelf: 'start' }}>QR Linki Kopyala</button>
+            {settings.qrMenu?.tableQrEnabled ? (
+              <div style={{ display: 'grid', gap: 8, position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ padding: '10px 14px', borderRadius: 16, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface-2, var(--app-surface-soft))', fontWeight: 800 }}>
+                    Masa: {selectedTable?.name || '-'}
+                  </div>
+                  <button className="btn" type="button" onClick={() => setTablePickerOpen((prev) => !prev)}>
+                    Masa Seç
+                  </button>
+                </div>
+                {tablePickerOpen ? (
+                  <div style={{ display: 'grid', gap: 8, maxHeight: 220, overflowY: 'auto', padding: 10, borderRadius: 18, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface)' }}>
+                    <button className="btn" type="button" onClick={() => { setSelectedTableId(''); setTablePickerOpen(false) }}>
+                      Genel QR
+                    </button>
+                    {qrTables.map((table) => (
+                      <button
+                        key={table.id}
+                        className="btn"
+                        type="button"
+                        onClick={() => {
+                          setSelectedTableId(String(table.id || ''))
+                          setTablePickerOpen(false)
+                        }}
+                      >
+                        {table.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
+            ) : null}
+            <div style={{ color: settings.qrMenu?.enabled ? 'var(--theme-accent)' : '#b91c1c', fontWeight: 900 }}>
+              {settings.qrMenu?.enabled ? 'QR Menü Yayında' : 'QR Menü Kapalı'}
             </div>
-            <div style={{ padding: 14, borderRadius: 20, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface-2, var(--app-surface-soft))' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--app-text)', fontWeight: 900 }}>Ek Bilgi</div>
-              <div style={{ marginTop: 6, color: 'var(--app-text)', fontWeight: 700 }}>
-                {settings.qrMenu?.tableQrEnabled ? 'Masa bazlı QR açık.' : 'Tek public QR akışı aktif.'}
-              </div>
-            </div>
-            <div style={{ padding: 14, borderRadius: 20, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface-2, var(--app-surface-soft))' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--app-text)', fontWeight: 900 }}>Tema</div>
-              <div style={{ marginTop: 6, color: 'var(--app-text)', fontWeight: 700 }}>
-                {(settings.qrMenu?.themeMode || 'light') === 'dark' ? 'Dark mod aktif.' : 'Beyaz mod aktif.'}
-              </div>
+            <div style={{ color: 'var(--app-text)', fontWeight: 700 }}>
+              {settings.qrMenu?.tableQrEnabled ? (selectedTable?.name ? `${selectedTable.name} için masa QR hazırlanıyor.` : 'Masa bazlı QR açık. Masa seçerek özel QR üretebilirsiniz.') : 'Tek public QR akışı aktif.'}
             </div>
           </div>
         </div>
-        <div style={{ display: 'grid', justifyItems: 'center' }}>
+        <div style={{ display: 'grid', justifyItems: 'center', gap: 10 }}>
           {qrDataUrl ? (
             <img src={qrDataUrl} alt="QR Code" style={{ width: isMobilePortrait || isTablet ? 'min(220px, 100%)' : 220, height: isMobilePortrait || isTablet ? 'auto' : 220, aspectRatio: '1 / 1', borderRadius: 28, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface)', padding: 14, boxShadow: '0 16px 30px rgba(15, 23, 42, 0.18)' }} />
           ) : (
@@ -380,6 +426,9 @@ export default function QrMenuSettingsPage() {
               QR hazırlanıyor
             </div>
           )}
+          <button className="btn" onClick={downloadQr} disabled={!qrDataUrl}>
+            QR İndir
+          </button>
         </div>
       </section>
     </div>

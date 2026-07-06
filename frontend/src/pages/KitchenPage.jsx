@@ -405,7 +405,10 @@ export default function KitchenPage() {
           ? new Date(o.batchSentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
           : '-'
         const servingType = trOrderServingType(o)
-        const createdByName = String(o?.createdByName || '').trim()
+        const isOnlineOrder = String(o?.orderChannel || '').trim() === 'online' ||
+          ['pending', 'approved', 'rejected'].includes(String(o?.approvalStatus || '').trim()) ||
+          ['pending', 'approved', 'rejected'].includes(String(o?.cancelRequestStatus || '').trim())
+        const createdByName = isOnlineOrder ? 'ONLINE' : String(o?.createdByName || '').trim()
 
         return (
           <div key={`${o._id || o.id}-${String(o.batchId || 'legacy')}`} className="card kitchenOrderCard" style={{ borderColor: ageColor(o.batchSentAt || o.createdAt) }}>
@@ -433,8 +436,6 @@ export default function KitchenPage() {
                 const orderServingType = trOrderServingType(o)
                 const itemServingType = ['tray', 'plate', 'package'].includes(String(it?.servingType || '').trim()) ? String(it.servingType).trim() : null
                 const showItemServingType = !!orderServingType && orderServingType !== 'package' && !!itemServingType && itemServingType !== orderServingType
-                const showItemStatus = it?.status && String(it.status).trim() !== 'sent'
-                const itemStatusLabel = showItemStatus ? trKitchenStatusLabel(it.status) : ''
                 const actionItemId = Array.isArray(it?.itemIds) && it.itemIds.length > 0 ? String(it.itemIds[0]) : String(it?._id || '')
                 const actionItemIds = Array.isArray(it?.itemIds) && it.itemIds.length > 0
                   ? it.itemIds.map((id) => String(id || '').trim()).filter(Boolean)
@@ -445,19 +446,24 @@ export default function KitchenPage() {
                   <div key={it.__rowKey || it._id || `${o._id || o.id}-${it.menuItemId}-${index}`} className="kitchenItem">
                     <div className="kitchenItemBar" style={{ backgroundColor: getItemBgColor(it.status) }}>
                       <div className="kitchenItemRow">
-                        <div className="kitchenItemName">
+                        <div className="kitchenItemHeader">
+                          <div className="kitchenItemName">
                           {it?.isWeightBased
                             ? `${it.nameSnapshot} • ${Number(it?.weightGrams || 0)} gr`
                             : <><span style={{ color: '#dc2626', fontWeight: 800 }}>{it.qty} ADET</span>{' '}<span>{it.nameSnapshot}</span></>}
+                          </div>
+                          {!!it.note && <div className="kitchenItemNote">Not: {it.note}</div>}
                         </div>
-                        <div className="kitchenItemAge">{getItemAgeMinutes(o, it)} dk</div>
-                        <div className="kitchenItemActions">
-                          {showItemServingType && (
-                            <span className="page-pill kitchen-badge kitchen-badge--serving">{servingTypeLabelTR(itemServingType) || '-'}</span>
-                          )}
-                          {showItemStatus && (
-                            <span className="page-pill kitchen-badge kitchen-badge--item-status">{itemStatusLabel || '-'}</span>
-                          )}
+                        <div className="kitchenItemControls">
+                          <div className="kitchenItemAge">{getItemAgeMinutes(o, it)} dk</div>
+                          <div className="kitchenItemActions">
+                            {showItemServingType && (
+                              <div className="kitchenItemMeta">
+                                {showItemServingType && (
+                                  <span className="page-pill kitchen-badge kitchen-badge--serving">{servingTypeLabelTR(itemServingType) || '-'}</span>
+                                )}
+                              </div>
+                            )}
                           <button
                             type="button"
                             className="btn btn--xs kitchenItemBtn"
@@ -507,8 +513,8 @@ export default function KitchenPage() {
                             İptal
                           </button>
                         </div>
+                        </div>
                       </div>
-                      {!!it.note && <div className="kitchenItemNote">Not: {it.note}</div>}
                     </div>
                   </div>
                 )

@@ -28,6 +28,7 @@ import settingsLogoRouter from './routes/settingsLogo.js'
 import settingsMenuRouter from './routes/settingsMenu.js'
 import userPreferencesRouter from './routes/userPreferences.js'
 import printingRouter from './routes/printing.js'
+import waiterCallsRouter from './routes/waiterCalls.js'
 import { requireActiveSubscription } from './middlewares/requireActiveSubscription.js'
 import { requireAuth } from './middlewares/requireAuth.js'
 import { tenantGuard } from './middlewares/tenantGuard.js'
@@ -176,6 +177,7 @@ export const createServer = () => {
   })
   app.use('/api/reports', requireAuth, tenantGuard, requireActiveSubscription, reportsRouter)
   app.use('/api/tenant/tables', requireAuth, tenantGuard, requireActiveSubscription, tablesRouter)
+  app.use('/api/tenant/waiter-calls', requireAuth, tenantGuard, requireActiveSubscription, waiterCallsRouter)
   app.use('/api/tenant/audit', tenantAuditRouter)
   app.use('/api/tenant/payment-settings', requireAuth, tenantGuard, requireActiveSubscription, paymentSettingsRouter)
   app.use('/api/platform', platformRouter)

@@ -91,7 +91,19 @@ export const addItem = async (req, res) => {
     const weightGrams = weightGramsRaw === undefined || weightGramsRaw === null || weightGramsRaw === ''
       ? null
       : Number(weightGramsRaw)
-    const { order } = await addItemService(req.user.tenantId, req.params.id, menuItemId, { quantity, weightGrams })
+    const portionKey = String(req.body?.portionKey || '').trim()
+    const nameOverride = String(req.body?.nameOverride || '').trim()
+    const rawPriceOverride = req.body?.priceOverride
+    const priceOverride = rawPriceOverride === undefined || rawPriceOverride === null || rawPriceOverride === ''
+      ? null
+      : Number(rawPriceOverride)
+    const { order } = await addItemService(req.user.tenantId, req.params.id, menuItemId, {
+      quantity,
+      weightGrams,
+      portionKey,
+      nameOverride,
+      priceOverride
+    })
     try {
       await auditLog(req.user.tenantId, req.user.id, 'hızlı_urun_ekleme', 'order', order._id, { menuItemId: req.body?.menuItemId })
     } catch (e) {

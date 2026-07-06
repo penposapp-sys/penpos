@@ -11,6 +11,7 @@ import { useAppDate } from '../context/AppDateContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
 import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionExpired } from '../lib/subscription.js'
+import { api } from '../lib/apiClient.js'
 
 const todayYmd = () => {
   const d = new Date()
@@ -33,6 +34,7 @@ export default function Layout() {
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [topbarHeight, setTopbarHeight] = useState(0)
+  const [pendingOnlineCount, setPendingOnlineCount] = useState(0)
 
   useBodyLayoutMode('pos-app-layout')
 
@@ -116,6 +118,47 @@ export default function Layout() {
     else if (pathname.startsWith('/kermes')) document.title = 'PenPOS - Kermes'
     else document.title = 'PenPOS'
   }, [pathname])
+
+  useEffect(() => {
+    const perms = Array.isArray(user?.permissions) ? user.permissions : []
+    const canViewPackageOrders = Boolean(
+      user
+      && user.role !== 'platform_admin'
+      && user.role !== 'superadmin'
+      && (
+        user.role === 'tenant_admin'
+        || perms.includes('view_delivery')
+        || perms.includes('manage_delivery')
+        || perms.includes('package_orders_view')
+        || perms.includes('package_courier_page_view')
+      )
+    )
+
+    if (!canViewPackageOrders) {
+      setPendingOnlineCount(0)
+      return undefined
+    }
+
+    let cancelled = false
+    const loadPendingCount = async () => {
+      try {
+        const res = await api('/api/pos/package-orders/online-pending-count', {
+          silent: true,
+          suppressBranchModal: true
+        })
+        if (!cancelled) setPendingOnlineCount(Math.max(0, Number(res?.count || 0)))
+      } catch {
+        if (!cancelled) setPendingOnlineCount(0)
+      }
+    }
+
+    loadPendingCount()
+    const timer = window.setInterval(loadPendingCount, 20000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [user])
 
   const IconHome = ({ size = 18 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5H10v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -216,7 +259,7 @@ export default function Layout() {
       items.push({ path: '/kermes/app/walkin', label: 'Masasız Satış', icon: IconShoppingCart, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) {
-      items.push({ path: '/kermes/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true })
+      items.push({ path: '/kermes/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true, badgeCount: pendingOnlineCount })
     }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('package_courier_page_view') || perms.includes('package_orders_view'))) {
       items.push({ path: '/kermes/app/package-courier', label: 'Paket Kurye', icon: IconTruck, show: true })
@@ -244,6 +287,7 @@ export default function Layout() {
         to: item.path,
         label: item.label,
         icon: item.icon,
+        badgeCount: Number(item.badgeCount || 0),
         active: pathname === item.path
           || (item.path === '/kermes/app/tables' && pathname === '/kermes/app/pos')
           || (item.path !== '/kermes/app/kitchen' && pathname.startsWith(item.path + '/'))
@@ -465,6 +509,7 @@ export default function Layout() {
                 {navItems.map((item) => {
                   const Icon = item.icon
                   const active = item.to === current?.to
+                  const hasBadge = Number(item.badgeCount || 0) > 0
 
                   return (
                     <Link
@@ -512,7 +557,18 @@ export default function Layout() {
                           }}
                         />
                       )}
-                      <span style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: desktopCollapsed ? 0 : 8 }}>
+                      <span
+                        style={{
+                          position: 'relative',
+                          zIndex: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: desktopCollapsed ? 0 : 8,
+                          width: desktopCollapsed ? (hasBadge ? '100%' : 'auto') : '100%',
+                          justifyContent: desktopCollapsed ? (hasBadge ? 'space-between' : 'center') : 'flex-start',
+                          padding: desktopCollapsed && hasBadge ? '0 4px 0 0' : 0
+                        }}
+                      >
                         <span
                           style={{
                             position: 'relative',
@@ -534,6 +590,29 @@ export default function Layout() {
                         {!desktopCollapsed && (
                           <span style={{ position: 'relative', zIndex: 10, fontSize: 12, fontWeight: 900, color: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {item.label}
+                          </span>
+                        )}
+                        {hasBadge && (
+                          <span
+                            style={{
+                              position: 'relative',
+                              zIndex: 10,
+                              minWidth: 22,
+                              height: 22,
+                              padding: '0 7px',
+                              borderRadius: 999,
+                              background: '#ef4444',
+                              color: '#fff',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 11,
+                              fontWeight: 900,
+                              marginLeft: desktopCollapsed ? 6 : 'auto',
+                              flexShrink: 0
+                            }}
+                          >
+                            {item.badgeCount > 99 ? '99+' : item.badgeCount}
                           </span>
                         )}
                       </span>

@@ -1,8 +1,72 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import ProductImage from '../components/ProductImage.jsx'
 import { api } from '../lib/apiClient.js'
+import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
+
+const translations = {
+  tr: {
+    menuLoading: 'Menu yukleniyor...',
+    menuOpenError: 'Menu acilamadi',
+    login: 'Giris',
+    qrMenu: 'QR Menu',
+    featured: 'Bugunun onerisi',
+    tapForDetails: 'Detaylari gormek icin urune dokunun.',
+    searchPlaceholder: 'Urun, kategori veya aciklama ara...',
+    all: 'Tumu',
+    menu: 'Menu',
+    itemCount: (count) => `${count} urun listeleniyor`,
+    itemShortCount: (count) => `${count} urun`,
+    lightMenu: 'Beyaz menu',
+    darkMenu: 'Dark menu',
+    noResult: 'Sonuc bulunamadi',
+    noItems: 'Bu kategoride urun yok',
+    retrySearch: 'Arama ifadesini degistirip yeniden deneyin.',
+    retryCategory: 'Farkli bir kategori secip tekrar deneyin.',
+    details: 'Detaylari gor',
+    noDescription: 'Bu urun icin ek aciklama bulunmuyor.',
+    noItemDescription: 'Detaylar icin dokunun.',
+    languageTr: 'TR',
+    languageEn: 'EN',
+    table: 'Masa',
+    qrModeTable: 'Masa QR aktif',
+    qrModePublic: 'Genel QR',
+    waiterCall: 'Garson cagir',
+    waiterCallSending: 'Gonderiliyor...',
+    waiterCallSuccess: 'Garson cagrisi iletildi',
+  },
+  en: {
+    menuLoading: 'Loading menu...',
+    menuOpenError: 'Menu could not be opened',
+    login: 'Login',
+    qrMenu: 'QR Menu',
+    featured: 'Featured today',
+    tapForDetails: 'Tap the item to view details.',
+    searchPlaceholder: 'Search products, categories or descriptions...',
+    all: 'All',
+    menu: 'Menu',
+    itemCount: (count) => `${count} items listed`,
+    itemShortCount: (count) => `${count} items`,
+    lightMenu: 'Light menu',
+    darkMenu: 'Dark menu',
+    noResult: 'No results found',
+    noItems: 'No items in this category',
+    retrySearch: 'Change the search phrase and try again.',
+    retryCategory: 'Choose a different category and try again.',
+    details: 'View details',
+    noDescription: 'No additional description is available for this item.',
+    noItemDescription: 'Tap for details.',
+    languageTr: 'TR',
+    languageEn: 'EN',
+    table: 'Table',
+    qrModeTable: 'Table QR active',
+    qrModePublic: 'Public QR',
+    waiterCall: 'Call waiter',
+    waiterCallSending: 'Sending...',
+    waiterCallSuccess: 'Waiter call sent',
+  },
+}
 
 function normalizeText(value) {
   return String(value ?? '')
@@ -16,7 +80,7 @@ function normalizeText(value) {
 
 function formatMoney(value) {
   const amount = Number(value || 0)
-  return `₺${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `\u20BA${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function isVisibleItem(item) {
@@ -37,23 +101,23 @@ function buildCategoryMap(categories) {
   return map
 }
 
-function ProductCard({ item, onOpen }) {
+function ProductCard({ item, onOpen, showPrices, showDescriptions, labels }) {
   return (
     <button type="button" className="digital-public-menu-card digital-public-menu-card--product" onClick={() => onOpen(item)}>
       {!!item.imageUrl ? (
         <ProductImage className="digital-public-menu-card-image" product={item} alt={item.name} />
       ) : (
-        <div className="digital-public-menu-card-image digital-public-menu-card-image--placeholder" aria-hidden="true">🍽</div>
+        <div className="digital-public-menu-card-image digital-public-menu-card-image--placeholder" aria-hidden="true">{'\u{1F37D}'}</div>
       )}
       <div className="digital-public-menu-card-body">
         <div className="digital-public-menu-card-top">
           <h5>{item.name}</h5>
-          <span>{formatMoney(item.price)}</span>
+          {showPrices ? <span>{formatMoney(item.price)}</span> : null}
         </div>
-        <p>{item.description || 'Detaylar icin dokunun.'}</p>
+        {showDescriptions ? <p>{item.description || labels.noItemDescription}</p> : null}
         <div className="digital-public-menu-card-foot">
-          <span>Detaylari gor</span>
-          <span className="digital-public-menu-card-arrow" aria-hidden="true">›</span>
+          <span>{labels.details}</span>
+          <span className="digital-public-menu-card-arrow" aria-hidden="true">{'\u203A'}</span>
         </div>
       </div>
     </button>
@@ -62,6 +126,8 @@ function ProductCard({ item, onOpen }) {
 
 export default function PublicMenuPage() {
   const { tenantSlug } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tenant, setTenant] = useState(null)
@@ -70,6 +136,11 @@ export default function PublicMenuPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [detail, setDetail] = useState(null)
+  const [selectedTable, setSelectedTable] = useState(null)
+  const [availableTables, setAvailableTables] = useState([])
+  const [waiterCalling, setWaiterCalling] = useState(false)
+  const [language, setLanguage] = useState('tr')
+  const [tablePickerOpen, setTablePickerOpen] = useState(false)
 
   useBodyLayoutMode('public-site-layout')
 
@@ -79,7 +150,13 @@ export default function PublicMenuPage() {
       setLoading(true)
       setError('')
       try {
-        const res = await api(`/api/public/menu?tenantSlug=${encodeURIComponent(String(tenantSlug || '').trim())}`, {
+        const search = new URLSearchParams(location.search || '')
+        const tableId = String(search.get('tableId') || '').trim()
+        const tableName = String(search.get('table') || search.get('tableName') || '').trim()
+        const query = new URLSearchParams({ tenantSlug: String(tenantSlug || '').trim() })
+        if (tableId) query.set('tableId', tableId)
+        if (tableName) query.set('table', tableName)
+        const res = await api(`/api/public/menu?${query.toString()}`, {
           silent: true,
           skipBranchHeader: true
         })
@@ -94,6 +171,8 @@ export default function PublicMenuPage() {
         setTenant(res?.tenant || null)
         setCategories(Array.isArray(res?.categories) ? res.categories : [])
         setItems(Array.isArray(res?.items) ? res.items : [])
+        setSelectedTable(res?.table || null)
+        setAvailableTables(Array.isArray(res?.availableTables) ? res.availableTables : [])
         setSelectedCategory('all')
       } catch (err) {
         if (!mounted) return
@@ -107,7 +186,7 @@ export default function PublicMenuPage() {
     }
     run()
     return () => { mounted = false }
-  }, [tenantSlug])
+  }, [tenantSlug, location.search])
 
   useEffect(() => {
     document.title = tenant?.name ? `${tenant.name} | Dijital Menu` : 'PenPOS | Dijital Menu'
@@ -123,6 +202,15 @@ export default function PublicMenuPage() {
   const categoryMap = useMemo(() => buildCategoryMap(categories), [categories])
   const qrMenuSettings = tenant?.settings?.qrMenu || {}
   const qrThemeMode = qrMenuSettings?.themeMode === 'dark' ? 'dark' : 'light'
+  const showLogo = qrMenuSettings?.showLogo !== false
+  const showCoverImage = qrMenuSettings?.showCoverImage !== false
+  const showPrices = qrMenuSettings?.showPrices !== false
+  const showDescriptions = qrMenuSettings?.showDescriptions !== false
+  const waiterCallEnabled = qrMenuSettings?.waiterCall === true
+  const multiLanguageEnabled = qrMenuSettings?.multiLanguage === true
+  const tableQrEnabled = qrMenuSettings?.tableQrEnabled === true
+  const tenantLogoUrl = String(tenant?.logoUrl || '').trim()
+  const labels = translations[language] || translations.tr
 
   const products = useMemo(() => {
     return (Array.isArray(items) ? items : [])
@@ -143,7 +231,8 @@ export default function PublicMenuPage() {
 
   const visibleProducts = useMemo(() => {
     return products.filter((item) => {
-      const matchesSearch = !normalizedSearchTerm || normalizeText(`${item?.name || ''} ${item?.description || ''} ${item?.categoryName || ''}`).includes(normalizedSearchTerm)
+      const haystack = `${item?.name || ''} ${item?.description || ''} ${item?.categoryName || ''}`
+      const matchesSearch = !normalizedSearchTerm || normalizeText(haystack).includes(normalizedSearchTerm)
       if (!matchesSearch) return false
       if (selectedCategory === 'all' || selectedCategory === 'Tumu' || selectedCategory === 'Tümü') return true
       if (String(item?.categoryId || '') === String(selectedCategory)) return true
@@ -151,44 +240,81 @@ export default function PublicMenuPage() {
     })
   }, [products, selectedCategory, normalizedSearchTerm])
 
-  const groupedProducts = useMemo(() => {
-    const map = new Map()
-    for (const product of visibleProducts) {
-      const key = String(product?.categoryId || '').trim()
-      if (!key) continue
-      const list = map.get(key)
-      if (list) list.push(product)
-      else map.set(key, [product])
-    }
-    return map
-  }, [visibleProducts])
-
   const categoryTabs = useMemo(() => {
     const backendCategories = (Array.isArray(categories) ? categories : []).map((category) => ({
       id: String(category?.id || category?._id || '').trim(),
       name: String(category?.name || category?.title || '').trim()
     })).filter((category) => category.id && category.name)
-    return [{ id: 'all', name: 'Tumu' }, ...backendCategories]
-  }, [categories])
+    return [{ id: 'all', name: labels.all }, ...backendCategories]
+  }, [categories, labels.all])
 
-  const visibleCategories = useMemo(() => {
-    if (!normalizedSearchTerm) return categoryTabs.filter((category) => category.id !== 'all')
-    const ids = new Set(visibleProducts.map((item) => String(item?.categoryId || '')).filter(Boolean))
-    return categoryTabs.filter((category) => category.id !== 'all' && ids.has(String(category.id)))
-  }, [categoryTabs, visibleProducts, normalizedSearchTerm])
-
-  const featuredItem = visibleProducts[0] || products[0] || null
+  const featuredItem = useMemo(() => {
+    const selectedFeaturedId = String(qrMenuSettings?.featuredProductId || '').trim()
+    if (selectedFeaturedId) {
+      const matched = products.find((item) => String(item?.id || '') === selectedFeaturedId)
+      if (matched) return matched
+    }
+    return products[0] || null
+  }, [products, qrMenuSettings?.featuredProductId])
 
   useEffect(() => {
     const validIds = new Set(categoryTabs.map((category) => category.id))
     if (!validIds.has(String(selectedCategory || 'all'))) setSelectedCategory('all')
   }, [categoryTabs, selectedCategory])
 
+  const callWaiter = async () => {
+    if (!tenantSlug || !waiterCallEnabled || waiterCalling) return
+    if (tableQrEnabled && !selectedTable?.id) {
+      toast.error('Önce masa seçin')
+      return
+    }
+    setWaiterCalling(true)
+    try {
+      const res = await api('/api/public/menu/waiter-call', {
+        method: 'POST',
+        body: JSON.stringify({
+          tenantSlug,
+          tableId: selectedTable?.id || '',
+          tableName: selectedTable?.name || '',
+        }),
+        silent: true,
+        skipBranchHeader: true,
+      })
+      if (res?.success === false) {
+        toast.error(res?.message || labels.waiterCallSuccess)
+        return
+      }
+      toast.success(res?.message || labels.waiterCallSuccess)
+    } catch (err) {
+      toast.error(err?.message || 'Islem basarisiz')
+    } finally {
+      setWaiterCalling(false)
+    }
+  }
+
+  const toggleLanguage = () => {
+    setLanguage((prev) => (prev === 'tr' ? 'en' : 'tr'))
+  }
+
+  const selectTable = (table) => {
+    const params = new URLSearchParams(location.search || '')
+    if (table?.id) {
+      params.set('tableId', String(table.id))
+      params.set('table', String(table.name || ''))
+    } else {
+      params.delete('tableId')
+      params.delete('table')
+      params.delete('tableName')
+    }
+    setTablePickerOpen(false)
+    navigate(`${location.pathname}${params.toString() ? `?${params.toString()}` : ''}`, { replace: true })
+  }
+
   if (loading) {
     return (
       <div className="digital-public-menu-page">
         <div className="digital-public-menu-shell">
-          <div className="card">Menu yukleniyor...</div>
+          <div className="card">{labels.menuLoading}</div>
         </div>
       </div>
     )
@@ -199,11 +325,11 @@ export default function PublicMenuPage() {
       <div className="digital-public-menu-page">
         <div className="digital-public-menu-shell">
           <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
-            <div style={{ fontWeight: 800, color: '#b91c1c' }}>Menu acilamadi</div>
+            <div style={{ fontWeight: 800, color: '#b91c1c' }}>{labels.menuOpenError}</div>
             <div style={{ color: 'var(--muted)', marginTop: 6 }}>{error}</div>
           </div>
           <div style={{ marginTop: 10 }}>
-            <Link to="/login" className="btn">Giris</Link>
+            <Link to="/login" className="btn">{labels.login}</Link>
           </div>
         </div>
       </div>
@@ -212,34 +338,103 @@ export default function PublicMenuPage() {
 
   return (
     <div className="digital-public-menu-page" data-qr-theme={qrThemeMode}>
-      <div className="digital-public-menu-shell">
-        <header className="digital-public-menu-header">
-          <div className="digital-public-menu-brand-copy">
-            <h1 className="digital-public-menu-title">{tenant?.name || 'Test'}</h1>
+      <div className="digital-public-menu-shell digital-public-menu-shell--compact">
+        <header className="digital-public-menu-header digital-public-menu-header--compact">
+          <div className="digital-public-menu-brand-row">
+            <div className="digital-public-menu-brand-copy">
+              <div className="digital-public-menu-kicker">{labels.qrMenu}</div>
+              <h1 className="digital-public-menu-title">{tenant?.name || 'Test'}</h1>
+            </div>
           </div>
 
-          {featuredItem ? (
-            <section className="digital-public-menu-hero">
-              <div className="digital-public-menu-hero-copy">
-                <div className="digital-public-menu-hero-pill">Bugunun onerisi</div>
-                <h2>{featuredItem.name}</h2>
-                <p>Detaylari gormek icin urune dokunun.</p>
+          {(showLogo || (showCoverImage && featuredItem)) ? (
+            <div className="digital-public-menu-spotlight-row">
+              {showLogo ? (
+                <div className="digital-public-menu-badge-wrap">
+                  {tenantLogoUrl ? (
+                    <img className="digital-public-menu-logo" src={tenantLogoUrl} alt={`${tenant?.name || 'Isletme'} logosu`} />
+                  ) : (
+                    <div className="digital-public-menu-logo digital-public-menu-logo--placeholder" aria-hidden="true">
+                      {String(tenant?.name || 'QR').slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {showCoverImage && featuredItem ? (
+                <section className="digital-public-menu-hero">
+                  <div className="digital-public-menu-hero-copy">
+                    <div className="digital-public-menu-hero-pill">{labels.featured}</div>
+                    <h2>{featuredItem.name}</h2>
+                    <p>{showDescriptions ? (featuredItem.description || labels.tapForDetails) : labels.tapForDetails}</p>
+                  </div>
+                  <button type="button" className="digital-public-menu-hero-thumb" onClick={() => setDetail(featuredItem)}>
+                    {!!featuredItem.imageUrl ? (
+                      <ProductImage product={featuredItem} alt={featuredItem.name} />
+                    ) : (
+                      <div className="digital-public-menu-hero-placeholder" aria-hidden="true">{'\u{1F37D}'}</div>
+                    )}
+                  </button>
+                </section>
+              ) : null}
+            </div>
+          ) : null}
+
+          {(tableQrEnabled || multiLanguageEnabled || waiterCallEnabled) ? (
+            <div className="digital-public-menu-meta-row">
+              <div className="digital-public-menu-meta-pills">
+                {tableQrEnabled ? (
+                  <>
+                    <div className="digital-public-menu-info-pill">
+                      <strong>{labels.table}</strong>
+                      <span>{selectedTable?.name || '-'}</span>
+                    </div>
+                    <button type="button" className="digital-public-menu-secondary-btn digital-public-menu-secondary-btn--compact" onClick={() => setTablePickerOpen((prev) => !prev)}>
+                      Masa Seç
+                    </button>
+                  </>
+                ) : null}
               </div>
-              <button type="button" className="digital-public-menu-hero-thumb" onClick={() => setDetail(featuredItem)}>
-                {!!featuredItem.imageUrl ? (
-                  <ProductImage product={featuredItem} alt={featuredItem.name} />
-                ) : (
-                  <div className="digital-public-menu-hero-placeholder" aria-hidden="true">🍽</div>
-                )}
-              </button>
-            </section>
+              <div className="digital-public-menu-meta-actions">
+                {multiLanguageEnabled ? (
+                  <button type="button" className="digital-public-menu-secondary-btn digital-public-menu-secondary-btn--compact digital-public-menu-language-toggle" onClick={toggleLanguage}>
+                    {language === 'tr' ? labels.languageTr : labels.languageEn}
+                  </button>
+                ) : null}
+                {waiterCallEnabled ? (
+                  <button type="button" className="digital-public-menu-secondary-btn digital-public-menu-secondary-btn--compact" onClick={callWaiter} disabled={waiterCalling || (tableQrEnabled && !selectedTable?.id)}>
+                    {waiterCalling ? labels.waiterCallSending : labels.waiterCall}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {tableQrEnabled && tablePickerOpen ? (
+            <div className="digital-public-menu-meta-row" style={{ marginTop: 10 }}>
+              <div className="digital-public-menu-meta-pills" style={{ flexWrap: 'wrap' }}>
+                <button type="button" className="digital-public-menu-secondary-btn digital-public-menu-secondary-btn--compact" onClick={() => selectTable(null)}>
+                  Genel QR
+                </button>
+                {availableTables.map((table) => (
+                  <button
+                    key={table.id}
+                    type="button"
+                    className={`digital-public-menu-secondary-btn digital-public-menu-secondary-btn--compact${selectedTable?.id === table.id ? ' is-active' : ''}`}
+                    onClick={() => selectTable(table)}
+                  >
+                    {table.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : null}
 
           <label className="digital-public-menu-search">
-            <span className="digital-public-menu-search-icon" aria-hidden="true">⌕</span>
+            <span className="digital-public-menu-search-icon" aria-hidden="true">{'\u2315'}</span>
             <input
               className="digital-public-menu-search-input"
-              placeholder="Urun, kategori veya aciklama ara..."
+              placeholder={labels.searchPlaceholder}
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value || '')}
             />
@@ -262,48 +457,17 @@ export default function PublicMenuPage() {
           </div>
         </header>
 
-        <main className="digital-public-menu-content">
-          <div className="digital-public-menu-content-head">
-            <div>
-              <h3>{selectedCategory === 'all' ? 'Tumu' : categoryTabs.find((category) => String(category.id) === String(selectedCategory))?.name || 'Menu'}</h3>
-              <p>{visibleProducts.length} urun listeleniyor</p>
-            </div>
-            <div className="digital-public-menu-mode-pill">{qrThemeMode === 'dark' ? 'Dark menu' : 'Beyaz menu'}</div>
-          </div>
-
+        <main className="digital-public-menu-content digital-public-menu-content--full">
           {visibleProducts.length > 0 ? (
-            selectedCategory === 'all' ? (
-              <div className="digital-public-menu-sections">
-                {visibleCategories.map((category) => {
-                  const categoryId = String(category.id)
-                  const categoryItems = groupedProducts.get(categoryId) || []
-                  if (categoryItems.length === 0) return null
-                  return (
-                    <section key={categoryId} className="digital-public-menu-section">
-                      <div className="digital-public-menu-section-head">
-                        <h4>{category.name}</h4>
-                        <span>{categoryItems.length} urun</span>
-                      </div>
-                      <div className="digital-public-menu-grid">
-                        {categoryItems.map((item) => (
-                          <ProductCard key={item.id} item={item} onOpen={setDetail} />
-                        ))}
-                      </div>
-                    </section>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="digital-public-menu-grid">
-                {visibleProducts.map((item) => (
-                  <ProductCard key={item.id} item={item} onOpen={setDetail} />
-                ))}
-              </div>
-            )
+            <div className="digital-public-menu-grid">
+              {visibleProducts.map((item) => (
+                <ProductCard key={item.id} item={item} onOpen={setDetail} showPrices={showPrices} showDescriptions={showDescriptions} labels={labels} />
+              ))}
+            </div>
           ) : (
             <div className="digital-public-menu-empty">
-              <h4>{normalizedSearchTerm ? 'Sonuc bulunamadi' : 'Bu kategoride urun yok'}</h4>
-              <p>{normalizedSearchTerm ? 'Arama ifadesini degistirip yeniden deneyin.' : 'Farkli bir kategori secip tekrar deneyin.'}</p>
+              <h4>{normalizedSearchTerm ? labels.noResult : labels.noItems}</h4>
+              <p>{normalizedSearchTerm ? labels.retrySearch : labels.retryCategory}</p>
             </div>
           )}
         </main>
@@ -318,16 +482,16 @@ export default function PublicMenuPage() {
               ) : (
                 <div className="digital-public-menu-modal-image digital-public-menu-modal-image--placeholder" aria-hidden="true">IMG</div>
               )}
-              <button type="button" className="digital-public-menu-modal-close" onClick={() => setDetail(null)}>×</button>
+              <button type="button" className="digital-public-menu-modal-close" onClick={() => setDetail(null)}>{'\u00D7'}</button>
             </div>
 
             <div className="digital-public-menu-modal-body">
               <div className="digital-public-menu-modal-head">
                 <div>
                   <h3>{detail.name}</h3>
-                  <p>{detail.description || 'Bu urun icin ek aciklama bulunmuyor.'}</p>
+                  {showDescriptions ? <p>{detail.description || labels.noDescription}</p> : null}
                 </div>
-                <div className="digital-public-menu-modal-price">{formatMoney(detail.price)}</div>
+                {showPrices ? <div className="digital-public-menu-modal-price">{formatMoney(detail.price)}</div> : null}
               </div>
             </div>
           </div>

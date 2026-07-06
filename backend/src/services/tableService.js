@@ -9,6 +9,7 @@ import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { getTenantPlan, ensureNotExpired } from './planService.js'
 import mongoose from 'mongoose'
 import { applyBranchFilter } from '../utils/branchFilter.js'
+import WaiterCall from '../models/WaiterCall.js'
 
 export const listTablesService = async (tenantId, branchFilter) => {
   const list = await listTables(tenantId, branchFilter)
@@ -172,9 +173,25 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
     ? await User.find({ tenantId, _id: { $in: creatorIds } }).select('name').lean()
     : []
   const creatorNameById = new Map((creators || []).map(u => [String(u._id), String(u?.name || '').trim()]))
+  const openWaiterCalls = await WaiterCall.find({
+    tenantId,
+    status: 'open',
+    tableId: { $in: tables.map((table) => table._id).filter(Boolean) }
+  }).sort({ createdAt: -1 }).lean()
 
   const activeByTable = {}
   const paidByTable = {}
+  const waiterCallsByTable = {}
+  for (const call of openWaiterCalls) {
+    const key = String(call.tableId || '')
+    if (!key) continue
+    const current = waiterCallsByTable[key] || { count: 0, latestAt: null, latestId: '', tableName: String(call.tableName || '') }
+    current.count += 1
+    current.latestAt = call.createdAt || current.latestAt
+    current.latestId = String(call._id || current.latestId)
+    current.tableName = String(call.tableName || current.tableName || '')
+    waiterCallsByTable[key] = current
+  }
   for (const t of tables) {
     const key = String(t._id)
     if (!t.activeOrderId) {
@@ -216,7 +233,8 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
       branchId: t.branchId
     })),
     activeByTable,
-    paidByTable
+    paidByTable,
+    waiterCallsByTable
   }
 }
 

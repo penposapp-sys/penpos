@@ -14,6 +14,8 @@ const deliveredHourPresets = [
 ]
 
 const statusColors = {
+  cancel_pending: '#dc2626',
+  approval_pending: '#f97316',
   pending: '#fbbf24',
   accepted: '#3b82f6',
   preparing: '#8b5cf6',
@@ -23,6 +25,8 @@ const statusColors = {
 }
 
 const statusLabels = {
+  cancel_pending: 'Iptal Onayi Bekliyor',
+  approval_pending: 'Onay Bekliyor',
   pending: 'Bekliyor',
   accepted: 'Onaylandi',
   preparing: 'Hazirlaniyor',
@@ -52,6 +56,8 @@ function normalizeOrder(order) {
 
 function computeUiStatus(order) {
   const current = order || {}
+  if (String(current?.orderChannel || '') === 'online' && String(current?.cancelRequestStatus || '') === 'pending') return 'cancel_pending'
+  if (String(current?.orderChannel || '') === 'online' && String(current?.approvalStatus || '') === 'pending') return 'approval_pending'
   if (String(current.status || '') === 'cancelled' || String(current.deliveryStatus || '') === 'cancelled') return 'cancelled'
   if (current.deliveredAt || String(current.status || '') === 'delivered' || String(current.deliveryStatus || '') === 'delivered') return 'delivered'
   const items = Array.isArray(current.items) ? current.items : []
@@ -95,6 +101,7 @@ export default function DeliveryOrdersPage() {
   const [customerSuggestions, setCustomerSuggestions] = useState([])
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
   const [payMethods, setPayMethods] = useState([])
+  const [approvingId, setApprovingId] = useState('')
 
   const loadOrders = async (nextTab = tab, opts = {}) => {
     const nextPage = opts.page ?? 1
@@ -285,6 +292,66 @@ export default function DeliveryOrdersPage() {
     setCustomerSuggestions([])
   }
 
+  const approveOnlineOrder = async (order) => {
+    const id = String(getOrderId(order) || '').trim()
+    if (!id) return
+    if (!canManageDelivery) {
+      toast.error('Bu islem icin yetkiniz yok')
+      return
+    }
+
+    setApprovingId(id)
+    try {
+      const res = await api(`/api/pos/package-orders/${id}/approve-online`, {
+        method: 'POST',
+        silent: true
+      })
+      if (res?.success === false) {
+        toast.error(res?.message || 'Siparis onaylanamadi')
+        return
+      }
+
+      const fresh = normalizeOrder(res?.order || res?.data?.order || null)
+      if (fresh) {
+        setOrders((prev) => prev.map((item) => (String(getOrderId(item) || '') === id ? { ...item, ...fresh } : item)))
+      }
+      toast.success('Siparis onaylandi ve hazirlanacaklara gonderildi')
+    } catch (err) {
+      toast.error(err?.message || 'Siparis onaylanamadi')
+    } finally {
+      setApprovingId('')
+    }
+  }
+
+  const approveCancelRequest = async (order) => {
+    const id = String(getOrderId(order) || '').trim()
+    if (!id) return
+    if (!canManageDelivery) {
+      toast.error('Bu islem icin yetkiniz yok')
+      return
+    }
+    setApprovingId(id)
+    try {
+      const res = await api(`/api/pos/package-orders/${id}/approve-cancel-request`, {
+        method: 'POST',
+        silent: true
+      })
+      if (res?.success === false) {
+        toast.error(res?.message || 'Iptal talebi onaylanamadi')
+        return
+      }
+      const fresh = normalizeOrder(res?.order || res?.data?.order || null)
+      if (fresh) {
+        setOrders((prev) => prev.map((item) => (String(getOrderId(item) || '') === id ? { ...item, ...fresh } : item)))
+      }
+      toast.success('Iptal talebi onaylandi')
+    } catch (err) {
+      toast.error(err?.message || 'Iptal talebi onaylanamadi')
+    } finally {
+      setApprovingId('')
+    }
+  }
+
   return (
     <div className="delivery-page-shell scrollbar-hidden">
       <div className="delivery-page-header">
@@ -346,6 +413,7 @@ export default function DeliveryOrdersPage() {
             const payments = Array.isArray(order?.payments) ? order.payments : []
             return payments.reduce((sum, payment) => sum + (Number(payment?.amount) || 0), 0)
           })()
+          const balance = Math.max(0, Number(order?.balanceDue ?? order?.totals?.balanceDue ?? (total - paid)))
           const status = computeUiStatus(order)
           const deliveredAt = formatDeliveredTime(order)
           const createdAt = (() => {
@@ -371,13 +439,14 @@ export default function DeliveryOrdersPage() {
                 <div>
                   <strong>{order?.customerName || 'Musteri'}</strong>
                   {order?.orderNo ? <div className="delivery-card-order-no">Siparis {order.orderNo}</div> : null}
+                  {String(order?.orderChannel || '') === 'online' ? <div className="delivery-card-order-no">Online Siparis</div> : null}
                 </div>
                 <span className="page-pill" style={{ color: statusColors[status] }}>{statusLabels[status]}</span>
               </div>
 
               <div className="delivery-card-info">
                 <span>Telefon: {order?.customerPhone || '-'}</span>
-                <span>Tutar: {total.toFixed(2)} TL</span>
+                <span>{tab === 'delivered' ? 'Tutar' : 'Kalan'}: {(tab === 'delivered' ? total : balance).toFixed(2)} TL</span>
                 <span>Odenen: {paid.toFixed(2)} TL</span>
                 <span>Adres: {order?.customerAddress || '-'}</span>
                 {tab === 'delivered' && deliveredAt ? <span>Teslim: {deliveredAt}</span> : null}
@@ -385,6 +454,34 @@ export default function DeliveryOrdersPage() {
 
               <div className="delivery-card-footer">
                 <span>{createdAt}</span>
+                {status === 'approval_pending' && canManageDelivery && (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={approvingId === String(id)}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      approveOnlineOrder(order)
+                    }}
+                  >
+                    {approvingId === String(id) ? 'Onaylaniyor...' : 'Onayla'}
+                  </button>
+                )}
+                {status === 'cancel_pending' && canManageDelivery && (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={approvingId === String(id)}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      approveCancelRequest(order)
+                    }}
+                  >
+                    {approvingId === String(id) ? 'Onaylaniyor...' : 'Iptal Onayla'}
+                  </button>
+                )}
               </div>
             </button>
           )

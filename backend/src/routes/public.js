@@ -1,15 +1,24 @@
 import { Router } from 'express'
 import {
   createPublicCanteenQrOrder,
+  createPublicOnlineStoreOrder,
+  getPublicOnlineStoreCustomerProfile,
+  requestPublicOnlineStoreOrderCancellation,
+  createPublicWaiterCall,
   downloadPrintAgentSetup,
   getPrintAgentWindowsManifest,
   getPublicCanteenQr,
   getPublicMenu,
+  getPublicOnlineStore,
+  loginPublicOnlineStoreCustomer,
   getPublicQrCustomerProfile,
+  registerPublicOnlineStoreCustomer,
   loginPublicQrCustomer,
   registerPublicQrCustomer,
+  updatePublicOnlineStoreCustomerProfile,
   updatePublicQrCustomerProfile,
   updatePublicQrCustomerFavorites,
+  upsertPublicOnlineStoreCustomer,
   upsertPublicQrCustomer
 } from '../controllers/publicController.js'
 import { registerPublicTenant } from '../controllers/publicRegisterController.js'
@@ -19,6 +28,15 @@ import { getPublicTenantWebsite, getPublicWebsiteByHost } from '../controllers/t
 const router = Router()
 
 router.get('/menu', getPublicMenu)
+router.post('/menu/waiter-call', createPublicWaiterCall)
+router.get('/online-store', getPublicOnlineStore)
+router.post('/online-store/orders', createPublicOnlineStoreOrder)
+router.post('/online-store/orders/:orderId/cancel-request', requestPublicOnlineStoreOrderCancellation)
+router.post('/online-store/customer/session', upsertPublicOnlineStoreCustomer)
+router.post('/online-store/customer/register', registerPublicOnlineStoreCustomer)
+router.post('/online-store/customer/login', loginPublicOnlineStoreCustomer)
+router.get('/online-store/customer/profile', getPublicOnlineStoreCustomerProfile)
+router.put('/online-store/customer/profile', updatePublicOnlineStoreCustomerProfile)
 router.get('/qr', getPublicCanteenQr)
 router.post('/qr-orders', createPublicCanteenQrOrder)
 router.post('/qr-customer/session', upsertPublicQrCustomer)

@@ -10,7 +10,7 @@ const OPEN_TABLES_CATEGORY = 'Acik Masalar'
 
 const inferTableCategory = (table) => {
   const raw = String(table?.name || '').trim()
-  if (!raw) return 'Diğer'
+  if (!raw) return 'Diger'
   const normalized = raw
     .replace(/\s+\d+$/u, '')
     .replace(/\s+/g, ' ')
@@ -59,6 +59,7 @@ export function TablesManagementContent({ embedded = false }) {
   const [tables, setTables] = useState([])
   const [activeByTable, setActiveByTable] = useState({})
   const [paidByTable, setPaidByTable] = useState({})
+  const [waiterCallsByTable, setWaiterCallsByTable] = useState({})
   const [error, setError] = useState('')
   const [activeCategory, setActiveCategory] = useState('')
   const [busyTableId, setBusyTableId] = useState(null)
@@ -71,7 +72,7 @@ export function TablesManagementContent({ embedded = false }) {
   const loadingRef = useRef(false)
 
   const parseApiError = (err) => {
-    if (!err) return 'Bir hata oluştu. Tekrar deneyin.'
+    if (!err) return 'Bir hata olustu. Tekrar deneyin.'
     if (err?.name === 'AbortError') return null
 
     const status = err?.status
@@ -79,15 +80,15 @@ export function TablesManagementContent({ embedded = false }) {
 
     if (status === 409) {
       const messages = {
-        table_in_use: 'Bu masada zaten aktif sipariş var. Liste yenilendi.',
-        order_not_editable: 'Bu sipariş artık düzenlenemez. Liste yenilendi.',
-        invalid_state: 'İşlem yapılamadı. Liste yenilendi.'
+        table_in_use: 'Bu masada zaten aktif siparis var. Liste yenilendi.',
+        order_not_editable: 'Bu siparis artik duzenlenemez. Liste yenilendi.',
+        invalid_state: 'Islem yapilamadi. Liste yenilendi.'
       }
-      return messages[code] || 'İşlem yapılamadı. Liste yenilendi.'
+      return messages[code] || 'Islem yapilamadi. Liste yenilendi.'
     }
 
-    if (status >= 500) return 'Bir hata oluştu. Tekrar deneyin.'
-    return err?.data?.message || err?.message || 'Bir hata oluştu. Tekrar deneyin.'
+    if (status >= 500) return 'Bir hata olustu. Tekrar deneyin.'
+    return err?.data?.message || err?.message || 'Bir hata olustu. Tekrar deneyin.'
   }
 
   const load = async (options = {}) => {
@@ -97,7 +98,8 @@ export function TablesManagementContent({ embedded = false }) {
       setTables([])
       setActiveByTable({})
       setPaidByTable({})
-      setError('Sistem Ayarları > Yetkili Şubeler bölümünden şube seçin')
+      setWaiterCallsByTable({})
+      setError('Sistem Ayarlari > Yetkili Subeler bolumunden sube secin')
       return null
     }
 
@@ -115,25 +117,29 @@ export function TablesManagementContent({ embedded = false }) {
         setTables([])
         setActiveByTable({})
         setPaidByTable({})
-        setError(res.message || 'Bir hata oluştu')
+        setWaiterCallsByTable({})
+        setError(res.message || 'Bir hata olustu')
         return null
       }
 
       const nextTables = Array.isArray(res?.tables) ? res.tables : []
       const nextActiveByTable = res?.activeByTable || {}
       const nextPaidByTable = res?.paidByTable || {}
+      const nextWaiterCallsByTable = res?.waiterCallsByTable || {}
 
       setTables(nextTables)
       setActiveByTable(nextActiveByTable)
       setPaidByTable(nextPaidByTable)
+      setWaiterCallsByTable(nextWaiterCallsByTable)
 
       return {
         tables: nextTables,
         activeByTable: nextActiveByTable,
-        paidByTable: nextPaidByTable
+        paidByTable: nextPaidByTable,
+        waiterCallsByTable: nextWaiterCallsByTable
       }
     } catch (err) {
-      setError(err?.message || 'Bir hata oluştu')
+      setError(err?.message || 'Bir hata olustu')
       return null
     } finally {
       loadingRef.current = false
@@ -246,7 +252,7 @@ export function TablesManagementContent({ embedded = false }) {
 
     const tableId = table?.id
     if (!tableId) {
-      toast.error('Masa id bulunamadı')
+      toast.error('Masa id bulunamadi')
       return
     }
 
@@ -254,10 +260,28 @@ export function TablesManagementContent({ embedded = false }) {
       const branchId = String(table.branchId)
       const allowedStr = Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String) : []
       if (allowedStr.length > 0 && !allowedStr.includes(branchId)) {
-        toast.error('Bu masaya erişim yetkin yok')
+        toast.error('Bu masaya erisim yetkin yok')
         return
       }
       localStorage.setItem('selectedBranchId', branchId)
+    }
+
+    if ((waiterCallsByTable?.[tableId]?.count || 0) > 0) {
+      try {
+        await api(`/api/tenant/waiter-calls/table/${tableId}/resolve`, {
+          method: 'PUT',
+          body: JSON.stringify({}),
+          silent: true,
+          skipBranchHeader: true,
+        })
+        setWaiterCallsByTable((prev) => {
+          const next = { ...(prev || {}) }
+          delete next[tableId]
+          return next
+        })
+      } catch (err) {
+        toast.error(err?.message || 'Garson cagrisi kapatilamadi')
+      }
     }
 
     const active = activeByTable[tableId]
@@ -308,45 +332,77 @@ export function TablesManagementContent({ embedded = false }) {
     }
   }
 
+  const totalWaiterCalls = useMemo(
+    () => Object.values(waiterCallsByTable || {}).reduce((sum, item) => sum + Number(item?.count || 0), 0),
+    [waiterCallsByTable]
+  )
+
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {Array.isArray(allowedBranchIds) && allowed.length === 0 && (
         <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', marginBottom: 12 }}>
           <div style={{ fontWeight: 800, color: '#b91c1c' }}>
-            Şube yetkisi yok. Ayarlar &gt; Sistem Ayarları &gt; Yetkili Şubeler bölümünden şube seçin.
+            Sube yetkisi yok. Ayarlar &gt; Sistem Ayarlari &gt; Yetkili Subeler bolumunden sube secin.
           </div>
         </div>
       )}
 
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>İşlem sürüyor...</div>}
+      {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>Islem suruyor...</div>}
 
       {categories.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className="btn"
-              onClick={() => setActiveCategory(category)}
-              style={{
-                fontWeight: activeCategory === category ? 800 : 700,
-                borderColor: activeCategory === category ? 'var(--border-hover)' : 'var(--app-border, var(--border))',
-                background: activeCategory === category ? 'var(--menu-active-bg, var(--card-hover))' : 'var(--app-surface, var(--panel))',
-                color: activeCategory === category ? 'var(--sidebar-nav-text-active, #ffffff)' : 'var(--app-text, var(--text))',
-                boxShadow: activeCategory === category ? 'none' : 'var(--card-shadow)',
-                borderWidth: 1.5,
-                borderStyle: 'solid',
-                borderRadius: 14,
-                padding: '10px 14px'
-              }}
-            >
-              {category}
-              <span style={{ marginLeft: 6, color: 'var(--muted)' }}>
-                ({groupedTables[category]?.length || 0})
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                className="btn"
+                onClick={() => setActiveCategory(category)}
+                style={{
+                  fontWeight: activeCategory === category ? 800 : 700,
+                  borderColor: activeCategory === category ? 'var(--border-hover)' : 'var(--app-border, var(--border))',
+                  background: activeCategory === category ? 'var(--menu-active-bg, var(--card-hover))' : 'var(--app-surface, var(--panel))',
+                  color: activeCategory === category ? 'var(--sidebar-nav-text-active, #ffffff)' : 'var(--app-text, var(--text))',
+                  boxShadow: activeCategory === category ? 'none' : 'var(--card-shadow)',
+                  borderWidth: 1.5,
+                  borderStyle: 'solid',
+                  borderRadius: 14,
+                  padding: '10px 14px'
+                }}
+              >
+                {category}
+                <span style={{ marginLeft: 6, color: 'var(--muted)' }}>
+                  ({groupedTables[category]?.length || 0})
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <button className="btn" type="button" onClick={() => nav('/kermes/app/waiter-calls')} style={{ flexShrink: 0 }}>
+            Garson Cagrilari
+            {totalWaiterCalls > 0 ? (
+              <span
+                style={{
+                  marginLeft: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 22,
+                  height: 22,
+                  padding: '0 6px',
+                  borderRadius: 999,
+                  background: '#f97316',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 900,
+                  lineHeight: 1
+                }}
+              >
+                {totalWaiterCalls}
               </span>
-            </button>
-          ))}
+            ) : null}
+          </button>
         </div>
       )}
 
@@ -354,6 +410,7 @@ export function TablesManagementContent({ embedded = false }) {
         {(groupedTables[activeCategory] || []).map((table) => {
           const active = activeByTable[table.id]
           const paid = paidByTable[table.id] || {}
+          const waiterCall = waiterCallsByTable[table.id] || null
           const elapsedMinutes = getElapsedMinutes(paid?.createdAt, nowTs)
           const createdByName = String(paid?.createdByName || '').trim()
           const isAnyBusy = busyGlobal || !!busyTableId
@@ -381,12 +438,20 @@ export function TablesManagementContent({ embedded = false }) {
             >
               {isBusy && (
                 <span className="page-pill" style={{ position: 'absolute', top: 12, left: 12 }}>
-                  İşleniyor
+                  Isleniyor
                 </span>
               )}
               {paid?.isPaid && (
                 <span className="page-pill" style={{ position: 'absolute', top: 12, right: 12 }}>
-                  Ödendi
+                  Odendi
+                </span>
+              )}
+              {waiterCall?.count > 0 && (
+                <span
+                  className="page-pill"
+                  style={{ position: 'absolute', right: 12, bottom: 12, background: '#f97316', color: '#fff', borderColor: '#f97316' }}
+                >
+                  Garson Cagiriyor
                 </span>
               )}
 
@@ -396,13 +461,19 @@ export function TablesManagementContent({ embedded = false }) {
 
               {active?.hasActive && createdByName && (
                 <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 700 }}>
-                  Siparişi Alan: {createdByName}
+                  Siparisi Alan: {createdByName}
+                </div>
+              )}
+
+              {waiterCall?.count > 0 && (
+                <div style={{ fontSize: 12, color: '#c2410c', fontWeight: 800 }}>
+                  Acik garson cagrisi var ({waiterCall.count})
                 </div>
               )}
 
               {active?.hasActive && paid?.hasCancelAlert === true && (
                 <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 800 }}>
-                  İptal var
+                  Iptal var
                 </div>
               )}
 
@@ -432,12 +503,12 @@ export function TablesManagementContent({ embedded = false }) {
                 }}
               >
                 <div style={{ color: !active?.hasActive ? '#22c55e' : (paid?.isPaid ? 'var(--muted)' : '#ef4444') }}>
-                  {!active?.hasActive ? 'Boş' : (paid?.isPaid ? 'Dolu (Ödendi)' : 'Dolu')}
+                  {!active?.hasActive ? 'Bos' : (paid?.isPaid ? 'Dolu (Odendi)' : 'Dolu')}
                 </div>
                 {active?.hasActive && (
                   <div style={{ color: 'var(--muted)' }}>
                     {formatTime(paid?.createdAt)}
-                    {elapsedMinutes !== null ? ` • ${elapsedMinutes} dk geçti` : ''}
+                    {elapsedMinutes !== null ? ` • ${elapsedMinutes} dk gecti` : ''}
                   </div>
                 )}
               </div>
@@ -457,7 +528,7 @@ export function TablesManagementContent({ embedded = false }) {
                       borderRadius: 9
                     }}
                   >
-                    Masa Birleştir
+                    Masa Birlestir
                   </button>
                 </div>
               )}
@@ -467,7 +538,7 @@ export function TablesManagementContent({ embedded = false }) {
 
         {tables.length === 0 && (
           <div className="card">
-            Masa tanımlı değil. İşletme yöneticisi Ayarlar &gt; Masalar üzerinden ekleyebilir.
+            Masa tanimli degil. Isletme yoneticisi Ayarlar &gt; Masalar uzerinden ekleyebilir.
           </div>
         )}
       </div>
@@ -475,7 +546,7 @@ export function TablesManagementContent({ embedded = false }) {
       <Modal
         open={mergeOpen}
         onClose={() => ((busyGlobal || !!busyTableId) ? null : setMergeOpen(false))}
-        title="Masa Birleştir"
+        title="Masa Birlestir"
       >
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hedef: {targetTable?.name}</div>
@@ -496,7 +567,7 @@ export function TablesManagementContent({ embedded = false }) {
               ))}
 
             {tables.filter((table) => table.status !== 'empty' && table.id !== targetTable?.id).length === 0 && (
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Birleştirilecek uygun masa yok.</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Birlestirilecek uygun masa yok.</div>
             )}
           </div>
 
@@ -506,10 +577,10 @@ export function TablesManagementContent({ embedded = false }) {
               onClick={submitMerge}
               disabled={mergeSources.length === 0 || busyGlobal || !!busyTableId}
             >
-              Birleştir
+              Birlestir
             </button>
             <button className="btn" onClick={() => setMergeOpen(false)} disabled={busyGlobal || !!busyTableId}>
-              İptal
+              Iptal
             </button>
           </div>
         </div>

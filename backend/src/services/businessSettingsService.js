@@ -6,6 +6,7 @@ import Branch from '../models/Branch.js'
 import { error } from '../utils/errors.js'
 import { buildIncomingBusinessSettings, mergeBusinessSettings } from '../utils/businessSettings.js'
 import { resolveUploadDir } from '../utils/uploads.js'
+import { listTablesService } from './tableService.js'
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -49,6 +50,17 @@ export const listBusinessBranches = async (tenantId) => {
   }).sort({ name: 1 }).lean()
 
   return branches.map(toBranchDto)
+}
+
+export const listBusinessQrTables = async (tenantId) => {
+  const tables = await listTablesService(tenantId, null)
+  return tables
+    .filter((table) => table?.isActive !== false)
+    .map((table) => ({
+      id: String(table.id || ''),
+      name: String(table.name || ''),
+      branchId: table?.branchId ? String(table.branchId) : '',
+    }))
 }
 
 export const getBusinessSettings = async (tenantId) => {

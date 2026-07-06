@@ -75,9 +75,27 @@ export const defaultBusinessSettings = {
     showPrices: true,
     showDescriptions: true,
     themeMode: 'light',
+    featuredProductId: '',
     waiterCall: false,
     multiLanguage: false,
     tableQrEnabled: false,
+  },
+  onlineSales: {
+    enabled: false,
+    branchId: '',
+    title: '',
+    description: '',
+    phone: '',
+    whatsapp: '',
+    email: '',
+    address: '',
+    workingHours: '',
+    showLogo: true,
+    showPrices: true,
+    showDescriptions: true,
+    featuredProductId: '',
+    autoSendToKitchen: true,
+    allowCustomerNote: true,
   },
 }
 
@@ -217,6 +235,10 @@ export function mergeBusinessSettings(existingSettings = {}) {
             ? safeExisting.qrMenuEnabled
             : defaultBusinessSettings.qrMenu.enabled,
     },
+    onlineSales: {
+      ...defaultBusinessSettings.onlineSales,
+      ...(isPlainObject(safeExisting.onlineSales) ? safeExisting.onlineSales : {}),
+    },
   }
 
   if (!merged.logo.url && typeof safeExisting.logoUrl === 'string') {
@@ -273,6 +295,10 @@ export function buildSafeBusinessSettings(currentSettings = {}, form = {}) {
     qrMenu: {
       ...mergedCurrent.qrMenu,
       ...(safeForm.qrMenu || {}),
+    },
+    onlineSales: {
+      ...mergedCurrent.onlineSales,
+      ...(safeForm.onlineSales || {}),
     },
   })
 }

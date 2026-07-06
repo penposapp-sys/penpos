@@ -1,4 +1,4 @@
-import { getBusinessSettings, listBusinessBranches, updateBusinessSettings } from '../services/businessSettingsService.js'
+import { getBusinessSettings, listBusinessBranches, listBusinessQrTables, updateBusinessSettings } from '../services/businessSettingsService.js'
 
 export const getSettings = async (req, res) => {
   const data = await getBusinessSettings(req.user.tenantId)
@@ -13,4 +13,9 @@ export const updateSettings = async (req, res) => {
 export const getBranches = async (req, res) => {
   const branches = await listBusinessBranches(req.user.tenantId)
   res.json({ success: true, branches })
+}
+
+export const getQrTables = async (req, res) => {
+  const tables = await listBusinessQrTables(req.user.tenantId)
+  res.json({ success: true, tables })
 }

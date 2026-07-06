@@ -1,5 +1,17 @@
 import mongoose from 'mongoose'
 
+const pushDeviceSchema = new mongoose.Schema(
+  {
+    token: { type: String, required: true },
+    platform: { type: String, enum: ['android', 'ios', 'web', 'unknown'], default: 'unknown' },
+    deviceId: { type: String, default: '' },
+    appVersion: { type: String, default: '' },
+    lastSeenAt: { type: Date, default: Date.now },
+    disabledAt: { type: Date, default: null }
+  },
+  { _id: false }
+)
+
 const userSchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null },
   branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
@@ -37,6 +49,7 @@ const userSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: null },
   status: { type: String, default: 'active', index: true },
   permissions: { type: [String], default: [] },
+  pushDevices: { type: [pushDeviceSchema], default: [] },
   resetPasswordToken: { type: String, default: null, index: true },
   resetPasswordExpires: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }

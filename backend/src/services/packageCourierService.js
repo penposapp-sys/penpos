@@ -1,9 +1,11 @@
 import mongoose from 'mongoose'
+import AccountTransaction from '../models/AccountTransaction.js'
 import Order from '../models/Order.js'
 import User from '../models/User.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import { error } from '../utils/errors.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
+import { notifyCourierAssigned } from './pushNotificationService.js'
 
 const PACKAGE_STATUS_LABELS = {
   yeni: 'Yeni Sipariş',
@@ -75,6 +77,25 @@ const canCollectPayment = (user) => {
   return perms.includes('take_payment')
 }
 
+const computeOrderCollectionTotal = async (tenantId, orderId, accountId = '') => {
+  if (!mongoose.Types.ObjectId.isValid(String(orderId || ''))) return 0
+  const filter = {
+    tenantId: new mongoose.Types.ObjectId(String(tenantId)),
+    orderId: new mongoose.Types.ObjectId(String(orderId)),
+    source: 'collection',
+    type: 'credit',
+    isDeleted: { $ne: true }
+  }
+  if (accountId && mongoose.Types.ObjectId.isValid(String(accountId))) {
+    filter.accountId = new mongoose.Types.ObjectId(String(accountId))
+  }
+  const rows = await AccountTransaction.aggregate([
+    { $match: filter },
+    { $group: { _id: null, sum: { $sum: '$amount' } } }
+  ])
+  return Number(rows?.[0]?.sum || 0) || 0
+}
+
 const toLegacyDeliveryStatus = (status) => {
   switch (status) {
     case 'yeni': return 'pending'
@@ -142,6 +163,12 @@ const normalizePackagePaymentStatus = (order) => {
   return 'odeme_bekliyor'
 }
 
+const normalizeApprovalStatus = (order) => {
+  const status = normalizeText(order?.approvalStatus)
+  if (status === 'pending' || status === 'approved' || status === 'rejected') return status
+  return 'none'
+}
+
 const ensurePackageOrder = (order) => {
   if (!order) throw error('not_found', 'Sipariş bulunamadı', 404)
   const saleType = normalizeText(order.saleType)
@@ -171,11 +198,19 @@ const computeTotals = (order) => {
   return Number.isFinite(total) ? total : 0
 }
 
+const withCollectionEntries = (order) => {
+  if (!order) return order
+  const collectionEntries = Array.isArray(order?.collectionEntries)
+    ? order.collectionEntries
+    : (Array.isArray(order?.linkedCollections) ? order.linkedCollections : [])
+  return { ...order, collectionEntries }
+}
+
 const mapOrder = (order) => {
   const status = normalizePackageStatus(order)
   const paymentStatus = normalizePackagePaymentStatus(order)
   const address = getAddressSnapshot(order)
-  const paymentSummary = computePaymentSummary(order)
+  const paymentSummary = computePaymentSummary(withCollectionEntries(order))
   const items = Array.isArray(order?.items) ? order.items : []
   const visibleItems = items.filter((item) => item?.status !== 'cancelled')
   const itemsSummary = visibleItems
@@ -211,6 +246,9 @@ const mapOrder = (order) => {
     updatedAt: order?.updatedAt || null,
     deliveryStatus: status,
     deliveryStatusLabel: PACKAGE_STATUS_LABELS[status] || status,
+    orderChannel: normalizeText(order?.orderChannel) || 'manual',
+    approvalStatus: normalizeApprovalStatus(order),
+    cancelRequestStatus: normalizeText(order?.cancelRequestStatus) || 'none',
     preparationStatus: derivePreparationStatus(order),
     deliveryPaymentStatus: paymentStatus,
     deliveryPaymentStatusLabel: PACKAGE_PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus,
@@ -229,6 +267,50 @@ const mapOrder = (order) => {
     itemCount: visibleItems.length,
     deliveryEvents: Array.isArray(order?.deliveryEvents) ? order.deliveryEvents : []
   }
+}
+
+const attachCollectionEntries = async (tenantId, orders = []) => {
+  const list = Array.isArray(orders) ? orders.filter(Boolean) : []
+  const orderIds = list
+    .map((order) => String(order?._id || order?.id || '').trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+  if (orderIds.length === 0) return list
+
+  const rows = await AccountTransaction.find({
+    tenantId,
+    orderId: { $in: orderIds.map((id) => new mongoose.Types.ObjectId(id)) },
+    source: 'collection',
+    type: 'credit',
+    isDeleted: { $ne: true }
+  })
+    .select('_id orderId amount method methodId methodLabel methodName methodBucket methodType note createdAt')
+    .lean()
+
+  const byOrderId = new Map()
+  for (const row of rows) {
+    const key = String(row?.orderId || '').trim()
+    if (!key) continue
+    const current = byOrderId.get(key) || []
+    current.push({
+      id: String(row?._id || ''),
+      amount: Number(row?.amount || 0) || 0,
+      method: String(row?.method || 'other'),
+      methodId: String(row?.methodId || ''),
+      methodLabel: String(row?.methodLabel || row?.method || ''),
+      methodName: String(row?.methodName || ''),
+      methodBucket: String(row?.methodBucket || ''),
+      methodType: String(row?.methodType || ''),
+      note: String(row?.note || ''),
+      createdAt: row?.createdAt || null,
+      source: 'collection'
+    })
+    byOrderId.set(key, current)
+  }
+
+  return list.map((order) => ({
+    ...order,
+    collectionEntries: byOrderId.get(String(order?._id || order?.id || '').trim()) || []
+  }))
 }
 
 const buildSearchPredicate = (search) => {
@@ -314,10 +396,12 @@ export const listPackageOrdersService = async (tenantId, user, branchIds = [], f
     }
   }
 
-  const orders = await Order.find(query).sort({ createdAt: -1 }).lean()
+  const rawOrders = await Order.find(query).sort({ createdAt: -1 }).lean()
+  const orders = await attachCollectionEntries(tenantId, rawOrders)
   const searchPredicate = buildSearchPredicate(filters.search)
   const filtered = orders
     .filter((order) => {
+      if (normalizeApprovalStatus(order) === 'pending') return false
       const deliveryStatus = normalizePackageStatus(order)
       const paymentStatus = normalizePackagePaymentStatus(order)
       if (!filters.status && ['iptal_edildi', 'musteriyi_bulamadi', 'adreste_yok', 'geri_dondu'].includes(deliveryStatus)) return false
@@ -329,6 +413,20 @@ export const listPackageOrdersService = async (tenantId, user, branchIds = [], f
     .map(mapOrder)
 
   return { orders: filtered, total: filtered.length }
+}
+
+export const countPendingOnlineOrdersService = async (tenantId, branchIds = []) => {
+  let query = {
+    tenantId,
+    saleType: 'delivery',
+    deliveryType: 'package',
+    orderChannel: 'online',
+    approvalStatus: 'pending',
+    status: { $nin: ['cancelled', 'closed'] }
+  }
+  query = applyBranchFilter(query, branchIds)
+  const count = await Order.countDocuments(query)
+  return { count }
 }
 
 export const listCouriersService = async (tenantId) => {
@@ -352,12 +450,13 @@ export const listCouriersService = async (tenantId) => {
 
 export const getPackageOrderDetailService = async (tenantId, user, orderId) => {
   if (!mongoose.Types.ObjectId.isValid(orderId)) throw error('invalid_request', 'Geçersiz sipariş id', 400)
-  const order = await Order.findOne({ _id: orderId, tenantId })
+  const order = await Order.findOne({ _id: orderId, tenantId }).lean()
   assertPackageOrderAccess(user, order)
 
   const { getOrderService } = await import('./orderService.js')
   const detail = await getOrderService(tenantId, orderId)
-  const mapped = mapOrder(order)
+  const [orderWithCollections] = await attachCollectionEntries(tenantId, [order])
+  const mapped = mapOrder(orderWithCollections)
 
   return {
     order: {
@@ -383,11 +482,12 @@ export const collectPackageOrderPaymentService = async (tenantId, user, orderId,
     method: payload?.method,
     amount: payload?.amount,
     note: payload?.note,
-    cashierId: user?.id
+    cashierId: user?.id || user?._id || null
   })
 
   const refreshed = await Order.findOne({ _id: orderId, tenantId })
   refreshed.deliveryType = 'package'
+  refreshed.deliveryPaymentStatus = String(refreshed?.paymentStatus || '') === 'paid' ? 'odeme_alindi' : 'odeme_bekliyor'
   appendDeliveryEvent(refreshed, {
     type: 'payment_collected',
     oldStatus: previousPaymentStatus,
@@ -413,6 +513,9 @@ export const assignCourierService = async (tenantId, user, orderId, courierId) =
   ])
   ensurePackageOrder(order)
   if (!courier) throw error('not_found', 'Kurye bulunamadı', 404)
+  if (normalizeText(order?.orderChannel) === 'online' && normalizeApprovalStatus(order) !== 'approved') {
+    throw error('invalid_request', 'Onaylanmayan online siparise kurye atanamaz', 400)
+  }
 
   const oldStatus = normalizePackageStatus(order)
   order.deliveryType = 'package'
@@ -429,6 +532,81 @@ export const assignCourierService = async (tenantId, user, orderId, courierId) =
     note: normalizeText(courier.name)
   })
   await order.save()
+  try {
+    await notifyCourierAssigned({ courierUserId: courier._id, order })
+  } catch {
+  }
+  return { order: mapOrder(order) }
+}
+
+export const approveOnlinePackageOrderService = async (tenantId, user, orderId) => {
+  if (!canManageAllPackageOrders(user)) {
+    throw error('forbidden', 'Online siparis onaylama yetkiniz yok', 403)
+  }
+  if (!mongoose.Types.ObjectId.isValid(orderId)) throw error('invalid_request', 'Geçersiz sipariş id', 400)
+
+  const order = await Order.findOne({ _id: orderId, tenantId })
+  ensurePackageOrder(order)
+
+  if (normalizeText(order?.orderChannel) !== 'online') {
+    throw error('invalid_request', 'Bu siparis online siparis degil', 400)
+  }
+  if (normalizeApprovalStatus(order) !== 'pending') {
+    throw error('invalid_request', 'Siparis zaten onaylanmis veya islenmis', 400)
+  }
+
+  order.approvalStatus = 'approved'
+  order.deliveryStatus = 'accepted'
+  appendDeliveryEvent(order, {
+    type: 'online_order_approved',
+    oldStatus: 'pending',
+    newStatus: 'approved',
+    userId: getUserActorId(user),
+    userName: user.name
+  })
+  await order.save()
+
+  const { sendOrderService } = await import('./orderService.js')
+  const result = await sendOrderService(tenantId, String(order._id), { servingType: 'package', kitchenEnabled: true })
+  return { order: mapOrder(result?.order || order) }
+}
+
+export const approveOnlineCancelRequestService = async (tenantId, user, orderId) => {
+  if (!canManageAllPackageOrders(user)) {
+    throw error('forbidden', 'Online siparis iptal onayi yetkiniz yok', 403)
+  }
+  if (!mongoose.Types.ObjectId.isValid(orderId)) throw error('invalid_request', 'Gecersiz siparis id', 400)
+
+  const order = await Order.findOne({ _id: orderId, tenantId })
+  ensurePackageOrder(order)
+
+  if (normalizeText(order?.orderChannel) !== 'online') {
+    throw error('invalid_request', 'Bu siparis online siparis degil', 400)
+  }
+  if (normalizeText(order?.cancelRequestStatus) !== 'pending') {
+    throw error('invalid_request', 'Bekleyen iptal talebi yok', 400)
+  }
+
+  const oldStatus = String(order?.deliveryStatus || '')
+  order.cancelRequestStatus = 'approved'
+  order.deliveryStatus = 'iptal_edildi'
+  order.status = 'cancelled'
+  order.approvalStatus = order.approvalStatus === 'pending' ? 'rejected' : order.approvalStatus
+  order.closedAt = order.closedAt || new Date()
+  ;(Array.isArray(order.items) ? order.items : []).forEach((item) => {
+    if (!['completed', 'cancelled'].includes(String(item?.status || ''))) item.status = 'cancelled'
+    item.cancelReason = String(item?.cancelReason || '') || 'Online iptal talebi onaylandi'
+    item.cancelledAt = item?.cancelledAt || new Date()
+  })
+  appendDeliveryEvent(order, {
+    type: 'online_cancel_approved',
+    oldStatus,
+    newStatus: 'iptal_edildi',
+    userId: getUserActorId(user),
+    userName: user.name,
+    note: 'Online iptal talebi onaylandi'
+  })
+  await order.save()
   return { order: mapOrder(order) }
 }
 
@@ -436,6 +614,9 @@ export const updatePackageOrderStatusService = async (tenantId, user, orderId, d
   if (!mongoose.Types.ObjectId.isValid(orderId)) throw error('invalid_request', 'Geçersiz sipariş id', 400)
   const order = await Order.findOne({ _id: orderId, tenantId })
   assertPackageOrderAccess(user, order)
+  if (normalizeText(order?.orderChannel) === 'online' && normalizeApprovalStatus(order) !== 'approved') {
+    throw error('invalid_request', 'Onaylanmayan online siparisin durumu degistirilemez', 400)
+  }
 
   const nextStatus = normalizeText(deliveryStatus)
   if (!ALL_PACKAGE_STATUSES.has(nextStatus)) throw error('invalid_request', 'Geçersiz teslimat durumu', 400)

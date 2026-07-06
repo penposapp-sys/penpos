@@ -47,6 +47,26 @@ export default function MobileTopSheetNav({ open, title, items, onClose, onSelec
                 >
                   {!!Icon && <span className="nav-icon"><Icon size={18} /></span>}
                   <span style={{ fontWeight: 800 }}>{i.label}</span>
+                  {Number(i?.badgeCount || 0) > 0 && (
+                    <span
+                      style={{
+                        marginLeft: 'auto',
+                        minWidth: 22,
+                        height: 22,
+                        padding: '0 7px',
+                        borderRadius: 999,
+                        background: '#ef4444',
+                        color: '#fff',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 900
+                      }}
+                    >
+                      {i.badgeCount > 99 ? '99+' : i.badgeCount}
+                    </span>
+                  )}
                 </button>
               )
             })}

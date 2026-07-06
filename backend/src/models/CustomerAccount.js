@@ -6,6 +6,9 @@ const customerAccountSchema = new mongoose.Schema(
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
     name: { type: String, required: true },
     phone: { type: String, default: '' },
+    address: { type: String, default: '' },
+    publicLocation: { type: String, default: '' },
+    passwordHash: { type: String, default: '' },
     note: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
     balance: { type: Number, default: 0 }

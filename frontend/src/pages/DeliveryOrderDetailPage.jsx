@@ -4,6 +4,7 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
 import InputModal from '../components/InputModal.jsx'
+import ProductConfigModal from '../components/ProductConfigModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import PaymentCollectionModal from '../components/PaymentCollectionModal.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -19,6 +20,7 @@ import { ServingType } from '../utils/servingType.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
 import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalItemStatus } from '../lib/kitchenItemStatus.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
+import { requiresProductConfig } from '../lib/productPortions.js'
 
 export default function DeliveryOrderDetailPage() {
   const { user, allowedBranchIds } = useAuth()
@@ -105,6 +107,9 @@ export default function DeliveryOrderDetailPage() {
   const [qtyDraftByRow, setQtyDraftByRow] = useState(() => ({}))
   const qtyDraftByRowRef = useRef({})
   const [cartViewMode, setCartViewMode] = useState('grouped')
+  const [onlineEditMode, setOnlineEditMode] = useState(false)
+  const [productConfigOpen, setProductConfigOpen] = useState(false)
+  const [pendingConfigItem, setPendingConfigItem] = useState(null)
 
   const qtyInputRefs = useRef(new Map())
   const activeQtyRowKeyRef = useRef(null)
@@ -119,6 +124,10 @@ export default function DeliveryOrderDetailPage() {
   useEffect(() => {
     qtyDraftByRowRef.current = qtyDraftByRow || {}
   }, [qtyDraftByRow])
+
+  useEffect(() => {
+    setOnlineEditMode(false)
+  }, [selectedId, routeOrderId])
 
   const getQtyDraft = (rowKey, fallbackNumber = 1) => {
     const key = String(rowKey || '')
@@ -613,6 +622,30 @@ export default function DeliveryOrderDetailPage() {
     }
   }
 
+  const approveOnlineOrder = async () => {
+    if (!order) return
+    if (!canManageDelivery) {
+      toast.error('Bu işlem için yetkiniz yok')
+      return
+    }
+    if (onlineEditMode) {
+      await flushPendingOrderEdits()
+    }
+    const res = await safeAction((signal) => api(`/api/pos/package-orders/${order.id}/approve-online`, {
+      method: 'POST',
+      signal,
+      silent: true
+    }))
+    const fresh = pickOrder(res)
+    if (fresh) {
+      const norm = normalizeOrder(fresh)
+      setOrder(norm)
+      setOrders((prev) => prev.map((item) => (getOrderId(item) === getOrderId(norm) ? { ...item, ...norm } : item)))
+      setOnlineEditMode(false)
+      toast.success('Online sipariş onaylandı ve hazırlığa gönderildi')
+    }
+  }
+
   const openCustomerEdit = () => {
     if (!order) return
     setCustomerEditForm({
@@ -662,15 +695,43 @@ export default function DeliveryOrderDetailPage() {
   }
 
   // Copied methods
-  const addItem = async (menuItemId) => {
+  const addItem = async (menuItem) => {
     if (tab === 'delivered') return
     setError('')
     const orderId = selectedId || getOrderId(order)
+    const menuItemId = typeof menuItem === 'object' && menuItem !== null ? menuItem.id : menuItem
+    if (requiresProductConfig(menuItem)) {
+      setPendingConfigItem(menuItem)
+      setProductConfigOpen(true)
+      return
+    }
     const key = `${orderId}:${menuItemId}:add`
     if (isDebounced(key, 200)) return
     const result = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, { method: 'POST', body: JSON.stringify({ menuItemId }), signal, silent: true })))
     const fresh = pickOrder(result)
     if (fresh) setNote(fresh.note || '')
+  }
+
+  const submitConfiguredItem = async (payload) => {
+    if (tab === 'delivered') return false
+    const orderId = selectedId || getOrderId(order)
+    const menuItemId = String(payload?.menuItemId || '').trim()
+    if (!orderId || !menuItemId) return false
+    const key = `${orderId}:${menuItemId}:add:${String(payload?.portionKey || 'full')}:${String(payload?.weightGrams || '')}`
+    if (isDebounced(key, 200)) return false
+    const result = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal,
+      silent: true
+    })))
+    const fresh = pickOrder(result)
+    if (fresh) {
+      setNote(fresh.note || '')
+      setPendingConfigItem(null)
+      return true
+    }
+    return false
   }
   const removeItem = async (menuItemId) => {
     if (tab === 'delivered') return
@@ -1023,8 +1084,13 @@ export default function DeliveryOrderDetailPage() {
   const isOrderDelivered = uiStatus === 'delivered'
   const hasOpenItems = (order?.items || []).some(it => it.status === 'open')
   const canSendToKitchen = !!order && hasOpenItems && !isOrderDelivered
+  const isPendingOnlineApproval = String(order?.orderChannel || '') === 'online' && String(order?.approvalStatus || '') === 'pending'
+  const showOnlineInfoMode = isPendingOnlineApproval && !onlineEditMode
+  const canShowSendToKitchen = canSendToKitchen && tab !== 'delivered' && !isPendingOnlineApproval
 
   const statusColors = {
+    cancel_pending: '#dc2626',
+    approval_pending: '#f97316',
     pending: '#fbbf24',
     accepted: '#3b82f6',
     preparing: '#8b5cf6',
@@ -1033,6 +1099,8 @@ export default function DeliveryOrderDetailPage() {
     cancelled: '#ef4444'
   }
   const statusLabels = {
+    cancel_pending: 'Iptal Onayi Bekliyor',
+    approval_pending: 'Onay Bekliyor',
     pending: 'Bekliyor',
     accepted: 'Onaylandı',
     preparing: 'Hazırlanıyor',
@@ -1043,6 +1111,8 @@ export default function DeliveryOrderDetailPage() {
 
   function computeUiStatus(o) {
     const ord = o || {}
+    if (String(ord?.orderChannel || '') === 'online' && String(ord?.cancelRequestStatus || '') === 'pending') return 'cancel_pending'
+    if (String(ord?.orderChannel || '') === 'online' && String(ord?.approvalStatus || '') === 'pending') return 'approval_pending'
     if (String(ord.status || '') === 'cancelled' || String(ord.deliveryStatus || '') === 'cancelled') return 'cancelled'
     if (ord.deliveredAt || String(ord.status || '') === 'delivered' || String(ord.deliveryStatus || '') === 'delivered') return 'delivered'
     const raw = Array.isArray(ord.items) ? ord.items : []
@@ -1083,6 +1153,13 @@ export default function DeliveryOrderDetailPage() {
   const paidTotal = Number(order?.paidTotal ?? order?.totals?.paidTotal ?? 0)
   const balanceDue = Math.max(0, netTotal - paidTotal)
   const payments = Array.isArray(order?.payments) ? order.payments : []
+  const infoModeItems = Array.isArray(order?.items) ? order.items : []
+  const infoModeGroups = infoModeItems.reduce((acc, item) => {
+    const key = String(item?.status || 'open')
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {})
 
   const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
   const signedBalance = (() => {
@@ -1321,20 +1398,61 @@ export default function DeliveryOrderDetailPage() {
                 </button>
                 <div className="delivery-customer-summary">
                   <strong className="delivery-customer-summary__name">{order.customerName}</strong>
-                  <button className="btn delivery-detail-btn delivery-detail-btn--small" onClick={openCustomerEdit} disabled={busy || !canManageDelivery}>Düzenle</button>
+                  {isPendingOnlineApproval ? (
+                    <button
+                      className="btn delivery-detail-btn delivery-detail-btn--small"
+                      onClick={async () => {
+                        if (showOnlineInfoMode) {
+                          setOnlineEditMode(true)
+                          return
+                        }
+                        await flushPendingOrderEdits()
+                        setOnlineEditMode(false)
+                        toast.success('Düzenleme kaydedildi')
+                      }}
+                      disabled={busy || !canManageDelivery}
+                    >
+                      {showOnlineInfoMode ? 'Düzenle' : 'Düzenlemeyi Kaydet'}
+                    </button>
+                  ) : (
+                    <button className="btn delivery-detail-btn delivery-detail-btn--small" onClick={openCustomerEdit} disabled={busy || !canManageDelivery}>Düzenle</button>
+                  )}
                   <span className="delivery-customer-summary__phone">{order.customerPhone}</span>
                   <span className="delivery-customer-summary__address" title={order.customerAddress || ''}>{order.customerAddress}</span>
                   {order.deliveryNote && <span className="delivery-customer-summary__note" title={order.deliveryNote}>Not: {order.deliveryNote}</span>}
                   <span className="delivery-customer-summary__meta">
-                    {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş -'}{order?.createdByName ? ` • Alan: ${order.createdByName}` : ''}
+                    {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş -'}{String(order?.orderChannel || '') === 'online' ? ' • Alan: Online' : order?.createdByName ? ` • Alan: ${order.createdByName}` : ''}
                   </span>
                 </div>
                 <div className="delivery-detail-actions">
                   <span className="page-pill delivery-detail-status-badge" style={{ color: statusColors[uiStatus] }}>{statusLabels[uiStatus]}</span>
+                  {String(order?.orderChannel || '') === 'online' && String(order?.approvalStatus || '') === 'pending' && (
+                    <button className="btn delivery-detail-btn" onClick={approveOnlineOrder} disabled={busy || !canManageDelivery || onlineEditMode}>
+                      Siparişi Onayla
+                    </button>
+                  )}
+                  {String(order?.orderChannel || '') === 'online' && String(order?.cancelRequestStatus || '') === 'pending' && (
+                    <button className="btn delivery-detail-btn" onClick={async () => {
+                      if (!getOrderId(order)) return
+                      setBusy(true)
+                      try {
+                        const res = await api(`/api/pos/package-orders/${getOrderId(order)}/approve-cancel-request`, { method: 'POST', silent: true })
+                        const fresh = res?.order || res?.data?.order || null
+                        if (fresh) setOrder(fresh)
+                        toast.success('Iptal talebi onaylandi')
+                      } catch (err) {
+                        toast.error(err?.message || 'Iptal talebi onaylanamadi')
+                      } finally {
+                        setBusy(false)
+                      }
+                    }} disabled={busy || !canManageDelivery}>
+                      Iptal Onayla
+                    </button>
+                  )}
                   <button className="btn delivery-detail-btn" onClick={printReceiptOneClick} disabled={busy || printingReceipt || !getOrderId(order)}>
                     Fiş Yazdır
                   </button>
-                  {uiStatus !== 'delivered' && uiStatus !== 'cancelled' && (
+                  {uiStatus !== 'approval_pending' && uiStatus !== 'delivered' && uiStatus !== 'cancelled' && (
                     <button className="btn delivery-detail-btn" onClick={() => updateStatus('delivered')} disabled={busy || !canManageDelivery}>
                       Teslim Et
                     </button>
@@ -1347,10 +1465,83 @@ export default function DeliveryOrderDetailPage() {
                 </div>
               </div>
               <div className="delivery-detail-meta-note">
-                Paket Servis detay ekranı, Masalar ekranındaki ürün/kategori/sepet yerleşimiyle aynı.
+                {showOnlineInfoMode
+                  ? 'Bu online sipariş bilgi ekranında açılır. Değişiklik gerekiyorsa Düzenle ile ürün ekranına geçin, kaydedip ardından Siparişi Onayla kullanın.'
+                  : String(order?.orderChannel || '') === 'online' && String(order?.approvalStatus || '') === 'pending'
+                  ? 'Bu online sipariş düzenleme modunda. Mutfağa gönder pasif kalır; önce düzenlemeyi kaydedin, sonra Siparişi Onaylayın.'
+                  : 'Paket Servis detay ekranı, Masalar ekranındaki ürün/kategori/sepet yerleşimiyle aynı.'}
               </div>
             </div>
 
+            {showOnlineInfoMode ? (
+              <div className="delivery-detail-online-info">
+                <section className="card delivery-detail-online-info-card">
+                  <div className="delivery-detail-section-head" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800 }}>Sipariş Bilgisi</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{infoModeItems.length} ürün</div>
+                  </div>
+                  <div className="delivery-detail-online-info-grid">
+                    <div className="delivery-detail-online-info-box">
+                      <div className="delivery-detail-online-info-label">Müşteri</div>
+                      <div>{order.customerName || '-'}</div>
+                      <div>{order.customerPhone || '-'}</div>
+                      <div>{order.customerAddress || '-'}</div>
+                    </div>
+                    <div className="delivery-detail-online-info-box">
+                      <div className="delivery-detail-online-info-label">Sipariş</div>
+                      <div>{order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş -'}</div>
+                      <div>Durum: {statusLabels[uiStatus] || '-'}</div>
+                      <div>Ödeme: {Number(paidTotal || 0).toFixed(2)} / {Number(netTotal || 0).toFixed(2)} TL</div>
+                    </div>
+                  </div>
+                  {!!order?.deliveryNote && (
+                    <div className="delivery-detail-online-note">
+                      <strong>Genel not:</strong> {order.deliveryNote}
+                    </div>
+                  )}
+                </section>
+
+                <section className="card delivery-detail-online-info-card">
+                  <div className="delivery-detail-section-head" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800 }}>Ürünler</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sadece görüntüleme</div>
+                  </div>
+                  <div className="delivery-detail-online-group-list">
+                    {Object.entries(infoModeGroups).map(([groupStatus, groupItems]) => {
+                      const meta = getKitchenItemStatusMeta(groupStatus, { compact: true })
+                      return (
+                        <div key={groupStatus} className="delivery-detail-online-group">
+                          <div className="delivery-detail-online-group-head">
+                            <span style={{ fontWeight: 700 }}>{meta?.label || groupStatus}</span>
+                            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{groupItems.length} ürün</span>
+                          </div>
+                          <div className="delivery-detail-online-lines">
+                            {groupItems.map((item, index) => (
+                              <div key={String(item?.id || item?._id || `${groupStatus}-${index}`)} className="delivery-detail-online-line">
+                                <div className="delivery-detail-online-line-main">
+                                  <div style={{ fontWeight: 700 }}>{item?.nameSnapshot || item?.name || 'Ürün'}</div>
+                                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                                    {Number(item?.quantity || 0)} adet • {Number(item?.lineTotal ?? item?.subtotal ?? item?.priceSnapshot ?? 0).toFixed(2)} TL
+                                  </div>
+                                </div>
+                                <div style={{ display: 'grid', justifyItems: 'end', gap: 6 }}>
+                                  {meta ? (
+                                    <span className="page-pill" style={{ background: meta.bg, borderColor: meta.border, color: meta.color }}>
+                                      {meta.label}
+                                    </span>
+                                  ) : null}
+                                  {!!item?.note && <div style={{ fontSize: 12, color: '#b45309', textAlign: 'right' }}>Not: {item.note}</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              </div>
+            ) : (
             <div className="saleStandard3Col delivery-detail-layout pos-grid" style={{ minHeight: 0, height: '100%' }}>
               <div className="delivery-detail-categories">
                 <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={setActiveCategory} />
@@ -1368,7 +1559,7 @@ export default function DeliveryOrderDetailPage() {
                         key={i.id}
                         item={i}
                         disabled={tab === 'delivered'}
-                        onClick={() => addItem(i.id)}
+                        onClick={() => addItem(i)}
                         showImage={showProductImages}
                       />
                     ))}
@@ -1396,9 +1587,9 @@ export default function DeliveryOrderDetailPage() {
                     </div>
                   </div>
                 </div>
-                {canSendToKitchen && tab !== 'delivered' && (
+                {canShowSendToKitchen && (
                   <div className="saleCartMobileActionBar">
-                    <button className="btn saleCartMobileActionBtn" onClick={sendKitchen} disabled={tab === 'delivered' || busy || !canSendToKitchen}>
+                    <button className="btn saleCartMobileActionBtn" onClick={sendKitchen} disabled={tab === 'delivered' || busy || !canShowSendToKitchen}>
                       Mutfağa Gönder (PAKET)
                     </button>
                   </div>
@@ -1622,6 +1813,7 @@ export default function DeliveryOrderDetailPage() {
                 </div>
               </div>
             </div>
+            )}
           </>
         )}
       </div>
@@ -1984,6 +2176,15 @@ export default function DeliveryOrderDetailPage() {
           </div>
         </div>
       </Modal>
+      <ProductConfigModal
+        open={productConfigOpen}
+        item={pendingConfigItem}
+        onClose={() => {
+          setProductConfigOpen(false)
+          setPendingConfigItem(null)
+        }}
+        onSubmit={submitConfiguredItem}
+      />
       <InputModal open={noteModalOpen} onClose={() => setNoteModalOpen(false)} title="Not" initialValue={itemNote} onSubmit={submitItemNote} />
       <InputModal open={cancelModalOpen} onClose={() => setCancelModalOpen(false)} title="İptal Sebebi" onSubmit={submitItemCancel} autoFocus={false} />
       <ConfirmModal open={orderCancelConfirmOpen} onClose={() => setOrderCancelConfirmOpen(false)} title="Siparişi İptal Et?" onConfirm={() => { setOrderCancelConfirmOpen(false); cancelOrder() }} />

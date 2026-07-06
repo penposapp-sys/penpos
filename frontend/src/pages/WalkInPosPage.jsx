@@ -5,6 +5,7 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
 import InputModal from '../components/InputModal.jsx'
+import ProductConfigModal from '../components/ProductConfigModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import { isValidObjectId } from '../lib/ids.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -21,6 +22,7 @@ import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
 import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalItemStatus } from '../lib/kitchenItemStatus.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
+import { requiresProductConfig } from '../lib/productPortions.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
 import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
@@ -80,6 +82,8 @@ export default function WalkInPosPage() {
   const [weightModalOpen, setWeightModalOpen] = useState(false)
   const [pendingWeightItem, setPendingWeightItem] = useState(null)
   const [weightModalValue, setWeightModalValue] = useState('')
+  const [productConfigOpen, setProductConfigOpen] = useState(false)
+  const [pendingConfigItem, setPendingConfigItem] = useState(null)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [selectedItemForCancel, setSelectedItemForCancel] = useState(null)
   const [orderCancelConfirmOpen, setOrderCancelConfirmOpen] = useState(false)
@@ -662,9 +666,9 @@ export default function WalkInPosPage() {
       return
     }
     const menuItemId = typeof menuItem === 'object' && menuItem !== null ? menuItem.id : menuItem
-    if (menuItem?.isWeightBased) {
-      setPendingWeightItem(menuItem)
-      setWeightModalOpen(true)
+    if (requiresProductConfig(menuItem)) {
+      setPendingConfigItem(menuItem)
+      setProductConfigOpen(true)
       return
     }
     const optimisticTempId = addOptimisticOrderItem(menuItem)
@@ -694,6 +698,31 @@ export default function WalkInPosPage() {
       setNote(fresh.note || '')
     }
   }, [addOptimisticOrderItem, removeOptimisticOrderItem])
+
+  const submitConfiguredItem = async (payload) => {
+    const orderId = selectedOrderId || getOrderId(order)
+    const menuItemId = String(payload?.menuItemId || '').trim()
+    if (!orderId || !menuItemId) return false
+    const key = `${orderId}:${menuItemId}:add:${String(payload?.portionKey || 'full')}:${String(payload?.weightGrams || '')}`
+    if (isDebounced(key, 200)) return false
+    const result = await withLock(key, () => api(`/api/pos/orders/${orderId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      silent: true
+    }))
+    if (!result?.ok) {
+      toast.error(result?.data?.message || result?.message || 'İşlem başarısız')
+      return false
+    }
+    const fresh = pickOrder(result?.data || result)
+    if (fresh) {
+      setOrder(fresh)
+      setNote(fresh.note || '')
+      setPendingConfigItem(null)
+      return true
+    }
+    return false
+  }
 
   const {
     containerRef: productScrollRef,
@@ -2202,6 +2231,15 @@ export default function WalkInPosPage() {
       initialValue={weightModalValue}
       placeholder="Örn: 350"
       onSubmit={submitWeightItem}
+    />
+    <ProductConfigModal
+      open={productConfigOpen}
+      item={pendingConfigItem}
+      onClose={() => {
+        setProductConfigOpen(false)
+        setPendingConfigItem(null)
+      }}
+      onSubmit={submitConfiguredItem}
     />
     <InputModal
       open={cancelModalOpen}

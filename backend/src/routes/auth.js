@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { forgotPassword, login, me, resetPassword } from '../services/authService.js'
+import { registerPushDevice, unregisterPushDevice } from '../services/pushNotificationService.js'
 import { requireAuth } from '../middlewares/requireAuth.js'
 import { sendError } from '../utils/errors.js'
 import { error as logError } from '../utils/logger.js'
@@ -72,6 +73,24 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await me(req.user.id)
     res.json({ user })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/push/register', requireAuth, async (req, res) => {
+  try {
+    const result = await registerPushDevice(req.user.id, req.body || {})
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/push/unregister', requireAuth, async (req, res) => {
+  try {
+    const result = await unregisterPushDevice(req.user.id, req.body || {})
+    res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)
   }

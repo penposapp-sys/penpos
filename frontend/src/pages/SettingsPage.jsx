@@ -705,6 +705,14 @@ export default function SettingsPage() {
             description: 'Public menü, QR indir, masa QR ve görünüm'
           },
           {
+            key: 'online-sales',
+            to: '/kermes/settings/online-sales',
+            label: 'Online Satış',
+            icon: 'delivery',
+            group: 'Dijital',
+            description: 'Public sipariş yüzeyi, hedef şube ve paket akışı'
+          },
+          {
             key: 'website',
             to: '/kermes/settings/website',
             label: 'Web Site Ayarları',

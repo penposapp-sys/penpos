@@ -115,6 +115,10 @@ const buildProductSummary = (order) => {
   }
 }
 
+const getSourceLabel = (order) => String(order?.orderChannel || '') === 'online'
+  ? 'ONLINE'
+  : String(order?.createdByName || '').trim()
+
 const formatDateTime = (value) => {
   if (!value) return '-'
   const d = new Date(value)
@@ -492,6 +496,28 @@ export default function PackageCourierPage() {
 
     if (isCancelled) return actions
 
+    if (canUpdateStatus && String(order?.orderChannel || '') === 'online' && String(order?.cancelRequestStatus || '') === 'pending') {
+      actions.push(
+        <button
+          key="approve-cancel"
+          type="button"
+          style={compactButton}
+          onClick={async (event) => {
+            event.stopPropagation()
+            try {
+              await api(`/api/pos/package-orders/${order.id}/approve-cancel-request`, { method: 'POST', silent: true })
+              toast.success('Iptal talebi onaylandi')
+              await refreshData()
+            } catch (err) {
+              toast.error(err?.message || 'Iptal talebi onaylanamadi')
+            }
+          }}
+        >
+          Iptal Onayla
+        </button>
+      )
+    }
+
     if (canAssignCourier && !isDelivered) {
       actions.push(
         <button key="assign" type="button" style={primaryButton} onClick={(event) => { event.stopPropagation(); openAssign(order) }}>
@@ -614,6 +640,7 @@ export default function PackageCourierPage() {
                       ) : null}
                       <span style={{ borderRadius: 999, padding: '4px 8px', fontSize: 11, fontWeight: 800, background: deliveryTone.bg, color: deliveryTone.color }}>{order.deliveryStatusLabel}</span>
                       <span style={{ borderRadius: 999, padding: '4px 8px', fontSize: 11, fontWeight: 800, background: payTone.bg, color: payTone.color }}>{paymentView.label}</span>
+                      {getSourceLabel(order) ? <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 900 }}>SIP. VER. {getSourceLabel(order)}</span> : null}
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--app-text, var(--text))' }}>{order.customerName || '-'}</div>
                     <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>
