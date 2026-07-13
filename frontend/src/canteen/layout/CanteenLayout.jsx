@@ -247,7 +247,7 @@ export default function CanteenLayout() {
     const base = []
     if (canReports) base.push({ to: '/canteen/raporlar', label: 'Raporlar', icon: IconBarChart })
     if (canPos) base.push({ to: '/canteen/kasa', label: 'Kasa', icon: IconCart })
-    if (canQrOrders) base.push({ to: '/canteen/qr-siparisleri', label: 'QR Siparişleri', icon: IconQrOrders })
+    if (canQrOrders) base.push({ to: '/canteen/qr-siparisleri', label: 'Online Siparişler', icon: IconQrOrders })
     if (canSales) base.push({ to: '/canteen/yapilan-satislar', label: 'Yapılan Satışlar', icon: IconHistory })
     if (canCustomers) base.push({ to: '/canteen/cariler', label: 'Cariler', icon: IconUsers })
     if (canSettings) base.push({ to: '/canteen/ayarlar', label: 'Ayarlar', icon: IconSettings })

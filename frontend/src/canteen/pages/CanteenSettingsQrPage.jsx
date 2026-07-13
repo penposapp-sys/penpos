@@ -357,10 +357,10 @@ export default function CanteenSettingsQrPage() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 1, color: 'var(--theme-accent)', textTransform: 'uppercase' }}>QR Ayarları</div>
-            <div style={{ marginTop: 6, fontSize: 32, fontWeight: 950, color: 'var(--app-text)' }}>QR vitrininizi yönetin</div>
+            <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 1, color: 'var(--theme-accent)', textTransform: 'uppercase' }}>Online Siparişler</div>
+            <div style={{ marginTop: 6, fontSize: 32, fontWeight: 950, color: 'var(--app-text)' }}>Online sipariş vitrininizi yönetin</div>
             <div style={{ marginTop: 8, maxWidth: 720, color: 'var(--app-text-secondary)', fontWeight: 700, lineHeight: 1.6 }}>
-              Bu sayfa QR vitrini ve yayın görünümünü yönetir. Sepet, sipariş, masa veya ödeme akışını içermez.
+              Bu sayfa online sipariş vitrini ve yayın görünümünü yönetir. Sepet, sipariş, masa veya ödeme akışını içermez.
             </div>
           </div>
           <button
@@ -377,7 +377,7 @@ export default function CanteenSettingsQrPage() {
               boxShadow: 'var(--theme-active-glow)'
             }}
           >
-            {saving ? 'Kaydediliyor...' : 'QR Ayarlarını Kaydet'}
+            {saving ? 'Kaydediliyor...' : 'Online Siparişleri Kaydet'}
           </button>
         </div>
       </div>
@@ -480,7 +480,7 @@ export default function CanteenSettingsQrPage() {
           </div>
 
           <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
-            <div style={FIELD_LABEL_STYLE}>Musteri QR Siparis Sayfasi Tema Secimi</div>
+            <div style={FIELD_LABEL_STYLE}>Musteri Online Siparis Sayfasi Tema Secimi</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 10 }}>
               {qrThemes.map((theme) => {
                 const selected = theme.id === settings.qrTheme
@@ -509,26 +509,26 @@ export default function CanteenSettingsQrPage() {
           </div>
 
           <div style={{ marginTop: 18, display: 'grid', gap: 8 }}>
-            <div style={FIELD_LABEL_STYLE}>QR sayfalari sube bazli olusturulur</div>
+            <div style={FIELD_LABEL_STYLE}>Online siparis sayfalari sube bazli olusturulur</div>
             <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
-              Yeni sube eklendiginde asagidaki listede otomatik yeni public QR satis sayfasi ve QR kodu olusur.
+              Yeni sube eklendiginde asagidaki listede otomatik yeni public online siparis sayfasi ve erisim kodu olusur.
             </div>
           </div>
         </div>
 
         <div className="card" style={{ ...SOFT_CARD_STYLE, padding: 24 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 1, color: 'var(--theme-accent)', textTransform: 'uppercase' }}>QR Erisimi</div>
-            <div style={{ marginTop: 6, fontSize: 22, fontWeight: 950, color: 'var(--app-text)' }}>Sube bazli QR satis sayfalari</div>
+            <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 1, color: 'var(--theme-accent)', textTransform: 'uppercase' }}>Online Siparis Erisimi</div>
+            <div style={{ marginTop: 6, fontSize: 22, fontWeight: 950, color: 'var(--app-text)' }}>Sube bazli online siparis sayfalari</div>
             <div style={{ marginTop: 8, color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
-              Her sube icin ayri public link ve ayri QR kod olusturulur. Personel ciktisini veya masa ustu gorselini bu kartlardan kullanabilir.
+              Her sube icin ayri public link ve ayri erisim kodu olusturulur. Personel ciktisini veya masa ustu gorselini bu kartlardan kullanabilir.
             </div>
           </div>
 
           <div style={{ marginTop: 18, display: 'grid', gap: 16 }}>
             {publicBranchCards.length === 0 ? (
               <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700 }}>
-                Sube veya slug bulunamadigi icin QR sayfasi listesi hazirlanamadi.
+                Sube veya slug bulunamadigi icin online siparis sayfasi listesi hazirlanamadi.
               </div>
             ) : publicBranchCards.map((branchCard) => {
               const qrDataUrl = qrCodeMap[branchCard.id] || ''
@@ -553,11 +553,11 @@ export default function CanteenSettingsQrPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 20, fontWeight: 950, color: 'var(--app-text)' }}>{branchCard.name}</span>
                         <span style={{ borderRadius: 999, padding: '6px 10px', background: 'color-mix(in srgb, var(--theme-accent) 14%, transparent)', color: 'var(--theme-accent)', fontSize: 11, fontWeight: 900 }}>
-                          Public QR
+                          Online Siparis
                         </span>
                       </div>
                       <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
-                        {branchCard.description || 'Bu sube icin musteri QR satis sayfasi.'}
+                        {branchCard.description || 'Bu sube icin musteri online siparis sayfasi.'}
                       </div>
                     </div>
 
@@ -575,7 +575,7 @@ export default function CanteenSettingsQrPage() {
                         type="button"
                         onClick={async () => {
                           await navigator.clipboard.writeText(branchCard.publicUrl)
-                          toast.success(`${branchCard.name} QR linki kopyalandi`)
+                          toast.success(`${branchCard.name} online siparis linki kopyalandi`)
                         }}
                         style={{
                           border: '1px solid color-mix(in srgb, var(--theme-accent) 14%, var(--app-border))',
@@ -609,7 +609,7 @@ export default function CanteenSettingsQrPage() {
                           textAlign: 'center'
                         }}
                       >
-                        Public QR Sayfasini Ac
+                        Online Siparis Sayfasini Ac
                       </a>
                     </div>
                   </div>

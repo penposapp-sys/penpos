@@ -79,7 +79,7 @@ function getSettingsItems(isExpired) {
     { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
     { key: 'billing', path: '/canteen/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
     { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
-    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'QR Ayarlari', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri QR siparis sayfasi ve yayin ayarlari' },
+    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri online siparis sayfasi ve yayin ayarlari' },
   ]
 }
 

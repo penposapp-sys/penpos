@@ -1301,16 +1301,7 @@ export default function CanteenCashierPage() {
 
           <div className="card kasaPaymentPanel" style={{ display: 'grid', gap: '2mm' }}>
             <div className="kasaPaymentPanelHead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2mm', flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 700 }}>Ödeme Al</div>
-              <button
-                className="btn btn--compact kasaDiscountToggle"
-                type="button"
-                onClick={() => setDiscountOpen(v => !v)}
-                aria-pressed={discountOpen}
-                style={{ minWidth: 0 }}
-              >
-                {discountOpen ? 'İndirimi Gizle' : `İndirim ${discountPercent > 0 ? `%${discountPercent}` : ''}`.trim()}
-              </button>
+              <div className="kasaPaymentPanelTitle" style={{ fontWeight: 700 }}>Ödeme Al</div>
               <input
                 className="input kasaPaymentHeadNote"
                 value={payNote}
@@ -1322,6 +1313,15 @@ export default function CanteenCashierPage() {
                 }}
                 placeholder="Not"
               />
+              <button
+                className="btn btn--compact kasaDiscountToggle"
+                type="button"
+                onClick={() => setDiscountOpen(v => !v)}
+                aria-pressed={discountOpen}
+                style={{ minWidth: 0 }}
+              >
+                {discountPercent > 0 ? `İndirim %${discountPercent}` : 'İndirim'}
+              </button>
               <button className="btn btn--compact onlyMobile" type="button" onClick={() => setPayAccordionOpen(v => !v)} aria-pressed={payAccordionOpen}>
                 {payAccordionOpen ? 'Kapat' : 'Aç'}
               </button>

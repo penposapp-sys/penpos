@@ -1,8 +1,14 @@
 apply plugin: 'com.android.application'
 
+def penposGoogleServicesFile = file('google-services.json')
+def penposFirebaseConfigured = penposGoogleServicesFile.exists() && penposGoogleServicesFile.isFile()
+
 android {
     namespace = "com.penpos.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.penpos.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -10,6 +16,8 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "boolean", "PENPOS_FIREBASE_CONFIGURED", penposFirebaseConfigured ? "true" : "false"
+        resValue "bool", "penpos_firebase_configured", penposFirebaseConfigured ? "true" : "false"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -45,8 +53,7 @@ dependencies {
 apply from: 'capacitor.build.gradle'
 
 try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
+    if (penposFirebaseConfigured) {
         apply plugin: 'com.google.gms.google-services'
     }
 } catch(Exception e) {

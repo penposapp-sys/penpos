@@ -5085,14 +5085,18 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
 }
 .kasaPaymentPanelHead {
   display: grid !important;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center !important;
   gap: 2mm !important;
   padding: 0 !important;
   margin: 0 !important;
 }
+.kasaPaymentPanelTitle {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
 .kasaPaymentHeadNote {
-  grid-column: 3;
+  grid-column: 2;
   min-width: 0 !important;
   width: 100% !important;
   min-height: 30px !important;
@@ -5102,6 +5106,7 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   min-width: 0 !important;
   white-space: nowrap;
   padding-inline: 10px !important;
+  flex: 0 0 auto;
 }
 .kasaPaymentPanel > .onlyDesktop > * {
   width: 100%;
@@ -5228,18 +5233,18 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   }
   @media (max-width: 560px) {
     .kasaPaymentPanelHead {
-      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-columns: auto minmax(0, 1fr) auto;
     }
     .kasaPaymentPanelHead > :first-child {
       grid-column: 1;
       white-space: nowrap;
     }
     .kasaPaymentPanelHead > .kasaDiscountToggle {
-      grid-column: 2;
-      justify-self: end;
+      grid-column: 3;
+      justify-self: stretch;
     }
     .kasaPaymentHeadNote {
-      grid-column: 1 / -1;
+      grid-column: 2;
     }
     .kasaPaymentPanelHead .onlyMobile {
       grid-column: 1 / -1;
@@ -5258,7 +5263,26 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
     min-width: 0;
   }
   .kasaPaymentPanel > .onlyDesktop > .kasaPaymentMethodGrid {
+    display: flex !important;
+    flex-wrap: nowrap;
+    gap: 10px !important;
+    justify-content: stretch;
+    align-items: stretch;
+    margin-inline: 0;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .kasaPaymentPanel > .onlyDesktop > .kasaPaymentMethodGrid .kasaPaymentMethodButton {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 0;
+    min-height: 42px;
+    height: 42px;
+    padding: 0 10px !important;
     justify-content: center;
+    font-size: 13px;
+    border-radius: 12px;
+    white-space: nowrap;
   }
   .kasaShowcasePanel,
   .kasaCartPanel,
