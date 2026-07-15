@@ -5,6 +5,7 @@ import { toast } from '../lib/toast.js'
 import QRCode from 'qrcode'
 import { buildSafeBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
+import { buildPublicAppUrl } from '../lib/publicAppUrl.js'
 
 const pageTheme = {
   pageBg: 'radial-gradient(circle at top left, color-mix(in srgb, var(--theme-accent) 18%, transparent) 0, transparent 32%), radial-gradient(circle at bottom right, color-mix(in srgb, var(--theme-accent-hover) 14%, transparent) 0, transparent 28%), var(--app-bg)',
@@ -136,7 +137,7 @@ export default function QrMenuSettingsPage() {
   const link = useMemo(() => {
     const slug = String(tenant?.slug || '').trim()
     if (!slug) return ''
-    const next = new URL(`${window.location.origin}/menu/${slug}`)
+    const next = new URL(buildPublicAppUrl(`/menu/${slug}`))
     if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
       next.searchParams.set('tableId', String(selectedTable.id))
       next.searchParams.set('table', String(selectedTable.name || ''))

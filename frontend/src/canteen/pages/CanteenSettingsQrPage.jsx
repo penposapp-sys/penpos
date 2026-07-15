@@ -7,6 +7,7 @@ import { qrThemes } from '../components/CanteenQrPreview.jsx'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import ProductImageUploadField from '../../components/ProductImageUploadField.jsx'
 import { optimizeProductImageForUpload } from '../../lib/productImage.js'
+import { buildPublicAppUrl } from '../../lib/publicAppUrl.js'
 
 const getSelectedTheme = (themeId) => qrThemes.find((item) => item.id === themeId) || qrThemes[0]
 
@@ -249,7 +250,7 @@ export default function CanteenSettingsQrPage() {
       const branchId = String(branch.id || branch._id || '').trim()
       const branchName = String(branch.name || '').trim() || 'Sube'
       const branchSlug = String(branch.publicSlug || tenant.slug || '').trim()
-      const publicUrl = `${window.location.origin}/qr/${branchSlug}`
+      const publicUrl = buildPublicAppUrl(`/qr/${branchSlug}`)
       return {
         id: branchId,
         name: branchName,

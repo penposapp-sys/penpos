@@ -3,6 +3,7 @@ import { api, clearApiCache } from '../lib/apiClient.js'
 import { mergeBusinessSettings, buildSafeBusinessSettings } from '../lib/businessSettings.js'
 import { toast } from '../lib/toast.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
+import { buildPublicAppUrl } from '../lib/publicAppUrl.js'
 
 const switches = [
   ['enabled', 'Online satis aktif', 'Public siparis sayfasini acar veya kapatir.'],
@@ -121,7 +122,7 @@ export default function OnlineSalesSettingsPage() {
   const publicBaseLink = useMemo(() => {
     const slug = String(tenant?.slug || '').trim()
     if (!slug) return ''
-    return `${window.location.origin}/online/${slug}`
+    return buildPublicAppUrl(`/online/${slug}`)
   }, [tenant?.slug])
   const branchLinks = useMemo(() => (
     (branches || []).map((branch) => {
