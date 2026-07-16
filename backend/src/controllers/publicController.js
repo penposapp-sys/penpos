@@ -182,13 +182,24 @@ export const getPublicMenu = async (req, res) => {
   let selectedTable = null
   let availableTables = []
   if (mergedSettings.qrMenu?.tableQrEnabled === true) {
-    const tables = await Table.find({ tenantId: tenant._id, isActive: true }).select('_id name').sort({ name: 1 }).lean()
+    const activeBranches = await Branch.find({
+      tenantId: tenant._id,
+      isActive: true,
+      isDeleted: { $ne: true },
+      status: { $ne: 'deleted' }
+    }).select('_id').lean()
+    const activeBranchIds = activeBranches.map((branch) => branch._id).filter(Boolean)
+    const tables = activeBranchIds.length > 0
+      ? await Table.find({ tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name').sort({ name: 1 }).lean()
+      : []
     availableTables = tables.map((table) => ({
       id: String(table._id),
       name: String(table.name || ''),
     }))
     if (requestedTableId && mongoose.Types.ObjectId.isValid(requestedTableId)) {
-      const table = await Table.findOne({ _id: requestedTableId, tenantId: tenant._id, isActive: true }).select('_id name').lean()
+      const table = activeBranchIds.length > 0
+        ? await Table.findOne({ _id: requestedTableId, tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name').lean()
+        : null
       if (table) {
         selectedTable = {
           id: String(table._id),
