@@ -378,6 +378,21 @@ export default function ProductCatalogStyles() {
         background: #111827;
         color: #ffffff;
       }
+      .product-list-price-chip-wrap {
+        min-width: 0;
+      }
+      .product-list-price-edit-btn {
+        width: 100%;
+        border: 0;
+        cursor: pointer;
+      }
+      .product-list-price-input {
+        min-height: 36px;
+        height: 36px;
+        width: 100%;
+        text-align: center;
+        border-radius: 999px;
+      }
       .product-stock-chip {
         background: color-mix(in srgb, #19a974 16%, var(--app-surface));
         color: #111111;
@@ -556,24 +571,46 @@ export default function ProductCatalogStyles() {
         width: 48px;
         height: 28px;
         border-radius: 999px;
-        background: var(--app-surface-3, var(--app-button-bg));
+        background: #d1d5db !important;
         padding: 3px;
-        border: 0;
+        border: 0 !important;
         display: flex;
         align-items: center;
         transition: 0.16s ease;
+        box-shadow: none !important;
+        color: transparent !important;
       }
       .product-toggle.active {
         justify-content: flex-end;
-        background: linear-gradient(135deg, #22c55e, #16a34a);
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+        border-color: #16a34a !important;
+        box-shadow: none !important;
       }
       .product-toggle i {
         width: 22px;
         height: 22px;
         border-radius: 999px;
-        background: #ffffff;
+        background: #ffffff !important;
         display: block;
         box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+      }
+      .settings-scope .product-toggle,
+      html[data-theme="light"].theme-white .product-toggle,
+      html[data-theme="light"].theme-white body.app-shell-active .product-toggle {
+        background: #d1d5db !important;
+        border-color: #d1d5db !important;
+        color: transparent !important;
+        box-shadow: none !important;
+      }
+      .settings-scope .product-toggle.active,
+      .settings-scope .product-toggle:is(:active, :hover, :focus-visible),
+      html[data-theme="light"].theme-white .product-toggle.active,
+      html[data-theme="light"].theme-white body.app-shell-active .product-toggle.active,
+      html[data-theme="light"].theme-white body.app-shell-active .product-toggle[style*="#22c55e"] {
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+        border-color: #16a34a !important;
+        color: transparent !important;
+        box-shadow: none !important;
       }
       .product-inline-table {
         display: grid;

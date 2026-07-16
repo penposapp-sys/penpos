@@ -134,7 +134,7 @@ export default function QrMenuSettingsPage() {
     [qrTables, selectedTableId]
   )
 
-  const link = useMemo(() => {
+  const liveLink = useMemo(() => {
     const slug = String(tenant?.slug || '').trim()
     if (!slug) return ''
     const next = new URL(buildPublicAppUrl(`/menu/${slug}`))
@@ -145,15 +145,28 @@ export default function QrMenuSettingsPage() {
     return next.toString()
   }, [tenant?.slug, settings.qrMenu?.tableQrEnabled, selectedTable])
 
+  const previewLink = useMemo(() => {
+    const slug = String(tenant?.slug || '').trim()
+    if (!slug) return ''
+    const next = new URL(buildPublicAppUrl(`/menu/${slug}`, null, { originMode: 'current' }))
+    if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
+      next.searchParams.set('tableId', String(selectedTable.id))
+      next.searchParams.set('table', String(selectedTable.name || ''))
+    }
+    return next.toString()
+  }, [tenant?.slug, settings.qrMenu?.tableQrEnabled, selectedTable])
+
+  const hasSeparateLocalPreview = import.meta.env.DEV && !!previewLink && !!liveLink && previewLink !== liveLink
+
   useEffect(() => {
-    if (!link) {
+    if (!liveLink) {
       setQrDataUrl('')
       return
     }
-    QRCode.toDataURL(link, { width: 320, margin: 2 }, (err, url) => {
+    QRCode.toDataURL(liveLink, { width: 320, margin: 2 }, (err, url) => {
       if (!err) setQrDataUrl(url)
     })
-  }, [link])
+  }, [liveLink])
 
   const load = async () => {
     setLoading(true)
@@ -249,19 +262,39 @@ export default function QrMenuSettingsPage() {
   )
 
   const copyLink = async () => {
-    if (!link) return
+    if (!liveLink) return
     try {
-      await navigator.clipboard.writeText(link)
+      await navigator.clipboard.writeText(liveLink)
       toast.success('Public link kopyalandı')
     } catch {
       try {
         const el = document.createElement('textarea')
-        el.value = link
+        el.value = liveLink
         document.body.appendChild(el)
         el.select()
         document.execCommand('copy')
         document.body.removeChild(el)
         toast.success('Public link kopyalandı')
+      } catch {
+        toast.error('Kopyalama başarısız')
+      }
+    }
+  }
+
+  const copyPreviewLink = async () => {
+    if (!previewLink) return
+    try {
+      await navigator.clipboard.writeText(previewLink)
+      toast.success('Lokal önizleme linki kopyalandı')
+    } catch {
+      try {
+        const el = document.createElement('textarea')
+        el.value = previewLink
+        document.body.appendChild(el)
+        el.select()
+        document.execCommand('copy')
+        document.body.removeChild(el)
+        toast.success('Lokal önizleme linki kopyalandı')
       } catch {
         toast.error('Kopyalama başarısız')
       }
@@ -375,10 +408,27 @@ export default function QrMenuSettingsPage() {
         <div>
           <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Önizleme</div>
           <div style={{ fontSize: 13, color: 'var(--app-text)', marginBottom: 12 }}>
-            Kaydetmeden önce linkin doğru tenant'a ve doğru slug'a gittiğini kontrol edebilirsiniz.
+            Kaydetmeden önce canlı linki ve varsa lokal önizleme linkini ayrı ayrı kontrol edebilirsiniz.
           </div>
           <div style={{ display: 'grid', gap: 10 }}>
-            <button className="btn" onClick={copyLink} disabled={!link} style={{ justifySelf: 'start' }}>QR Linki Kopyala</button>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 900 }}>Canlı QR Linki</div>
+              <div style={{ fontSize: 12, color: 'var(--app-text)', wordBreak: 'break-all' }}>{liveLink || '-'}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={copyLink} disabled={!liveLink} style={{ justifySelf: 'start' }}>Canlı Linki Kopyala</button>
+                <a className="btn" href={liveLink || '#'} target="_blank" rel="noreferrer" onClick={(event) => { if (!liveLink) event.preventDefault() }}>Canlıyı Aç</a>
+              </div>
+            </div>
+            {hasSeparateLocalPreview ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 900 }}>Lokal Önizleme Linki</div>
+                <div style={{ fontSize: 12, color: 'var(--app-text)', wordBreak: 'break-all' }}>{previewLink}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn" onClick={copyPreviewLink} disabled={!previewLink}>Lokal Linki Kopyala</button>
+                  <a className="btn" href={previewLink || '#'} target="_blank" rel="noreferrer" onClick={(event) => { if (!previewLink) event.preventDefault() }}>Lokalde Aç</a>
+                </div>
+              </div>
+            ) : null}
             {settings.qrMenu?.tableQrEnabled ? (
               <div style={{ display: 'grid', gap: 8, position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

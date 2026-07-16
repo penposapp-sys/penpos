@@ -226,7 +226,18 @@ const createEmptyCategoryForm = (category = null) => {
 
 function Toggle({ checked = false, onChange, disabled = false }) {
   return (
-    <button type="button" className={`product-toggle ${checked ? 'active' : ''}`} onClick={() => !disabled && onChange(!checked)} disabled={disabled}>
+    <button
+      type="button"
+      className={`product-toggle ${checked ? 'active' : ''}`}
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      style={{
+        justifyContent: checked ? 'flex-end' : 'flex-start',
+        background: checked
+          ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+          : '#d1d5db'
+      }}
+    >
       <i />
     </button>
   )
@@ -293,11 +304,13 @@ export default function MenuItemsPage() {
   const [loading, setLoading] = useState(true)
   const [savingRowId, setSavingRowId] = useState('')
   const [error, setError] = useState('')
-  const [viewMode, setViewMode] = useState('list')
+  const [viewMode, setViewMode] = useState('card')
   const [activeTab, setActiveTab] = useState('all')
   const [searchText, setSearchText] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
   const [branchFilter, setBranchFilter] = useState('')
+  const [priceEditorItemId, setPriceEditorItemId] = useState('')
+  const [priceDraft, setPriceDraft] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
   const [createOpen, setCreateOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -389,7 +402,7 @@ export default function MenuItemsPage() {
   }, [activeTab, sortedCategories])
 
   const visibleItems = useMemo(() => {
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       const settings = mergeProductSettings(item?.settings)
       const category = sortedCategories.find((entry) => String(entry.id) === String(item.categoryId))
       const activeCategoryId = String(activeTab).startsWith('category:') ? String(activeTab).slice('category:'.length) : ''
@@ -404,10 +417,43 @@ export default function MenuItemsPage() {
       const matchesBranch = !branchFilter ? true : branchIds.length === 0 || branchIds.includes(String(branchFilter))
       return matchesTab && matchesSearch && matchesActive && matchesBranch
     })
+    return filtered.sort((a, b) => {
+      const categoryA = sortedCategories.find((entry) => String(entry.id) === String(a?.categoryId || ''))
+      const categoryB = sortedCategories.find((entry) => String(entry.id) === String(b?.categoryId || ''))
+      const categorySort = Number(categoryA?.sortOrder ?? Number.MAX_SAFE_INTEGER) - Number(categoryB?.sortOrder ?? Number.MAX_SAFE_INTEGER)
+      if (categorySort !== 0) return categorySort
+      const itemSort = Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0)
+      if (itemSort !== 0) return itemSort
+      return String(a?.name || '').localeCompare(String(b?.name || ''), 'tr')
+    })
   }, [activeFilter, activeTab, branchFilter, items, searchText, sortedCategories])
 
   const toggleSelected = (itemId) => {
     setSelectedIds((prev) => prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId])
+  }
+
+  const openPriceEditor = (item) => {
+    setPriceEditorItemId(String(item?.id || ''))
+    setPriceDraft(String(Number(item?.price || 0).toFixed(2)))
+  }
+
+  const closePriceEditor = () => {
+    setPriceEditorItemId('')
+    setPriceDraft('')
+  }
+
+  const saveInlinePrice = async (item) => {
+    const normalizedPrice = Number(String(priceDraft || '').replace(',', '.'))
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+      toast.error('Gecerli bir fiyat girin')
+      return
+    }
+    if (Number(item?.price || 0) === normalizedPrice) {
+      closePriceEditor()
+      return
+    }
+    await updateItem(item, { price: normalizedPrice })
+    closePriceEditor()
   }
 
   const buildUpdatedItem = (item, patch = {}, settingsPatch = {}) => {
@@ -756,7 +802,39 @@ export default function MenuItemsPage() {
               <div className="product-name-subtext">{categoryMetaText}</div>
             </div>
             <div className="product-chip product-list-category-chip" title={categoryBadgeText}>{categoryBadgeText}</div>
-            <div className="product-chip product-money-chip product-list-price-chip">{Number(item.price || 0).toFixed(2)} TL</div>
+            <div className="product-list-price-chip-wrap">
+              {priceEditorItemId === String(item.id) ? (
+                <input
+                  className="product-input product-list-price-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  autoFocus
+                  value={priceDraft}
+                  onChange={(event) => setPriceDraft(event.target.value)}
+                  onBlur={() => saveInlinePrice(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      saveInlinePrice(item)
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      closePriceEditor()
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="product-chip product-money-chip product-list-price-chip product-list-price-edit-btn"
+                  onClick={() => openPriceEditor(item)}
+                  title="Fiyati duzenle"
+                >
+                  {Number(item.price || 0).toFixed(2)} TL
+                </button>
+              )}
+            </div>
             <div className="product-chip product-stock-chip product-list-stock-chip">{Number(settings.stockQty || 0)}</div>
             <div className="product-toggle-cell product-toggle-cell--active">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

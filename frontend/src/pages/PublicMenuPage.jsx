@@ -35,6 +35,7 @@ const translations = {
     waiterCall: 'Garson cagir',
     waiterCallSending: 'Gonderiliyor...',
     waiterCallSuccess: 'Garson cagrisi iletildi',
+    uncategorized: 'Diger Urunler',
   },
   en: {
     menuLoading: 'Loading menu...',
@@ -65,6 +66,7 @@ const translations = {
     waiterCall: 'Call waiter',
     waiterCallSending: 'Sending...',
     waiterCallSuccess: 'Waiter call sent',
+    uncategorized: 'Other Items',
   },
 }
 
@@ -99,6 +101,12 @@ function buildCategoryMap(categories) {
     if (id) map.set(id, { ...category, id, name })
   }
   return map
+}
+
+function compareBySortAndName(left, right) {
+  const sortDiff = Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0)
+  if (sortDiff !== 0) return sortDiff
+  return String(left?.name || '').localeCompare(String(right?.name || ''), 'tr')
 }
 
 function ProductCard({ item, onOpen, showPrices, showDescriptions, labels }) {
@@ -200,6 +208,16 @@ export default function PublicMenuPage() {
   }, [detail])
 
   const categoryMap = useMemo(() => buildCategoryMap(categories), [categories])
+  const sortedCategories = useMemo(() => {
+    return [...(Array.isArray(categories) ? categories : [])]
+      .map((category) => ({
+        ...category,
+        id: String(category?.id || category?._id || '').trim(),
+        name: String(category?.name || category?.title || '').trim(),
+      }))
+      .filter((category) => category.id && category.name)
+      .sort(compareBySortAndName)
+  }, [categories])
   const qrMenuSettings = tenant?.settings?.qrMenu || {}
   const qrThemeMode = qrMenuSettings?.themeMode === 'dark' ? 'dark' : 'light'
   const showLogo = qrMenuSettings?.showLogo !== false
@@ -225,6 +243,18 @@ export default function PublicMenuPage() {
           categoryName: String(item?.categoryName || category?.name || item?.category || '').trim()
         }
       })
+      .sort((left, right) => {
+        const leftCategory = categoryMap.get(String(left?.categoryId || ''))
+        const rightCategory = categoryMap.get(String(right?.categoryId || ''))
+        const categoryDiff = compareBySortAndName(
+          leftCategory || { sortOrder: Number.MAX_SAFE_INTEGER, name: left?.categoryName || '' },
+          rightCategory || { sortOrder: Number.MAX_SAFE_INTEGER, name: right?.categoryName || '' }
+        )
+        if (categoryDiff !== 0) return categoryDiff
+        const itemSortDiff = Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0)
+        if (itemSortDiff !== 0) return itemSortDiff
+        return String(left?.name || '').localeCompare(String(right?.name || ''), 'tr')
+      })
   }, [items, categoryMap])
 
   const normalizedSearchTerm = useMemo(() => normalizeText(searchTerm), [searchTerm])
@@ -240,13 +270,42 @@ export default function PublicMenuPage() {
     })
   }, [products, selectedCategory, normalizedSearchTerm])
 
+  const groupedVisibleProducts = useMemo(() => {
+    const groups = []
+    const groupMap = new Map()
+
+    for (const item of visibleProducts) {
+      const categoryId = String(item?.categoryId || '')
+      const category = categoryMap.get(categoryId)
+      const groupKey = categoryId || `uncategorized:${item.categoryName || labels.uncategorized}`
+      if (!groupMap.has(groupKey)) {
+        const entry = {
+          key: groupKey,
+          categoryId,
+          categoryName: category?.name || item.categoryName || labels.uncategorized,
+          sortOrder: Number(category?.sortOrder ?? Number.MAX_SAFE_INTEGER),
+          items: []
+        }
+        groupMap.set(groupKey, entry)
+        groups.push(entry)
+      }
+      groupMap.get(groupKey)?.items.push(item)
+    }
+
+    return groups.sort((left, right) => {
+      const sortDiff = Number(left?.sortOrder ?? Number.MAX_SAFE_INTEGER) - Number(right?.sortOrder ?? Number.MAX_SAFE_INTEGER)
+      if (sortDiff !== 0) return sortDiff
+      return String(left?.categoryName || '').localeCompare(String(right?.categoryName || ''), 'tr')
+    })
+  }, [visibleProducts, categoryMap, labels.uncategorized])
+
   const categoryTabs = useMemo(() => {
-    const backendCategories = (Array.isArray(categories) ? categories : []).map((category) => ({
-      id: String(category?.id || category?._id || '').trim(),
-      name: String(category?.name || category?.title || '').trim()
-    })).filter((category) => category.id && category.name)
+    const backendCategories = sortedCategories.map((category) => ({
+      id: category.id,
+      name: category.name
+    }))
     return [{ id: 'all', name: labels.all }, ...backendCategories]
-  }, [categories, labels.all])
+  }, [sortedCategories, labels.all])
 
   const featuredItem = useMemo(() => {
     const selectedFeaturedId = String(qrMenuSettings?.featuredProductId || '').trim()
@@ -366,7 +425,6 @@ export default function PublicMenuPage() {
                   <div className="digital-public-menu-hero-copy">
                     <div className="digital-public-menu-hero-pill">{labels.featured}</div>
                     <h2>{featuredItem.name}</h2>
-                    <p>{showDescriptions ? (featuredItem.description || labels.tapForDetails) : labels.tapForDetails}</p>
                   </div>
                   <button type="button" className="digital-public-menu-hero-thumb" onClick={() => setDetail(featuredItem)}>
                     {!!featuredItem.imageUrl ? (
@@ -459,9 +517,19 @@ export default function PublicMenuPage() {
 
         <main className="digital-public-menu-content digital-public-menu-content--full">
           {visibleProducts.length > 0 ? (
-            <div className="digital-public-menu-grid">
-              {visibleProducts.map((item) => (
-                <ProductCard key={item.id} item={item} onOpen={setDetail} showPrices={showPrices} showDescriptions={showDescriptions} labels={labels} />
+            <div className="digital-public-menu-group-list">
+              {groupedVisibleProducts.map((group) => (
+                <section key={group.key} className="digital-public-menu-group">
+                  <div className="digital-public-menu-group-head">
+                    <h3>{group.categoryName}</h3>
+                    <span>{labels.itemShortCount(group.items.length)}</span>
+                  </div>
+                  <div className="digital-public-menu-grid">
+                    {group.items.map((item) => (
+                      <ProductCard key={item.id} item={item} onOpen={setDetail} showPrices={showPrices} showDescriptions={showDescriptions} labels={labels} />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           ) : (

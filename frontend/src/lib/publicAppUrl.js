@@ -51,8 +51,18 @@ export const resolvePublicAppOrigin = () => {
   return DEFAULT_PUBLIC_APP_ORIGIN
 }
 
-export const buildPublicAppUrl = (path, searchParams) => {
-  const url = new URL(path || '/', `${resolvePublicAppOrigin()}/`)
+export const resolveCurrentAppOrigin = () => {
+  try {
+    const currentOrigin = String(window.location?.origin || '').trim()
+    if (currentOrigin) return currentOrigin.replace(/\/+$/, '')
+  } catch {}
+  return resolvePublicAppOrigin()
+}
+
+export const buildPublicAppUrl = (path, searchParams, options = {}) => {
+  const originMode = String(options?.originMode || 'public').trim()
+  const baseOrigin = originMode === 'current' ? resolveCurrentAppOrigin() : resolvePublicAppOrigin()
+  const url = new URL(path || '/', `${baseOrigin}/`)
   if (searchParams && typeof searchParams === 'object') {
     Object.entries(searchParams).forEach(([key, value]) => {
       if (value === undefined || value === null || value === '') return

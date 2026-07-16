@@ -4,6 +4,7 @@ import { api } from '../lib/apiClient.js'
 import ProductImage from '../components/ProductImage.jsx'
 import ProductImageUploadField from '../components/ProductImageUploadField.jsx'
 import BranchAccessField from '../components/settings/BranchAccessField.jsx'
+import { SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
 import { optimizeProductImageForUpload } from '../lib/productImage.js'
 import ProductCatalogStyles from './ProductCatalogStyles.jsx'
 import {
@@ -368,6 +369,7 @@ export default function ProductItemSettingsPage() {
 
   return (
     <div className="page-scroll-area scrollbar-hidden">
+      <SettingsUiStyles />
       <ProductCatalogStyles />
       <div className="product-catalog-page">
         <div className="product-shell">
