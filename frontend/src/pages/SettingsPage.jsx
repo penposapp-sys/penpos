@@ -7,6 +7,7 @@ import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import Modal from '../components/Modal.jsx'
 import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
 import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
+import { SettingsToggle } from '../components/settings/SettingsUi.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
@@ -1043,6 +1044,18 @@ export const SettingsSystemContent = () => {
   const { isMobileRuntime, setThemeKey, setDarkMode } = useTheme()
 
   const apiOrigin = React.useMemo(() => resolveApiOrigin(), [])
+  const activeBranches = React.useMemo(
+    () => (Array.isArray(branches) ? branches.filter((branch) => branch?.isActive !== false) : []),
+    [branches]
+  )
+  const activeBranchIdSet = React.useMemo(
+    () => new Set(activeBranches.map((branch) => String(branch?._id || branch?.id || '')).filter(Boolean)),
+    [activeBranches]
+  )
+  const sanitizedAllowedBranchIds = React.useMemo(
+    () => (Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String).filter((id) => activeBranchIdSet.has(String(id))) : []),
+    [allowedBranchIds, activeBranchIdSet]
+  )
 
   const logoPreviewSrc = React.useMemo(() => {
     const raw = String(logoUrl || '').trim()
@@ -1073,7 +1086,18 @@ export const SettingsSystemContent = () => {
     setName(t?.name || '')
     setDescription(t?.description || '')
     setLogoUrl(t?.logoUrl || '')
-    setAllowedBranchIdsLocal(Array.isArray(t?.allowedBranchIds) ? t.allowedBranchIds : [])
+    const nextBranches = Array.isArray(branchesRes?.branches) ? branchesRes.branches : []
+    const nextActiveBranchIds = new Set(
+      nextBranches
+        .filter((branch) => branch?.isActive !== false)
+        .map((branch) => String(branch?._id || branch?.id || ''))
+        .filter(Boolean)
+    )
+    setAllowedBranchIdsLocal(
+      Array.isArray(t?.allowedBranchIds)
+        ? t.allowedBranchIds.map(String).filter((id) => nextActiveBranchIds.has(String(id)))
+        : []
+    )
     setSelectedThemeId(nextThemeId)
     setSelectedDarkMode(nextDarkMode)
     setSavedThemeId(nextThemeId)
@@ -1085,7 +1109,7 @@ export const SettingsSystemContent = () => {
       setBranches([])
       return
     }
-    setBranches(Array.isArray(branchesRes?.branches) ? branchesRes.branches : [])
+    setBranches(nextBranches)
   }
   useEffect(() => { load() }, [])
 
@@ -1103,7 +1127,7 @@ export const SettingsSystemContent = () => {
     try {
       const res = await api('/api/tenant/profile', {
         method: 'PUT',
-        body: JSON.stringify({ name, description, allowedBranchIds }),
+        body: JSON.stringify({ name, description, allowedBranchIds: sanitizedAllowedBranchIds }),
         silent: true,
         skipBranchHeader: true
       })
@@ -1114,7 +1138,7 @@ export const SettingsSystemContent = () => {
       }
 
       try {
-        const nextAllowed = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+        const nextAllowed = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String).filter((id) => activeBranchIdSet.has(String(id))) : []
         setAllowedBranchIdsLocal(nextAllowed)
         setAllowedBranchIds(nextAllowed)
         window.dispatchEvent(new CustomEvent('allowed_branches_changed', { detail: { allowedBranchIds: nextAllowed } }))
@@ -1139,7 +1163,7 @@ export const SettingsSystemContent = () => {
       const [profileSaveRes, businessSaveRes] = await Promise.all([
         api('/api/tenant/profile', {
           method: 'PUT',
-          body: JSON.stringify({ name, description, allowedBranchIds }),
+          body: JSON.stringify({ name, description, allowedBranchIds: sanitizedAllowedBranchIds }),
           silent: true,
           skipBranchHeader: true
         }),
@@ -1186,7 +1210,7 @@ export const SettingsSystemContent = () => {
       })
 
       try {
-        const nextAllowed = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String) : []
+        const nextAllowed = Array.isArray(res?.tenant?.allowedBranchIds) ? res.tenant.allowedBranchIds.map(String).filter((id) => activeBranchIdSet.has(String(id))) : []
         setAllowedBranchIdsLocal(nextAllowed)
         setAllowedBranchIds(nextAllowed)
         window.dispatchEvent(new CustomEvent('allowed_branches_changed', { detail: { allowedBranchIds: nextAllowed } }))
@@ -1318,21 +1342,17 @@ export const SettingsSystemContent = () => {
             POS/Walk-in/Delivery için şube seçimi altyapısı. Birden fazla şube seçilebilir.
           </div>
           <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-            {(branches || []).length === 0 ? (
+            {activeBranches.length === 0 ? (
               <div style={{ color: 'var(--muted)', fontSize: 13 }}>Şube bulunamadı</div>
             ) : (
-              (branches || []).map((b) => (
-                <label key={b._id || b.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={allowedBranchIds.includes(String(b._id || b.id))}
-                    onChange={(e) => toggleAllowedBranch((b._id || b.id), e.target.checked)}
-                  />
-                  <div style={{ display: 'grid' }}>
-                    <div style={{ fontWeight: 700 }}>{b.name}</div>
-                    {!!(b.description || '') && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{b.description}</div>}
-                  </div>
-                </label>
+              activeBranches.map((b) => (
+                <SettingsToggle
+                  key={b._id || b.id}
+                  label={b.name}
+                  description={b.description || b.address || 'Bu sube isletme yetki alanina dahil edilir.'}
+                  checked={allowedBranchIds.includes(String(b._id || b.id))}
+                  onChange={(e) => toggleAllowedBranch((b._id || b.id), e.target.checked)}
+                />
               ))
             )}
           </div>

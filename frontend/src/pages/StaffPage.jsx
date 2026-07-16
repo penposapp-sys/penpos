@@ -19,21 +19,102 @@ const createAccessState = (branchIds = []) => {
   }
 }
 
-const toAccessibleBranchIds = (access) => access?.allBranches ? [] : normalizeBranchIdList(access?.branchIds)
+const toAccessibleBranchIds = (access) => (access?.allBranches ? [] : normalizeBranchIdList(access?.branchIds))
 
-const COURIER_ROLE_PERMISSIONS = [
-  PERMISSIONS.TAKE_PAYMENT,
-  PERMISSIONS.CREATE_VERESIYE,
-  PERMISSIONS.VIEW_DELIVERY,
-  PERMISSIONS.MANAGE_DELIVERY,
-  PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW,
-  PERMISSIONS.PACKAGE_ORDERS_VIEW,
-  PERMISSIONS.PACKAGE_STATUS_UPDATE,
-  PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE,
-  PERMISSIONS.PACKAGE_CANCEL,
-  PERMISSIONS.CUSTOMER_PHONE_VIEW,
-  PERMISSIONS.CUSTOMER_ADDRESS_VIEW,
-  PERMISSIONS.CUSTOMER_LOCATION_OPEN
+const STAFF_PERMISSION_PRESETS = [
+  {
+    id: 'waiter',
+    label: 'Garson',
+    description: 'Masalar, siparis acma ve servis akisi.',
+    permissions: [
+      PERMISSIONS.POS_ACCESS,
+      PERMISSIONS.MANAGE_TABLES
+    ]
+  },
+  {
+    id: 'cashier',
+    label: 'Kasa',
+    description: 'Ayarlar haric restoran tarafindaki tum yetkiler.',
+    permissions: [
+      PERMISSIONS.REPORTS_DASHBOARD_VIEW,
+      PERMISSIONS.CLOSED_TABLES_PAGE_VIEW,
+      PERMISSIONS.CLOSED_TABLES_VIEW,
+      PERMISSIONS.CLOSED_TABLES_DETAIL_VIEW,
+      PERMISSIONS.CLOSED_TABLES_REOPEN,
+      PERMISSIONS.POS_ACCESS,
+      PERMISSIONS.TAKE_PAYMENT,
+      PERMISSIONS.CREATE_VERESIYE,
+      PERMISSIONS.KITCHEN_ACCESS,
+      PERMISSIONS.MANAGE_TABLES,
+      PERMISSIONS.VIEW_REPORTS,
+      PERMISSIONS.VIEW_CLOSED_TABLES,
+      PERMISSIONS.VIEW_ACCOUNTS,
+      PERMISSIONS.MANAGE_ACCOUNTS,
+      PERMISSIONS.COLLECT_DEBT
+      ,
+      PERMISSIONS.CARI_TAHSILAT_SIL,
+      PERMISSIONS.VIEW_DELIVERY,
+      PERMISSIONS.MANAGE_DELIVERY,
+      PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW,
+      PERMISSIONS.PACKAGE_ORDERS_VIEW,
+      PERMISSIONS.PACKAGE_ASSIGN_COURIER,
+      PERMISSIONS.PACKAGE_STATUS_UPDATE,
+      PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE,
+      PERMISSIONS.PACKAGE_CANCEL,
+      PERMISSIONS.COURIER_REPORTS_VIEW,
+      PERMISSIONS.CUSTOMER_PHONE_VIEW,
+      PERMISSIONS.CUSTOMER_ADDRESS_VIEW,
+      PERMISSIONS.CUSTOMER_LOCATION_OPEN,
+      PERMISSIONS.WALKIN_ACCESS,
+      PERMISSIONS.MANAGE_MENU
+    ]
+  },
+  {
+    id: 'courier',
+    label: 'Kurye',
+    description: 'Kurye ekrani, teslimat durumu ve musteri iletisim bilgileri.',
+    permissions: [
+      PERMISSIONS.TAKE_PAYMENT,
+      PERMISSIONS.CREATE_VERESIYE,
+      PERMISSIONS.VIEW_DELIVERY,
+      PERMISSIONS.MANAGE_DELIVERY,
+      PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW,
+      PERMISSIONS.PACKAGE_ORDERS_VIEW,
+      PERMISSIONS.PACKAGE_STATUS_UPDATE,
+      PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE,
+      PERMISSIONS.PACKAGE_CANCEL,
+      PERMISSIONS.CUSTOMER_PHONE_VIEW,
+      PERMISSIONS.CUSTOMER_ADDRESS_VIEW,
+      PERMISSIONS.CUSTOMER_LOCATION_OPEN
+    ]
+  },
+  {
+    id: 'package',
+    label: 'Paket',
+    description: 'Paket siparis onaylama, atama ve takip akisi.',
+    permissions: [
+      PERMISSIONS.POS_ACCESS,
+      PERMISSIONS.VIEW_DELIVERY,
+      PERMISSIONS.MANAGE_DELIVERY,
+      PERMISSIONS.PACKAGE_COURIER_PAGE_VIEW,
+      PERMISSIONS.PACKAGE_ORDERS_VIEW,
+      PERMISSIONS.PACKAGE_ASSIGN_COURIER,
+      PERMISSIONS.PACKAGE_STATUS_UPDATE,
+      PERMISSIONS.PACKAGE_PAYMENT_STATUS_UPDATE,
+      PERMISSIONS.PACKAGE_CANCEL,
+      PERMISSIONS.CUSTOMER_PHONE_VIEW,
+      PERMISSIONS.CUSTOMER_ADDRESS_VIEW,
+      PERMISSIONS.CUSTOMER_LOCATION_OPEN
+    ]
+  },
+  {
+    id: 'kitchen',
+    label: 'Mutfak',
+    description: 'Mutfak ekranina giris ve urun durum yonetimi.',
+    permissions: [
+      PERMISSIONS.KITCHEN_ACCESS
+    ]
+  }
 ]
 
 export default function StaffPage({ systemType }) {
@@ -70,13 +151,27 @@ export default function StaffPage({ systemType }) {
     const selectedPermissions = new Set(Array.isArray(value) ? value : [])
     return (
       <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" className="settings-ui-btn" onClick={() => onChange(canonicalizePermissions(COURIER_ROLE_PERMISSIONS))}>
-            Kurye Rolünü Uygula
-          </button>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ fontSize: 12, color: '#64748b' }}>Yetki kisa yollari</div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
+            {STAFF_PERMISSION_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="settings-ui-btn"
+                title={preset.description}
+                onClick={() => onChange(canonicalizePermissions(preset.permissions))}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <button type="button" className="settings-ui-btn" onClick={() => onChange([])}>
+              Temizle
+            </button>
+          </div>
         </div>
         {(PERMISSION_GROUPS_TR || []).map((group) => (
-          <SettingsCard key={group.title} title={group.title} description="Rol bazlı erişim davranışını bu gruptan yönetin." icon="🔐" style={{ padding: 16 }}>
+          <SettingsCard key={group.title} title={group.title} description="Rol bazli erisim davranisini bu gruptan yonetin." icon="Q" style={{ padding: 16 }}>
             <div style={{ display: 'grid', gap: 10 }}>
               {(group.items || []).map((item) => (
                 <SettingsToggle
@@ -145,7 +240,7 @@ export default function StaffPage({ systemType }) {
       }
       const res = await api('/api/tenant/staff', { method: 'POST', body: JSON.stringify(payload), silent: true, skipBranchHeader: true })
       if (res?.success === false) {
-        setFormError(res.message || 'Bu işlem için yetkiniz yok')
+        setFormError(res.message || 'Bu islem icin yetkiniz yok')
         return
       }
       setItems((prev) => [res.staff, ...prev].filter(isVisibleItem))
@@ -186,7 +281,7 @@ export default function StaffPage({ systemType }) {
       }
       const res = await api(`/api/tenant/staff/${selected.id}`, { method: 'PUT', body: JSON.stringify(payload), silent: true, skipBranchHeader: true })
       if (res?.success === false) {
-        setFormError(res.message || 'Bu işlem için yetkiniz yok')
+        setFormError(res.message || 'Bu islem icin yetkiniz yok')
         return
       }
       setItems((prev) => prev.map((item) => (item.id === res.staff.id ? res.staff : item)).filter(isVisibleItem))
@@ -215,7 +310,7 @@ export default function StaffPage({ systemType }) {
     try {
       const res = await api(`/api/tenant/staff/${selected.id}/password`, { method: 'PUT', body: JSON.stringify(pwdForm), silent: true, skipBranchHeader: true })
       if (res?.success === false) {
-        setFormError(res.message || 'Bu işlem için yetkiniz yok')
+        setFormError(res.message || 'Bu islem icin yetkiniz yok')
         return
       }
       setPwdOpen(false)
@@ -237,7 +332,7 @@ export default function StaffPage({ systemType }) {
     try {
       const result = await api(`/api/tenant/staff/${staff.id}`, { method: 'DELETE', silent: true, skipBranchHeader: true })
       if (result?.success === false) {
-        setError(result.message || 'Bu işlem için yetkiniz yok')
+        setError(result.message || 'Bu islem icin yetkiniz yok')
         return
       }
       setItems((prev) => prev.filter((item) => item.id !== staff.id))
@@ -258,13 +353,13 @@ export default function StaffPage({ systemType }) {
       <div className="settings-ui-toolbar">
         <div>
           <h3 style={{ margin: 0 }}>Personel</h3>
-          <div style={{ marginTop: 6, fontSize: 13, color: '#64748b' }}>Personel erişim, giriş ve şube görünürlüğünü bu panelden yönetin.</div>
+          <div style={{ marginTop: 6, fontSize: 13, color: '#64748b' }}>Personel erisim, giris ve sube gorunurlugunu bu panelden yonetin.</div>
         </div>
         <button
           className="settings-ui-btn"
           onClick={openCreate}
           disabled={getSubscriptionStatus(tenantCtx) === 'expired'}
-          title={getSubscriptionStatus(tenantCtx) === 'expired' ? 'Paket süreniz doldu. Plan yükseltin.' : undefined}
+          title={getSubscriptionStatus(tenantCtx) === 'expired' ? 'Paket sureniz doldu. Plan yukselin.' : undefined}
         >
           Yeni Personel
         </button>
@@ -272,8 +367,8 @@ export default function StaffPage({ systemType }) {
 
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
 
-      {loading ? 'Yükleniyor...' : items.length === 0 ? (
-        <div className="settings-ui-table-shell" style={{ padding: 18 }}>Henüz personel yok. Başlamak için “Yeni Personel” ekleyin.</div>
+      {loading ? 'Yukleniyor...' : items.length === 0 ? (
+        <div className="settings-ui-table-shell" style={{ padding: 18 }}>Henuz personel yok. Baslamak icin "Yeni Personel" ekleyin.</div>
       ) : (
         <>
           <div className="desktop-only settings-ui-table-shell">
@@ -281,11 +376,11 @@ export default function StaffPage({ systemType }) {
               <thead>
                 <tr>
                   <th>Ad</th>
-                  <th>Kullanıcı Adı</th>
+                  <th>Kullanici Adi</th>
                   <th>E-posta</th>
                   <th>Durum</th>
-                  <th>Şubeler</th>
-                  <th>İzinler</th>
+                  <th>Subeler</th>
+                  <th>Izinler</th>
                   <th className="actions" style={{ width: 320 }}>Aksiyonlar</th>
                 </tr>
               </thead>
@@ -302,8 +397,8 @@ export default function StaffPage({ systemType }) {
                       <td>{permCount > 0 ? `${permCount} izin` : '-'}</td>
                       <td className="actions">
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <button className="settings-ui-btn" type="button" onClick={() => openEdit(staff)}>Düzenle</button>
-                          <button className="settings-ui-btn" type="button" onClick={() => openPwd(staff)}>Şifre Sıfırla</button>
+                          <button className="settings-ui-btn" type="button" onClick={() => openEdit(staff)}>Duzenle</button>
+                          <button className="settings-ui-btn" type="button" onClick={() => openPwd(staff)}>Sifre Sifirla</button>
                           <button className="settings-ui-btn-danger" type="button" onClick={() => openDeleteConfirm(staff)}>Sil</button>
                         </div>
                       </td>
@@ -319,15 +414,15 @@ export default function StaffPage({ systemType }) {
               <div key={staff.id} className="settings-ui-table-shell" style={{ padding: 16, marginBottom: 12 }}>
                 <div style={{ fontWeight: 900, color: '#0f172a' }}>{staff.name}</div>
                 <div style={{ marginTop: 8, display: 'grid', gap: 4, color: '#64748b', fontSize: 13 }}>
-                  <span>Kullanıcı adı: {staff.username || '-'}</span>
+                  <span>Kullanici adi: {staff.username || '-'}</span>
                   <span>E-posta: {staff.email}</span>
                   <span>Durum: {staff.isActive ? 'Aktif' : 'Pasif'}</span>
-                  <span>Şubeler: {branchSummary(staff)}</span>
-                  <span>İzin: {(staff.permissions || []).length}</span>
+                  <span>Subeler: {branchSummary(staff)}</span>
+                  <span>Izin: {(staff.permissions || []).length}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                  <button className="settings-ui-btn" type="button" onClick={() => openEdit(staff)}>Düzenle</button>
-                  <button className="settings-ui-btn" type="button" onClick={() => openPwd(staff)}>Şifre Sıfırla</button>
+                  <button className="settings-ui-btn" type="button" onClick={() => openEdit(staff)}>Duzenle</button>
+                  <button className="settings-ui-btn" type="button" onClick={() => openPwd(staff)}>Sifre Sifirla</button>
                   <button className="settings-ui-btn-danger" type="button" onClick={() => openDeleteConfirm(staff)}>Sil</button>
                 </div>
               </div>
@@ -336,80 +431,108 @@ export default function StaffPage({ systemType }) {
         </>
       )}
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Personel">
-        <form onSubmit={onCreate} style={{ display: 'grid', gap: 12 }}>
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Yeni Personel"
+        headerActions={(
+          <button
+            className="settings-ui-submit"
+            type="submit"
+            form="staff-create-form"
+            disabled={formLoading}
+            style={{ minHeight: 42, padding: '8px 16px', borderRadius: 14, boxShadow: 'var(--theme-active-glow)' }}
+          >
+            {formLoading ? 'Gonderiliyor...' : 'Olustur'}
+          </button>
+        )}
+      >
+        <form id="staff-create-form" onSubmit={onCreate} style={{ display: 'grid', gap: 12 }}>
           <SettingsField label="Ad">
             <input className="settings-ui-input" value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} />
           </SettingsField>
-          <SettingsField label="Kullanıcı Adı">
+          <SettingsField label="Kullanici Adi">
             <input className="settings-ui-input" value={createForm.username} onChange={(event) => setCreateForm({ ...createForm, username: event.target.value })} placeholder="ornek: garson1" />
           </SettingsField>
           <SettingsField label="E-posta">
             <input className="settings-ui-input" type="email" value={createForm.email} onChange={(event) => setCreateForm({ ...createForm, email: event.target.value })} />
           </SettingsField>
-          <SettingsField label="Şifre">
+          <SettingsField label="Sifre">
             <input className="settings-ui-input" type="password" value={createForm.password} onChange={(event) => setCreateForm({ ...createForm, password: event.target.value })} />
           </SettingsField>
           <BranchAccessField
-            label="Görebileceği Şubeler"
-            hint="Şube seçmezseniz personel tüm şubeleri görebilir. Belirli şubeleri seçerseniz sadece onlar görünür."
+            label="Gorebilecegi Subeler"
+            hint="Sube secmezseniz personel tum subeleri gorebilir. Belirli subeleri secerseniz sadece onlar gorunur."
             branches={branches}
             value={createForm.branchAccess}
             onChange={(branchAccess) => setCreateForm({ ...createForm, branchAccess })}
-            allLabel="Tüm Şubeleri Görebilir"
+            allLabel="Tum Subeleri Gorebilir"
           />
           <div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>İzinler</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Izinler</div>
             {renderPermissionsEditor(createForm.permissions, (permissions) => setCreateForm({ ...createForm, permissions }))}
           </div>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Oluştur'}</button>
         </form>
       </Modal>
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Personel Düzenle">
-        <form onSubmit={onEdit} style={{ display: 'grid', gap: 12 }}>
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Personel Duzenle"
+        headerActions={(
+          <button
+            className="settings-ui-submit"
+            type="submit"
+            form="staff-edit-form"
+            disabled={formLoading}
+            style={{ minHeight: 42, padding: '8px 16px', borderRadius: 14, boxShadow: 'var(--theme-active-glow)' }}
+          >
+            {formLoading ? 'Gonderiliyor...' : 'Kaydet'}
+          </button>
+        )}
+      >
+        <form id="staff-edit-form" onSubmit={onEdit} style={{ display: 'grid', gap: 12 }}>
           <SettingsField label="Ad">
             <input className="settings-ui-input" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
           </SettingsField>
-          <SettingsField label="Kullanıcı Adı">
+          <SettingsField label="Kullanici Adi">
             <input className="settings-ui-input" value={editForm.username} onChange={(event) => setEditForm({ ...editForm, username: event.target.value })} placeholder="ornek: garson1" />
           </SettingsField>
           <SettingsField label="E-posta">
             <input className="settings-ui-input" type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} />
           </SettingsField>
           <BranchAccessField
-            label="Görebileceği Şubeler"
-            hint="Şube dropdownlarında bu personele izin verilen şubeler gösterilir."
+            label="Gorebilecegi Subeler"
+            hint="Sube dropdownlarinda bu personele izin verilen subeler gosterilir."
             branches={branches}
             value={editForm.branchAccess}
             onChange={(branchAccess) => setEditForm({ ...editForm, branchAccess })}
-            allLabel="Tüm Şubeleri Görebilir"
+            allLabel="Tum Subeleri Gorebilir"
           />
           <SettingsToggle label="Aktif" checked={!!editForm.isActive} onChange={(event) => setEditForm({ ...editForm, isActive: event.target.checked })} />
           <div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>İzinler</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Izinler</div>
             {renderPermissionsEditor(editForm.permissions, (permissions) => setEditForm({ ...editForm, permissions }))}
           </div>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>
         </form>
       </Modal>
 
-      <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Şifre Sıfırla">
+      <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Sifre Sifirla">
         <form onSubmit={onPwd} style={{ display: 'grid', gap: 12 }}>
-          <SettingsField label="Yeni Şifre">
+          <SettingsField label="Yeni Sifre">
             <input className="settings-ui-input" type="password" value={pwdForm.password} onChange={(event) => setPwdForm({ password: event.target.value })} />
           </SettingsField>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
-          <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Güncelle'}</button>
+          <button className="settings-ui-submit" disabled={formLoading}>{formLoading ? 'Gonderiliyor...' : 'Guncelle'}</button>
         </form>
       </Modal>
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Personeli Listeden Kaldır"
-        message="Bu personel aktif listeden kaldırılacak. Geçmiş satış ve raporlardaki adı korunacaktır. Devam etmek istiyor musunuz?"
+        title="Personeli Listeden Kaldir"
+        message="Bu personel aktif listeden kaldirilacak. Gecmis satis ve raporlardaki adi korunur. Devam etmek istiyor musunuz?"
         confirmText="Personeli Sil"
         loading={deleteLoading}
         onConfirm={onDelete}
