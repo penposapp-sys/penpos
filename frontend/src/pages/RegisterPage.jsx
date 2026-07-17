@@ -65,6 +65,12 @@ export default function RegisterPage() {
     return () => { cancelled = true }
   }, [])
 
+  const handleTypeCardKeyDown = (event, nextType) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    setForm((current) => ({ ...current, businessType: nextType }))
+  }
+
   const onSubmit = async (event) => {
     event.preventDefault()
     setLoading(true)
@@ -111,6 +117,57 @@ export default function RegisterPage() {
 
   return (
     <div className="public-auth-page public-auth-page--website register-page">
+      <style>{`
+        .register-page .register-type-grid .register-type-card,
+        .register-page .register-type-grid .register-type-card:hover,
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card,
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card:hover,
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card,
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card:hover {
+          background: linear-gradient(180deg, rgba(52, 42, 36, 0.96) 0%, rgba(39, 31, 27, 0.99) 100%) !important;
+          border: 1px solid rgba(208, 138, 89, 0.18) !important;
+          color: #fff8ef !important;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+        }
+
+        .register-page .register-type-grid .register-type-card.is-active,
+        .register-page .register-type-grid .register-type-card.is-active:hover,
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card.is-active,
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card.is-active:hover,
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card.is-active,
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card.is-active:hover {
+          background: linear-gradient(180deg, rgba(91, 70, 58, 0.98) 0%, rgba(67, 50, 41, 1) 100%) !important;
+          border: 1px solid rgba(208, 138, 89, 0.56) !important;
+          color: #fff8ef !important;
+          box-shadow: 0 20px 38px rgba(35, 23, 17, 0.34) !important;
+        }
+
+        .register-page .register-type-grid .register-type-card :is(strong, p, span, svg, svg *, i),
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card :is(strong, p, span, svg, svg *, i),
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card :is(strong, p, span, svg, svg *, i) {
+          color: inherit !important;
+          fill: currentColor !important;
+          stroke: currentColor !important;
+        }
+
+        .register-page .register-type-grid .register-type-card p,
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card p,
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card p {
+          color: rgba(255, 248, 239, 0.78) !important;
+        }
+
+        .register-page .register-type-grid .register-type-card.is-active p,
+        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card.is-active p,
+        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card.is-active p {
+          color: rgba(255, 248, 239, 0.86) !important;
+        }
+
+        .register-page .register-type-grid .register-type-card {
+          cursor: pointer;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+      `}</style>
       <div className="public-auth-shell public-auth-shell--website register-shell">
         <div className="public-auth-head">
           <Link to="/" className="muted-link">← Ana sayfaya dön</Link>
@@ -120,25 +177,29 @@ export default function RegisterPage() {
 
         <form className="card card--stable register-form" onSubmit={onSubmit}>
           <div className="register-type-grid">
-            <button
-              type="button"
+            <div
+              tabIndex={0}
+              data-selected={form.businessType === 'restaurant' ? 'true' : 'false'}
               className={`register-type-card ${form.businessType === 'restaurant' ? 'is-active' : ''}`}
-              onClick={() => setForm({ ...form, businessType: 'restaurant' })}
+              onClick={() => setForm((current) => ({ ...current, businessType: 'restaurant' }))}
+              onKeyDown={(event) => handleTypeCardKeyDown(event, 'restaurant')}
             >
               <span>🍽</span>
               <strong>Restoran / Cafe</strong>
               <p>Masa, adisyon, paket servis ve QR menü akışı.</p>
-            </button>
+            </div>
 
-            <button
-              type="button"
+            <div
+              tabIndex={0}
+              data-selected={form.businessType === 'market' ? 'true' : 'false'}
               className={`register-type-card ${form.businessType === 'market' ? 'is-active' : ''}`}
-              onClick={() => setForm({ ...form, businessType: 'market' })}
+              onClick={() => setForm((current) => ({ ...current, businessType: 'market' }))}
+              onKeyDown={(event) => handleTypeCardKeyDown(event, 'market')}
             >
               <span>🏪</span>
               <strong>Mağaza / Market</strong>
               <p>Barkodlu satış, stok, cari ve hızlı kasa akışı.</p>
-            </button>
+            </div>
           </div>
 
           <div className="register-form-grid">

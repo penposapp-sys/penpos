@@ -22,14 +22,35 @@ const normalizeLabel = (value: unknown) => {
 const buildPaymentTypeRows = (report: ZReportData | null): React.ReactNode[][] => {
   const summary = report?.summary
   const rows = new Map<string, { label: string, total: number }>()
-  const cashInBreakdown = Array.isArray(summary?.cashInBreakdown) ? summary.cashInBreakdown : []
+  const paymentBreakdown = Array.isArray(summary?.cashInBreakdown) && summary.cashInBreakdown.length > 0
+    ? summary.cashInBreakdown
+    : (Array.isArray(summary?.paymentBreakdown) ? summary.paymentBreakdown : [])
 
-  for (const row of cashInBreakdown) {
+  for (const row of paymentBreakdown) {
     const label = `Toplam ${normalizeLabel(row.methodName)}`
     const key = label.toLocaleLowerCase('tr-TR')
     const current = rows.get(key) || { label, total: 0 }
     current.total += Number(row.totalAmount || 0)
     rows.set(key, current)
+  }
+
+  const creditTotal = Number(summary?.payments?.credit || 0)
+  if (creditTotal > 0 && paymentBreakdown.length === 0) {
+    rows.set('toplam veresiye', { label: 'Toplam Veresiye', total: creditTotal })
+  }
+
+  if (rows.size === 0) {
+    const fallbackRows = [
+      ['Nakit', Number(summary?.payments?.cash || 0)],
+      ['Kart', Number(summary?.payments?.card || 0)],
+      ['Yemek Karti', Number(summary?.payments?.mealCard || 0)],
+      ['Online Odeme', Number(summary?.payments?.online || 0)],
+      ['Veresiye', creditTotal]
+    ].filter(([, total]) => total > 0)
+
+    for (const [label, total] of fallbackRows) {
+      rows.set(String(label).toLocaleLowerCase('tr-TR'), { label: `Toplam ${label}`, total: Number(total || 0) })
+    }
   }
 
   return Array.from(rows.values())

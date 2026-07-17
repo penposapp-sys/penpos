@@ -105,8 +105,26 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
           <a href="#egitim">{settings.headerTrainingLabel || 'Egitim Videolari'}</a>
         </nav>
         <div className="lp-header-actions">
-          <button className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={onLogin}>{settings.secondaryCtaText || 'Giris Yap'}</button>
-          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={onRegister}>{settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}</button>
+          <a
+            className="lp-btn lp-btn--text lp-direct-link-cta lp-direct-link-cta--login"
+            href={settings.secondaryCtaUrl || '/login'}
+            onClick={(event) => {
+              event.preventDefault()
+              onLogin?.()
+            }}
+          >
+            {settings.secondaryCtaText || 'Giris Yap'}
+          </a>
+          <a
+            className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register"
+            href={settings.primaryCtaUrl || '/register'}
+            onClick={(event) => {
+              event.preventDefault()
+              onRegister?.()
+            }}
+          >
+            {settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}
+          </a>
         </div>
         <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü">
           <Icon name={open ? 'x' : 'menu'} className="lp-menu-icon" />
@@ -118,8 +136,28 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
           <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>{settings.headerFeaturesLabel || 'Ozellikler'}</a>
           <a href="#fiyat" onClick={() => setOpen(false)}>{settings.headerPricingLabel || 'Fiyat'}</a>
           <a href="#egitim" onClick={() => setOpen(false)}>{settings.headerTrainingLabel || 'Egitim Videolari'}</a>
-          <button className="lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => { setOpen(false); onLogin?.() }}>{settings.secondaryCtaText || 'Giris Yap'}</button>
-          <button className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => { setOpen(false); onRegister?.() }}>{settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}</button>
+          <a
+            className="lp-direct-link-cta lp-direct-link-cta--login"
+            href={settings.secondaryCtaUrl || '/login'}
+            onClick={(event) => {
+              event.preventDefault()
+              setOpen(false)
+              onLogin?.()
+            }}
+          >
+            {settings.secondaryCtaText || 'Giris Yap'}
+          </a>
+          <a
+            className="lp-btn lp-btn--primary lp-direct-link-cta lp-direct-link-cta--register"
+            href={settings.primaryCtaUrl || '/register'}
+            onClick={(event) => {
+              event.preventDefault()
+              setOpen(false)
+              onRegister?.()
+            }}
+          >
+            {settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}
+          </a>
         </div>
       ) : null}
     </header>
@@ -377,7 +415,11 @@ export default function LandingPage() {
     '--lp-text': settings.themeTextColor || '#ffffff',
     '--lp-muted-text': settings.themeMutedTextColor || '#b7ada6',
     '--lp-border': settings.themeBorderColor || '#6e625a',
-    '--lp-footer-bg': settings.themeFooterBackground || '#000000'
+    '--lp-footer-bg': settings.themeFooterBackground || '#000000',
+    '--lp-panel-bg': 'linear-gradient(180deg, rgba(24, 18, 15, 0.94) 0%, rgba(13, 10, 9, 0.99) 100%)',
+    '--lp-panel-strong': 'linear-gradient(180deg, rgba(34, 27, 23, 0.95) 0%, rgba(18, 14, 12, 0.99) 100%)',
+    '--lp-soft-bg': 'linear-gradient(180deg, rgba(42, 33, 29, 0.96) 0%, rgba(29, 22, 19, 0.99) 100%)',
+    '--lp-soft-text': '#fff8ef'
   }
 
   return (
@@ -395,9 +437,16 @@ export default function LandingPage() {
           --lp-muted-text: #b7ada6;
           --lp-border: #6e625a;
           --lp-footer-bg: #000000;
+          --lp-panel-bg: linear-gradient(180deg, rgba(24, 18, 15, 0.94) 0%, rgba(13, 10, 9, 0.99) 100%);
+          --lp-panel-strong: linear-gradient(180deg, rgba(34, 27, 23, 0.95) 0%, rgba(18, 14, 12, 0.99) 100%);
+          --lp-soft-bg: linear-gradient(180deg, rgba(42, 33, 29, 0.96) 0%, rgba(29, 22, 19, 0.99) 100%);
+          --lp-soft-text: #fff8ef;
           min-height: 100vh;
           background:
-            radial-gradient(circle at top, var(--lp-bg-start) 0%, var(--lp-bg-start) 38%, var(--lp-bg-end) 100%);
+            radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--lp-accent) 14%, transparent) 0%, transparent 28%),
+            radial-gradient(circle at 10% 16%, rgba(69, 51, 40, 0.26) 0%, transparent 26%),
+            radial-gradient(circle at 90% 18%, rgba(69, 51, 40, 0.18) 0%, transparent 24%),
+            linear-gradient(180deg, var(--lp-bg-start) 0%, color-mix(in srgb, var(--lp-bg-start) 84%, #090807) 42%, var(--lp-bg-end) 100%);
           color: var(--lp-text);
         }
         .lp-shell {
@@ -409,7 +458,7 @@ export default function LandingPage() {
           top: 0;
           z-index: 50;
           padding: 0 20px;
-          background: color-mix(in srgb, var(--lp-header-bg) 95%, transparent);
+          background: color-mix(in srgb, var(--lp-header-bg) 92%, transparent);
           backdrop-filter: blur(20px);
           border-bottom: 1px solid color-mix(in srgb, var(--lp-border) 20%, transparent);
         }
@@ -521,6 +570,10 @@ export default function LandingPage() {
           border-top: 1px solid rgba(110,98,90,.2);
           flex-direction: column;
           gap: 16px;
+          background: color-mix(in srgb, var(--lp-header-bg) 90%, transparent);
+          backdrop-filter: blur(18px);
+          border-bottom-left-radius: 20px;
+          border-bottom-right-radius: 20px;
         }
         .lp-mobile-nav a,
         .lp-mobile-nav button {
@@ -570,6 +623,12 @@ export default function LandingPage() {
           display: flex;
           flex-direction: column;
           align-items: center;
+          padding: 36px;
+          border-radius: 34px;
+          border: 1px solid color-mix(in srgb, var(--lp-border) 26%, transparent);
+          background: var(--lp-panel-bg);
+          box-shadow: 0 28px 80px rgba(0,0,0,.22);
+          overflow: hidden;
         }
         .lp-hero-copy {
           max-width: 900px;
@@ -685,14 +744,14 @@ export default function LandingPage() {
           overflow: hidden;
           border-radius: 34px;
           border: 1px solid rgba(255,255,255,.15);
-          background: #0a0908;
+          background: var(--lp-panel-strong);
           padding: 12px;
           box-shadow: 0 40px 120px rgba(0,0,0,.65);
         }
         .lp-preview-inner {
           border-radius: 26px;
           border: 1px solid rgba(110,98,90,.2);
-          background: #11100f;
+          background: var(--lp-panel-bg);
           padding: 24px;
         }
         .lp-preview-header {
@@ -842,29 +901,31 @@ export default function LandingPage() {
         }
         .lp-soft-card {
           border-radius: 22px;
-          background: #1b1714;
+          background: var(--lp-soft-bg);
+          color: var(--lp-soft-text);
           padding: 20px;
           box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
         }
         .lp-soft-card--green {
-          background: #071f1d;
+          background: linear-gradient(180deg, rgba(26, 50, 44, 0.98) 0%, rgba(18, 38, 33, 0.99) 100%);
         }
         .lp-soft-card--accent {
-          background: #161210;
+          background: linear-gradient(180deg, rgba(58, 47, 40, 0.96) 0%, rgba(40, 31, 27, 0.98) 100%);
+          color: #fff8ef;
           box-shadow: inset 0 0 0 1px rgba(184,115,75,.2);
         }
         .lp-soft-title {
           margin-bottom: 16px;
           font-size: 22px;
           font-weight: 900;
-          color: #fff;
+          color: inherit;
         }
         .lp-card-top {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          color: #fff;
+          color: inherit;
         }
         .lp-card-top span {
           color: rgba(183,173,166,.55);
@@ -892,9 +953,9 @@ export default function LandingPage() {
         .lp-kitchen-card {
           margin-top: 16px;
           border-radius: 16px;
-          background: #2a211d;
+          background: linear-gradient(180deg, rgba(58, 47, 40, 0.96) 0%, rgba(40, 31, 27, 0.98) 100%);
           padding: 16px;
-          color: #fff;
+          color: #fff8ef;
         }
         .lp-kitchen-card div {
           margin-top: 8px;
@@ -995,7 +1056,7 @@ export default function LandingPage() {
           padding: 0;
           border-radius: 24px;
           border: 1px solid rgba(110,98,90,.2);
-          background: #11100f;
+          background: color-mix(in srgb, var(--lp-header-bg) 68%, rgba(255,255,255,.04));
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -1011,8 +1072,8 @@ export default function LandingPage() {
         }
         .lp-tab.is-active {
           border-color: rgba(184,115,75,.7);
-          background: #171717;
-          color: #b8734b;
+          background: color-mix(in srgb, var(--lp-accent) 22%, rgba(255,255,255,.06));
+          color: #fff;
           box-shadow: 0 0 45px rgba(184,115,75,.28);
         }
         .lp-tab-icon {
@@ -1627,6 +1688,11 @@ export default function LandingPage() {
             padding-top: 40px;
             padding-bottom: 60px;
           }
+          .lp-hero-inner {
+            padding: 22px 18px;
+            border-radius: 26px;
+            gap: 28px;
+          }
           .lp-hero-copy h1 {
             font-size: 40px;
           }
@@ -1665,6 +1731,7 @@ export default function LandingPage() {
           .lp-hero-secondary,
           .lp-hero-download {
             width: 100%;
+            min-height: 54px;
           }
           .lp-hero-download {
             font-size: 15px;
@@ -1693,6 +1760,43 @@ export default function LandingPage() {
           }
         }
       `}</style>
+      <style>{`
+        .lp-page .lp-hero-actions .lp-hero-primary,
+        .lp-page .lp-hero-actions .lp-hero-secondary,
+        .lp-page .lp-hero-actions .lp-hero-download,
+        html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary,
+        html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-secondary,
+        html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-download,
+        body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary,
+        body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-secondary,
+        body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-download {
+          color: #fff8ef !important;
+          border: 1px solid rgba(208, 138, 89, 0.22) !important;
+        }
+
+        .lp-page .lp-hero-actions .lp-hero-primary,
+        html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary,
+        body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary {
+          background: linear-gradient(180deg, rgba(38, 143, 116, 0.98) 0%, rgba(23, 117, 96, 1) 100%) !important;
+          box-shadow: 0 18px 44px rgba(23, 117, 96, 0.28) !important;
+        }
+
+        .lp-page .lp-hero-actions .lp-hero-secondary,
+        .lp-page .lp-hero-actions .lp-hero-download,
+        html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-secondary,
+        html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-download,
+        body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-secondary,
+        body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-download {
+          background: linear-gradient(180deg, rgba(52, 42, 36, 0.96) 0%, rgba(39, 31, 27, 0.99) 100%) !important;
+          box-shadow: 0 16px 34px rgba(24, 15, 11, 0.22) !important;
+        }
+
+        .lp-page .lp-hero-actions .lp-hero-primary:hover,
+        .lp-page .lp-hero-actions .lp-hero-secondary:hover,
+        .lp-page .lp-hero-actions .lp-hero-download:hover {
+          filter: brightness(1.04);
+        }
+      `}</style>
 
       <Header
         settings={settings}
@@ -1714,20 +1818,37 @@ export default function LandingPage() {
               <h1><span>{settings.heroTitle || 'Restoran ve mağaza sistemlerini ayrı ayrı yönetin.'}</span></h1>
               <p>{settings.heroDescription || 'PenPOS; Restoran-Cafe ve Mağaza-Market için ayrı girişleri, ayrı ekran akışları olan modern otomasyon yapısıdır.'}</p>
               <div className="lp-hero-actions">
-                <button className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register" type="button" onClick={() => openWebsiteLink(settings.primaryCtaUrl || '/register', nav)}>
+                <a
+                  className="lp-hero-primary lp-direct-link-cta lp-direct-link-cta--register"
+                  href={settings.primaryCtaUrl || '/register'}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    openWebsiteLink(settings.primaryCtaUrl || '/register', nav)
+                  }}
+                >
                   {settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}
-                </button>
-                <button className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login" type="button" onClick={() => openWebsiteLink(settings.secondaryCtaUrl || '/login', nav)}>
+                </a>
+                <a
+                  className="lp-hero-secondary lp-direct-link-cta lp-direct-link-cta--login"
+                  href={settings.secondaryCtaUrl || '/login'}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    openWebsiteLink(settings.secondaryCtaUrl || '/login', nav)
+                  }}
+                >
                   {settings.secondaryCtaText || 'Giris Yap'}
-                </button>
+                </a>
                 {showAndroidDownload ? (
-                  <button
+                  <a
                     className="lp-hero-download"
-                    type="button"
-                    onClick={() => openWebsiteLink(settings.androidApkUrl, nav)}
+                    href={settings.androidApkUrl}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      openWebsiteLink(settings.androidApkUrl, nav)
+                    }}
                   >
                     {settings.androidButtonText || 'Android Uygulamasini Indir'}
-                  </button>
+                  </a>
                 ) : null}
               </div>
               <div className="lp-hero-points">

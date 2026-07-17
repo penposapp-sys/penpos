@@ -10889,6 +10889,14 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 }
 
 .public-auth-page--website {
+  --public-web-surface: linear-gradient(180deg, rgba(29, 21, 17, 0.96) 0%, rgba(15, 11, 9, 0.99) 100%);
+  --public-web-surface-strong: linear-gradient(180deg, rgba(52, 42, 36, 0.94) 0%, rgba(39, 31, 27, 0.98) 100%);
+  --public-web-surface-active: linear-gradient(180deg, rgba(91, 70, 58, 0.98) 0%, rgba(67, 50, 41, 0.99) 100%);
+  --public-web-border: rgba(208,138,89,0.18);
+  --public-web-border-strong: rgba(208,138,89,0.52);
+  --public-web-text: #fff8ef;
+  --public-web-muted: rgba(255,248,239,0.74);
+  --public-web-active-text: #fff8ef;
   background:
     radial-gradient(circle at top left, rgba(184,115,75,0.22), transparent 24%),
     radial-gradient(circle at bottom right, rgba(217,181,111,0.12), transparent 28%),
@@ -10903,8 +10911,8 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   box-shadow: 0 32px 90px rgba(15, 23, 42, 0.26);
 }
 .public-auth-shell--website {
-  background: linear-gradient(180deg, rgba(26,18,15,0.94) 0%, rgba(16,11,9,0.98) 100%);
-  border: 1px solid rgba(217,181,111,0.16);
+  background: var(--public-web-surface);
+  border: 1px solid var(--public-web-border);
   box-shadow: 0 38px 90px rgba(0,0,0,0.36);
 }
 .public-auth-head { text-align: left; display: grid; gap: 18px; }
@@ -11048,23 +11056,47 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 
 .register-type-card {
   min-width: 0;
-  background: rgba(255,255,255,0.05);
-  color: #fff8ef;
-  border: 1px solid rgba(208,138,89,0.16);
-  box-shadow: none;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(110px, 0.9fr);
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 6px;
+  background: var(--public-web-surface-strong);
+  color: var(--public-web-text);
+  border: 1px solid var(--public-web-border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.register-type-card span {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.register-type-card strong {
+  margin-top: 0;
 }
 
 .register-type-card p {
-  color: rgba(255,248,239,0.76);
+  margin: 0;
+  color: var(--public-web-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 1;
 }
 
 .register-type-card.is-active {
-  border-color: rgba(208,138,89,0.42);
-  box-shadow: 0 18px 34px rgba(0,0,0,0.22);
+  background: var(--public-web-active-surface, var(--public-web-surface-active));
+  color: var(--public-web-active-text);
+  border-color: var(--public-web-border-strong);
+  box-shadow: 0 18px 34px rgba(0,0,0,0.16);
+}
+
+.register-type-card.is-active p {
+  color: rgba(255, 248, 239, 0.82);
 }
 
 .register-type-card:hover {
-  border-color: rgba(208,138,89,0.32);
+  border-color: rgba(208,138,89,0.3);
   box-shadow: 0 18px 34px rgba(0,0,0,0.18);
 }
 
@@ -11142,18 +11174,18 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 
 .register-form {
   margin-top: 8px;
-  padding: 12px;
+  padding: 14px;
   border-radius: 24px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(208,138,89,0.16);
-  box-shadow: none;
+  background: linear-gradient(180deg, rgba(24,18,15,0.92) 0%, rgba(16,11,9,0.98) 100%);
+  border: 1px solid var(--public-web-border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
   overflow: hidden;
 }
 
 .register-form:hover {
   transform: none;
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(208,138,89,0.16);
+  background: linear-gradient(180deg, rgba(24,18,15,0.92) 0%, rgba(16,11,9,0.98) 100%);
+  border-color: var(--public-web-border);
   box-shadow: none;
 }
 
@@ -11164,7 +11196,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 .register-actions { margin-top: 10px; gap: 10px; }
 
 .register-form label > div {
-  color: rgba(255, 248, 239, 0.74);
+  color: var(--public-web-muted);
   font-size: 12px;
   font-weight: 800;
 }
@@ -11172,9 +11204,9 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 .register-form .input {
   min-height: 42px;
   border-radius: 14px;
-  border: 1px solid rgba(208,138,89,0.22);
-  background: rgba(255,255,255,0.08);
-  color: #fff8ef;
+  border: 1px solid rgba(208,138,89,0.2);
+  background: rgba(255,255,255,0.11);
+  color: var(--public-web-text);
   padding: 0 14px;
   font-size: 14px;
 }
@@ -11194,8 +11226,8 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 }
 
 .register-form .marketing-btn--ghost {
-  background: rgba(255,255,255,0.06);
-  color: #fff8ef;
+  background: rgba(255,255,255,0.08);
+  color: var(--public-web-text);
   border-color: rgba(208,138,89,0.18);
 }
 
@@ -11962,6 +11994,21 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
     border-radius: 24px;
   }
 
+  .register-type-card {
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .register-type-card span {
+    grid-row: 1 / span 2;
+    margin-top: 4px;
+  }
+
+  .register-type-card p {
+    grid-column: 1 / -1;
+    padding-left: 42px;
+  }
+
   .public-auth-grid--selection {
     grid-template-columns: 1fr;
   }
@@ -12561,6 +12608,168 @@ body.tenant-dark-mode,
 .mobile-performance-mode.mobile-system-light .productCard[data-has-image="true"] :is(.productCard__name, .productCard__price) {
   color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55) !important;
+}
+
+body.mobile-performance-mode.public-site-layout {
+  --app-bg: #120d0b;
+  --app-shell-bg: #120d0b;
+  --app-surface: #1b1411;
+  --app-surface-soft: #241b17;
+  --app-border: rgba(208, 138, 89, 0.18);
+  --app-text: #fff8ef;
+  --app-text-secondary: rgba(255, 248, 239, 0.76);
+  --app-text-muted: rgba(255, 248, 239, 0.6);
+  --card-bg: transparent;
+  --card-hover: transparent;
+  --border-soft: rgba(208, 138, 89, 0.18);
+  --border-hover: rgba(208, 138, 89, 0.3);
+  --panel: #1b1411;
+  --panelElevated: #241b17;
+  --text: #fff8ef;
+  --text-primary: #fff8ef;
+  --text-secondary: rgba(255, 248, 239, 0.76);
+  --muted: rgba(255, 248, 239, 0.6);
+  --input-bg: rgba(255, 255, 255, 0.08);
+  --button-bg: rgba(255, 255, 255, 0.08);
+  --button-text: #fff8ef;
+  --button-border: rgba(208, 138, 89, 0.18);
+}
+
+body.mobile-performance-mode.public-site-layout .public-auth-page--website,
+body.mobile-performance-mode.public-site-layout .lp-page {
+  background:
+    radial-gradient(circle at top left, rgba(184,115,75,0.22), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(217,181,111,0.12), transparent 28%),
+    linear-gradient(180deg, #120d0b 0%, #201512 44%, #0b0908 100%) !important;
+  color: #fff8ef !important;
+}
+
+body.mobile-performance-mode.public-site-layout .public-auth-shell--website,
+body.mobile-performance-mode.public-site-layout .register-form.card,
+body.mobile-performance-mode.public-site-layout .lp-hero-inner,
+body.mobile-performance-mode.public-site-layout .lp-preview-frame,
+body.mobile-performance-mode.public-site-layout .lp-preview-inner,
+body.mobile-performance-mode.public-site-layout .lp-feature-card,
+body.mobile-performance-mode.public-site-layout .lp-operation-main,
+body.mobile-performance-mode.public-site-layout .lp-operation-card,
+body.mobile-performance-mode.public-site-layout .lp-video-card,
+body.mobile-performance-mode.public-site-layout .lp-pricing-card,
+body.mobile-performance-mode.public-site-layout .lp-modal,
+body.mobile-performance-mode.public-site-layout .lp-login-card {
+  background: linear-gradient(180deg, rgba(24,18,15,0.94) 0%, rgba(13,10,9,0.99) 100%) !important;
+  border-color: rgba(208, 138, 89, 0.18) !important;
+  color: #fff8ef !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.22) !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-type-card,
+body.mobile-performance-mode.public-site-layout .public-auth-card--website,
+body.mobile-performance-mode.public-site-layout .lp-tab {
+  background: linear-gradient(180deg, rgba(52,42,36,0.94) 0%, rgba(39,31,27,0.98) 100%) !important;
+  border-color: rgba(208, 138, 89, 0.18) !important;
+  color: #fff8ef !important;
+  box-shadow: none !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-type-card.is-active {
+  background: linear-gradient(180deg, rgba(91,70,58,0.98) 0%, rgba(67,50,41,0.99) 100%) !important;
+  border-color: rgba(208, 138, 89, 0.52) !important;
+  color: #fff8ef !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-type-card p,
+body.mobile-performance-mode.public-site-layout .public-auth-head p,
+body.mobile-performance-mode.public-site-layout .register-form label > div,
+body.mobile-performance-mode.public-site-layout .lp-hero-copy p,
+body.mobile-performance-mode.public-site-layout .lp-section-title p,
+body.mobile-performance-mode.public-site-layout .lp-feature-card p,
+body.mobile-performance-mode.public-site-layout .lp-video-card p,
+body.mobile-performance-mode.public-site-layout .lp-pricing-card p,
+body.mobile-performance-mode.public-site-layout .lp-login-card p {
+  color: rgba(255, 248, 239, 0.76) !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-type-card.is-active p {
+  color: rgba(255, 248, 239, 0.82) !important;
+}
+
+body.mobile-performance-mode.public-site-layout .public-auth-head h1,
+body.mobile-performance-mode.public-site-layout .register-shell .muted-link,
+body.mobile-performance-mode.public-site-layout .register-type-card strong,
+body.mobile-performance-mode.public-site-layout .register-type-card span,
+body.mobile-performance-mode.public-site-layout .register-form,
+body.mobile-performance-mode.public-site-layout .register-form .input,
+body.mobile-performance-mode.public-site-layout .lp-hero-copy h1,
+body.mobile-performance-mode.public-site-layout .lp-section-title h2,
+body.mobile-performance-mode.public-site-layout .lp-feature-card h3,
+body.mobile-performance-mode.public-site-layout .lp-pricing-head h3,
+body.mobile-performance-mode.public-site-layout .lp-login-card strong {
+  color: #fff8ef !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-type-card.is-active strong,
+body.mobile-performance-mode.public-site-layout .register-type-card.is-active span {
+  color: #fff8ef !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-form .input {
+  background: rgba(255,255,255,0.1) !important;
+  border-color: rgba(208,138,89,0.22) !important;
+}
+
+body.mobile-performance-mode.public-site-layout .register-form .marketing-btn--ghost,
+body.mobile-performance-mode.public-site-layout .lp-hero-secondary,
+body.mobile-performance-mode.public-site-layout .lp-btn--text,
+body.mobile-performance-mode.public-site-layout .lp-mobile-nav button,
+body.mobile-performance-mode.public-site-layout .lp-mobile-nav a {
+  color: #fff8ef !important;
+}
+
+body.mobile-performance-mode.public-site-layout .lp-soft-card {
+  background: linear-gradient(180deg, rgba(42,33,29,0.96) 0%, rgba(29,22,19,0.99) 100%) !important;
+  border-color: rgba(208, 138, 89, 0.18) !important;
+  color: #fff8ef !important;
+}
+
+body.mobile-performance-mode.public-site-layout .lp-soft-card--accent,
+body.mobile-performance-mode.public-site-layout .lp-kitchen-card {
+  background: linear-gradient(180deg, rgba(58,47,40,0.96) 0%, rgba(40,31,27,0.98) 100%) !important;
+  color: #fff8ef !important;
+}
+
+html[data-theme="light"].theme-white body.public-site-layout .register-type-card,
+html[data-theme="light"].theme-white body.public-site-layout button.register-type-card:not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: var(--public-web-surface-strong) !important;
+  border-color: var(--public-web-border) !important;
+  color: var(--public-web-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+
+html[data-theme="light"].theme-white body.public-site-layout .register-type-card :is(*, span, svg, svg *, i) {
+  color: inherit !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white body.public-site-layout .register-type-card.is-active,
+html[data-theme="light"].theme-white body.public-site-layout button.register-type-card.is-active:not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: var(--public-web-surface-active) !important;
+  border-color: var(--public-web-border-strong) !important;
+  color: var(--public-web-active-text) !important;
+  box-shadow: 0 18px 34px rgba(0,0,0,0.16) !important;
+}
+
+html[data-theme="light"].theme-white body.public-site-layout .register-type-card.is-active p,
+html[data-theme="light"].theme-white body.public-site-layout button.register-type-card.is-active p {
+  color: rgba(255, 248, 239, 0.82) !important;
+}
+
+html[data-theme="light"].theme-white body.public-site-layout .register-type-card:hover,
+html[data-theme="light"].theme-white body.public-site-layout button.register-type-card:hover:not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: var(--public-web-surface-strong) !important;
+  border-color: rgba(208,138,89,0.3) !important;
+  color: var(--public-web-text) !important;
+  box-shadow: 0 18px 34px rgba(0,0,0,0.18) !important;
 }
 
 .mobile-performance-mode.mobile-system-dark .pos-app-shell,

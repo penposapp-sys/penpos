@@ -856,8 +856,7 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
   const chargedToAccountValue = toMoney((sales?.accountChargedTotal ?? sales?.byMethod?.account) || 0)
   const accountCollectionValue = toMoney(sales?.accountCollectionTotal || 0)
   const discountValue = toMoney(sales?.discountTotal || 0)
-  const totalRevenueWithAccount = totalRevenue + chargedToAccountValue
-  const averageCheck = orderCount > 0 ? totalRevenueWithAccount / orderCount : 0
+  const averageCheck = orderCount > 0 ? totalRevenue / orderCount : 0
   const currentAccountBalanceValue = toMoney(sales?.currentAccountBalance || 0)
   const overpayValue = toMoney(sales?.overpayTotal || 0)
   const balanceDueSigned = toMoney(sales?.balanceDueSigned || 0)
@@ -867,12 +866,6 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
   const revenueBreakdownDetails = buildPaymentBreakdownRows(sales, { preferCollected: false })
     .filter((row) => row.amount > 0)
     .map((row) => ({ label: row.label, value: fmtTl(row.amount) }))
-  const revenueBreakdownWithAccountDetails = [
-    ...revenueBreakdownDetails,
-    ...(chargedToAccountValue > 0 && !revenueBreakdownDetails.some((row) => String(row.label || '').trim().toLowerCase() === 'cariye yazilan')
-      ? [{ label: 'Cariye Yazilan', value: fmtTl(chargedToAccountValue) }]
-      : [])
-  ]
   const collectionBreakdownDetails = buildPaymentBreakdownRows(sales, { preferCollected: true })
     .filter((row) => row.amount > 0)
     .map((row) => ({ label: row.label, value: fmtTl(row.amount) }))
@@ -913,7 +906,7 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
     kpis: [
       {
         title: 'Toplam Ciro',
-        value: fmtTl(totalRevenueWithAccount),
+        value: fmtTl(totalRevenue),
         note: 'Bugun',
         trend: getTrendText(12.5),
         tone: 'green',
@@ -923,12 +916,12 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
           items: [
             {
               title: 'Genel Özet',
-              value: fmtTl(totalRevenueWithAccount),
+              value: fmtTl(totalRevenue),
               badge: `${orderCount} sipariş`,
               note: 'Toplam ciroya ulasan tüm ödeme ve açık hesap kirilimlari.',
               details: [
-                { label: 'Toplam Ciro', value: fmtTl(totalRevenueWithAccount) },
-                ...(revenueBreakdownWithAccountDetails.length > 0 ? revenueBreakdownWithAccountDetails : [
+                { label: 'Toplam Ciro', value: fmtTl(totalRevenue) },
+                ...(revenueBreakdownDetails.length > 0 ? revenueBreakdownDetails : [
                   { label: 'Nakit', value: fmtTl(cashValue) },
                   { label: 'Banka', value: fmtTl(bankValue) },
                   { label: 'K. Karti / POS', value: fmtTl(posValue) },
@@ -986,7 +979,7 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
               note: 'Seçili gün için ortalama hesap tutari.',
               details: [
                 { label: 'Sipariş Sayisi', value: String(orderCount) },
-                { label: 'Toplam Ciro', value: fmtTl(totalRevenueWithAccount) },
+                { label: 'Toplam Ciro', value: fmtTl(totalRevenue) },
                 { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
                 { label: 'Cari Bakiyesi', value: fmtTl(currentAccountBalanceValue) },
                 { label: 'Bekleyen Açık Hesap', value: fmtTl(explicitOpenAccountValue) },
@@ -1041,7 +1034,7 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
                 { label: 'Acilan Cari Borcu', value: fmtTl(chargedToAccountValue) },
                 { label: 'Açık Masa Bekleyeni', value: fmtTl(openOrderBalanceTotal) },
                 { label: 'Bekleyen Açık Hesap', value: fmtTl(explicitOpenAccountValue) },
-                { label: 'Toplam Ciro', value: fmtTl(totalRevenueWithAccount) },
+                { label: 'Toplam Ciro', value: fmtTl(totalRevenue) },
                 { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
                 { label: 'Net Açık Hesap Gosterimi', value: fmtTl(openAccountValue) }
               ]

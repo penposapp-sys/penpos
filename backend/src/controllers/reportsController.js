@@ -110,6 +110,11 @@ const buildZReportPaymentSummary = () => ({
   credit: 0
 })
 
+const buildZReportCashInSummary = () => ({
+  total: 0,
+  cash: 0
+})
+
 const buildZReportChannelSummary = () => ({
   table: 0,
   takeaway: 0,
@@ -1457,8 +1462,14 @@ export const zReport = async (req, res) => {
       discountTotal: 0,
       cancelTotal: 0,
       netSales: 0,
+      paidSalesTotal: 0,
       payments: buildZReportPaymentSummary(),
       paymentBreakdownMap: createPaymentBreakdownMap(),
+      cashIn: buildZReportCashInSummary(),
+      cashInBreakdownMap: createPaymentBreakdownMap(),
+      collectionsTotal: 0,
+      collectionBreakdownMap: createPaymentBreakdownMap(),
+      periodCreditBalance: 0,
       salesChannels: buildZReportChannelSummary(),
       vatBreakdown: []
     }
@@ -1521,6 +1532,12 @@ export const zReport = async (req, res) => {
         const bucket = classifyZReportPayment(payment)
         pushMoney(summary.payments, bucket, amount)
         pushPaymentBreakdown(summary.paymentBreakdownMap, payment)
+        if (bucket !== 'credit') {
+          summary.paidSalesTotal += amount
+          summary.cashIn.total += amount
+          if (bucket === 'cash') summary.cashIn.cash += amount
+          pushPaymentBreakdown(summary.cashInBreakdownMap, payment)
+        }
         explicitPaidTotal += amount
       }
 
@@ -1547,6 +1564,29 @@ export const zReport = async (req, res) => {
       branchTotalsMap.set(branchId, branchTotals)
     }
 
+    const collectionFilterBase = applyBranchFilter({
+      tenantId: req.user.tenantId,
+      source: 'collection',
+      type: 'credit',
+      isDeleted: { $ne: true },
+      createdAt: { $gte: from, $lt: to }
+    }, scope.branchIds)
+
+    const collectionRows = await AccountTransaction.find(collectionFilterBase)
+      .select({ amount: 1, method: 1, methodBucket: 1 })
+      .lean()
+
+    for (const tx of collectionRows || []) {
+      const amount = toMoneySafe(tx?.amount)
+      if (amount <= 0) continue
+      summary.collectionsTotal += amount
+      summary.cashIn.total += amount
+      const bucket = normalizeMethod(tx?.methodBucket || tx?.method)
+      if (bucket === 'cash') summary.cashIn.cash += amount
+      pushPaymentBreakdown(summary.collectionBreakdownMap, tx)
+      pushPaymentBreakdown(summary.cashInBreakdownMap, tx)
+    }
+
     const includedOrderIds = new Set(orders.map((order) => String(order?._id || '')))
     for (const discountOrder of discountOnlyOrders) {
       const discountOrderId = String(discountOrder?._id || '')
@@ -1558,6 +1598,13 @@ export const zReport = async (req, res) => {
     summary.discountTotal = roundMoney(summary.discountTotal)
     summary.cancelTotal = roundMoney(summary.cancelTotal)
     summary.netSales = roundMoney(summary.netSales)
+    summary.paidSalesTotal = roundMoney(summary.paidSalesTotal)
+    summary.cashIn = {
+      total: roundMoney(summary.cashIn.total),
+      cash: roundMoney(summary.cashIn.cash)
+    }
+    summary.collectionsTotal = roundMoney(summary.collectionsTotal)
+    summary.periodCreditBalance = roundMoney(summary.payments.credit - summary.collectionsTotal)
     summary.vatBreakdown = Array.from(vatMap.values())
       .map((row) => ({
         rate: Number(row.rate || 0),
@@ -1582,7 +1629,13 @@ export const zReport = async (req, res) => {
           online: roundMoney(summary.payments.online),
           credit: roundMoney(summary.payments.credit)
         },
+        paidSalesTotal: summary.paidSalesTotal,
+        cashIn: summary.cashIn,
         paymentBreakdown: finalizePaymentBreakdown(summary.paymentBreakdownMap),
+        cashInBreakdown: finalizePaymentBreakdown(summary.cashInBreakdownMap),
+        collectionsTotal: summary.collectionsTotal,
+        collectionBreakdown: finalizePaymentBreakdown(summary.collectionBreakdownMap),
+        periodCreditBalance: summary.periodCreditBalance,
         salesChannels: {
           table: roundMoney(summary.salesChannels.table),
           takeaway: roundMoney(summary.salesChannels.takeaway),

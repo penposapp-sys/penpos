@@ -439,7 +439,7 @@ function ReportHero() {
 
 function ReportSummaryCards({ summary, datasets, isMobilePortrait }) {
   const fireRate = summary.cancelRate
-  const netSales = Math.max(0, summary.totalRevenue - toMoney(datasets.dashboard?.cancelled?.totalRevenue || 0))
+  const netSales = Math.max(0, summary.totalRevenue)
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
       <KpiCard title="Net Satis" value={fmtTl(netSales, 0)} note="Seçili dönem" trend="+0%" tone="green" />
@@ -951,7 +951,7 @@ export const buildReportDetailData = (report, datasets, summary) => {
   const metricValuesByKey = {
     salesSummary: {
       'Toplam Ciro': fmtTl(summary.totalRevenue),
-      'Net Satis': fmtTl(summary.totalRevenue - toMoney(cancelled.totalRevenue || 0)),
+      'Net Satis': fmtTl(summary.totalRevenue),
       'Toplam Tahsilat': fmtTl(summary.totalPaid),
       'Ortalama Sepet': fmtTl(summary.averageOrder, 0)
     },

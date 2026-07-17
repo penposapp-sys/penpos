@@ -25,13 +25,25 @@ const normalizeLabel = (value: unknown) => {
 
 const buildExcelHtml = (report: ZReportData) => {
   const safeReport = report || ({} as ZReportData)
-  const cashInBreakdown = Array.isArray(safeReport.summary?.cashInBreakdown) ? safeReport.summary.cashInBreakdown : []
-  const paymentRows = cashInBreakdown.map((row) => ({
+  const paymentBreakdown = Array.isArray(safeReport.summary?.cashInBreakdown) && safeReport.summary.cashInBreakdown.length > 0
+    ? safeReport.summary.cashInBreakdown
+    : (Array.isArray(safeReport.summary?.paymentBreakdown) ? safeReport.summary.paymentBreakdown : [])
+  const paymentRows = paymentBreakdown.map((row) => ({
     label: `Toplam ${normalizeLabel(row.methodName)}`,
     total: Number(row.totalAmount || 0)
   }))
   const creditTotal = Number(safeReport.summary?.payments?.credit || 0)
-  if (creditTotal > 0) paymentRows.push({ label: 'Toplam Veresiye', total: creditTotal })
+  if (creditTotal > 0 && paymentBreakdown.length === 0) paymentRows.push({ label: 'Toplam Veresiye', total: creditTotal })
+  if (paymentRows.length === 0) {
+    const fallbackRows = [
+      ['Toplam Nakit', Number(safeReport.summary?.payments?.cash || 0)],
+      ['Toplam Kart', Number(safeReport.summary?.payments?.card || 0)],
+      ['Toplam Yemek Karti', Number(safeReport.summary?.payments?.mealCard || 0)],
+      ['Toplam Online Odeme', Number(safeReport.summary?.payments?.online || 0)],
+      ['Toplam Veresiye', creditTotal]
+    ].filter(([, total]) => total > 0)
+    paymentRows.push(...fallbackRows.map(([label, total]) => ({ label: String(label), total: Number(total || 0) })))
+  }
 
   return `<!doctype html>
 <html lang="tr">
