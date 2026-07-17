@@ -28,11 +28,8 @@ const PACKAGE_PAYMENT_STATUS_LABELS = {
   iade_edildi: 'İade Edildi'
 }
 
-const ADMIN_PERMISSIONS = new Set([
-  'manage_delivery',
+const MANAGER_PERMISSIONS = new Set([
   'package_assign_courier',
-  'package_status_update',
-  'package_payment_status_update',
   'package_cancel',
   'courier_reports_view'
 ])
@@ -67,7 +64,7 @@ const canManageAllPackageOrders = (user) => {
   if (!user) return false
   if (user.role === 'tenant_admin' || user.role === 'superadmin') return true
   const perms = Array.isArray(user.permissions) ? user.permissions : []
-  return perms.some((permission) => ADMIN_PERMISSIONS.has(permission))
+  return perms.some((permission) => MANAGER_PERMISSIONS.has(permission))
 }
 
 const canCollectPayment = (user) => {
@@ -126,8 +123,10 @@ const normalizePackageStatus = (order) => {
   const direct = normalizeText(order?.deliveryStatus)
   const preparationStatus = derivePreparationStatus(order)
   const hasCourier = Boolean(order?.courierId)
+  const paymentSettled = isPackagePaymentSettled(order)
 
   if (['kuryeye_atandi', 'yola_cikti', 'teslim_edildi', 'iptal_edildi', 'musteriyi_bulamadi', 'adreste_yok', 'geri_dondu'].includes(direct)) {
+    if (direct === 'teslim_edildi' && !paymentSettled) return 'yola_cikti'
     return direct
   }
   if (direct === 'hazir') return hasCourier ? 'kuryeye_atandi' : 'hazir'
@@ -143,7 +142,7 @@ const normalizePackageStatus = (order) => {
     case 'accepted': return 'yeni'
     case 'preparing': return preparationStatus === 'ready' ? (hasCourier ? 'kuryeye_atandi' : 'hazir') : 'hazirlaniyor'
     case 'ready': return hasCourier ? 'kuryeye_atandi' : 'hazir'
-    case 'delivered': return 'teslim_edildi'
+    case 'delivered': return paymentSettled ? 'teslim_edildi' : 'yola_cikti'
     case 'cancelled': return 'iptal_edildi'
     default:
       if (preparationStatus === 'ready') return hasCourier ? 'kuryeye_atandi' : 'hazir'
@@ -206,11 +205,24 @@ const withCollectionEntries = (order) => {
   return { ...order, collectionEntries }
 }
 
+const isPackagePaymentSettled = (order) => {
+  if (String(order?.paymentStatus || '').trim() === 'paid') return true
+  const summary = computePaymentSummary(withCollectionEntries(order))
+  return Number(summary?.balanceDue || 0) <= 0.01
+}
+
+const isDeliveredPendingPayment = (order) => {
+  const direct = normalizeText(order?.deliveryStatus)
+  if (direct !== 'teslim_edildi') return false
+  return !isPackagePaymentSettled(order)
+}
+
 const mapOrder = (order) => {
   const status = normalizePackageStatus(order)
   const paymentStatus = normalizePackagePaymentStatus(order)
   const address = getAddressSnapshot(order)
   const paymentSummary = computePaymentSummary(withCollectionEntries(order))
+  const deliveredPendingPayment = isDeliveredPendingPayment(order)
   const items = Array.isArray(order?.items) ? order.items : []
   const visibleItems = items.filter((item) => item?.status !== 'cancelled')
   const itemsSummary = visibleItems
@@ -245,7 +257,8 @@ const mapOrder = (order) => {
     createdAt: order?.createdAt || null,
     updatedAt: order?.updatedAt || null,
     deliveryStatus: status,
-    deliveryStatusLabel: PACKAGE_STATUS_LABELS[status] || status,
+    deliveryStatusLabel: deliveredPendingPayment ? 'Teslim Edildi - Odeme Bekliyor' : (PACKAGE_STATUS_LABELS[status] || status),
+    deliveryCompletedPendingPayment: deliveredPendingPayment,
     orderChannel: normalizeText(order?.orderChannel) || 'manual',
     approvalStatus: normalizeApprovalStatus(order),
     cancelRequestStatus: normalizeText(order?.cancelRequestStatus) || 'none',
@@ -488,6 +501,10 @@ export const collectPackageOrderPaymentService = async (tenantId, user, orderId,
   const refreshed = await Order.findOne({ _id: orderId, tenantId })
   refreshed.deliveryType = 'package'
   refreshed.deliveryPaymentStatus = String(refreshed?.paymentStatus || '') === 'paid' ? 'odeme_alindi' : 'odeme_bekliyor'
+  if (String(refreshed?.paymentStatus || '') === 'paid' && refreshed.deliveredAt) {
+    refreshed.deliveryStatus = 'teslim_edildi'
+    refreshed.status = refreshed.status === 'cancelled' ? refreshed.status : 'completed'
+  }
   appendDeliveryEvent(refreshed, {
     type: 'payment_collected',
     oldStatus: previousPaymentStatus,
@@ -631,18 +648,23 @@ export const updatePackageOrderStatusService = async (tenantId, user, orderId, d
 
   const oldStatus = normalizePackageStatus(order)
   order.deliveryType = 'package'
-  order.deliveryStatus = nextStatus
   if (nextStatus === 'yola_cikti' && !order.courierDepartedAt) order.courierDepartedAt = new Date()
   if (nextStatus === 'teslim_edildi') {
     const now = new Date()
     order.deliveredAt = order.deliveredAt || now
     order.deliveryAt = order.deliveryAt || now
-    order.status = order.status === 'cancelled' ? order.status : 'completed'
+    if (String(order?.paymentStatus || '') === 'paid') {
+      order.deliveryStatus = 'teslim_edildi'
+      order.status = order.status === 'cancelled' ? order.status : 'completed'
+    } else {
+      order.deliveryStatus = 'yola_cikti'
+    }
+  } else {
+    order.deliveryStatus = nextStatus
   }
   if (nextStatus === 'iptal_edildi') {
     order.status = 'cancelled'
   }
-  order.deliveryStatus = nextStatus
   appendDeliveryEvent(order, {
     type: 'status_change',
     oldStatus,
@@ -677,6 +699,10 @@ export const updatePackageOrderPaymentStatusService = async (tenantId, user, ord
   if (nextStatus === 'odeme_alindi' || nextStatus === 'online_odendi') {
     order.paymentStatus = 'paid'
     order.paidAt = order.paidAt || new Date()
+    if (order.deliveredAt) {
+      order.deliveryStatus = 'teslim_edildi'
+      order.status = order.status === 'cancelled' ? order.status : 'completed'
+    }
   } else if (nextStatus === 'odeme_bekliyor') {
     order.paymentStatus = 'unpaid'
     order.paidAt = null

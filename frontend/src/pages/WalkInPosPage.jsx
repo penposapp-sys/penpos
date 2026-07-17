@@ -50,6 +50,13 @@ export default function WalkInPosPage() {
   const [activeCategory, setActiveCategory] = useState('')
   const [activeOrders, setActiveOrders] = useState([])
   const [loadingList, setLoadingList] = useState(false)
+  const [branchPickerOpen, setBranchPickerOpen] = useState(false)
+  const [branchPickerLoading, setBranchPickerLoading] = useState(false)
+  const [branchPickerError, setBranchPickerError] = useState('')
+  const [availableBranches, setAvailableBranches] = useState([])
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    try { return String(localStorage.getItem('selectedBranchId') || '').trim() } catch { return '' }
+  })
 
   const [order, setOrder] = useState(null)
   const [note, setNote] = useState('')
@@ -112,6 +119,21 @@ export default function WalkInPosPage() {
     return servingTypeLabelTR(type) || '-'
   }
 
+  const renderServingTypeDetail = (item, detailText, preferredServingType = null) => {
+    const itemServingType = normalizeServingType(preferredServingType || item?.servingType || order?.servingType || servingType, { fallback: null })
+    const servingLabel = itemServingType ? servingTypeLabelTR(itemServingType, { fallback: '' }) : ''
+    return (
+      <div className="sale-cart-line__detail-stack">
+        <div>{detailText}</div>
+        {servingLabel ? (
+          <div className="sale-cart-line__serving-note">
+            <span className="sale-cart-line__serving-pill">Servis: {servingLabel}</span>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   const [payMethods, setPayMethods] = useState([])
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
@@ -134,6 +156,47 @@ export default function WalkInPosPage() {
   const qtyLastToastAtRef = useRef(new Map())
 
   incrementPerfCounter('pageRenders', 'WalkInPosPage')
+
+  const normalizedAllowedBranchIds = useMemo(
+    () => Array.from(new Set((Array.isArray(allowedBranchIds) ? allowedBranchIds : []).map((id) => String(id || '').trim()).filter(Boolean))),
+    [allowedBranchIds]
+  )
+
+  useEffect(() => {
+    const syncSelectedBranch = () => {
+      try {
+        setSelectedBranchId(String(localStorage.getItem('selectedBranchId') || '').trim())
+      } catch {
+        setSelectedBranchId('')
+      }
+    }
+    syncSelectedBranch()
+    window.addEventListener('selected_branch_changed', syncSelectedBranch)
+    return () => window.removeEventListener('selected_branch_changed', syncSelectedBranch)
+  }, [])
+
+  const loadAvailableBranches = useCallback(async () => {
+    setBranchPickerLoading(true)
+    setBranchPickerError('')
+    try {
+      const res = await api('/api/branches', { skipBranchHeader: true, silent: true, suppressBranchModal: true })
+      const list = Array.isArray(res?.branches) ? res.branches : []
+      const filtered = list.filter((branch) => {
+        const id = String(branch?._id || branch?.id || '').trim()
+        if (!id) return false
+        if (branch?.isActive === false) return false
+        return normalizedAllowedBranchIds.length === 0 || normalizedAllowedBranchIds.includes(id)
+      })
+      setAvailableBranches(filtered)
+      return filtered
+    } catch (err) {
+      setBranchPickerError(err?.message || 'Şubeler yüklenemedi')
+      setAvailableBranches([])
+      return []
+    } finally {
+      setBranchPickerLoading(false)
+    }
+  }, [normalizedAllowedBranchIds])
 
   useEffect(() => {
     qtyDraftByRowRef.current = qtyDraftByRow || {}
@@ -554,19 +617,58 @@ export default function WalkInPosPage() {
   }, [selectedOrderId, isOrderView])
 
   const startWalkInOrder = async () => {
-    try {
-      const res = await api('/api/pos/walkin/orders', {
-        method: 'POST',
-        data: { customerName: 'Misafir', note: '' },
-        silent: true
-      })
-      const fresh = pickOrder(res)
-      const newId = getOrderId(fresh)
-      if (!newId) {
-        toast.error('Sipariş başlatılamadı')
+    const createWalkInOrderForBranch = async (branchIdOverride) => {
+      try {
+        const res = await api('/api/pos/walkin/orders', {
+          method: 'POST',
+          data: { customerName: 'Misafir', note: '' },
+          branchIdOverride,
+          silent: true
+        })
+        const fresh = pickOrder(res)
+        const newId = getOrderId(fresh)
+        if (!newId) {
+          toast.error('Sipariş başlatılamadı')
+          return
+        }
+        nav(`/kermes/app/walkin/${newId}`)
+      } catch (err) {
+        toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
+      }
+    }
+
+    const currentSelectedBranchId = (() => {
+      const raw = String(selectedBranchId || '').trim()
+      if (raw) return raw
+      try { return String(localStorage.getItem('selectedBranchId') || '').trim() } catch { return '' }
+    })()
+    const hasSelectedAllowedBranch = currentSelectedBranchId && (
+      normalizedAllowedBranchIds.length === 0 || normalizedAllowedBranchIds.includes(currentSelectedBranchId)
+    )
+
+    if (user?.role === 'tenant_admin' && normalizedAllowedBranchIds.length > 1) {
+      await loadAvailableBranches()
+      setBranchPickerOpen(true)
+      return
+    }
+
+    if (!hasSelectedAllowedBranch) {
+      if (normalizedAllowedBranchIds.length === 1) {
+        const onlyBranchId = normalizedAllowedBranchIds[0]
+        try {
+          localStorage.setItem('selectedBranchId', onlyBranchId)
+          setSelectedBranchId(onlyBranchId)
+        } catch {}
+        await createWalkInOrderForBranch(onlyBranchId)
         return
       }
-      nav(`/kermes/app/walkin/${newId}`)
+      await loadAvailableBranches()
+      setBranchPickerOpen(true)
+      return
+    }
+
+    try {
+      await createWalkInOrderForBranch(currentSelectedBranchId)
     } catch (err) {
       toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
     }
@@ -584,6 +686,7 @@ export default function WalkInPosPage() {
     if (!menuItemId) return null
     const tempId = `tmp:${menuItemId}:${Date.now()}:${optimisticItemSeqRef.current++}`
     const unitPrice = Number(product?.price || 0)
+    const nextServingType = normalizeServingType(product?.servingType || servingType || order?.servingType, { fallback: null })
     setOrder((prev) => {
       if (!prev) return prev
       const nextItems = Array.isArray(prev.items) ? [...prev.items] : []
@@ -593,11 +696,13 @@ export default function WalkInPosPage() {
         itemId: tempId,
         menuItemId,
         nameSnapshot: String(product?.name || 'Ürün'),
+        priceSnapshot: unitPrice,
         qty: 1,
         subtotal: unitPrice,
         status: 'open',
         note: '',
-        isWeightBased: !!product?.isWeightBased
+        isWeightBased: !!product?.isWeightBased,
+        servingType: nextServingType
       })
       const prevGross = Number(prev?.total ?? prev?.totals?.total ?? prev?.totals?.grandTotal ?? 0)
       const prevDiscountPercent = Number(prev?.discountPercent ?? 0)
@@ -622,7 +727,7 @@ export default function WalkInPosPage() {
       }
     })
     return tempId
-  }, [])
+  }, [order?.servingType, servingType])
 
   const removeOptimisticOrderItem = useCallback((tempId) => {
     if (!tempId) return
@@ -1440,6 +1545,9 @@ export default function WalkInPosPage() {
         <div className="card" style={topbarStyle}>
           <div>
             <div style={{ fontWeight: 800, fontSize: 16 }}>Aktif Masasız Satışlar</div>
+            {selectedBranchId ? (
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Aktif şube: {selectedBranchId}</div>
+            ) : null}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="btn" onClick={() => loadActiveOrders()} disabled={loadingList || busy}>Yenile</button>
@@ -1740,9 +1848,10 @@ export default function WalkInPosPage() {
                   const rawDraft = getQtyDraft(row.key, row.qty)
                   const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
                   const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
+                  const unitPrice = Number(it?.priceSnapshot ?? (displayQty > 0 ? row.subtotal / displayQty : row.subtotal) ?? 0)
                   const detailText = isWeightBased
-                    ? `${it?.priceSnapshot} TL/KG • ${weightGrams} gr`
-                    : `${it?.priceSnapshot} TL • x${displayQty}`
+                    ? `${unitPrice} TL/KG • ${weightGrams} gr`
+                    : `${unitPrice} TL • x${displayQty}`
                   const badge = getKitchenItemStatusMeta(it?.status, { compact: true })
 
                   return (
@@ -1762,7 +1871,7 @@ export default function WalkInPosPage() {
                           {badge.label}
                         </span>
                       ) : null}
-                      detail={detailText}
+                      detail={renderServingTypeDetail(it, detailText, isOpen ? servingType : null)}
                       actions={(
                         <>
                           {isOpen && (
@@ -2297,6 +2406,63 @@ export default function WalkInPosPage() {
         setCancelModalOpen(true)
       }}
     />
+
+    <Modal open={branchPickerOpen} onClose={() => setBranchPickerOpen(false)} title="Sipariş Şubesi Seç">
+      <div style={{ display: 'grid', gap: 10 }}>
+        <div className="card" style={{ borderColor: '#bfdbfe', background: '#eff6ff' }}>
+          <div style={{ fontWeight: 700, color: '#1d4ed8' }}>Siparişi hangi şubeye gireceğinizi seçin</div>
+          <div style={{ color: 'var(--muted)', marginTop: 4 }}>
+            Ana kullanıcıda tüm masalar görünür; yeni hızlı satış ve paket sipariş için önce işlem yapılacak şube seçilir.
+          </div>
+        </div>
+        {branchPickerLoading ? <div style={{ color: 'var(--muted)' }}>Şubeler yükleniyor...</div> : null}
+        {!!branchPickerError ? <div style={{ color: '#b91c1c' }}>{branchPickerError}</div> : null}
+        {!branchPickerLoading && !branchPickerError && availableBranches.length === 0 ? (
+          <div style={{ color: 'var(--muted)' }}>Kullanılabilir şube bulunamadı.</div>
+        ) : null}
+        <div style={{ display: 'grid', gap: 8 }}>
+          {availableBranches.map((branch) => {
+            const branchId = String(branch?._id || branch?.id || '').trim()
+            return (
+              <button
+                key={branchId}
+                className="btn"
+                type="button"
+                onClick={async () => {
+                  try {
+                    localStorage.setItem('selectedBranchId', branchId)
+                    setSelectedBranchId(branchId)
+                    window.dispatchEvent(new CustomEvent('selected_branch_changed', { detail: { branchId } }))
+                  } catch {}
+                  setBranchPickerOpen(false)
+                  await api('/api/pos/walkin/orders', {
+                    method: 'POST',
+                    data: { customerName: 'Misafir', note: '' },
+                    branchIdOverride: branchId,
+                    silent: true
+                  }).then((res) => {
+                    const fresh = pickOrder(res)
+                    const newId = getOrderId(fresh)
+                    if (!newId) {
+                      toast.error('Sipariş başlatılamadı')
+                      return
+                    }
+                    nav(`/kermes/app/walkin/${newId}`)
+                  }).catch((err) => {
+                    toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
+                  })
+                }}
+                disabled={branchPickerLoading || !branchId}
+                style={{ justifyContent: 'space-between', display: 'flex' }}
+              >
+                <span>{branch?.name || 'Şube'}</span>
+                <span style={{ color: 'var(--muted)' }}>{branchId === selectedBranchId ? 'Seçili' : 'Seç'}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </Modal>
 
     </div>
   )

@@ -234,3 +234,48 @@ export const notifyCourierAssigned = async ({ courierUserId, order } = {}) => {
     }
   })
 }
+
+export const notifyOnlineOrderUsers = async ({ tenantId, branchId = '', order = null } = {}) => {
+  if (!tenantId || !order) return { sent: 0, skipped: 'missing_data' }
+
+  const users = await User.find({
+    tenantId,
+    isDeleted: { $ne: true },
+    isActive: true,
+    $or: [
+      { role: 'tenant_admin' },
+      {
+        permissions: {
+          $in: [
+            'manage_delivery',
+            'package_orders_view',
+            'package_courier_page_view',
+            'package_assign_courier'
+          ]
+        }
+      }
+    ]
+  }).select('_id role branchId branchIds accessibleBranchIds pushDevices')
+
+  const visibleUsers = users.filter((user) => {
+    if (String(user?.role || '') === 'tenant_admin') return true
+    const allowed = getUserAccessibleBranchIds(user)
+    if (allowed.length === 0) return true
+    return allowed.includes(String(branchId))
+  })
+
+  return sendPushToUsers(visibleUsers, {
+    title: 'Yeni Online Siparis',
+    body: order?.orderNo
+      ? `Onay bekleyen yeni online siparis var (#${order.orderNo}).`
+      : 'Onay bekleyen yeni online siparis var.',
+    channelId: 'penpos-alerts',
+    data: {
+      type: 'online_order',
+      orderId: String(order?._id || order?.id || ''),
+      orderNo: String(order?.orderNo || ''),
+      branchId: String(branchId || order?.branchId || ''),
+      targetPath: '/kermes/app/package-courier'
+    }
+  })
+}

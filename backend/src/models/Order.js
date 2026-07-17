@@ -9,7 +9,16 @@ const paymentSchema = new mongoose.Schema(
     methodBucket: { type: String, enum: ['cash', 'card', 'bank', 'account', 'other'], default: 'other' },
     methodType: { type: String, enum: ['cash', 'card', 'bank', 'credit', 'other'], default: 'other' },
     amount: { type: Number, required: true, min: 0 },
-    note: { type: String, default: '' }
+    note: { type: String, default: '' },
+    itemAllocations: {
+      type: [{
+        itemId: { type: String, default: '' },
+        menuItemId: { type: String, default: '' },
+        qty: { type: Number, default: 0, min: 0 },
+        subtotal: { type: Number, default: 0, min: 0 }
+      }],
+      default: []
+    }
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 )

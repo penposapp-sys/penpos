@@ -2428,11 +2428,11 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .saleStandard3Col {
-  --pos-font-base: 13px;
-  --pos-font-title: 14px;
-  --pos-font-meta: 11px;
-  --pos-font-badge: 10px;
-  --pos-font-button: 13px;
+  --pos-font-base: 8.8px;
+  --pos-font-title: 9.4px;
+  --pos-font-meta: 7.4px;
+  --pos-font-badge: 6.8px;
+  --pos-font-button: 8.9px;
   display: grid;
   grid-template-columns: 170px minmax(520px, 1fr) minmax(420px, 460px);
   gap: 12px;
@@ -2703,6 +2703,7 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .sale-cart-line__title {
+  font-size: var(--pos-font-title);
   font-weight: 700;
   line-height: 1.15;
   min-width: 0;
@@ -2713,6 +2714,7 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .sale-cart-line__name {
+  font-size: inherit;
   min-width: 0;
   display: block;
   max-width: 100%;
@@ -2724,6 +2726,7 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .sale-cart-line__detail {
+  font-size: var(--pos-font-meta);
   color: var(--muted);
   white-space: nowrap;
   grid-area: detail;
@@ -2732,8 +2735,34 @@ body.modal-open .qr-menu .menu-row:hover {
   text-overflow: ellipsis;
 }
 
+.sale-cart-line__detail-stack {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  white-space: normal;
+}
+
+.sale-cart-line__serving-note {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sale-cart-line__serving-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, #3b82f6) 22%, var(--border));
+  background: color-mix(in srgb, var(--accent, #3b82f6) 8%, var(--panel));
+  color: var(--app-text, var(--text));
+  font-size: var(--pos-font-meta);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .sale-cart-line__note {
-  font-size: 11px;
+  font-size: var(--pos-font-meta);
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -2765,6 +2794,7 @@ body.modal-open .qr-menu .menu-row:hover {
 
 .sale-cart-line__action-btn {
   border-radius: 999px;
+  font-size: var(--pos-font-button);
   line-height: 1.1;
   display: inline-flex;
   align-items: center;
@@ -2774,11 +2804,13 @@ body.modal-open .qr-menu .menu-row:hover {
 }
 
 .sale-cart-line__actions .input {
+  font-size: var(--pos-font-button);
   text-align: center;
   flex: 0 0 auto;
 }
 
 .sale-cart-line__price {
+  font-size: var(--pos-font-title);
   font-weight: 700;
   white-space: nowrap;
   align-self: center;
@@ -2887,7 +2919,7 @@ body.modal-open .qr-menu .menu-row:hover {
     max-width: 100%;
     color: var(--app-text, var(--text));
     opacity: 1;
-    font-size: 10.5px;
+    font-size: 11.34px;
     font-weight: 800;
     white-space: nowrap;
     overflow: hidden;
@@ -2904,7 +2936,7 @@ body.modal-open .qr-menu .menu-row:hover {
 
   .sale-cart-line__detail {
     display: block;
-    font-size: 9.5px;
+    font-size: 10.26px;
     white-space: nowrap;
     justify-self: end;
     text-align: right;
@@ -2913,11 +2945,17 @@ body.modal-open .qr-menu .menu-row:hover {
     align-self: center;
   }
 
+  .sale-cart-line__serving-note {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
   .sale-cart-line-status {
     min-width: 68px;
     height: 22px;
     padding: 0 6px !important;
-    font-size: 10.5px !important;
+    font-size: 11.34px !important;
     line-height: 22px !important;
     justify-content: center;
     justify-self: start;
@@ -2941,7 +2979,7 @@ body.modal-open .qr-menu .menu-row:hover {
     height: 22px;
     min-height: 22px;
     padding: 0 5px;
-    font-size: 9.5px;
+    font-size: 10.26px;
     font-weight: 700;
     line-height: 1;
   }
@@ -2964,19 +3002,80 @@ body.modal-open .qr-menu .menu-row:hover {
     height: 22px;
     min-height: 22px;
     padding: 0 4px;
-    font-size: 9.5px;
+    font-size: 10.26px;
   }
 
   .sale-cart-line__price {
     justify-self: end;
     text-align: right;
     font-weight: 800;
-    font-size: 11.5px;
+    font-size: 12.42px;
     min-width: 0;
     overflow: visible;
     text-overflow: clip;
     padding-left: 0;
     white-space: nowrap;
+  }
+
+  @media (min-width: 1501px) {
+    .sale-cart-line {
+      grid-template-columns: minmax(112px, 1fr) max-content max-content;
+      grid-template-areas:
+        "info line1 price"
+        "line2 meta actions";
+      column-gap: 8px;
+      row-gap: 5px;
+      min-height: 52px;
+      padding: 7px 8px;
+      align-items: center;
+    }
+
+    .sale-cart-line__info {
+      grid-area: info;
+      align-self: center;
+    }
+
+    .sale-cart-line__meta {
+      grid-area: meta;
+      justify-self: start;
+      align-self: center;
+    }
+
+    .sale-cart-line__detail {
+      display: contents;
+    }
+
+    .sale-cart-line__detail-stack {
+      display: contents;
+    }
+
+    .sale-cart-line__detail-stack > :first-child {
+      grid-area: line1;
+      display: block;
+      font-size: 10.26px;
+      white-space: nowrap;
+      justify-self: start;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      align-self: center;
+    }
+
+    .sale-cart-line__serving-note {
+      grid-area: line2;
+      justify-self: start;
+      align-self: center;
+    }
+
+    .sale-cart-line__actions {
+      grid-area: actions;
+      gap: 4px;
+    }
+
+    .sale-cart-line__price {
+      grid-area: price;
+      align-self: center;
+    }
   }
 
   .walkin-cart-panel .saleCartList {
@@ -3119,8 +3218,10 @@ body.modal-open .qr-menu .menu-row:hover {
 
   .walkin-sales-page .saleCartFooterSummaryMain,
   .delivery-orders-page .delivery-detail-footer-summary .saleCartFooterSummaryMain {
-    font-size: 11px;
-    line-height: 1.1;
+    font-size: 15.4px;
+    line-height: 1.15;
+    font-family: inherit;
+    font-weight: 700;
   }
 
   .walkin-sales-page .saleCartFooterSummaryMeta,
@@ -3129,14 +3230,18 @@ body.modal-open .qr-menu .menu-row:hover {
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 1px 8px;
-    font-size: 10px;
-    line-height: 1.05;
+    font-size: 14px;
+    line-height: 1.15;
     text-align: right;
+    font-family: inherit;
+    font-weight: 700;
   }
 
   .walkin-sales-page .saleCartFooterSummaryMetaLine,
   .delivery-orders-page .delivery-detail-footer-summary .saleCartFooterSummaryMetaLine {
-    font-size: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 700;
   }
 
   .walkin-sales-page .saleCartFooterActions,
@@ -3787,6 +3892,23 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   white-space: nowrap;
 }
 
+@media (min-width: 1501px) {
+  .saleCartFooterSummaryMain {
+    font-size: 15.4px;
+    line-height: 1.15;
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .saleCartFooterSummaryMeta,
+  .saleCartFooterSummaryMetaLine {
+    font-size: 14px;
+    line-height: 1.15;
+    font-family: inherit;
+    font-weight: 700;
+  }
+}
+
 .saleCartFooterActions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4087,7 +4209,7 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   }
 
   .sale-cart-line__title {
-    font-size: 10px;
+    font-size: 13.5px;
     font-weight: 700;
     color: #111827;
     opacity: 1;
@@ -4108,7 +4230,7 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   }
 
   .sale-cart-line__detail {
-    font-size: 8px;
+    font-size: 10.8px;
     align-self: center;
     white-space: nowrap;
     overflow: hidden;
@@ -4130,7 +4252,7 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   .sale-cart-line__price {
     grid-area: price;
     align-self: center;
-    font-size: 10px;
+    font-size: 13.5px;
     font-weight: 800;
     text-align: right;
     width: auto;
@@ -4394,7 +4516,7 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   color: var(--app-text-soft);
 }
 
-.kitchenItemsList { display: grid; gap: 3px; max-height: 42vh; overflow-y: auto; padding-right: 6px }
+.kitchenItemsList { display: grid; gap: 3px; max-height: none; overflow: visible; padding-right: 0 }
 
 .kitchenItem { display: grid; gap: 2px }
 
@@ -7527,11 +7649,11 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 
 @media (min-width: 769px) and (max-width: 1500px) {
   .saleStandard3Col {
-    --pos-font-base: 12px;
-    --pos-font-title: 13px;
-    --pos-font-meta: 10px;
-    --pos-font-badge: 9px;
-    --pos-font-button: 12px;
+    --pos-font-base: 7.6px;
+    --pos-font-title: 8.1px;
+    --pos-font-meta: 6.4px;
+    --pos-font-badge: 5.8px;
+    --pos-font-button: 7.4px;
     grid-template-columns: 132px minmax(0, 1fr) minmax(248px, 300px);
     gap: 8px;
   }
@@ -7565,7 +7687,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
     min-height: 32px;
     height: 32px;
     padding: 0 6px;
-    font-size: 10.5px;
+    font-size: 8.4px;
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
@@ -7590,14 +7712,16 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   }
 
   .sale-cart-line {
-    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    grid-template-columns: minmax(0, 1fr) max-content;
     grid-template-areas:
-      "info meta price"
-      "detail actions price";
-    column-gap: 1px;
-    row-gap: 4px;
-    min-height: 50px;
-    align-items: center;
+      "info price"
+      "detail meta"
+      "actions actions";
+    column-gap: 6px;
+    row-gap: 5px;
+    min-height: 72px;
+    align-items: start;
+    padding: 8px 9px;
   }
 
   .sale-cart-line__info,
@@ -7609,40 +7733,59 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   }
 
   .sale-cart-line__title {
-    font-size: 10.5px;
+    font-size: 9.8px;
     font-weight: 800;
+    line-height: 1.2;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .sale-cart-line__detail {
     justify-self: start;
     text-align: left;
-    font-size: 9.5px;
+    font-size: 7.8px;
+  }
+
+  .sale-cart-line__detail-stack {
+    gap: 5px;
+  }
+
+  .sale-cart-line__serving-pill {
+    font-size: 7.8px;
+    padding: 4px 8px;
   }
 
   .sale-cart-line__meta {
-    justify-self: start;
+    grid-area: meta;
+    justify-self: end;
+    align-self: center;
   }
 
   .sale-cart-line-status {
-    min-width: 62px;
-    height: 22px;
+    min-width: 58px;
+    height: 20px;
     padding: 0 6px !important;
-    font-size: 10.5px !important;
-    line-height: 22px !important;
+    font-size: 8.6px !important;
+    line-height: 20px !important;
     font-weight: 800;
   }
 
   .sale-cart-line__actions {
-    justify-self: start;
-    gap: 1px;
+    justify-self: stretch;
+    justify-content: flex-end;
+    gap: 4px;
+    flex-wrap: nowrap;
   }
 
   .sale-cart-line__action-btn {
-    min-width: 20px;
-    height: 18px;
-    min-height: 18px;
-    padding: 0 3px;
-    font-size: 7px;
+    min-width: 28px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0 5px;
+    font-size: 7.4px;
   }
 
   .sale-cart-line__action-btn--note {
@@ -7660,7 +7803,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .sale-cart-line__price {
     align-self: center;
     justify-self: end;
-    font-size: 9px;
+    font-size: 9.6px;
   }
 
   .sale-cart-line--terminal {
@@ -7675,7 +7818,12 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .sale-cart-line--terminal .sale-cart-line__detail {
     justify-self: start;
     text-align: left;
-    font-size: 7px;
+    font-size: 7.6px;
+  }
+
+  .sale-cart-line--terminal .sale-cart-line__serving-pill {
+    font-size: 7.8px;
+    padding: 3px 7px;
   }
 
   .sale-cart-line--terminal .sale-cart-line__meta {
@@ -7700,12 +7848,12 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   }
 
   .saleCartFooterSummaryMain {
-    font-size: 10px;
+    font-size: 13.8px;
   }
 
   .saleCartFooterSummaryMeta {
     gap: 1px;
-    font-size: 8px;
+    font-size: 10.8px;
   }
 
   .saleCartFooterActions,
@@ -7722,7 +7870,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
     height: 34px;
     min-height: 34px;
     padding: 0 8px;
-    font-size: 10.5px;
+    font-size: 9.2px;
     font-weight: 700;
     line-height: 1.05;
     border-radius: 10px;

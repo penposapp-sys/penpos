@@ -21,6 +21,7 @@ import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 import { isVisibleInBranch } from '../utils/branchVisibility.js'
 import { buildKitchenReceiptRaw } from '../utils/kitchenReceiptRaw.js'
 import { upsertDeliveryCustomerProfile } from './deliveryCustomerService.js'
+import { notifyOnlineOrderUsers } from './pushNotificationService.js'
 
 const toMoney = (v) => {
   const n = Number(v)
@@ -1087,6 +1088,20 @@ export const createPublicOnlineOrderService = async (
     order: fresh
   })
   const finalOrder = await Order.findById(baseOrder.id).lean()
+  try {
+    await notifyOnlineOrderUsers({
+      tenantId,
+      branchId,
+      order: finalOrder
+    })
+  } catch (err) {
+    logger.error('[ONLINE_ORDER_PUSH_NOTIFY_ERROR]', {
+      tenantId: String(tenantId || ''),
+      branchId: String(branchId || ''),
+      orderId: String(finalOrder?._id || baseOrder.id || ''),
+      message: String(err?.message || err || '')
+    })
+  }
   lastOrder = decorateOrder(finalOrder)
 
   return { order: lastOrder }
@@ -2215,6 +2230,75 @@ export const setNoteService = async (tenantId, id, note) => {
   return { order: dto }
 }
 
+export const splitOrderServiceByItemId = async (tenantId, id, itemsToMove = [], targetTableId) => {
+  const order = await findByIdAndTenant(id, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+  if (!['open', 'sent'].includes(order.status)) throw error('order_not_splitable', 'Order not splitable', 400)
+  if (!Array.isArray(itemsToMove) || itemsToMove.length === 0) throw error('invalid_request', 'No items to split', 400)
+
+  let targetTable = null
+  if (targetTableId) {
+    targetTable = await Table.findOne({ _id: targetTableId, tenantId, isActive: true })
+    if (!targetTable || targetTable.status !== 'empty') throw error('target_table_not_empty', 'Target table not empty', 400)
+  }
+
+  const session = await mongoose.startSession()
+  try {
+    const seq = await getNextOrderSequence(tenantId, order.branchId)
+    let newOrder = null
+    await session.withTransaction(async () => {
+      const sourceItems = Array.isArray(order.items) ? order.items : []
+      const newOrderItems = []
+
+      for (const move of itemsToMove) {
+        const itemId = String(move?.itemId || '').trim()
+        const menuItemId = String(move?.menuItemId || '').trim()
+        const requestedQty = Math.max(0, Math.floor(Number(move?.qty || 0)))
+        const sourceItem = itemId
+          ? sourceItems.find((entry) => String(entry?._id || entry?.id || '') === itemId)
+          : sourceItems.find((entry) => String(entry?.menuItemId || '') === menuItemId)
+
+        if (!sourceItem) throw error('not_found', 'Menu item not in order', 404)
+        if (requestedQty < 1 || requestedQty > Number(sourceItem?.qty || 0)) throw error('invalid_qty', 'Invalid qty', 400)
+
+        const unitPrice = toMoney(sourceItem?.priceSnapshot || 0)
+        sourceItem.qty = Math.max(0, Number(sourceItem.qty || 0) - requestedQty)
+        sourceItem.subtotal = toMoney(sourceItem.qty * unitPrice)
+
+        newOrderItems.push(splitQtyItemSnapshot(sourceItem, {
+          _id: new mongoose.Types.ObjectId(),
+          qty: requestedQty,
+          subtotal: toMoney(requestedQty * unitPrice)
+        }))
+      }
+
+      const updatedSourceItems = sourceItems.filter((item) => Number(item?.qty || 0) > 0)
+      const updatedSourceTotals = computeTotals(updatedSourceItems)
+      await Order.findByIdAndUpdate(order.id, { items: updatedSourceItems, totals: updatedSourceTotals }, { new: true, session })
+
+      newOrder = await Order.create([{
+        tenantId,
+        branchId: order.branchId,
+        createdBy: order.createdBy,
+        orderNo: seq.orderNo,
+        orderDayKey: seq.orderDayKey,
+        tableId: targetTableId ?? order.tableId,
+        status: 'open',
+        items: newOrderItems,
+        totals: computeTotals(newOrderItems),
+        note: ''
+      }], { session }).then((res) => res[0])
+
+      if (targetTableId) {
+        await Table.findByIdAndUpdate(targetTableId, { status: 'occupied', activeOrderId: newOrder.id }, { new: true, session })
+      }
+    })
+    return { newOrderId: newOrder.id }
+  } finally {
+    await session.endSession()
+  }
+}
+
 export const setCustomerNameService = async (tenantId, id, customerName) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('order_not_found', 'Order not found', 404)
@@ -2387,7 +2471,7 @@ export const setKitchenModeService = async (tenantId, id, { kitchenEnabled, send
   return { order: decorateOrder(fresh) }
 }
 
-export const addOrderPaymentService = async (tenantId, id, { method, amount, note, cashierId }) => {
+export const addOrderPaymentService = async (tenantId, id, { method, amount, note, cashierId, itemAllocations = [] }) => {
   if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
     throw error('invalid_request', 'Invalid orderId', 400)
   }
@@ -2402,6 +2486,34 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
   const payAmount = Number(amount)
   if (!Number.isFinite(payAmount) || payAmount <= 0) {
     throw error('invalid_amount', 'Invalid payment amount', 400)
+  }
+
+  const normalizedItemAllocations = Array.isArray(itemAllocations)
+    ? itemAllocations
+      .map((entry) => ({
+        itemId: String(entry?.itemId || '').trim(),
+        menuItemId: String(entry?.menuItemId || '').trim(),
+        qty: Math.max(0, Math.floor(Number(entry?.qty || 0))),
+        subtotal: toMoney(entry?.subtotal || 0)
+      }))
+      .filter((entry) => entry.qty > 0 && (entry.itemId || entry.menuItemId))
+    : []
+
+  if (normalizedItemAllocations.length > 0) {
+    const orderItems = Array.isArray(order.items) ? order.items : []
+    const selectedSubtotal = normalizedItemAllocations.reduce((sum, entry) => {
+      const sourceItem = entry.itemId
+        ? orderItems.find((item) => String(item?._id || item?.id || '') === entry.itemId)
+        : orderItems.find((item) => String(item?.menuItemId || '') === entry.menuItemId)
+      if (!sourceItem) return sum
+      const unitPrice = toMoney(sourceItem?.priceSnapshot || 0)
+      return sum + toMoney(unitPrice * entry.qty)
+    }, 0)
+    const discountPercent = Math.max(0, Math.min(100, toMoney(order.discountPercent)))
+    const expectedAmount = toMoney(Math.max(0, selectedSubtotal - ((selectedSubtotal * discountPercent) / 100)))
+    if (Math.abs(expectedAmount - payAmount) > 0.01) {
+      throw error('invalid_amount', 'Secilen urunlerin odeme tutari degisti, tekrar deneyin', 400)
+    }
   }
 
   const accountId = String(order?.publicCustomerAccountId || '').trim()
@@ -2438,7 +2550,8 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
       methodBucket: resolvedMethod.methodBucket,
       methodType: resolvedMethod.methodType,
       amount: payAmount,
-      note: String(note || '')
+      note: String(note || ''),
+      itemAllocations: normalizedItemAllocations
     })
     const paymentState = await computePersistedPaymentState(tenantId, order)
     order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'

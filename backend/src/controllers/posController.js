@@ -1,5 +1,5 @@
 import { sendError, error } from '../utils/errors.js'
-import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderService, setItemQuantityService, setItemQuantityByItemIdService, setItemWeightByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService } from '../services/orderService.js'
+import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderServiceByItemId, setItemQuantityService, setItemQuantityByItemIdService, setItemWeightByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService } from '../services/orderService.js'
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
@@ -366,8 +366,8 @@ export const pay = async (req, res) => {
 export const addPayment = async (req, res) => {
   try {
     const { id } = req.params
-    const { method, amount, note } = req.body || {}
-    const { order } = await addOrderPaymentService(req.user.tenantId, id, { method, amount, note, cashierId: req.user.id })
+    const { method, amount, note, itemAllocations } = req.body || {}
+    const { order } = await addOrderPaymentService(req.user.tenantId, id, { method, amount, note, itemAllocations, cashierId: req.user.id })
     try {
       await auditLog(req.user.tenantId, req.user.id, 'odeme_ekle', 'order', order._id || order.id || id, { method, amount })
     } catch {}
@@ -590,7 +590,7 @@ export const split = async (req, res) => {
   try {
     const targetTableId = String(req.body?.targetTableId || '').trim()
     await assertTablesWithinStaffBranches(req, targetTableId ? [targetTableId] : [])
-    const result = await splitOrderService(req.user.tenantId, req.params.id, req.body?.items || [], req.body?.targetTableId)
+    const result = await splitOrderServiceByItemId(req.user.tenantId, req.params.id, req.body?.items || [], req.body?.targetTableId)
     res.json(result)
   } catch (err) {
     sendError(res, err)

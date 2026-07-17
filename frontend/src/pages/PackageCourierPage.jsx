@@ -160,15 +160,20 @@ export default function PackageCourierPage() {
   const perms = Array.isArray(user?.permissions) ? user.permissions : []
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'superadmin'
   const hasPerm = (permission) => isAdmin || perms.includes(permission)
+  const ownCourierId = String(user?.id || user?._id || '').trim()
 
-  const canAssignCourier = hasPerm(PERMISSIONS.PACKAGE_ASSIGN_COURIER) || hasPerm(PERMISSIONS.MANAGE_DELIVERY)
+  const canAssignCourier = hasPerm(PERMISSIONS.PACKAGE_ASSIGN_COURIER)
   const canUpdateStatus = hasPerm(PERMISSIONS.PACKAGE_STATUS_UPDATE) || hasPerm(PERMISSIONS.MANAGE_DELIVERY)
   const canTakePayment = hasPerm(PERMISSIONS.TAKE_PAYMENT)
   const canViewReports = hasPerm(PERMISSIONS.COURIER_REPORTS_VIEW) || hasPerm(PERMISSIONS.REPORTS_DASHBOARD_VIEW)
   const canSeePhone = hasPerm(PERMISSIONS.CUSTOMER_PHONE_VIEW) || canAssignCourier
   const canSeeAddress = hasPerm(PERMISSIONS.CUSTOMER_ADDRESS_VIEW) || canAssignCourier
   const canOpenLocation = hasPerm(PERMISSIONS.CUSTOMER_LOCATION_OPEN) || canAssignCourier
-  const courierMode = !canAssignCourier
+  const canManageAllOrders = isAdmin
+    || hasPerm(PERMISSIONS.PACKAGE_ASSIGN_COURIER)
+    || hasPerm(PERMISSIONS.PACKAGE_CANCEL)
+  const courierMode = !canManageAllOrders
+  const showManagementFilters = canManageAllOrders
 
   const [orders, setOrders] = useState([])
   const [couriers, setCouriers] = useState([])
@@ -190,12 +195,20 @@ export default function PackageCourierPage() {
   const [selectedCourierId, setSelectedCourierId] = useState('')
   const [filters, setFilters] = useState({
     date: todayYmd(),
-    branchId: courierMode ? '' : '',
-    courierId: '',
+    branchId: '',
+    courierId: courierMode ? ownCourierId : '',
     status: '',
     paymentStatus: '',
     search: ''
   })
+
+  useEffect(() => {
+    if (!courierMode || !ownCourierId) return
+    setFilters((current) => {
+      if (String(current.courierId || '') === ownCourierId) return current
+      return { ...current, courierId: ownCourierId }
+    })
+  }, [courierMode, ownCourierId])
 
   const loadOrders = async () => {
     setLoading(true)
@@ -205,7 +218,12 @@ export default function PackageCourierPage() {
         if (String(value || '').trim()) params.set(key, String(value).trim())
       })
       const result = await api(`/api/pos/package-orders?${params.toString()}`, { skipBranchHeader: true, suppressBranchModal: true, silent: true })
-      setOrders(Array.isArray(result?.orders) ? result.orders : [])
+      const nextOrders = Array.isArray(result?.orders) ? result.orders : []
+      setOrders(
+        courierMode && ownCourierId
+          ? nextOrders.filter((order) => String(order?.courierId || '') === ownCourierId)
+          : nextOrders
+      )
     } catch (err) {
       toast.error(err.message || 'Paket siparisleri yuklenemedi')
     } finally {
@@ -214,6 +232,10 @@ export default function PackageCourierPage() {
   }
 
   const loadCouriers = async () => {
+    if (courierMode) {
+      setCouriers([])
+      return
+    }
     try {
       const result = await api('/api/pos/couriers', { skipBranchHeader: true, suppressBranchModal: true, silent: true })
       setCouriers(Array.isArray(result?.couriers) ? result.couriers : [])
@@ -221,6 +243,10 @@ export default function PackageCourierPage() {
   }
 
   const loadBranches = async () => {
+    if (courierMode) {
+      setBranches([])
+      return
+    }
     try {
       const result = await api('/api/branches', { skipBranchHeader: true, silent: true })
       const allowed = Array.isArray(allowedBranchIds) ? allowedBranchIds.map(String) : []
@@ -278,12 +304,12 @@ export default function PackageCourierPage() {
     loadCouriers()
     loadBranches()
     loadPaymentMethods()
-  }, [Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : ''])
+  }, [Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : '', courierMode])
 
   useEffect(() => {
     loadOrders()
     loadReport()
-  }, [filters.date, filters.branchId, filters.courierId, filters.status, filters.paymentStatus, filters.search])
+  }, [filters.date, filters.branchId, filters.courierId, filters.status, filters.paymentStatus, filters.search, courierMode, ownCourierId])
 
   const summary = useMemo(() => {
     const totalAmount = orders.reduce((sum, order) => sum + Number(order?.total || 0), 0)
@@ -291,7 +317,7 @@ export default function PackageCourierPage() {
       yeni: orders.filter((order) => order.deliveryStatus === 'yeni').length,
       hazirlaniyor: orders.filter((order) => order.deliveryStatus === 'hazirlaniyor').length,
       hazir: orders.filter((order) => order.deliveryStatus === 'hazir').length,
-      yolda: orders.filter((order) => order.deliveryStatus === 'yola_cikti').length,
+      yolda: orders.filter((order) => order.deliveryStatus === 'yola_cikti' || order?.deliveryCompletedPendingPayment === true).length,
       teslim: orders.filter((order) => order.deliveryStatus === 'teslim_edildi').length,
       totalAmount
     }
@@ -481,8 +507,9 @@ export default function PackageCourierPage() {
   const renderOrderActionsV2 = (order) => {
     const isCancelled = String(order?.status || '') === 'cancelled' || ['iptal_edildi', 'geri_dondu', 'musteriyi_bulamadi', 'adreste_yok'].includes(String(order?.deliveryStatus || ''))
     const isDelivered = String(order?.deliveryStatus || '') === 'teslim_edildi'
+    const deliveredPendingPayment = order?.deliveryCompletedPendingPayment === true
     const canDepart = ['hazir', 'kuryeye_atandi'].includes(String(order?.deliveryStatus || ''))
-    const canMarkDelivered = ['yola_cikti'].includes(String(order?.deliveryStatus || ''))
+    const canMarkDelivered = ['yola_cikti'].includes(String(order?.deliveryStatus || '')) && !deliveredPendingPayment
     const mapUrl = order?.deliveryAddress?.mapUrl
       || ((order?.deliveryAddress?.latitude && order?.deliveryAddress?.longitude)
         ? `https://www.google.com/maps?q=${order.deliveryAddress.latitude},${order.deliveryAddress.longitude}`
@@ -566,30 +593,32 @@ export default function PackageCourierPage() {
   return (
     <div style={{ minHeight: '100%', display: 'grid', gap: 12 }}>
 
-      <div className="card" style={{ margin: 0, padding: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
-        <input className="input" type="date" value={filters.date} onChange={(event) => setFilters((current) => ({ ...current, date: event.target.value }))} style={{ minHeight: 40 }} />
-        <select className="input" value={filters.branchId} onChange={(event) => setFilters((current) => ({ ...current, branchId: event.target.value }))} style={{ minHeight: 40 }}>
-          <option value="">Tum Subeler</option>
-          {branches.map((branch) => (
-            <option key={String(branch?._id || branch?.id || '')} value={String(branch?._id || branch?.id || '')}>{branch?.name || 'Sube'}</option>
-          ))}
-        </select>
-        <select className="input" value={filters.courierId} onChange={(event) => setFilters((current) => ({ ...current, courierId: event.target.value }))} style={{ minHeight: 40 }}>
-          <option value="">{courierMode ? 'Benim Siparislerim' : 'Tum Kuryeler'}</option>
-          {couriers.map((courier) => (
-            <option key={courier.id} value={courier.id}>{courier.name}</option>
-          ))}
-        </select>
-        <select className="input" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} style={{ minHeight: 40 }}>
-          <option value="">Tum Durumlar</option>
-          {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <select className="input" value={filters.paymentStatus} onChange={(event) => setFilters((current) => ({ ...current, paymentStatus: event.target.value }))} style={{ minHeight: 40 }}>
-          <option value="">Tum Odemeler</option>
-          {PAYMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <input className="input" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Siparis, musteri, telefon..." style={{ minHeight: 40 }} />
-      </div>
+      {showManagementFilters ? (
+        <div className="card" style={{ margin: 0, padding: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+          <input className="input" type="date" value={filters.date} onChange={(event) => setFilters((current) => ({ ...current, date: event.target.value }))} style={{ minHeight: 40 }} />
+          <select className="input" value={filters.branchId} onChange={(event) => setFilters((current) => ({ ...current, branchId: event.target.value }))} style={{ minHeight: 40 }}>
+            <option value="">Tum Subeler</option>
+            {branches.map((branch) => (
+              <option key={String(branch?._id || branch?.id || '')} value={String(branch?._id || branch?.id || '')}>{branch?.name || 'Sube'}</option>
+            ))}
+          </select>
+          <select className="input" value={filters.courierId} onChange={(event) => setFilters((current) => ({ ...current, courierId: event.target.value }))} style={{ minHeight: 40 }}>
+            <option value="">Tum Kuryeler</option>
+            {couriers.map((courier) => (
+              <option key={courier.id} value={courier.id}>{courier.name}</option>
+            ))}
+          </select>
+          <select className="input" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} style={{ minHeight: 40 }}>
+            <option value="">Tum Durumlar</option>
+            {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select className="input" value={filters.paymentStatus} onChange={(event) => setFilters((current) => ({ ...current, paymentStatus: event.target.value }))} style={{ minHeight: 40 }}>
+            <option value="">Tum Odemeler</option>
+            {PAYMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <input className="input" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Siparis, musteri, telefon..." style={{ minHeight: 40 }} />
+        </div>
+      ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
         {summaryCards.map(([label, value]) => (
@@ -646,6 +675,9 @@ export default function PackageCourierPage() {
                     <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>
                       {canSeePhone ? (order.customerPhone || '-') : 'Telefon gizli'} {' • '}
                       {order.courierName || 'Kurye atanmadi'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>
+                      Atayan Sube: {order.branchName || '-'}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>

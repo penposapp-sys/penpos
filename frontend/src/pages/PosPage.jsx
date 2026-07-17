@@ -73,7 +73,6 @@ export default function PosPage() {
   const [mergedBadge, setMergedBadge] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [splitSelection, setSplitSelection] = useState({})
-  const [splitTargetTableId, setSplitTargetTableId] = useState('')
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [orderNoteModalOpen, setOrderNoteModalOpen] = useState(false)
   const [selectedItemForNote, setSelectedItemForNote] = useState(null)
@@ -88,8 +87,6 @@ export default function PosPage() {
   const [selectedItemForCancel, setSelectedItemForCancel] = useState(null)
   const [orderCancelConfirmOpen, setOrderCancelConfirmOpen] = useState(false)
   const [itemCancelConfirmOpen, setItemCancelConfirmOpen] = useState(false)
-  const [splitConfirmOpen, setSplitConfirmOpen] = useState(false)
-  const [splitResult, setSplitResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [printingReceipt, setPrintingReceipt] = useState(false)
   const [tableId, setTableId] = useState(null)
@@ -359,6 +356,21 @@ export default function PosPage() {
     return servingTypeLabelTR(type) || '-'
   }
 
+  const renderServingTypeDetail = (item, detailText, preferredServingType = null) => {
+    const itemServingType = normalizeServingType(preferredServingType || item?.servingType || order?.servingType || servingType, { fallback: null })
+    const servingLabel = itemServingType ? servingTypeLabelTR(itemServingType, { fallback: '' }) : ''
+    return (
+      <div className="sale-cart-line__detail-stack">
+        <div>{detailText}</div>
+        {servingLabel ? (
+          <div className="sale-cart-line__serving-note">
+            <span className="sale-cart-line__serving-pill">Servis: {servingLabel}</span>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   const loadCategories = async () => {
     const res = await api('/api/tenant/categories?active=true')
     if (res?.success === false) {
@@ -438,7 +450,7 @@ export default function PosPage() {
         setNote('')
         setMergedBadge(false)
         setError(res.message || 'Bu işlem için yetkiniz yok')
-        return
+        return null
       }
       const order = res?.order
       if (!order) {
@@ -446,7 +458,7 @@ export default function PosPage() {
         setNote('')
         setMergedBadge(false)
         setError('Sipariş bulunamadı')
-        return
+        return null
       }
       setOrder(order)
       setNote(order.note || '')
@@ -468,8 +480,10 @@ export default function PosPage() {
       } else {
         setTableName('')
       }
+      return order
     } catch (err) {
       setError(err.message)
+      return null
     }
   }
 
@@ -629,6 +643,7 @@ export default function PosPage() {
     if (!menuItemId) return null
     const tempId = `tmp:${menuItemId}:${Date.now()}:${optimisticItemSeqRef.current++}`
     const unitPrice = Number(product?.price || 0)
+    const nextServingType = normalizeServingType(product?.servingType || servingType || orderRef.current?.servingType, { fallback: null })
     setOrder((prev) => {
       if (!prev) return prev
       const nextItems = Array.isArray(prev.items) ? [...prev.items] : []
@@ -638,11 +653,13 @@ export default function PosPage() {
         itemId: tempId,
         menuItemId,
         nameSnapshot: String(product?.name || 'Ürün'),
+        priceSnapshot: unitPrice,
         qty: 1,
         subtotal: unitPrice,
         status: 'open',
         note: '',
-        isWeightBased: !!product?.isWeightBased
+        isWeightBased: !!product?.isWeightBased,
+        servingType: nextServingType
       })
       const prevGross = Number(prev?.total ?? prev?.totals?.total ?? prev?.totals?.grandTotal ?? 0)
       const prevDiscountPercent = Number(prev?.discountPercent ?? 0)
@@ -667,7 +684,7 @@ export default function PosPage() {
       }
     })
     return tempId
-  }, [])
+  }, [servingType])
 
   const removeOptimisticOrderItem = useCallback((tempId) => {
     if (!tempId) return
@@ -1120,9 +1137,24 @@ export default function PosPage() {
       setError('Sipariş bulunamadı')
       return
     }
+    const paymentAllocations = splitSelectedRows.reduce((acc, row) => {
+      const itemId = String(row?.itemId || row?.repr?._id || row?.repr?.id || '')
+      if (!itemId) return acc
+      const current = acc.get(itemId) || {
+        itemId,
+        menuItemId: String(row?.menuItemId || row?.repr?.menuItemId || ''),
+        qty: 0,
+        subtotal: 0
+      }
+      current.qty += 1
+      current.subtotal += Number(row?.subtotal || row?.repr?.subtotal || 0) || 0
+      acc.set(itemId, current)
+      return acc
+    }, new Map())
+    const itemAllocations = Array.from(paymentAllocations.values())
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/payments`, {
       method: 'POST',
-      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote }),
+      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, itemAllocations }),
       signal,
       silent: true
     }))
@@ -1132,6 +1164,8 @@ export default function PosPage() {
       const due = Number(fresh.balanceDue ?? fresh.totals?.balanceDue ?? 0)
       setPaymentAmount(due > 0 ? String(due) : '')
       setPaymentNote('')
+      setSplitSelection({})
+      setSplitOpen(false)
     }
   }
 
@@ -1388,41 +1422,21 @@ export default function PosPage() {
 
   const openSplit = async () => {
     setError('')
-    const { params } = buildBranchQueryParams(allowedBranchIds)
-    const url = params ? `/api/tenant/tables?${params.toString()}` : '/api/tenant/tables'
-    const res = await safeAction((signal) => api(url, { signal, silent: true, skipBranchHeader: true }), { reload: false })
-    const tables = res?.tables || []
-    setEmptyTables(tables.filter(x => x.status === 'empty'))
     const initial = {}
-    ;((order?.items) || []).forEach(it => { initial[it.menuItemId] = 0 })
+    payableSplitRows.forEach((row) => {
+      initial[row.key] = false
+    })
     setSplitSelection(initial)
-    setSplitTargetTableId('')
     setSplitOpen(true)
   }
 
   const submitSplit = async () => {
-    setError('')
-    const items = Object.entries(splitSelection)
-      .filter(([, qty]) => qty > 0)
-      .map(([menuItemId, qty]) => ({ menuItemId, qty }))
-    if (items.length === 0) return setSplitOpen(false)
-    const res = await safeAction((signal) => api(`/api/pos/orders/${order.id}/split`, { method: 'PUT', body: JSON.stringify({ items, targetTableId: splitTargetTableId || undefined }), signal, silent: true }))
-    if (!res) return
-    setSplitOpen(false)
-    setSplitResult(res)
-    setSplitConfirmOpen(true)
-  }
-
-  const handleSplitConfirm = () => {
-    if (splitResult?.newOrderId) {
-      window.location.assign(`/kermes/app/pos?orderId=${splitResult.newOrderId}`)
+    if (splitSelectedRows.length === 0) {
+      toast.error('En az bir ürün seçin')
+      return
     }
-    setSplitConfirmOpen(false)
-  }
-
-  const handleSplitCancel = async () => {
-    await reloadOrder()
-    setSplitConfirmOpen(false)
+    setSplitOpen(false)
+    setPaymentAmount(splitSelectedAmount > 0 ? String(splitSelectedAmount) : '')
   }
 
   const hasOpenItems = (order?.items || []).some(it => it.status === 'open')
@@ -1441,6 +1455,54 @@ export default function PosPage() {
   })()
   const signedBalanceLabel = signedBalance < -0.01 ? 'Fazla' : 'Kalan'
   const signedBalanceValue = signedBalance < -0.01 ? Math.abs(signedBalance) : signedBalance
+  const splitRows = useMemo(() => {
+    const items = Array.isArray(order?.items) ? order.items : []
+    return buildCartRows(
+      items.filter((item) => item && item.status !== 'cancelled' && Number(item?.qty || 0) > 0),
+      'separate',
+      'split'
+    )
+  }, [order?.items])
+  const paidSplitUnitCounts = useMemo(() => {
+    const counts = new Map()
+    const payments = Array.isArray(order?.payments) ? order.payments : []
+    for (const payment of payments) {
+      const allocations = Array.isArray(payment?.itemAllocations) ? payment.itemAllocations : []
+      for (const allocation of allocations) {
+        const itemId = String(allocation?.itemId || '').trim()
+        const qty = Math.max(0, Math.floor(Number(allocation?.qty || 0)))
+        if (!itemId || qty <= 0) continue
+        counts.set(itemId, (counts.get(itemId) || 0) + qty)
+      }
+    }
+    return counts
+  }, [order?.payments])
+  const payableSplitRows = useMemo(() => {
+    const usedCounts = new Map()
+    return splitRows.filter((row) => {
+      const itemId = String(row?.itemId || row?.repr?._id || row?.repr?.id || '').trim()
+      if (!itemId) return true
+      const alreadyPaidQty = paidSplitUnitCounts.get(itemId) || 0
+      const seenQty = usedCounts.get(itemId) || 0
+      usedCounts.set(itemId, seenQty + 1)
+      return seenQty >= alreadyPaidQty
+    })
+  }, [splitRows, paidSplitUnitCounts])
+  const splitSelectedRows = useMemo(
+    () => payableSplitRows.filter((row) => splitSelection?.[row.key] === true),
+    [payableSplitRows, splitSelection]
+  )
+  const splitSelectedSubtotal = useMemo(
+    () => splitSelectedRows.reduce((sum, row) => sum + (Number(row?.subtotal || row?.repr?.subtotal || 0) || 0), 0),
+    [splitSelectedRows]
+  )
+  const splitSelectedAmount = useMemo(() => {
+    const subtotal = Math.max(0, splitSelectedSubtotal)
+    const discount = Math.max(0, Math.min(100, Number(discountPercent || 0)))
+    const net = subtotal - ((subtotal * discount) / 100)
+    return Math.max(0, Math.round(net * 100) / 100)
+  }, [splitSelectedSubtotal, discountPercent])
+  const canSplitOrder = !!order && (order.status === 'open' || order.status === 'sent') && payableSplitRows.length > 0 && signedBalance > 0.01
 
   const selectedPaymentMethod = payMethods.find((method) => String(method?.key || method?.id || '') === String(paymentMethod || '')) || null
   const selectedPaymentIsCash = isCashPaymentMethod(selectedPaymentMethod || paymentMethod)
@@ -1522,6 +1584,19 @@ export default function PosPage() {
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
   }, [order?.id, order?._id, order?.updatedAt, order?.createdAt, order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye, discountTotal, discountPercent])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('pay') !== '1' || !getOrderId(order) || payOpen) return
+    setDiscountDraft(Number(order?.discountPercent || 0))
+    setPaymentAmount(signedBalance > 0.01 ? String(signedBalance) : '')
+    setPaymentNote('')
+    setPayOpen(true)
+    params.delete('pay')
+    const nextQuery = params.toString()
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`
+    window.history.replaceState(window.history.state, '', nextUrl)
+  }, [order, payOpen, signedBalance])
+
   const openPaymentModal = async () => {
     try {
       const entityId = getOrderId(order)
@@ -1535,6 +1610,8 @@ export default function PosPage() {
     setDiscountDraft(Number(order?.discountPercent || 0))
     setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '')
     setPaymentNote('')
+    setSplitOpen(false)
+    setSplitSelection({})
     setPayOpen(true)
   }
 
@@ -1660,9 +1737,10 @@ export default function PosPage() {
             const rawDraft = getQtyDraft(row.key, row.qty)
             const parsedDraft = rawDraft === '' ? NaN : Number(rawDraft)
             const displayQty = Number.isFinite(parsedDraft) ? Math.max(0, Math.floor(parsedDraft)) : row.qty
+            const unitPrice = Number(it?.priceSnapshot ?? (displayQty > 0 ? row.subtotal / displayQty : row.subtotal) ?? 0)
             const detailText = isWeightBased
-              ? `${it?.priceSnapshot} TL/KG • ${weightGrams} gr`
-              : `${it?.priceSnapshot} TL • x${displayQty}`
+              ? `${unitPrice} TL/KG • ${weightGrams} gr`
+              : `${unitPrice} TL • x${displayQty}`
             const statusMeta = getKitchenItemStatusMeta(it?.status, { compact: true })
               return (
                 <div
@@ -1685,7 +1763,7 @@ export default function PosPage() {
                       </span>
                     )}
                   </div>
-                <div className="sale-cart-line__detail">{detailText}</div>
+                <div className="sale-cart-line__detail">{renderServingTypeDetail(it, detailText, isOpen ? servingType : null)}</div>
                 <div className="sale-cart-line__actions">
                   {isOpen && (
                     <>
@@ -1886,7 +1964,6 @@ export default function PosPage() {
                   Sipariş Notu
                 </button>
                 <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
-                <button className="btn saleCartFooterActionBtn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
                 <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
                 <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
               </div>
@@ -1902,7 +1979,6 @@ export default function PosPage() {
                 >Ödeme Al</button>
                 <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
                 <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
-                <button className="btn saleCartFooterActionBtn" onClick={openSplit} disabled={(order.status !== 'open' && order.status !== 'sent') || (order.items || []).length === 0}>Fiş Böl</button>
                 <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
                 <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
               </div>
@@ -2066,6 +2142,34 @@ export default function PosPage() {
 
         <div className="payment-panel">
           <div className="payment-panel-body">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div>
+                <div className="payment-field-label">Ödeme Böl</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  {splitSelectedRows.length > 0
+                    ? `${splitSelectedRows.length} ürün seçildi • ${splitSelectedAmount.toFixed(2)} TL`
+                    : 'Aynı fiş içinde ürün bazlı ödeme seçebilirsiniz.'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn--compact" type="button" onClick={openSplit} disabled={!canSplitOrder || busy}>
+                  Ödeme Böl
+                </button>
+                {splitSelectedRows.length > 0 && (
+                  <button
+                    className="btn btn--compact"
+                    type="button"
+                    onClick={() => {
+                      setSplitSelection({})
+                      setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '')
+                    }}
+                    disabled={busy}
+                  >
+                    Seçimi Temizle
+                  </button>
+                )}
+              </div>
+            </div>
             <div>
               <div className="payment-field-label">Yöntem</div>
               <div className="payment-method-grid">
@@ -2215,34 +2319,50 @@ export default function PosPage() {
     </Modal>
 
 
-    <Modal open={splitOpen} onClose={() => setSplitOpen(false)} title="Fiş Böl">
+    <Modal open={splitOpen} onClose={() => setSplitOpen(false)} title="Ödeme Böl">
       <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ürünleri ayır</div>
-        {(order?.items || []).map((it, index) => (
-          <div key={it._id || `${it.menuItemId}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>{it.nameSnapshot} • x{it.qty}</div>
-            <input
-              type="number"
-              min="0"
-              max={it.qty}
-              className="input"
-              style={{ width: 100 }}
-              value={splitSelection[it.menuItemId] ?? 0}
-              onChange={(e) => setSplitSelection({ ...splitSelection, [it.menuItemId]: Math.max(0, Math.min(it.qty, Number(e.target.value))) })}
-            />
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>Aynı sipariş içinden ödemesi alınacak ürünleri seçin. Ürünler sepette kalır, sadece ödeme tutarı bölünür.</div>
+        <div style={{ display: 'grid', gap: 8, maxHeight: '50vh', overflowY: 'auto', paddingRight: 4 }}>
+          {payableSplitRows.map((row) => {
+            const item = row?.repr || {}
+            const itemId = String(row?.itemId || item?._id || item?.id || '')
+            const servingLabel = servingTypeLabelTR(item?.servingType || order?.servingType, { fallback: '' })
+            const unitPrice = Number(item?.priceSnapshot ?? row?.subtotal ?? 0)
+            const note = String(row?.note || item?.note || '').trim()
+            const selected = splitSelection?.[row.key] === true
+            return (
+              <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', border: '1px solid var(--border)', borderRadius: 14, padding: '10px 12px' }}>
+                <div style={{ minWidth: 0, display: 'grid', gap: 3 }}>
+                  <div style={{ fontWeight: 700 }}>{item?.nameSnapshot || 'Ürün'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    {unitPrice.toFixed(2)} TL
+                    {servingLabel ? ` • ${servingLabel}` : ''}
+                    {itemId ? ` • #${itemId.slice(-4)}` : ''}
+                  </div>
+                  {note ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not: {note}</div> : null}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--toggle"
+                  aria-pressed={selected}
+                  onClick={() => setSplitSelection((prev) => ({ ...(prev || {}), [row.key]: !selected }))}
+                >
+                  {selected ? 'Seçildi' : 'Seç'}
+                </button>
+              </div>
+            )
+          })}
+          {payableSplitRows.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ödeme böl için seçilebilir ürün kalmadı.</div>
+          ) : null}
+        </div>
+        {splitSelectedRows.length > 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+            Seçilen ürünlerin net ödeme tutarı: <strong style={{ color: 'var(--text)' }}>{splitSelectedAmount.toFixed(2)} TL</strong>
           </div>
-        ))}
-        <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni Masaya Taşı (opsiyonel)</div>
-          <select className="input" value={splitTargetTableId} onChange={(e) => setSplitTargetTableId(e.target.value)}>
-            <option value="">Seçiniz</option>
-            {emptyTables.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </label>
+        ) : null}
         <div className="app-modal-footer">
-          <button className="btn" onClick={submitSplit}>Onayla</button>
+          <button className="btn" onClick={submitSplit} disabled={payableSplitRows.length === 0}>Tutari Uygula</button>
         </div>
       </div>
     </Modal>
@@ -2346,15 +2466,6 @@ export default function PosPage() {
         setItemCancelConfirmOpen(false)
         setCancelModalOpen(true)
       }}
-    />
-    <ConfirmModal
-      open={splitConfirmOpen}
-      onClose={handleSplitCancel}
-      title="Fiş Bölündü"
-      description="Yeni fişe gitmek ister misiniz?"
-      confirmText="Evet, Git"
-      cancelText="Hayır, Kal"
-      onConfirm={handleSplitConfirm}
     />
     </div>
   )
