@@ -52,7 +52,7 @@ export function ReportsSalesContent({ embedded = false }) {
       if (to) qs.set('to', to)
       const { params } = buildBranchQueryParams(allowedBranchIds)
       const qBranch = params ? `&${params.toString()}` : ''
-      const sum = await api(`/api/reports/summary?${qs.toString()}${qBranch}`, { skipBranchHeader: true, suppressBranchModal: true })
+      const sum = await api(`/api/reports/summary?${qs.toString()}${qBranch}&status=closed`, { skipBranchHeader: true, suppressBranchModal: true })
       const list = await api(`/api/reports/orders?${qs.toString()}${qBranch}&status=closed`, { skipBranchHeader: true, suppressBranchModal: true })
       if (sum?.success === false || list?.success === false) return
       setSummary(sum)

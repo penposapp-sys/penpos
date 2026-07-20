@@ -731,8 +731,12 @@ export const orders = async (req, res) => {
   try {
     await ensureNotExpired(req.user.tenantId, req.user.id)
     await ensureFeature(req.user.tenantId, 'reports')
-    const { period, start, end, status } = req.query || {}
-    const { from, to } = getLocalRangeExclusive(period, start, end)
+    const { period, start, end, from: rawFrom, to: rawTo, status } = req.query || {}
+    const hasDirectRange = Boolean(rawFrom || rawTo)
+    const directFrom = rawFrom ? startOfDayLocal(rawFrom) : null
+    const directToStart = rawTo ? startOfDayLocal(rawTo) : null
+    const from = hasDirectRange ? (directFrom || startOfDayLocal(rawTo)) : getLocalRangeExclusive(period, start, end).from
+    const to = hasDirectRange ? addDaysLocal(directToStart || directFrom, 1) : getLocalRangeExclusive(period, start, end).to
     const branchIds = Array.isArray(req.branchIds) ? req.branchIds.map(String).filter(Boolean) : []
     if (branchIds.length === 0) {
       return res.status(403).json({
@@ -748,7 +752,9 @@ export const orders = async (req, res) => {
       if (status === 'closed') filter.status = { $in: ['closed', 'completed'] }
       else filter.status = status
     }
-    const effectiveDateExpr = '$createdAt'
+    const effectiveDateExpr = status === 'closed'
+      ? { $ifNull: ['$closedAt', { $ifNull: ['$updatedAt', { $ifNull: ['$paidAt', '$createdAt'] }] }] }
+      : '$createdAt'
     filter.$expr = {
       $and: [
         { $gte: [effectiveDateExpr, from] },
@@ -839,7 +845,7 @@ export const summary = async (req, res) => {
   try {
     await ensureNotExpired(req.user.tenantId, req.user.id)
     await ensureFeature(req.user.tenantId, 'reports')
-    const { from, to } = req.query || {}
+    const { from, to, status } = req.query || {}
     const branchIds = Array.isArray(req.branchIds) ? req.branchIds.map(String).filter(Boolean) : []
     if (branchIds.length === 0) {
       return res.status(403).json({
@@ -852,7 +858,9 @@ export const summary = async (req, res) => {
     let filter = { tenantId: req.user.tenantId }
     filter = applyBranchFilter(filter, branchIds)
     if (from || to) {
-      const effectiveDateExpr = '$createdAt'
+      const effectiveDateExpr = status === 'closed'
+        ? { $ifNull: ['$closedAt', { $ifNull: ['$updatedAt', '$createdAt'] }] }
+        : '$createdAt'
       const fromStart = from ? startOfDayLocal(from) : null
       const toStart = to ? startOfDayLocal(to) : null
       const and = []
@@ -860,8 +868,9 @@ export const summary = async (req, res) => {
       if (toStart) and.push({ $lt: [effectiveDateExpr, addDaysLocal(toStart, 1)] })
       if (and.length > 0) filter.$expr = { $and: and }
     }
-    
-    filter.status = { $in: ['closed', 'completed'] }
+
+    if (status === 'closed') filter.status = { $in: ['closed', 'completed'] }
+    else filter.status = { $in: ['closed', 'completed'] }
     const list = await Order.find(filter).select({ items: 1, discountPercent: 1, payments: 1, settlementType: 1 }).lean()
 
     const computeNetTotal = (order) => {

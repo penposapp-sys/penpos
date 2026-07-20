@@ -275,6 +275,9 @@ export default function Layout() {
     } else if (canSettings) {
       items.push({ path: '/kermes/settings', label: 'Ayarlar', icon: IconSettings, show: true })
     }
+    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) {
+      items.push({ path: '/kermes/app/reports/sales', label: 'Kapanan Masalar', icon: IconFileCheck, show: true })
+    }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('audit_view'))) {
       items.push({ path: '/kermes/app/audit', label: 'Denetim', icon: IconShieldCheck, show: true })
     }
