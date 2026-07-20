@@ -52,6 +52,12 @@ const toMoneySafe = (v) => {
 
 const roundMoney = (value) => Math.round(toMoneySafe(value) * 100) / 100
 
+const isDateInRange = (value, from, to) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+  return date >= from && date < to
+}
+
 const computeActiveGrossTotal = (items = []) => {
   const safeItems = Array.isArray(items) ? items : []
   return safeItems
@@ -136,17 +142,7 @@ const classifyZReportPayment = (payment) => {
   return 'card'
 }
 
-const toReportDateExpr = {
-  $ifNull: [
-    '$closedAt',
-    {
-      $ifNull: [
-        '$paidAt',
-        { $ifNull: ['$updatedAt', '$createdAt'] }
-      ]
-    }
-  ]
-}
+const toReportDateExpr = '$createdAt'
 
 const buildZReportAllowedBranchScope = async (req) => {
   const tenantId = req.user?.tenantId
@@ -370,7 +366,7 @@ const aggregateOrderProducts = async ({ tenantId, branchIds, fromDate, toDate })
               '$items.sentAt',
               {
                 $ifNull: [
-                  '$paidAt',
+                  '$createdAt',
                   { $ifNull: ['$closedAt', { $ifNull: ['$updatedAt', '$createdAt'] }] }
                 ]
               }
@@ -752,7 +748,7 @@ export const orders = async (req, res) => {
       if (status === 'closed') filter.status = { $in: ['closed', 'completed'] }
       else filter.status = status
     }
-    const effectiveDateExpr = { $ifNull: ['$closedAt', '$updatedAt'] }
+    const effectiveDateExpr = '$createdAt'
     filter.$expr = {
       $and: [
         { $gte: [effectiveDateExpr, from] },
@@ -856,7 +852,7 @@ export const summary = async (req, res) => {
     let filter = { tenantId: req.user.tenantId }
     filter = applyBranchFilter(filter, branchIds)
     if (from || to) {
-      const effectiveDateExpr = { $ifNull: ['$closedAt', '$updatedAt'] }
+      const effectiveDateExpr = '$createdAt'
       const fromStart = from ? startOfDayLocal(from) : null
       const toStart = to ? startOfDayLocal(to) : null
       const and = []
@@ -927,7 +923,7 @@ export const dashboard = async (req, res) => {
       })
     }
 
-    const effectiveDateExpr = { $ifNull: ['$closedAt', '$updatedAt'] }
+    const effectiveDateExpr = '$createdAt'
     let filter = {
       tenantId: req.user.tenantId,
       $expr: {
@@ -1010,7 +1006,7 @@ export const dashboard = async (req, res) => {
       sales.discountTotal += discountTotal
       sales.totalRevenue += netTotalEffective
 
-      const payments = Array.isArray(o?.payments) ? o.payments : []
+      const payments = Array.isArray(o?.payments) ? o.payments.filter((payment) => isDateInRange(payment?.createdAt, from, to)) : []
       let nonAccountPaid = 0
       let accountPaidExplicit = 0
       for (const p of payments) {
@@ -1054,8 +1050,7 @@ export const dashboard = async (req, res) => {
         productMap.set(key, prev)
       }
 
-      const effectiveTs = o.closedAt || o.updatedAt || o.createdAt
-      const hh = getHour(effectiveTs)
+      const hh = getHour(o.createdAt)
       hourlyCounts.set(hh, (hourlyCounts.get(hh) || 0) + 1)
     }
 
@@ -1525,7 +1520,7 @@ export const zReport = async (req, res) => {
         vatMap.set(String(vatRate), vatRow)
       }
 
-      const payments = Array.isArray(order?.payments) ? order.payments : []
+      const payments = Array.isArray(order?.payments) ? order.payments.filter((payment) => isDateInRange(payment?.createdAt, from, to)) : []
       let explicitPaidTotal = 0
       for (const payment of payments) {
         const amount = toMoneySafe(payment?.amount)

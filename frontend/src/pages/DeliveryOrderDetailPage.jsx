@@ -21,12 +21,14 @@ import { buildCartRows } from '../lib/cartItemRows.js'
 import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalItemStatus } from '../lib/kitchenItemStatus.js'
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { requiresProductConfig } from '../lib/productPortions.js'
+import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 
 export default function DeliveryOrderDetailPage() {
   const { user, allowedBranchIds } = useAuth()
   const { isMobilePortrait } = useResponsiveFlags()
   const nav = useNavigate()
   const { orderId: routeOrderId } = useParams()
+  const canEditEntryDate = user?.role === 'tenant_admin'
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canTakePayment = hasPerm('take_payment')
   const canCreateVeresiye = hasPerm('create_veresiye')
@@ -70,6 +72,7 @@ export default function DeliveryOrderDetailPage() {
   const [payOpen, setPayOpen] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentEntryDate, setPaymentEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
   const [paymentNote, setPaymentNote] = useState('')
   const [discountDraft, setDiscountDraft] = useState(0)
   const [veresiyeOpen, setVeresiyeOpen] = useState(false)
@@ -321,6 +324,10 @@ export default function DeliveryOrderDetailPage() {
     deliveryPaymentStatus: 'unknown',
     deliveryPaymentMethod: ''
   })
+
+  useEffect(() => {
+    if (!canEditEntryDate) setPaymentEntryDate(todayYmd())
+  }, [canEditEntryDate])
 
   const pickOrder = (res) => res?.data?.order ?? res?.order ?? null
   const getOrderId = (o) => o?._id || o?.id || o?.orderId || null
@@ -857,7 +864,7 @@ export default function DeliveryOrderDetailPage() {
     const amount = paymentAmount ? Number(paymentAmount) : 0
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/payments`, {
       method: 'POST',
-      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote }),
+      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, entryDate: paymentEntryDate }),
       signal,
       silent: true
     }))
@@ -1917,6 +1924,9 @@ export default function DeliveryOrderDetailPage() {
         onPaymentMethodChange={setPaymentMethod}
         paymentAmount={paymentAmount}
         onPaymentAmountChange={setPaymentAmount}
+        paymentDate={paymentEntryDate}
+        onPaymentDateChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+        showPaymentDate={canEditEntryDate}
         paymentNote={paymentNote}
         onPaymentNoteChange={setPaymentNote}
         canTakePayment={canTakePayment}
@@ -2192,5 +2202,3 @@ export default function DeliveryOrderDetailPage() {
     </div>
   )
 }
-
-

@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx'
 import InputModal from '../components/InputModal.jsx'
 import ProductConfigModal from '../components/ProductConfigModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 import { isValidObjectId } from '../lib/ids.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
@@ -24,6 +25,7 @@ import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalI
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { requiresProductConfig } from '../lib/productPortions.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
+import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
 import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
 
@@ -33,6 +35,7 @@ export default function PosPage() {
   const location = useLocation()
   const { user, allowedBranchIds } = useAuth()
   const { isMobilePortrait } = useResponsiveFlags()
+  const canEditEntryDate = user?.role === 'tenant_admin'
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canTakePayment = hasPerm('take_payment')
   const canCreateVeresiye = hasPerm('create_veresiye')
@@ -53,6 +56,10 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
+  const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
+  const [savedEntryDate, setSavedEntryDate] = useState('')
+  const [paymentEntryDate, setPaymentEntryDate] = useState(() => todayYmd())
+  const [savingEntryDate, setSavingEntryDate] = useState(false)
   const [discountDraft, setDiscountDraft] = useState(0)
   const [veresiyeOpen, setVeresiyeOpen] = useState(false)
   const [accountQuery, setAccountQuery] = useState('')
@@ -122,6 +129,27 @@ export default function PosPage() {
   useEffect(() => {
     qtyDraftByRowRef.current = qtyDraftByRow || {}
   }, [qtyDraftByRow])
+
+  useEffect(() => {
+    if (!canEditEntryDate) setEntryDate(todayYmd())
+  }, [canEditEntryDate])
+
+  useEffect(() => {
+    if (!canEditEntryDate) setPaymentEntryDate(todayYmd())
+  }, [canEditEntryDate])
+
+  const toEntryDateValue = (value) => {
+    if (!value) return todayYmd()
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return todayYmd()
+    const year = parsed.getFullYear()
+    const month = String(parsed.getMonth() + 1).padStart(2, '0')
+    const day = String(parsed.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const canSaveEntryDate = canEditEntryDate && Boolean(order?.tableId) && Boolean(order?.id || order?._id)
+  const hasEntryDateChange = Boolean(savedEntryDate) && entryDate !== savedEntryDate
 
   const getQtyDraft = (rowKey, fallbackNumber = 1) => {
     const key = String(rowKey || '')
@@ -464,6 +492,11 @@ export default function PosPage() {
       setNote(order.note || '')
       setMergedBadge((order.mergeSourceOrderIds || []).length > 0)
       setDiscountDraft(Number(order.discountPercent || 0))
+      if (canEditEntryDate) {
+        const nextEntryDate = toEntryDateValue(order.createdAt)
+        setEntryDate(nextEntryDate)
+        setSavedEntryDate(nextEntryDate)
+      }
       const due = Number(order.balanceDue ?? order.totals?.balanceDue ?? order.remainingBalance ?? 0)
       setPaymentAmount(due > 0 ? String(due) : '')
       if (order.tableId) {
@@ -484,6 +517,33 @@ export default function PosPage() {
     } catch (err) {
       setError(err.message)
       return null
+    }
+  }
+
+  const saveOrderEntryDate = async () => {
+    const orderId = String(order?.id || order?._id || '').trim()
+    if (!orderId || !canSaveEntryDate || !hasEntryDateChange) return
+    setSavingEntryDate(true)
+    try {
+      const res = await api(`/api/pos/orders/${orderId}/entry-date`, {
+        method: 'PUT',
+        data: { entryDate },
+        silent: true
+      })
+      if (!res?.ok) {
+        toast.error(res?.message || 'Sipariş tarihi kaydedilemedi')
+        return
+      }
+      const fresh = pickOrder(res)
+      if (fresh) {
+        setOrder(fresh)
+        const nextEntryDate = toEntryDateValue(fresh.createdAt)
+        setEntryDate(nextEntryDate)
+        setSavedEntryDate(nextEntryDate)
+      }
+      toast.success('Sipariş tarihi kaydedildi')
+    } finally {
+      setSavingEntryDate(false)
     }
   }
 
@@ -541,7 +601,7 @@ export default function PosPage() {
         return
       }
 
-      const startRes = await api(`/api/pos/tables/${tId}/start`, { method: 'POST', silent: true })
+      const startRes = await api(`/api/pos/tables/${tId}/start`, { method: 'POST', body: JSON.stringify({ entryDate }), silent: true })
 
       if (startRes?.ok) {
         const newOrderId = startRes?.data?.orderId || startRes?.data?.data?.orderId || null
@@ -1154,7 +1214,7 @@ export default function PosPage() {
     const itemAllocations = Array.from(paymentAllocations.values())
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/payments`, {
       method: 'POST',
-      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, itemAllocations }),
+      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, itemAllocations, entryDate: paymentEntryDate }),
       signal,
       silent: true
     }))
@@ -1590,6 +1650,7 @@ export default function PosPage() {
     setDiscountDraft(Number(order?.discountPercent || 0))
     setPaymentAmount(signedBalance > 0.01 ? String(signedBalance) : '')
     setPaymentNote('')
+    setPaymentEntryDate(todayYmd())
     setPayOpen(true)
     params.delete('pay')
     const nextQuery = params.toString()
@@ -1629,9 +1690,28 @@ export default function PosPage() {
               Masa Kapat
             </button>
           )}
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Durum: {trStatusLabel(order?.status) || '-'}
-            {(order?.remainingBalance !== undefined && order.remainingBalance <= 0.01 && (order.totals?.grandTotal || 0) > 0) && <span style={{ color: '#22c55e', marginLeft: 4 }}>• ÖDENDİ</span>}
+          <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>
+              Durum: {trStatusLabel(order?.status) || '-'}
+              {(order?.remainingBalance !== undefined && order.remainingBalance <= 0.01 && (order.totals?.grandTotal || 0) > 0) && <span style={{ color: '#22c55e', marginLeft: 4 }}>• ÖDENDİ</span>}
+            </span>
+            {canEditEntryDate ? (
+              <SalesEntryDateButton
+                value={entryDate}
+                onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
+                title="Sipariş tarihini seç"
+              />
+            ) : null}
+            {canSaveEntryDate && hasEntryDateChange ? (
+              <button
+                type="button"
+                className="btn btn--xs"
+                onClick={saveOrderEntryDate}
+                disabled={savingEntryDate || busy}
+              >
+                {savingEntryDate ? '...' : 'Kaydet'}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2200,6 +2280,15 @@ export default function PosPage() {
                 disabled={!canTakePayment || busy}
               />
             </label>
+            {canEditEntryDate ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <SalesEntryDateButton
+                  value={paymentEntryDate}
+                  onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+                  title="Ödeme tarihini seç"
+                />
+              </div>
+            ) : null}
             <label>
               <div className="payment-field-label">Not (opsiyonel)</div>
               <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />

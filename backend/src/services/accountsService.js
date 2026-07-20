@@ -330,6 +330,7 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
     ? [rawNote, `Tahsilat: ${toMoney(amount).toFixed(2)} TL`, `İndirim: ${toMoney(discountAmount).toFixed(2)} TL`].filter(Boolean).join(' • ')
     : rawNote
   const orderId = body?.orderId && mongoose.Types.ObjectId.isValid(String(body.orderId)) ? new mongoose.Types.ObjectId(String(body.orderId)) : null
+  const createdAt = body?.createdAt instanceof Date && !Number.isNaN(body.createdAt.getTime()) ? body.createdAt : null
 
   const acc = await CustomerAccount.findOneAndUpdate(
     { _id: id, tenantId },
@@ -352,7 +353,8 @@ export const collectDebtService = async (tenantId, branchId, actorUserId, id, bo
     methodType: paymentMethod.methodType,
     note,
     source: 'collection',
-    orderId
+    orderId,
+    ...(createdAt ? { createdAt } : {})
   })
 
   await auditLog(tenantId, actorUserId, 'cari_tahsilat', 'CustomerAccount', acc.id, { amount, discountAmount, method: paymentMethod.method })

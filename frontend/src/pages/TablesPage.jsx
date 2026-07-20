@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../components/Modal.jsx'
+import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../lib/apiClient.js'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
+import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 import { toast } from '../lib/toast.js'
 
 const OPEN_TABLES_CATEGORY = 'Acik Masalar'
@@ -53,7 +55,8 @@ const getBorderColor = (active, paid, elapsedMinutes) => {
 
 export function TablesManagementContent({ embedded = false }) {
   const nav = useNavigate()
-  const { allowedBranchIds } = useAuth()
+  const { user, allowedBranchIds } = useAuth()
+  const canEditEntryDate = user?.role === 'tenant_admin'
   const { ids: allowed } = buildBranchQueryParams(allowedBranchIds)
 
   const [tables, setTables] = useState([])
@@ -68,6 +71,7 @@ export function TablesManagementContent({ embedded = false }) {
   const [targetTable, setTargetTable] = useState(null)
   const [mergeSources, setMergeSources] = useState([])
   const [nowTs, setNowTs] = useState(Date.now())
+  const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
 
   const loadingRef = useRef(false)
 
@@ -183,6 +187,10 @@ export function TablesManagementContent({ embedded = false }) {
     return () => window.clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    if (!canEditEntryDate) setEntryDate(todayYmd())
+  }, [canEditEntryDate])
+
   const groupedTables = useMemo(() => {
     const baseGroups = tables.reduce((acc, table) => {
       const category = inferTableCategory(table)
@@ -290,7 +298,9 @@ export function TablesManagementContent({ embedded = false }) {
       return
     }
 
-    nav(`/kermes/app/pos?tableId=${tableId}`, { state: { fromTables: true, tableName: table?.name || '' } })
+    const params = new URLSearchParams({ tableId })
+    if (entryDate) params.set('entryDate', entryDate)
+    nav(`/kermes/app/pos?${params.toString()}`, { state: { fromTables: true, tableName: table?.name || '' } })
   }
 
   const openMerge = (table) => {
@@ -379,30 +389,39 @@ export function TablesManagementContent({ embedded = false }) {
             ))}
           </div>
 
-          <button className="btn" type="button" onClick={() => nav('/kermes/app/waiter-calls')} style={{ flexShrink: 0 }}>
-            Garson Cagrilari
-            {totalWaiterCalls > 0 ? (
-              <span
-                style={{
-                  marginLeft: 8,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: 22,
-                  height: 22,
-                  padding: '0 6px',
-                  borderRadius: 999,
-                  background: '#f97316',
-                  color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 900,
-                  lineHeight: 1
-                }}
-              >
-                {totalWaiterCalls}
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {canEditEntryDate ? (
+              <SalesEntryDateButton
+                value={entryDate}
+                onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
+                title="Sipariş tarihini seç"
+              />
             ) : null}
-          </button>
+            <button className="btn" type="button" onClick={() => nav('/kermes/app/waiter-calls')} style={{ flexShrink: 0 }}>
+              Garson Cagrilari
+              {totalWaiterCalls > 0 ? (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 22,
+                    height: 22,
+                    padding: '0 6px',
+                    borderRadius: 999,
+                    background: '#f97316',
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 900,
+                    lineHeight: 1
+                  }}
+                >
+                  {totalWaiterCalls}
+                </span>
+              ) : null}
+            </button>
+          </div>
         </div>
       )}
 

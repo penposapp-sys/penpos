@@ -1,5 +1,6 @@
 import React from 'react'
 import Modal from './Modal.jsx'
+import SalesEntryDateButton from './SalesEntryDateButton.jsx'
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
 
@@ -13,6 +14,9 @@ export default function PaymentCollectionModal({
   onPaymentMethodChange,
   paymentAmount = '',
   onPaymentAmountChange,
+  paymentDate = '',
+  onPaymentDateChange,
+  showPaymentDate = false,
   paymentNote = '',
   onPaymentNoteChange,
   canTakePayment = false,
@@ -171,6 +175,15 @@ export default function PaymentCollectionModal({
                   disabled={!canTakePayment || busy}
                 />
               </label>
+              {showPaymentDate ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <SalesEntryDateButton
+                    value={paymentDate}
+                    onChange={onPaymentDateChange}
+                    title="Ödeme tarihini seç"
+                  />
+                </div>
+              ) : null}
               <label>
                 <div className="payment-field-label">Not (opsiyonel)</div>
                 <input className="input" value={paymentNote} onChange={(event) => onPaymentNoteChange?.(event.target.value)} disabled={!canTakePayment || busy} />

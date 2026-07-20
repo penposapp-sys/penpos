@@ -495,7 +495,8 @@ export const collectPackageOrderPaymentService = async (tenantId, user, orderId,
     method: payload?.method,
     amount: payload?.amount,
     note: payload?.note,
-    cashierId: user?.id || user?._id || null
+    cashierId: user?.id || user?._id || null,
+    entryDate: payload?.entryDate
   })
 
   const refreshed = await Order.findOne({ _id: orderId, tenantId })

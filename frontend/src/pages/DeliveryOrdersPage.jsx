@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
+import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { pickInitialPaymentMethod } from '../lib/paymentMethods.js'
+import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 
 const deliveredHourPresets = [
   { label: '24s', value: 24 },
@@ -85,6 +87,7 @@ function formatDeliveredTime(order) {
 export default function DeliveryOrdersPage() {
   const { user, allowedBranchIds } = useAuth()
   const nav = useNavigate()
+  const canEditEntryDate = user?.role === 'tenant_admin'
   const hasPerm = (permission) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(permission)
   const canManageDelivery = hasPerm('manage_delivery')
 
@@ -102,6 +105,11 @@ export default function DeliveryOrdersPage() {
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
   const [payMethods, setPayMethods] = useState([])
   const [approvingId, setApprovingId] = useState('')
+  const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
+
+  useEffect(() => {
+    if (!canEditEntryDate) setEntryDate(todayYmd())
+  }, [canEditEntryDate])
 
   const loadOrders = async (nextTab = tab, opts = {}) => {
     const nextPage = opts.page ?? 1
@@ -242,7 +250,8 @@ export default function DeliveryOrdersPage() {
           address,
           note,
           deliveryPaymentStatus,
-          deliveryPaymentMethod
+          deliveryPaymentMethod,
+          entryDate
         }),
         silent: true
       })
@@ -359,18 +368,27 @@ export default function DeliveryOrdersPage() {
           <h1 className="delivery-page-title">Paket Siparisler</h1>
           <div className="delivery-page-subtitle">{totalCount || 0} siparis</div>
         </div>
-        {canManageDelivery && (
-          <button
-            className="btn"
-            onClick={() => {
-              setTab('active')
-              setCreateOrderError('')
-              setCreateOpen(true)
-            }}
-          >
-            Yeni Paket Siparisi
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'end', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {canEditEntryDate ? (
+            <SalesEntryDateButton
+              value={entryDate}
+              onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
+              title="Sipariş tarihini seç"
+            />
+          ) : null}
+          {canManageDelivery && (
+            <button
+              className="btn"
+              onClick={() => {
+                setTab('active')
+                setCreateOrderError('')
+                setCreateOpen(true)
+              }}
+            >
+              Yeni Paket Siparisi
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="delivery-filter-bar">

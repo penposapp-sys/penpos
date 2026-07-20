@@ -1,5 +1,5 @@
 import { sendError, error } from '../utils/errors.js'
-import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderServiceByItemId, setItemQuantityService, setItemQuantityByItemIdService, setItemWeightByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService } from '../services/orderService.js'
+import { createOrderService, getOrderService, addItemService, removeItemService, setNoteService, setCustomerNameService, cancelOrderService, sendOrderService, payOrderService, transferOrderService, closeOrderService, reopenOrderService, splitOrderServiceByItemId, setItemQuantityService, setItemQuantityByItemIdService, setItemWeightByItemIdService, setItemNoteByItemIdService, createWalkInOrderService, createDeliveryOrderService, updateDeliveryStatusService, updateDeliveryCustomerService, getDeliveryOrdersService, addOrderPaymentService, deleteOrderPaymentService, setOrderDiscountService, setOrderVeresiyeService, deleteOrderVeresiyeEntryService, deleteOrderCollectionTransactionService, getWalkInOrdersService, setKitchenModeService, completeItemByItemIdService, updateOrderEntryDateService } from '../services/orderService.js'
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
@@ -9,6 +9,7 @@ import { log as auditLog } from '../services/auditService.js'
 import * as logger from '../utils/logger.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
+import { normalizeManualEntryDateInput } from '../utils/manualEntryDate.js'
 
 const getStaffAllowedBranchIds = (req) => {
   if (String(req.user?.role || '') !== 'staff') return null
@@ -57,7 +58,8 @@ export const getTableMeta = async (req, res) => {
 
 export const createOrder = async (req, res) => {
   try {
-    const order = await createOrderService(req.user.tenantId, req.user.id, req.branch?.id || null, { createdByName: req.user?.name })
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
+    const order = await createOrderService(req.user.tenantId, req.user.id, req.branch?.id || null, { createdByName: req.user?.name, entryDate })
     res.json({ order })
   } catch (err) {
     sendError(res, err)
@@ -353,7 +355,8 @@ export const pay = async (req, res) => {
     try {
       console.log('[PAY HIT]', { orderId: req.params.id, tenantId: req.user?.tenantId || null, userId: req.user?.id || null, amount: req.body?.amount })
     } catch {}
-    const result = await payOrderService(req.user.tenantId, req.params.id, req.body?.paymentMethod, req.body?.amount)
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
+    const result = await payOrderService(req.user.tenantId, req.params.id, req.body?.paymentMethod, req.body?.amount, entryDate)
     try {
       await auditLog(req.user.tenantId, req.user.id, 'ödeme_tamamlandi', 'order', result.order?.id || req.params.id, { paymentMethod: req.body?.paymentMethod, amount: req.body?.amount })
     } catch {}
@@ -367,7 +370,8 @@ export const addPayment = async (req, res) => {
   try {
     const { id } = req.params
     const { method, amount, note, itemAllocations } = req.body || {}
-    const { order } = await addOrderPaymentService(req.user.tenantId, id, { method, amount, note, itemAllocations, cashierId: req.user.id })
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
+    const { order } = await addOrderPaymentService(req.user.tenantId, id, { method, amount, note, itemAllocations, cashierId: req.user.id, entryDate })
     try {
       await auditLog(req.user.tenantId, req.user.id, 'odeme_ekle', 'order', order._id || order.id || id, { method, amount })
     } catch {}
@@ -401,6 +405,20 @@ export const setDiscount = async (req, res) => {
     try {
       await auditLog(req.user.tenantId, req.user.id, 'indirim_guncelle', 'order', order._id || order.id || id, { discountPercent })
     } catch {}
+    res.json({ success: true, order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const setOrderEntryDate = async (req, res) => {
+  try {
+    if (String(req.user?.role || '') !== 'tenant_admin') {
+      return res.status(403).json({ success: false, code: 'forbidden', message: 'Bu işlem yalnızca ana hesap için kullanılabilir' })
+    }
+    const { id } = req.params
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
+    const { order } = await updateOrderEntryDateService(req.user.tenantId, id, entryDate)
     res.json({ success: true, order })
   } catch (err) {
     sendError(res, err)
@@ -458,7 +476,8 @@ export const startForTable = async (req, res) => {
     if (!branchId) {
       return res.status(403).json({ status: 403, code: 'missing_branch', message: 'Branch required' })
     }
-    const result = await startOrderForTableService(req.user.tenantId, req.user.id, req.params.tableId, branchId, { createdByName: req.user?.name })
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
+    const result = await startOrderForTableService(req.user.tenantId, req.user.id, req.params.tableId, branchId, { createdByName: req.user?.name, entryDate })
     res.json({ success: true, orderId: result.orderId })
   } catch (err) {
     sendError(res, err)
@@ -669,8 +688,9 @@ export const createWalkInOrder = async (req, res) => {
 
     const customerName = String(req.body?.customerName || '').trim() || 'Misafir'
     const note = String(req.body?.note || '').trim()
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
 
-    const order = await createWalkInOrderService(tenantId, req.user.id, branchId, { customerName, note, createdByName: req.user?.name })
+    const order = await createWalkInOrderService(tenantId, req.user.id, branchId, { customerName, note, createdByName: req.user?.name, entryDate })
     res.json({ success: true, order })
   } catch (err) {
     if (err?.name === 'ValidationError') {
@@ -729,6 +749,7 @@ export const createDeliveryOrder = async (req, res) => {
     const note = String(req.body?.note ?? req.body?.deliveryNote ?? '').trim()
     const deliveryPaymentStatus = String(req.body?.deliveryPaymentStatus || '').trim()
     const deliveryPaymentMethod = String(req.body?.deliveryPaymentMethod || req.body?.paymentMethod || '').trim()
+    const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
 
     if (!customerName) {
       return res.status(400).json({ success: false, code: 'customer_name_required', error: 'customer_name_required', message: 'Customer name required' })
@@ -742,7 +763,8 @@ export const createDeliveryOrder = async (req, res) => {
       note,
       createdByName: req.user?.name,
       deliveryPaymentStatus,
-      deliveryPaymentMethod
+      deliveryPaymentMethod,
+      entryDate
     })
     res.json({ success: true, order })
   } catch (err) {

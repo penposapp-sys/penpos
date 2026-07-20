@@ -10,6 +10,7 @@ import { getTenantPlan, ensureNotExpired } from './planService.js'
 import mongoose from 'mongoose'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import WaiterCall from '../models/WaiterCall.js'
+import { parseManualEntryDate } from '../utils/manualEntryDate.js'
 
 export const listTablesService = async (tenantId, branchFilter) => {
   const list = await listTables(tenantId, branchFilter)
@@ -67,7 +68,7 @@ export const deleteTableService = async (tenantId, userId, id) => {
   return { id: updated.id, isActive: updated.isActive }
 }
 
-export const startOrderForTableService = async (tenantId, userId, tableId, branchId, { createdByName } = {}) => {
+export const startOrderForTableService = async (tenantId, userId, tableId, branchId, { createdByName, entryDate } = {}) => {
   if (!mongoose.Types.ObjectId.isValid(tableId)) {
     const e = new Error('Invalid tableId')
     e.status = 400
@@ -102,6 +103,7 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
   }
   const branchDoc = effectiveBranchId ? await Branch.findOne({ _id: effectiveBranchId, tenantId }).select('name').lean() : null
   const safeCreatedByName = String(createdByName || '').trim()
+  const createdAt = parseManualEntryDate(entryDate) || new Date()
   const order = await createOrder({
     tenantId,
     branchId: effectiveBranchId,
@@ -113,7 +115,8 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
     tableId,
     status: 'open',
     items: [],
-    totals: { subtotal: 0, grandTotal: 0 }
+    totals: { subtotal: 0, grandTotal: 0 },
+    createdAt
   })
   await updateById(tableId, { status: 'occupied', activeOrderId: order.id })
   await (await import('./auditService.js')).log(tenantId, userId, 'table_start_order', 'Table', tableId, { orderId: order.id })

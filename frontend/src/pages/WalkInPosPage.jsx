@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx'
 import InputModal from '../components/InputModal.jsx'
 import ProductConfigModal from '../components/ProductConfigModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 import { isValidObjectId } from '../lib/ids.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
@@ -24,6 +25,7 @@ import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalI
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { requiresProductConfig } from '../lib/productPortions.js'
 import { openReceiptPopup } from '../lib/receiptPopup.js'
+import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
 import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
 
@@ -36,6 +38,7 @@ export default function WalkInPosPage() {
   const routeOrderId = params?.orderId || null
   const isOrderView = !!routeOrderId && isValidObjectId(routeOrderId)
   const { user, allowedBranchIds } = useAuth()
+  const canEditEntryDate = user?.role === 'tenant_admin'
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canTakePayment = hasPerm('take_payment')
   const canCreateVeresiye = hasPerm('create_veresiye')
@@ -66,6 +69,8 @@ export default function WalkInPosPage() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
+  const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
+  const [paymentEntryDate, setPaymentEntryDate] = useState(() => todayYmd())
   const [discountDraft, setDiscountDraft] = useState(0)
   const [veresiyeOpen, setVeresiyeOpen] = useState(false)
   const [accountQuery, setAccountQuery] = useState('')
@@ -174,6 +179,14 @@ export default function WalkInPosPage() {
     window.addEventListener('selected_branch_changed', syncSelectedBranch)
     return () => window.removeEventListener('selected_branch_changed', syncSelectedBranch)
   }, [])
+
+  useEffect(() => {
+    if (!canEditEntryDate) setEntryDate(todayYmd())
+  }, [canEditEntryDate])
+
+  useEffect(() => {
+    if (!canEditEntryDate) setPaymentEntryDate(todayYmd())
+  }, [canEditEntryDate])
 
   const loadAvailableBranches = useCallback(async () => {
     setBranchPickerLoading(true)
@@ -621,7 +634,7 @@ export default function WalkInPosPage() {
       try {
         const res = await api('/api/pos/walkin/orders', {
           method: 'POST',
-          data: { customerName: 'Misafir', note: '' },
+          data: { customerName: 'Misafir', note: '', entryDate },
           branchIdOverride,
           silent: true
         })
@@ -1167,7 +1180,7 @@ export default function WalkInPosPage() {
     }
     const amount = paymentAmount ? Number(paymentAmount) : 0
     const res = await safeAction(
-      (signal) => api(`/api/pos/orders/${currentOrderId}/payments`, { method: 'POST', data: { method: paymentMethod, amount, note: paymentNote }, signal, silent: true }),
+      (signal) => api(`/api/pos/orders/${currentOrderId}/payments`, { method: 'POST', data: { method: paymentMethod, amount, note: paymentNote, entryDate: paymentEntryDate }, signal, silent: true }),
       { reload: false }
     )
     const fresh = pickOrder(res)
@@ -1667,6 +1680,13 @@ export default function WalkInPosPage() {
             </span>
           )}
         </div>
+        {canEditEntryDate ? (
+          <SalesEntryDateButton
+            value={entryDate}
+            onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
+            title="Sipariş tarihini seç"
+          />
+        ) : null}
         <button
           className="btn btn--danger"
           onClick={closeSelectedOrder}
@@ -2191,6 +2211,15 @@ export default function WalkInPosPage() {
                 disabled={!canTakePayment || busy}
               />
             </label>
+            {canEditEntryDate ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <SalesEntryDateButton
+                  value={paymentEntryDate}
+                  onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+                  title="Ödeme tarihini seç"
+                />
+              </div>
+            ) : null}
             <label>
               <div className="payment-field-label">Not (opsiyonel)</div>
               <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
@@ -2437,7 +2466,7 @@ export default function WalkInPosPage() {
                   setBranchPickerOpen(false)
                   await api('/api/pos/walkin/orders', {
                     method: 'POST',
-                    data: { customerName: 'Misafir', note: '' },
+                    data: { customerName: 'Misafir', note: '', entryDate },
                     branchIdOverride: branchId,
                     silent: true
                   }).then((res) => {

@@ -17,6 +17,7 @@ import { applyBranchFilter } from '../utils/branchFilter.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { mergeBusinessSettings } from '../utils/businessSettings.js'
+import { parseManualEntryDate } from '../utils/manualEntryDate.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 import { isVisibleInBranch } from '../utils/branchVisibility.js'
 import { buildKitchenReceiptRaw } from '../utils/kitchenReceiptRaw.js'
@@ -650,8 +651,8 @@ export const buildOrderDayKey = (date) => {
   return `${y}-${m}-${day}`
 }
 
-export const getNextOrderSequence = async (tenantId, branchId) => {
-  const now = new Date()
+export const getNextOrderSequence = async (tenantId, branchId, date = new Date()) => {
+  const now = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date()
   const dayKey = buildOrderDayKey(now)
   if (!branchId) {
     const e = new Error('Branch required')
@@ -705,8 +706,9 @@ const decorateOrder = (order) => {
   }
 }
 
-export const createOrderService = async (tenantId, userId, branchId, { createdByName } = {}) => {
+export const createOrderService = async (tenantId, userId, branchId, { createdByName, entryDate } = {}) => {
   const safeCreatedByName = String(createdByName || '').trim()
+  const createdAt = parseManualEntryDate(entryDate) || new Date()
   const branchDoc = branchId ? await Branch.findOne({ _id: branchId, tenantId }).select('name').lean() : null
   const order = await createOrder({
     tenantId,
@@ -718,7 +720,8 @@ export const createOrderService = async (tenantId, userId, branchId, { createdBy
     createdByName: safeCreatedByName,
     items: [],
     status: 'open',
-    totals: { subtotal: 0, grandTotal: 0 }
+    totals: { subtotal: 0, grandTotal: 0 },
+    createdAt
   })
   await (await import('./auditService.js')).log(tenantId, userId, 'order_create', 'Order', order.id, {})
   return {
@@ -732,10 +735,11 @@ export const createOrderService = async (tenantId, userId, branchId, { createdBy
   }
 }
 
-export const createWalkInOrderService = async (tenantId, userId, branchId, { customerName, note, createdByName } = {}) => {
+export const createWalkInOrderService = async (tenantId, userId, branchId, { customerName, note, createdByName, entryDate } = {}) => {
   const safeCustomerName = (String(customerName || '').trim().slice(0, 40)) || 'Misafir'
   const safeNote = String(note || '').trim()
   const safeCreatedByName = String(createdByName || '').trim()
+  const createdAt = parseManualEntryDate(entryDate) || new Date()
   const branchDoc = branchId ? await Branch.findOne({ _id: branchId, tenantId }).select('name').lean() : null
   const order = await createOrder({
     tenantId,
@@ -751,7 +755,8 @@ export const createWalkInOrderService = async (tenantId, userId, branchId, { cus
     saleType: 'walkin',
     customerName: safeCustomerName,
     note: safeNote,
-    paymentStatus: 'unpaid'
+    paymentStatus: 'unpaid',
+    createdAt
   })
   await (await import('./auditService.js')).log(tenantId, userId, 'order_create_walkin', 'Order', order.id, { customerName: safeCustomerName })
   return {
@@ -822,12 +827,13 @@ export const getWalkInOrdersService = async (tenantId, branchFilter, { status = 
   return { orders: dto }
 }
 
-export const createDeliveryOrderService = async (tenantId, userId, branchId, { customerId, customerName, phone, address, note, createdByName, deliveryPaymentStatus, deliveryPaymentMethod } = {}) => {
+export const createDeliveryOrderService = async (tenantId, userId, branchId, { customerId, customerName, phone, address, note, createdByName, deliveryPaymentStatus, deliveryPaymentMethod, entryDate } = {}) => {
   const safeCustomerName = String(customerName || '').trim()
   const safePhone = String(phone || '').trim()
   const safeAddress = String(address || '').trim()
   const safeNote = String(note || '').trim()
   const safeCreatedByName = String(createdByName || '').trim()
+  const createdAt = parseManualEntryDate(entryDate) || new Date()
   const safeDeliveryPaymentStatus = String(deliveryPaymentStatus || '').trim() === 'already_paid'
     ? 'already_paid'
     : (String(deliveryPaymentStatus || '').trim() === 'pay_on_delivery' ? 'pay_on_delivery' : 'unknown')
@@ -841,7 +847,7 @@ export const createDeliveryOrderService = async (tenantId, userId, branchId, { c
     phone: safePhone,
     address: safeAddress,
     note: safeNote,
-    lastOrderAt: new Date()
+    lastOrderAt: createdAt
   })
   const branchDoc = branchId ? await Branch.findOne({ _id: branchId, tenantId }).select('name').lean() : null
   const order = await createOrder({
@@ -873,7 +879,8 @@ export const createDeliveryOrderService = async (tenantId, userId, branchId, { c
     deliveryPaymentMethod: resolvedPlannedMethod?.methodId || '',
     deliveryPaymentMethodLabel: resolvedPlannedMethod?.methodLabel || '',
     deliveryStatus: 'pending',
-    paymentStatus: 'unpaid'
+    paymentStatus: 'unpaid',
+    createdAt
   })
   await (await import('./auditService.js')).log(tenantId, userId, 'order_create_delivery', 'Order', order.id, { customerName: safeCustomerName })
   return {
@@ -1347,6 +1354,7 @@ export const getOrderService = async (tenantId, id) => {
     id: obj.id,
     tableId: obj.tableId,
     status: obj.status,
+    createdAt: obj.createdAt || null,
     items: normalizedItems,
     totals: obj.totals,
     note: obj.note,
@@ -1411,7 +1419,7 @@ export const addItemService = async (tenantId, id, menuItemId, input = 1) => {
   }
 
   if (order.orderNo == null) {
-    const seq = await getNextOrderSequence(tenantId, order.branchId)
+    const seq = await getNextOrderSequence(tenantId, order.branchId, order.createdAt || new Date())
     const updated = await Order.updateOne(
       { _id: order.id, tenantId, $or: [{ orderNo: null }, { orderNo: { $exists: false } }] },
       { $set: { orderNo: seq.orderNo, orderDayKey: seq.orderDayKey } }
@@ -2471,7 +2479,7 @@ export const setKitchenModeService = async (tenantId, id, { kitchenEnabled, send
   return { order: decorateOrder(fresh) }
 }
 
-export const addOrderPaymentService = async (tenantId, id, { method, amount, note, cashierId, itemAllocations = [] }) => {
+export const addOrderPaymentService = async (tenantId, id, { method, amount, note, cashierId, itemAllocations = [], entryDate } = {}) => {
   if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
     throw error('invalid_request', 'Invalid orderId', 400)
   }
@@ -2518,6 +2526,7 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
 
   const accountId = String(order?.publicCustomerAccountId || '').trim()
   const shouldUseAccountCollection = String(order?.orderChannel || '').trim() === 'online' && mongoose.Types.ObjectId.isValid(accountId)
+  const paymentCreatedAt = parseManualEntryDate(entryDate) || new Date()
 
   if (shouldUseAccountCollection) {
     const existingCollections = await computeOrderCollectionTotal(tenantId, order.id, accountId)
@@ -2532,11 +2541,12 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
       discountAmount: 0,
       method,
       note: String(note || 'Siparis uzerinden tahsil edildi'),
-      orderId: order.id
+      orderId: order.id,
+      createdAt: paymentCreatedAt
     })
     const paymentState = await computePersistedPaymentState(tenantId, order)
     order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
-    order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+    order.paidAt = paymentState.isPaid ? (order.paidAt || paymentCreatedAt) : null
     if (String(order?.saleType || '') === 'delivery') {
       order.deliveryPaymentStatus = paymentState.isPaid ? 'odeme_alindi' : 'odeme_bekliyor'
     }
@@ -2551,11 +2561,12 @@ export const addOrderPaymentService = async (tenantId, id, { method, amount, not
       methodType: resolvedMethod.methodType,
       amount: payAmount,
       note: String(note || ''),
-      itemAllocations: normalizedItemAllocations
+      itemAllocations: normalizedItemAllocations,
+      createdAt: paymentCreatedAt
     })
     const paymentState = await computePersistedPaymentState(tenantId, order)
     order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
-    order.paidAt = paymentState.isPaid ? (order.paidAt || new Date()) : null
+    order.paidAt = paymentState.isPaid ? (order.paidAt || paymentCreatedAt) : null
   }
 
   await order.save()
@@ -2620,6 +2631,36 @@ export const setOrderDiscountService = async (tenantId, id, discountPercent) => 
     order
   })
   await order.save()
+  const fresh = await Order.findById(order.id).lean()
+  return { order: decorateOrder(fresh) }
+}
+
+export const updateOrderEntryDateService = async (tenantId, id, entryDate) => {
+  const order = await findByIdAndTenant(id, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+  if (['closed', 'cancelled', 'merged'].includes(order.status)) {
+    const e = new Error('Order is not editable')
+    e.status = 409
+    e.payload = { code: 'order_not_editable', message: 'Order is not editable' }
+    throw e
+  }
+
+  const createdAt = parseManualEntryDate(entryDate)
+  if (!createdAt) {
+    throw error('invalid_entry_date', 'Geçerli bir sipariş tarihi seçin', 400)
+  }
+
+  await Order.updateOne(
+    { _id: order._id, tenantId },
+    {
+      $set: {
+        createdAt,
+        ...(order.orderDayKey ? { orderDayKey: String(entryDate || '').trim() } : {})
+      }
+    },
+    { timestamps: false, strict: false }
+  )
+
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }
 }
@@ -3024,7 +3065,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
   return { success: true, order: dto, txId: String(txId) }
 }
 
-export const payOrderService = async (tenantId, id, paymentMethod, amount) => {
+export const payOrderService = async (tenantId, id, paymentMethod, amount, entryDate) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
   
@@ -3052,6 +3093,7 @@ export const payOrderService = async (tenantId, id, paymentMethod, amount) => {
   }
 
   const resolvedMethod = await resolvePaymentMethodSelection(tenantId, order.branchId, paymentMethod)
+  const paymentCreatedAt = parseManualEntryDate(entryDate) || new Date()
   order.payments.push({
     amount: payAmount,
     method: resolvedMethod.method,
@@ -3060,13 +3102,14 @@ export const payOrderService = async (tenantId, id, paymentMethod, amount) => {
     methodName: resolvedMethod.methodName,
     methodBucket: resolvedMethod.methodBucket,
     methodType: resolvedMethod.methodType,
-    note: ''
+    note: '',
+    createdAt: paymentCreatedAt
   })
 
   const after = computePaymentSummary(order)
   if (after.netTotal > 0 && after.balanceDue <= 0.01) {
     order.paymentStatus = 'paid'
-    order.paidAt = order.paidAt || new Date()
+    order.paidAt = order.paidAt || paymentCreatedAt
   } else {
     order.paymentStatus = 'unpaid'
     order.paidAt = null

@@ -6,6 +6,7 @@ import Modal from '../components/Modal.jsx'
 import PaymentCollectionModal from '../components/PaymentCollectionModal.jsx'
 import { toast } from '../lib/toast.js'
 import { isCashPaymentMethod, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
+import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 
 const STATUS_OPTIONS = [
   ['yeni', 'Yeni Siparis'],
@@ -89,11 +90,6 @@ const blueButton = {
   color: '#fff'
 }
 
-const todayYmd = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 const money = (value) => `${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
 const phoneHref = (value) => `tel:${String(value || '').replace(/[^\d+]/g, '')}`
 
@@ -159,6 +155,7 @@ export default function PackageCourierPage() {
   const { user, allowedBranchIds } = useAuth()
   const perms = Array.isArray(user?.permissions) ? user.permissions : []
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'superadmin'
+  const canEditEntryDate = user?.role === 'tenant_admin'
   const hasPerm = (permission) => isAdmin || perms.includes(permission)
   const ownCourierId = String(user?.id || user?._id || '').trim()
 
@@ -190,6 +187,7 @@ export default function PackageCourierPage() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
+  const [paymentEntryDate, setPaymentEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignTarget, setAssignTarget] = useState(null)
   const [selectedCourierId, setSelectedCourierId] = useState('')
@@ -201,6 +199,10 @@ export default function PackageCourierPage() {
     paymentStatus: '',
     search: ''
   })
+
+  useEffect(() => {
+    if (!canEditEntryDate) setPaymentEntryDate(todayYmd())
+  }, [canEditEntryDate])
 
   useEffect(() => {
     if (!courierMode || !ownCourierId) return
@@ -441,7 +443,7 @@ export default function PackageCourierPage() {
     try {
       const result = await api(`/api/pos/package-orders/${paymentTarget.id}/collect-payment`, {
         method: 'POST',
-        body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote }),
+        body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, entryDate: paymentEntryDate }),
         silent: true
       })
       const nextOrder = result?.order || null
@@ -830,6 +832,9 @@ export default function PackageCourierPage() {
         onPaymentMethodChange={setPaymentMethod}
         paymentAmount={paymentAmount}
         onPaymentAmountChange={setPaymentAmount}
+        paymentDate={paymentEntryDate}
+        onPaymentDateChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+        showPaymentDate={canEditEntryDate}
         paymentNote={paymentNote}
         onPaymentNoteChange={setPaymentNote}
         canTakePayment={canTakePayment}
@@ -872,6 +877,3 @@ export default function PackageCourierPage() {
     </div>
   )
 }
-
-
-
