@@ -35,6 +35,24 @@ const setQrSeenAt = (value) => {
   try { localStorage.setItem(qrSeenAtKey, String(Number.isFinite(numeric) ? numeric : Date.now())) } catch {}
 }
 
+const syncCanteenBranchSelection = (session) => {
+  const allowedIds = Array.isArray(session?.allowedBranchIds) ? session.allowedBranchIds.map(String).filter(Boolean) : []
+  const activeId = String(session?.branchId || session?.activeBranch?.id || '').trim()
+  const fallbackId = activeId && allowedIds.includes(activeId)
+    ? activeId
+    : String(allowedIds[0] || '').trim()
+
+  try {
+    const stored = String(localStorage.getItem('selectedBranchId_canteen') || '').trim()
+    if (stored && allowedIds.length > 0 && !allowedIds.includes(stored)) {
+      if (fallbackId) localStorage.setItem('selectedBranchId_canteen', fallbackId)
+      else localStorage.removeItem('selectedBranchId_canteen')
+      return
+    }
+    if (!stored && fallbackId) localStorage.setItem('selectedBranchId_canteen', fallbackId)
+  } catch {}
+}
+
 export default function CanteenLayout() {
   const nav = useNavigate()
   const { logout: authLogout } = useAuth()
@@ -127,6 +145,7 @@ export default function CanteenLayout() {
       setMe(normalized)
 
       const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
+      if (sess?.ok) syncCanteenBranchSelection(sess)
       setSession(sess?.ok ? sess : null)
       const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
       setTenantCtx(ctx?.ok ? ctx : null)
@@ -139,6 +158,7 @@ export default function CanteenLayout() {
     if (!me) return
     const run = async () => {
       const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
+      if (sess?.ok) syncCanteenBranchSelection(sess)
       setSession(sess?.ok ? sess : null)
       const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
       setTenantCtx(ctx?.ok ? ctx : null)
@@ -150,6 +170,7 @@ export default function CanteenLayout() {
     if (!me) return
     const handler = async () => {
       const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
+      if (sess?.ok) syncCanteenBranchSelection(sess)
       setSession(sess?.ok ? sess : null)
       const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
       setTenantCtx(ctx?.ok ? ctx : null)

@@ -67,7 +67,7 @@ export default function CanteenSettingsProductsPage() {
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [q, setQ] = useState('')
   const [error, setError] = useState('')
-  const [viewMode, setViewMode] = useState('list')
+  const [viewMode, setViewMode] = useState('card')
   const [activeTab, setActiveTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState([])
@@ -205,20 +205,52 @@ export default function CanteenSettingsProductsPage() {
     ...sortedCategories.map((category) => ({ key: `category:${category.id}`, label: category.name, category }))
   ]), [sortedCategories])
 
+  const categoryOrderMap = useMemo(() => {
+    const entries = sortedCategories.map((category, index) => [
+      String(category?.id || ''),
+      {
+        sortOrder: Number(category?.sortOrder || 0),
+        index,
+        name: String(category?.name || '')
+      }
+    ])
+    return new Map(entries)
+  }, [sortedCategories])
+
   const filtered = useMemo(() => {
     const query = normalize(q)
-    return items.filter((item) => {
-      const matchesSearch = !query || [item.name, item.categoryName, item.barcode].some((value) => normalize(value).includes(query))
-      const matchesStatus = statusFilter === 'all'
-        ? true
-        : statusFilter === 'active'
-          ? item?.isActive !== false
-          : item?.isActive === false
-      const activeCategoryId = String(activeTab).startsWith('category:') ? String(activeTab).slice('category:'.length) : ''
-      const matchesTab = activeTab === 'all' ? true : String(item.categoryId || '') === activeCategoryId
-      return matchesSearch && matchesStatus && matchesTab
-    })
-  }, [activeTab, items, q, statusFilter])
+    return items
+      .filter((item) => {
+        const matchesSearch = !query || [item.name, item.categoryName, item.barcode].some((value) => normalize(value).includes(query))
+        const matchesStatus = statusFilter === 'all'
+          ? true
+          : statusFilter === 'active'
+            ? item?.isActive !== false
+            : item?.isActive === false
+        const activeCategoryId = String(activeTab).startsWith('category:') ? String(activeTab).slice('category:'.length) : ''
+        const matchesTab = activeTab === 'all' ? true : String(item.categoryId || '') === activeCategoryId
+        return matchesSearch && matchesStatus && matchesTab
+      })
+      .sort((left, right) => {
+        const leftCategory = categoryOrderMap.get(String(left?.categoryId || '')) || null
+        const rightCategory = categoryOrderMap.get(String(right?.categoryId || '')) || null
+
+        const leftSort = leftCategory?.sortOrder ?? Number.MAX_SAFE_INTEGER
+        const rightSort = rightCategory?.sortOrder ?? Number.MAX_SAFE_INTEGER
+        if (leftSort !== rightSort) return leftSort - rightSort
+
+        const leftIndex = leftCategory?.index ?? Number.MAX_SAFE_INTEGER
+        const rightIndex = rightCategory?.index ?? Number.MAX_SAFE_INTEGER
+        if (leftIndex !== rightIndex) return leftIndex - rightIndex
+
+        const leftCategoryName = String(leftCategory?.name || left?.categoryName || 'Diğer Ürünler')
+        const rightCategoryName = String(rightCategory?.name || right?.categoryName || 'Diğer Ürünler')
+        const categoryCompare = leftCategoryName.localeCompare(rightCategoryName, 'tr')
+        if (categoryCompare !== 0) return categoryCompare
+
+        return String(left?.name || '').localeCompare(String(right?.name || ''), 'tr')
+      })
+  }, [activeTab, categoryOrderMap, items, q, statusFilter])
 
   const isCreateFormValid =
     canManage &&

@@ -14,7 +14,7 @@ export const canteenBranchQueryGuard = async (req, res, next) => {
   const fromToken = Array.isArray(req.user?.allowedBranchIds)
     ? req.user.allowedBranchIds.map(String).filter(Boolean)
     : []
-  const fromUser = Array.isArray(req.user?.branchIds)
+  const fromUser = req.user?.role === 'staff' && Array.isArray(req.user?.branchIds)
     ? req.user.branchIds.map(String).filter(Boolean)
     : []
 

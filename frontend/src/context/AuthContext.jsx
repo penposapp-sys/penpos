@@ -41,8 +41,11 @@ const resolveAllowedBranchIds = (normalizedUser, tenantProfile) => {
 const persistActiveBranchSelection = (normalizedUser, branchIds = []) => {
   const systemType = String(normalizedUser?.systemType || '').trim()
   const primaryBranchId = String(normalizedUser?.branchId || '').trim()
-  const fallbackBranchId = Array.isArray(branchIds) && branchIds.length > 0 ? String(branchIds[0] || '').trim() : ''
-  const selectedBranchId = primaryBranchId || fallbackBranchId
+  const normalizedBranchIds = Array.isArray(branchIds) ? branchIds.map(String).filter(Boolean) : []
+  const fallbackBranchId = normalizedBranchIds.length > 0 ? String(normalizedBranchIds[0] || '').trim() : ''
+  const selectedBranchId = systemType === 'kantin' || systemType === 'canteen'
+    ? (normalizedBranchIds.includes(primaryBranchId) ? primaryBranchId : fallbackBranchId)
+    : (primaryBranchId || fallbackBranchId)
   if (!selectedBranchId) return
 
   try {
