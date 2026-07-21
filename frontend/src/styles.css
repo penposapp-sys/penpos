@@ -3935,6 +3935,47 @@ body.sales-mobile-scroll .delivery-orders-page .productCard__img {
   overflow-wrap: anywhere;
 }
 
+.btn--close-action {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.btn--close-action:hover,
+.btn--close-action:focus-visible,
+.btn--close-action:active {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="light"].theme-white :is(button, .btn).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]),
+html[data-theme="light"].theme-white body.app-shell-active :is(button, .btn).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]),
+.mobile-performance-mode.mobile-system-dark :is(button, .btn).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"].theme-white :is(button, .btn).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i),
+html[data-theme="light"].theme-white body.app-shell-active :is(button, .btn).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i),
+.mobile-performance-mode.mobile-system-dark :is(button, .btn).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+  color: #ffffff !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active :is(button:hover, button:focus-visible, .btn:hover, .btn:focus-visible).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]),
+html[data-theme="light"].theme-white body.app-shell-active :is(button:active, .btn:active).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]),
+.mobile-performance-mode.mobile-system-dark :is(button:hover, button:focus-visible, .btn:hover, .btn:focus-visible, button:active, .btn:active).btn--close-action:not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
 .saleCartMobileActionBar {
   display: grid;
   gap: 2px;
@@ -6514,7 +6555,7 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.product-toggle):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
   background: #ffffff !important;
   color: #111111 !important;
   border-color: #d1d5db !important;
@@ -6542,7 +6583,7 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.product-toggle):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
   color: #111111 !important;
   fill: currentColor !important;
   stroke: currentColor !important;
@@ -6588,7 +6629,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   .canteen-settings-menu-toggle:hover,
   .hamburger-btn:hover,
   .nav-link:hover
-):not(.product-toggle):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
   background: color-mix(in srgb, #f3f4f6 78%, #ffffff) !important;
   color: #111111 !important;
   border-color: #d1d5db !important;
@@ -6615,7 +6656,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   .settings-ui-branch-pill.active,
   [aria-pressed="true"],
   [aria-current="page"]
-):not(.product-toggle):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
   background: var(--button-selected-bg, #ffffff) !important;
   color: var(--button-selected-text, #111111) !important;
   border-color: var(--button-selected-border, #d1d5db) !important;
@@ -6647,7 +6688,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   .canteen-settings-menu-toggle:hover,
   .hamburger-btn:hover,
   .nav-link:hover
-):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
   color: #111111 !important;
   fill: currentColor !important;
   stroke: currentColor !important;

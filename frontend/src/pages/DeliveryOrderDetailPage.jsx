@@ -1520,12 +1520,12 @@ export default function DeliveryOrderDetailPage() {
                     Fiş Yazdır
                   </button>
                   {uiStatus !== 'approval_pending' && uiStatus !== 'delivered' && uiStatus !== 'cancelled' && (
-                    <button className="btn delivery-detail-btn" onClick={() => updateStatus('delivered')} disabled={busy || !canManageDelivery}>
+                    <button className="btn delivery-detail-btn btn--close-action" onClick={() => updateStatus('delivered')} disabled={busy || !canManageDelivery}>
                       Teslim Et
                     </button>
                   )}
                   {uiStatus === 'cancelled' && (
-                    <button className="btn delivery-detail-btn" onClick={closeOrder} disabled={busy}>
+                    <button className="btn delivery-detail-btn btn--close-action" onClick={closeOrder} disabled={busy}>
                       Kapat
                     </button>
                   )}

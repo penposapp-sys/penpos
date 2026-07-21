@@ -1683,7 +1683,7 @@ export default function PosPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {canCloseTable && (
             <button
-              className="btn btn--danger"
+              className="btn btn--danger btn--close-action"
               onClick={closeTable}
               disabled={busy}
             >

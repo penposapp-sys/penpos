@@ -1746,7 +1746,7 @@ export default function WalkInPosPage() {
           </div>
         ) : null}
         <button
-          className="btn btn--danger"
+          className="btn btn--danger btn--close-action"
           onClick={closeSelectedOrder}
           disabled={!getOrderId(order) || busy}
         >
