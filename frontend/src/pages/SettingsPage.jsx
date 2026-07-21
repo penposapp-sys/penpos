@@ -661,7 +661,7 @@ export default function SettingsPage() {
             label: 'Ödeme Seçenekleri',
             icon: 'payments',
             group: 'Satış',
-            description: 'Nakit, kart, banka ve veresiye seçenekleri'
+            description: 'Nakit, kart, banka ve ek ödeme seçenekleri'
           },
           {
             key: 'delivery',
@@ -1928,17 +1928,16 @@ export const SettingsPaymentsContent = ({ showHeading = true } = {}) => {
       <div style={{ display: 'grid', gap: 10, maxWidth: 860, width: '100%' }}>
         {(methods || []).map((method) => {
           const isEditing = editingId === method.id
-          const isFixedCredit = String(method?.id) === 'credit'
           return (
           <div key={method.id} className="card" style={{ display: 'grid', gap: 12, padding: 14, minWidth: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1.6fr) auto', gap: 12, alignItems: 'center', minWidth: 0 }}>
               <label style={{ display: 'flex', alignItems: isMobilePortrait ? 'flex-start' : 'center', gap: 12, minWidth: 0 }}>
-                <input type="checkbox" checked={!!method.enabled} onChange={() => toggleEnabled(method.id)} disabled={saving || isFixedCredit} />
+                <input type="checkbox" checked={!!method.enabled} onChange={() => toggleEnabled(method.id)} disabled={saving} />
                 {!isEditing ? (
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{method.name}</div>
                     <div style={{ color: 'var(--app-text-muted)', fontSize: 12 }}>
-                      {isFixedCredit ? 'Sabit odeme kaydedici. Silinemez, adi duzenlenebilir.' : (method.enabled ? 'Aktif odeme yontemi' : 'Pasif odeme yontemi')}
+                      {method.enabled ? 'Aktif odeme yontemi' : 'Pasif odeme yontemi'}
                     </div>
                   </div>
                 ) : (
@@ -1966,7 +1965,7 @@ export const SettingsPaymentsContent = ({ showHeading = true } = {}) => {
                   type="button"
                   className="btn"
                   onClick={() => removeMethod(method)}
-                  disabled={saving || isFixedCredit}
+                  disabled={saving}
                   style={{ borderColor: '#fecaca', color: '#b91c1c', flex: isMobilePortrait ? '1 1 140px' : undefined }}
                 >
                   Sil

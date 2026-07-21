@@ -2231,7 +2231,15 @@ export default function PosPage() {
                     : 'Aynı fiş içinde ürün bazlı ödeme seçebilirsiniz.'}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {canEditEntryDate ? (
+                  <SalesEntryDateButton
+                    value={paymentEntryDate}
+                    onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+                    title="Ödeme tarihini seç"
+                    showValue
+                  />
+                ) : null}
                 <button className="btn btn--compact" type="button" onClick={openSplit} disabled={!canSplitOrder || busy}>
                   Ödeme Böl
                 </button>
@@ -2280,15 +2288,6 @@ export default function PosPage() {
                 disabled={!canTakePayment || busy}
               />
             </label>
-            {canEditEntryDate ? (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <SalesEntryDateButton
-                  value={paymentEntryDate}
-                  onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
-                  title="Ödeme tarihini seç"
-                />
-              </div>
-            ) : null}
             <label>
               <div className="payment-field-label">Not (opsiyonel)</div>
               <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />

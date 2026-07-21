@@ -153,6 +153,7 @@ const orderSchema = new mongoose.Schema(
     courierName: { type: String, default: '' },
     courierAssignedAt: { type: Date, default: null },
     courierDepartedAt: { type: Date, default: null },
+    requestedDeliveryAt: { type: Date, default: null },
     deliveryAt: { type: Date, default: null },
     deliveredAt: { type: Date, default: null },
     deliveryAddress: { type: deliveryAddressSchema, default: () => ({}) },

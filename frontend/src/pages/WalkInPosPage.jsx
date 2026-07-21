@@ -70,7 +70,9 @@ export default function WalkInPosPage() {
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
+  const [savedEntryDate, setSavedEntryDate] = useState('')
   const [paymentEntryDate, setPaymentEntryDate] = useState(() => todayYmd())
+  const [savingEntryDate, setSavingEntryDate] = useState(false)
   const [discountDraft, setDiscountDraft] = useState(0)
   const [veresiyeOpen, setVeresiyeOpen] = useState(false)
   const [accountQuery, setAccountQuery] = useState('')
@@ -187,6 +189,16 @@ export default function WalkInPosPage() {
   useEffect(() => {
     if (!canEditEntryDate) setPaymentEntryDate(todayYmd())
   }, [canEditEntryDate])
+
+  const toEntryDateValue = (value) => {
+    if (!value) return todayYmd()
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return todayYmd()
+    const year = parsed.getFullYear()
+    const month = String(parsed.getMonth() + 1).padStart(2, '0')
+    const day = String(parsed.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
 
   const loadAvailableBranches = useCallback(async () => {
     setBranchPickerLoading(true)
@@ -452,6 +464,8 @@ export default function WalkInPosPage() {
     return normalizeOrder(o)
   }
   const getOrderId = (o) => o?._id || o?.id || o?.orderId || null
+  const canSaveEntryDate = canEditEntryDate && Boolean(getOrderId(order))
+  const hasEntryDateChange = Boolean(savedEntryDate) && entryDate !== savedEntryDate
 
   const printReceiptOneClick = async () => {
     const orderId = getOrderId(order)
@@ -488,6 +502,41 @@ export default function WalkInPosPage() {
       setServingType(v)
     }
   }, [order?.id, order?.servingType])
+
+  useEffect(() => {
+    const orderId = getOrderId(order)
+    if (!orderId || !canEditEntryDate) return
+    const nextEntryDate = toEntryDateValue(order?.createdAt)
+    setEntryDate(nextEntryDate)
+    setSavedEntryDate(nextEntryDate)
+  }, [order?.id, order?.createdAt, canEditEntryDate])
+
+  const saveOrderEntryDate = async () => {
+    const orderId = getOrderId(order)
+    if (!orderId || !canSaveEntryDate || !hasEntryDateChange) return
+    setSavingEntryDate(true)
+    try {
+      const res = await api(`/api/pos/orders/${orderId}/entry-date`, {
+        method: 'PUT',
+        data: { entryDate },
+        silent: true
+      })
+      if (!res?.ok) {
+        toast.error(res?.message || 'Sipariş tarihi kaydedilemedi')
+        return
+      }
+      const fresh = pickOrder(res)
+      if (fresh) {
+        setOrder(fresh)
+        const nextEntryDate = toEntryDateValue(fresh.createdAt)
+        setEntryDate(nextEntryDate)
+        setSavedEntryDate(nextEntryDate)
+      }
+      toast.success('Sipariş tarihi kaydedildi')
+    } finally {
+      setSavingEntryDate(false)
+    }
+  }
 
   const loadCategories = async () => {
     const res = await api('/api/tenant/categories?active=true')
@@ -659,12 +708,6 @@ export default function WalkInPosPage() {
       normalizedAllowedBranchIds.length === 0 || normalizedAllowedBranchIds.includes(currentSelectedBranchId)
     )
 
-    if (user?.role === 'tenant_admin' && normalizedAllowedBranchIds.length > 1) {
-      await loadAvailableBranches()
-      setBranchPickerOpen(true)
-      return
-    }
-
     if (!hasSelectedAllowedBranch) {
       if (normalizedAllowedBranchIds.length === 1) {
         const onlyBranchId = normalizedAllowedBranchIds[0]
@@ -675,6 +718,12 @@ export default function WalkInPosPage() {
         await createWalkInOrderForBranch(onlyBranchId)
         return
       }
+      await loadAvailableBranches()
+      setBranchPickerOpen(true)
+      return
+    }
+
+    if (user?.role === 'tenant_admin' && normalizedAllowedBranchIds.length > 1 && !currentSelectedBranchId) {
       await loadAvailableBranches()
       setBranchPickerOpen(true)
       return
@@ -1558,9 +1607,6 @@ export default function WalkInPosPage() {
         <div className="card" style={topbarStyle}>
           <div>
             <div style={{ fontWeight: 800, fontSize: 16 }}>Aktif Masasız Satışlar</div>
-            {selectedBranchId ? (
-              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Aktif şube: {selectedBranchId}</div>
-            ) : null}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="btn" onClick={() => loadActiveOrders()} disabled={loadingList || busy}>Yenile</button>
@@ -1681,11 +1727,23 @@ export default function WalkInPosPage() {
           )}
         </div>
         {canEditEntryDate ? (
-          <SalesEntryDateButton
-            value={entryDate}
-            onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
-            title="Sipariş tarihini seç"
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SalesEntryDateButton
+              value={entryDate}
+              onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
+              title="Sipariş tarihini seç"
+            />
+            {canSaveEntryDate && hasEntryDateChange ? (
+              <button
+                type="button"
+                className="btn btn--xs"
+                onClick={saveOrderEntryDate}
+                disabled={savingEntryDate || busy}
+              >
+                {savingEntryDate ? '...' : 'Kaydet'}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         <button
           className="btn btn--danger"
@@ -2211,15 +2269,6 @@ export default function WalkInPosPage() {
                 disabled={!canTakePayment || busy}
               />
             </label>
-            {canEditEntryDate ? (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <SalesEntryDateButton
-                  value={paymentEntryDate}
-                  onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
-                  title="Ödeme tarihini seç"
-                />
-              </div>
-            ) : null}
             <label>
               <div className="payment-field-label">Not (opsiyonel)</div>
               <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
@@ -2230,16 +2279,28 @@ export default function WalkInPosPage() {
                 <div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
               </div>
             )}
-            <div className="payment-actions">
-              <button className="btn btn--compact" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
-                Ödeme Ekle
-              </button>
-              <button className="btn btn--compact" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
-                Veresiye Yap
-              </button>
-              <button className="btn btn--compact" onClick={() => setPayOpen(false)} disabled={busy}>
-                Kapat
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {canEditEntryDate ? (
+                  <SalesEntryDateButton
+                    value={paymentEntryDate}
+                    onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+                    title="Ödeme tarihini seç"
+                    showValue
+                  />
+                ) : null}
+              </div>
+              <div className="payment-actions">
+                <button className="btn btn--compact" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
+                  Ödeme Ekle
+                </button>
+                <button className="btn btn--compact" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
+                  Veresiye Yap
+                </button>
+                <button className="btn btn--compact" onClick={() => setPayOpen(false)} disabled={busy}>
+                  Kapat
+                </button>
+              </div>
             </div>
           </div>
         </div>

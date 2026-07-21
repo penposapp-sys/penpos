@@ -43,6 +43,7 @@ const emptyCreateForm = {
   phone: '',
   address: '',
   note: '',
+  requestedDeliveryTime: '',
   deliveryPaymentStatus: 'pay_on_delivery',
   deliveryPaymentMethod: ''
 }
@@ -84,6 +85,11 @@ function formatDeliveredTime(order) {
   }
 }
 
+function getNowTimeValue() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
 export default function DeliveryOrdersPage() {
   const { user, allowedBranchIds } = useAuth()
   const nav = useNavigate()
@@ -99,17 +105,28 @@ export default function DeliveryOrdersPage() {
   const [deliveredOnlyLastHours, setDeliveredOnlyLastHours] = useState(24)
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState(emptyCreateForm)
+  const [createForm, setCreateForm] = useState(() => ({ ...emptyCreateForm, requestedDeliveryTime: getNowTimeValue() }))
   const [createOrderError, setCreateOrderError] = useState('')
   const [customerSuggestions, setCustomerSuggestions] = useState([])
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
   const [payMethods, setPayMethods] = useState([])
   const [approvingId, setApprovingId] = useState('')
   const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
+  const createTimeInputRef = React.useRef(null)
 
   useEffect(() => {
     if (!canEditEntryDate) setEntryDate(todayYmd())
   }, [canEditEntryDate])
+
+  const openTimePicker = (inputRef) => {
+    const input = inputRef?.current
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+      return
+    }
+    input.focus()
+  }
 
   const loadOrders = async (nextTab = tab, opts = {}) => {
     const nextPage = opts.page ?? 1
@@ -232,6 +249,7 @@ export default function DeliveryOrdersPage() {
     const phone = String(createForm.phone || '').trim()
     const address = String(createForm.address || '').trim()
     const note = String(createForm.note || '').trim()
+    const requestedDeliveryTime = String(createForm.requestedDeliveryTime || '').trim()
     const deliveryPaymentStatus = String(createForm.deliveryPaymentStatus || '').trim() || 'unknown'
     const deliveryPaymentMethod = String(createForm.deliveryPaymentMethod || '').trim()
 
@@ -249,6 +267,7 @@ export default function DeliveryOrdersPage() {
           phone,
           address,
           note,
+          requestedDeliveryTime,
           deliveryPaymentStatus,
           deliveryPaymentMethod,
           entryDate
@@ -279,6 +298,7 @@ export default function DeliveryOrdersPage() {
       setCreateOpen(false)
       setCreateForm({
         ...emptyCreateForm,
+        requestedDeliveryTime: getNowTimeValue(),
         deliveryPaymentMethod: pickInitialPaymentMethod(payMethods, '')
       })
       setCustomerSuggestions([])
@@ -369,19 +389,18 @@ export default function DeliveryOrdersPage() {
           <div className="delivery-page-subtitle">{totalCount || 0} siparis</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'end', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {canEditEntryDate ? (
-            <SalesEntryDateButton
-              value={entryDate}
-              onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
-              title="Sipariş tarihini seç"
-            />
-          ) : null}
           {canManageDelivery && (
             <button
               className="btn"
               onClick={() => {
                 setTab('active')
                 setCreateOrderError('')
+                setEntryDate(todayYmd())
+                setCreateForm({
+                  ...emptyCreateForm,
+                  requestedDeliveryTime: getNowTimeValue(),
+                  deliveryPaymentMethod: pickInitialPaymentMethod(payMethods, '')
+                })
                 setCreateOpen(true)
               }}
             >
@@ -467,6 +486,7 @@ export default function DeliveryOrdersPage() {
                 <span>{tab === 'delivered' ? 'Tutar' : 'Kalan'}: {(tab === 'delivered' ? total : balance).toFixed(2)} TL</span>
                 <span>Odenen: {paid.toFixed(2)} TL</span>
                 <span>Adres: {order?.customerAddress || '-'}</span>
+                {order?.requestedDeliveryAt ? <span>Plan: {new Date(order.requestedDeliveryAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span> : null}
                 {tab === 'delivered' && deliveredAt ? <span>Teslim: {deliveredAt}</span> : null}
               </div>
 
@@ -551,6 +571,55 @@ export default function DeliveryOrdersPage() {
           )}
           <label>Adres <textarea className="input" value={createForm.address} onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })} /></label>
           <label>Not <input className="input" value={createForm.note} onChange={(e) => setCreateForm({ ...createForm, note: e.target.value })} /></label>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Sipariş için saat ve tarih seçiniz (Sipariş, seçilen saate 30 dk kala hazırlanacaklara düşer)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: canEditEntryDate ? 'repeat(2, minmax(0, 1fr))' : 'minmax(220px, 1fr)', gap: 10, alignItems: 'end' }}>
+              {canEditEntryDate ? (
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sipariş tarihi</div>
+                  <SalesEntryDateButton
+                    value={entryDate}
+                    onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
+                    title="Sipariş tarihini seç"
+                    showValue
+                  />
+                </div>
+              ) : null}
+              <label style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                  <span>Teslim saati</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 3" />
+                  </svg>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    ref={createTimeInputRef}
+                    type="time"
+                    className="input"
+                    value={createForm.requestedDeliveryTime}
+                    onChange={(e) => setCreateForm({ ...createForm, requestedDeliveryTime: e.target.value })}
+                    onClick={() => openTimePicker(createTimeInputRef)}
+                    style={{ paddingLeft: 38, paddingRight: 38, textAlign: 'center', fontWeight: 600 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => openTimePicker(createTimeInputRef)}
+                    title="Teslim saatini seç"
+                    aria-label="Teslim saatini seç"
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 7v5l3 3" />
+                    </svg>
+                  </button>
+                </div>
+              </label>
+            </div>
+          </div>
           <div style={{ display: 'grid', gap: 6 }}>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Odeme durumu</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

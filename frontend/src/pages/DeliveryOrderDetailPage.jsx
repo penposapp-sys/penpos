@@ -22,8 +22,14 @@ import { getKitchenItemStatusMeta, isKitchenActiveItemStatus, isKitchenTerminalI
 import { isCashPaymentMethod, paymentMethodLabel, pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import { requiresProductConfig } from '../lib/productPortions.js'
 import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
+import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 
 export default function DeliveryOrderDetailPage() {
+  const getNowTimeValue = () => {
+    const now = new Date()
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  }
+
   const { user, allowedBranchIds } = useAuth()
   const { isMobilePortrait } = useResponsiveFlags()
   const nav = useNavigate()
@@ -73,6 +79,7 @@ export default function DeliveryOrderDetailPage() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentEntryDate, setPaymentEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
+  const [createEntryDate, setCreateEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
   const [paymentNote, setPaymentNote] = useState('')
   const [discountDraft, setDiscountDraft] = useState(0)
   const [veresiyeOpen, setVeresiyeOpen] = useState(false)
@@ -117,6 +124,8 @@ export default function DeliveryOrderDetailPage() {
   const qtyInputRefs = useRef(new Map())
   const activeQtyRowKeyRef = useRef(null)
   const activeQtySelectionRef = useRef({ start: null, end: null })
+  const createTimeInputRef = useRef(null)
+  const customerEditTimeInputRef = useRef(null)
 
   const qtyPendingRef = useRef(new Map())
   const qtyTimerRef = useRef(new Map())
@@ -309,6 +318,7 @@ export default function DeliveryOrderDetailPage() {
     phone: '',
     address: '',
     note: '',
+    requestedDeliveryTime: getNowTimeValue(),
     deliveryPaymentStatus: 'pay_on_delivery',
     deliveryPaymentMethod: ''
   })
@@ -318,16 +328,42 @@ export default function DeliveryOrderDetailPage() {
 
   const [customerEditOpen, setCustomerEditOpen] = useState(false)
   const [customerEditForm, setCustomerEditForm] = useState({
-    customerName: '',
-    phone: '',
-    address: '',
-    deliveryPaymentStatus: 'unknown',
-    deliveryPaymentMethod: ''
+      customerName: '',
+      phone: '',
+      address: '',
+      entryDate: todayYmd(),
+      requestedDeliveryTime: getNowTimeValue(),
+      deliveryPaymentStatus: 'unknown',
+      deliveryPaymentMethod: ''
   })
 
   useEffect(() => {
     if (!canEditEntryDate) setPaymentEntryDate(todayYmd())
   }, [canEditEntryDate])
+
+  useEffect(() => {
+    if (!canEditEntryDate) setCreateEntryDate(todayYmd())
+  }, [canEditEntryDate])
+
+  const toEntryDateValue = (value) => {
+    if (!value) return todayYmd()
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return todayYmd()
+    const year = parsed.getFullYear()
+    const month = String(parsed.getMonth() + 1).padStart(2, '0')
+    const day = String(parsed.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const openTimePicker = (inputRef) => {
+    const input = inputRef?.current
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+      return
+    }
+    input.focus()
+  }
 
   const pickOrder = (res) => res?.data?.order ?? res?.order ?? null
   const getOrderId = (o) => o?._id || o?.id || o?.orderId || null
@@ -536,6 +572,7 @@ export default function DeliveryOrderDetailPage() {
     const safePhone = String(createForm.phone || '').trim()
     const safeAddress = String(createForm.address || '').trim()
     const safeNote = String(createForm.note || '').trim()
+    const safeRequestedDeliveryTime = String(createForm.requestedDeliveryTime || '').trim()
     const safeDeliveryPaymentStatus = String(createForm.deliveryPaymentStatus || '').trim() || 'unknown'
     const safeDeliveryPaymentMethod = String(createForm.deliveryPaymentMethod || '').trim()
     if (!safeCustomerName) {
@@ -551,8 +588,10 @@ export default function DeliveryOrderDetailPage() {
           phone: safePhone,
           address: safeAddress,
           note: safeNote,
+          requestedDeliveryTime: safeRequestedDeliveryTime,
           deliveryPaymentStatus: safeDeliveryPaymentStatus,
-          deliveryPaymentMethod: safeDeliveryPaymentMethod
+          deliveryPaymentMethod: safeDeliveryPaymentMethod,
+          entryDate: createEntryDate
         }),
         silent: true
       })
@@ -578,9 +617,11 @@ export default function DeliveryOrderDetailPage() {
           phone: '',
           address: '',
           note: '',
+          requestedDeliveryTime: '',
           deliveryPaymentStatus: 'pay_on_delivery',
           deliveryPaymentMethod: pickInitialPaymentMethod(payMethods, '')
         })
+        setCreateEntryDate(canEditEntryDate ? readSalesEntryDate() : todayYmd())
         setCustomerSuggestions([])
       }
     } catch (err) {
@@ -655,10 +696,17 @@ export default function DeliveryOrderDetailPage() {
 
   const openCustomerEdit = () => {
     if (!order) return
+    const requestedAt = order?.requestedDeliveryAt ? new Date(order.requestedDeliveryAt) : null
+    const hasRequestedAt = requestedAt && !Number.isNaN(requestedAt.getTime())
+    const requestedTime = hasRequestedAt
+      ? `${String(requestedAt.getHours()).padStart(2, '0')}:${String(requestedAt.getMinutes()).padStart(2, '0')}`
+      : getNowTimeValue()
     setCustomerEditForm({
       customerName: String(order?.customerName || ''),
       phone: String(order?.customerPhone || ''),
       address: String(order?.customerAddress || ''),
+      entryDate: hasRequestedAt ? toEntryDateValue(requestedAt) : todayYmd(),
+      requestedDeliveryTime: requestedTime,
       deliveryPaymentStatus: String(order?.deliveryPaymentStatus || 'unknown'),
       deliveryPaymentMethod: String(order?.deliveryPaymentMethod || '')
     })
@@ -674,6 +722,8 @@ export default function DeliveryOrderDetailPage() {
     const customerName = String(customerEditForm.customerName || '').trim()
     const phone = String(customerEditForm.phone || '').trim()
     const address = String(customerEditForm.address || '').trim()
+    const entryDate = String(customerEditForm.entryDate || '').trim()
+    const requestedDeliveryTime = String(customerEditForm.requestedDeliveryTime || '').trim()
     const deliveryPaymentStatus = String(customerEditForm.deliveryPaymentStatus || '').trim()
     const deliveryPaymentMethod = String(customerEditForm.deliveryPaymentMethod || '').trim()
     if (!customerName) {
@@ -687,6 +737,8 @@ export default function DeliveryOrderDetailPage() {
         customerName,
         phone,
         address,
+        entryDate,
+        requestedDeliveryTime,
         deliveryPaymentStatus,
         deliveryPaymentMethod
       }),
@@ -1403,27 +1455,35 @@ export default function DeliveryOrderDetailPage() {
                 <button className="btn delivery-detail-btn" type="button" onClick={() => nav('/kermes/app/delivery')}>
                   Paket Siparislere Don
                 </button>
+                {isPendingOnlineApproval ? (
+                  <button
+                    className="btn delivery-detail-btn delivery-detail-btn--small delivery-detail-customer-edit-btn"
+                    type="button"
+                    onClick={async () => {
+                      if (showOnlineInfoMode) {
+                        setOnlineEditMode(true)
+                        return
+                      }
+                      await flushPendingOrderEdits()
+                      setOnlineEditMode(false)
+                      toast.success('Düzenleme kaydedildi')
+                    }}
+                    disabled={busy || !canManageDelivery}
+                  >
+                    {showOnlineInfoMode ? 'Düzenle' : 'Düzenlemeyi Kaydet'}
+                  </button>
+                ) : (
+                  <button
+                    className="btn delivery-detail-btn delivery-detail-btn--small delivery-detail-customer-edit-btn"
+                    type="button"
+                    onClick={openCustomerEdit}
+                    disabled={busy || !canManageDelivery}
+                  >
+                    Düzenle
+                  </button>
+                )}
                 <div className="delivery-customer-summary">
                   <strong className="delivery-customer-summary__name">{order.customerName}</strong>
-                  {isPendingOnlineApproval ? (
-                    <button
-                      className="btn delivery-detail-btn delivery-detail-btn--small"
-                      onClick={async () => {
-                        if (showOnlineInfoMode) {
-                          setOnlineEditMode(true)
-                          return
-                        }
-                        await flushPendingOrderEdits()
-                        setOnlineEditMode(false)
-                        toast.success('Düzenleme kaydedildi')
-                      }}
-                      disabled={busy || !canManageDelivery}
-                    >
-                      {showOnlineInfoMode ? 'Düzenle' : 'Düzenlemeyi Kaydet'}
-                    </button>
-                  ) : (
-                    <button className="btn delivery-detail-btn delivery-detail-btn--small" onClick={openCustomerEdit} disabled={busy || !canManageDelivery}>Düzenle</button>
-                  )}
                   <span className="delivery-customer-summary__phone">{order.customerPhone}</span>
                   <span className="delivery-customer-summary__address" title={order.customerAddress || ''}>{order.customerAddress}</span>
                   {order.deliveryNote && <span className="delivery-customer-summary__note" title={order.deliveryNote}>Not: {order.deliveryNote}</span>}
@@ -1848,6 +1908,55 @@ export default function DeliveryOrderDetailPage() {
           )}
           <label>Adres <textarea className="input" value={createForm.address} onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })} /></label>
           <label>Not <input className="input" value={createForm.note} onChange={(e) => setCreateForm({ ...createForm, note: e.target.value })} /></label>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Sipariş için saat ve tarih seçiniz (Sipariş, seçilen saate 30 dk kala hazırlanacaklara düşer)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: canEditEntryDate ? 'repeat(2, minmax(0, 1fr))' : 'minmax(220px, 1fr)', gap: 10, alignItems: 'end' }}>
+              {canEditEntryDate ? (
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sipariş tarihi</div>
+                  <SalesEntryDateButton
+                    value={createEntryDate}
+                    onChange={(value) => setCreateEntryDate(writeSalesEntryDate(value))}
+                    title="Sipariş tarihini seç"
+                    showValue
+                  />
+                </div>
+              ) : null}
+              <label style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                  <span>Teslim saati</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 3" />
+                  </svg>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    ref={createTimeInputRef}
+                    className="input"
+                    type="time"
+                    value={createForm.requestedDeliveryTime}
+                    onChange={(e) => setCreateForm({ ...createForm, requestedDeliveryTime: e.target.value })}
+                    onClick={() => openTimePicker(createTimeInputRef)}
+                    style={{ paddingLeft: 38, paddingRight: 38, textAlign: 'center', fontWeight: 600 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => openTimePicker(createTimeInputRef)}
+                    title="Teslim saatini seç"
+                    aria-label="Teslim saatini seç"
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 7v5l3 3" />
+                    </svg>
+                  </button>
+                </div>
+              </label>
+            </div>
+          </div>
           <div className="card" style={{ borderColor: 'var(--border)', display: 'grid', gap: 10, padding: 10 }}>
             <div style={{ fontWeight: 700 }}>Ödeme nasıl olacak?</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1886,6 +1995,57 @@ export default function DeliveryOrderDetailPage() {
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Adres</div>
             <textarea className="input" value={customerEditForm.address} onChange={(e) => setCustomerEditForm({ ...customerEditForm, address: e.target.value })} disabled={busy} />
           </label>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Sipariş için saat ve tarih seçiniz (Sipariş, seçilen saate 30 dk kala hazırlanacaklara düşer)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: canEditEntryDate ? 'repeat(2, minmax(0, 1fr))' : 'minmax(220px, 1fr)', gap: 10, alignItems: 'end' }}>
+              {canEditEntryDate ? (
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sipariş tarihi</div>
+                  <SalesEntryDateButton
+                    value={customerEditForm.entryDate}
+                    onChange={(value) => setCustomerEditForm({ ...customerEditForm, entryDate: writeSalesEntryDate(value) })}
+                    title="Sipariş tarihini seç"
+                    showValue
+                  />
+                </div>
+              ) : null}
+              <label style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                  <span>Teslim saati</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 3" />
+                  </svg>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    ref={customerEditTimeInputRef}
+                    className="input"
+                    type="time"
+                    value={customerEditForm.requestedDeliveryTime}
+                    onChange={(e) => setCustomerEditForm({ ...customerEditForm, requestedDeliveryTime: e.target.value })}
+                    onClick={() => openTimePicker(customerEditTimeInputRef)}
+                    disabled={busy}
+                    style={{ paddingLeft: 38, paddingRight: 38, textAlign: 'center', fontWeight: 600 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => openTimePicker(customerEditTimeInputRef)}
+                    title="Teslim saatini seç"
+                    aria-label="Teslim saatini seç"
+                    disabled={busy}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 7v5l3 3" />
+                    </svg>
+                  </button>
+                </div>
+              </label>
+            </div>
+          </div>
           <div className="card" style={{ borderColor: 'var(--border)', display: 'grid', gap: 10, padding: 10 }}>
             <div style={{ fontWeight: 700 }}>Teslimatta ödeme</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

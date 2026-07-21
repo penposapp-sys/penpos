@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../components/Modal.jsx'
-import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../lib/apiClient.js'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
@@ -390,13 +389,6 @@ export function TablesManagementContent({ embedded = false }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {canEditEntryDate ? (
-              <SalesEntryDateButton
-                value={entryDate}
-                onChange={(value) => setEntryDate(writeSalesEntryDate(value))}
-                title="Sipariş tarihini seç"
-              />
-            ) : null}
             <button className="btn" type="button" onClick={() => nav('/kermes/app/waiter-calls')} style={{ flexShrink: 0 }}>
               Garson Cagrilari
               {totalWaiterCalls > 0 ? (
@@ -611,3 +603,5 @@ export function TablesManagementContent({ embedded = false }) {
 export default function TablesPage() {
   return <TablesManagementContent />
 }
+
+

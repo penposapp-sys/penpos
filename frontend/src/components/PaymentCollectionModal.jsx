@@ -1,6 +1,7 @@
 import React from 'react'
 import Modal from './Modal.jsx'
 import SalesEntryDateButton from './SalesEntryDateButton.jsx'
+import { inferPaymentMethodType } from '../lib/paymentMethods.js'
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
 
@@ -54,6 +55,7 @@ export default function PaymentCollectionModal({
       }
     : null
   const historyLines = discountHistoryLine ? [discountHistoryLine, ...previousLines] : previousLines
+  const visiblePayMethods = (Array.isArray(payMethods) ? payMethods : []).filter((method) => inferPaymentMethodType(method) !== 'credit')
 
   return (
     <Modal
@@ -146,7 +148,7 @@ export default function PaymentCollectionModal({
               <div>
                 <div className="payment-field-label">Yontem</div>
                 <div className="payment-method-grid">
-                  {payMethods.map((method) => {
+                  {visiblePayMethods.map((method) => {
                     const key = String(method?.key || method?.id || '')
                     const label = method?.label || method?.name || key
                     const active = String(paymentMethod || '') === key
@@ -175,15 +177,6 @@ export default function PaymentCollectionModal({
                   disabled={!canTakePayment || busy}
                 />
               </label>
-              {showPaymentDate ? (
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <SalesEntryDateButton
-                    value={paymentDate}
-                    onChange={onPaymentDateChange}
-                    title="Ödeme tarihini seç"
-                  />
-                </div>
-              ) : null}
               <label>
                 <div className="payment-field-label">Not (opsiyonel)</div>
                 <input className="input" value={paymentNote} onChange={(event) => onPaymentNoteChange?.(event.target.value)} disabled={!canTakePayment || busy} />
@@ -194,18 +187,30 @@ export default function PaymentCollectionModal({
                   <div style={{ fontWeight: 600 }}>{money(changeDue)}</div>
                 </div>
               ) : null}
-              <div className="payment-actions app-modal-footer">
-                <button className="btn btn--compact" onClick={onSubmit} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
-                  {submitLabel}
-                </button>
-                {showVeresiye ? (
-                  <button className="btn btn--compact" onClick={onOpenVeresiye} disabled={busy || balanceDue <= 0.01}>
-                    Veresiye Yap
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {showPaymentDate ? (
+                    <SalesEntryDateButton
+                      value={paymentDate}
+                      onChange={onPaymentDateChange}
+                      title="Odeme tarihini sec"
+                      showValue
+                    />
+                  ) : null}
+                </div>
+                <div className="payment-actions app-modal-footer">
+                  <button className="btn btn--compact" onClick={onSubmit} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
+                    {submitLabel}
                   </button>
-                ) : null}
-                <button className="btn btn--compact" onClick={onClose} disabled={busy}>
-                  Kapat
-                </button>
+                  {showVeresiye ? (
+                    <button className="btn btn--compact" onClick={onOpenVeresiye} disabled={busy || balanceDue <= 0.01}>
+                      Veresiye Yap
+                    </button>
+                  ) : null}
+                  <button className="btn btn--compact" onClick={onClose} disabled={busy}>
+                    Kapat
+                  </button>
+                </div>
               </div>
             </div>
           </div>

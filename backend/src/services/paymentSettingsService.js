@@ -120,6 +120,8 @@ const withLegacyShape = (method) => ({
 })
 
 const toLegacyResponse = (methods = []) => methods.map(withLegacyShape)
+const isVisibleMethod = (method) => String(method?.id || '') !== FIXED_CREDIT_METHOD_ID
+const visibleMethodsOnly = (methods = []) => methods.filter((method) => isVisibleMethod(method))
 
 const normalizeIncomingMethod = (method = {}, fallback = {}) => {
   const id = normalizeText(method.id || method.key || fallback.id)
@@ -208,7 +210,7 @@ const persistTenantMethods = async (tenantId, methods, actorUserId = null) => {
 
 export const getPaymentMethodsService = async (tenantId, { includeDeleted = false } = {}) => {
   const { methods } = await readTenantMethods(tenantId)
-  const visibleMethods = includeDeleted ? methods : methods.filter((method) => method.isDeleted !== true)
+  const visibleMethods = visibleMethodsOnly(includeDeleted ? methods : methods.filter((method) => method.isDeleted !== true))
   return {
     paymentMethods: visibleMethods,
     methods: toLegacyResponse(visibleMethods),
@@ -223,9 +225,10 @@ export const updatePaymentMethodsService = async (tenantId, methods, actorUserId
     return normalizeIncomingMethod({ ...method, sortOrder: method?.sortOrder ?? index + 1 }, fallback)
   })
   const saved = await persistTenantMethods(tenantId, merged, actorUserId)
+  const visibleMethods = visibleMethodsOnly(saved.filter((method) => method.isDeleted !== true))
   return {
-    paymentMethods: saved.filter((method) => method.isDeleted !== true),
-    methods: toLegacyResponse(saved.filter((method) => method.isDeleted !== true)),
+    paymentMethods: visibleMethods,
+    methods: toLegacyResponse(visibleMethods),
   }
 }
 
@@ -249,9 +252,10 @@ export const createPaymentMethodService = async (tenantId, name, actorUserId = n
     },
   ]
   const saved = await persistTenantMethods(tenantId, next, actorUserId)
+  const visibleMethods = visibleMethodsOnly(saved.filter((method) => method.isDeleted !== true))
   return {
-    paymentMethods: saved.filter((method) => method.isDeleted !== true),
-    methods: toLegacyResponse(saved.filter((method) => method.isDeleted !== true)),
+    paymentMethods: visibleMethods,
+    methods: toLegacyResponse(visibleMethods),
   }
 }
 
@@ -276,9 +280,10 @@ export const patchPaymentMethodService = async (tenantId, id, patch = {}, actorU
     }, method)
   })
   const saved = await persistTenantMethods(tenantId, next, actorUserId)
+  const visibleMethods = visibleMethodsOnly(saved.filter((method) => method.isDeleted !== true))
   return {
-    paymentMethods: saved.filter((method) => method.isDeleted !== true),
-    methods: toLegacyResponse(saved.filter((method) => method.isDeleted !== true)),
+    paymentMethods: visibleMethods,
+    methods: toLegacyResponse(visibleMethods),
   }
 }
 
@@ -296,9 +301,10 @@ export const deletePaymentMethodService = async (tenantId, id, actorUserId = nul
       : { ...method }
   ))
   const saved = await persistTenantMethods(tenantId, next, actorUserId)
+  const visibleMethods = visibleMethodsOnly(saved.filter((method) => method.isDeleted !== true))
   return {
-    paymentMethods: saved.filter((method) => method.isDeleted !== true),
-    methods: toLegacyResponse(saved.filter((method) => method.isDeleted !== true)),
+    paymentMethods: visibleMethods,
+    methods: toLegacyResponse(visibleMethods),
   }
 }
 

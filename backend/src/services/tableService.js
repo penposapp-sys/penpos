@@ -12,6 +12,22 @@ import { applyBranchFilter } from '../utils/branchFilter.js'
 import WaiterCall from '../models/WaiterCall.js'
 import { parseManualEntryDate } from '../utils/manualEntryDate.js'
 
+const hasBlockingKitchenItems = (order) => {
+  const items = Array.isArray(order?.items) ? order.items : []
+  return items.some((item) => item && (item.status === 'open' || item.status === 'sent'))
+}
+
+const canAutoClearTableOrder = (order) => {
+  if (!order) return true
+  if (String(order.status || '') === 'closed' || String(order.status || '') === 'cancelled') return true
+  const fin = computePaymentSummary(order)
+  const remaining = Number(fin.balanceDue) || 0
+  const hasLegacyPaid = (!order.payments || order.payments.length === 0) && order.paymentStatus === 'paid'
+  if (remaining > 0.01 && !hasLegacyPaid) return false
+  if (hasBlockingKitchenItems(order)) return false
+  return true
+}
+
 export const listTablesService = async (tenantId, branchFilter) => {
   const list = await listTables(tenantId, branchFilter)
   return list.map(t => ({
@@ -83,10 +99,20 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
     throw e
   }
   if (t.status === 'occupied' && t.activeOrderId) {
-    const e = new Error('Table already occupied')
-    e.status = 409
-    e.payload = { code: 'table_in_use', message: 'Table already occupied', details: { orderId: String(t.activeOrderId) } }
-    throw e
+    const activeOrder = await Order.findOne({ _id: t.activeOrderId, tenantId })
+    if (canAutoClearTableOrder(activeOrder)) {
+      if (activeOrder && String(activeOrder.status || '') !== 'closed' && String(activeOrder.status || '') !== 'cancelled') {
+        await Order.updateOne({ _id: activeOrder._id, tenantId }, { $set: { status: 'closed', closedAt: activeOrder.closedAt || new Date() } })
+      }
+      await Table.updateOne({ _id: t._id, tenantId }, { $set: { status: 'empty', activeOrderId: null } })
+      t.status = 'empty'
+      t.activeOrderId = null
+    } else {
+      const e = new Error('Table already occupied')
+      e.status = 409
+      e.payload = { code: 'table_in_use', message: 'Table already occupied', details: { orderId: String(t.activeOrderId) } }
+      throw e
+    }
   }
   const effectiveBranchId = t.branchId
   const existing = await Order.findOne({
@@ -96,10 +122,16 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
     status: { $in: ['open', 'sent', 'completed'] }
   }).sort({ updatedAt: -1, createdAt: -1 })
   if (existing) {
-    const e = new Error('Table already occupied')
-    e.status = 409
-    e.payload = { code: 'table_in_use', message: 'Table already occupied', details: { orderId: existing.id } }
-    throw e
+    if (canAutoClearTableOrder(existing)) {
+      if (String(existing.status || '') !== 'closed' && String(existing.status || '') !== 'cancelled') {
+        await Order.updateOne({ _id: existing._id, tenantId }, { $set: { status: 'closed', closedAt: existing.closedAt || new Date() } })
+      }
+    } else {
+      const e = new Error('Table already occupied')
+      e.status = 409
+      e.payload = { code: 'table_in_use', message: 'Table already occupied', details: { orderId: existing.id } }
+      throw e
+    }
   }
   const branchDoc = effectiveBranchId ? await Branch.findOne({ _id: effectiveBranchId, tenantId }).select('name').lean() : null
   const safeCreatedByName = String(createdByName || '').trim()
@@ -332,7 +364,7 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
     { $set: { status: 'closed', closedAt: new Date() } }
   )
 
-  await updateById(tableId, { status: 'empty', activeOrderId: null })
+  await Table.updateOne({ _id: tableId, tenantId }, { $set: { status: 'empty', activeOrderId: null } })
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'table_close', 'Table', tableId, { previousOrderId: t.activeOrderId })
   return { tableId: String(t._id), cleared: true }
 }

@@ -750,6 +750,7 @@ export const createDeliveryOrder = async (req, res) => {
     const deliveryPaymentStatus = String(req.body?.deliveryPaymentStatus || '').trim()
     const deliveryPaymentMethod = String(req.body?.deliveryPaymentMethod || req.body?.paymentMethod || '').trim()
     const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
+    const requestedDeliveryTime = String(req.body?.requestedDeliveryTime || '').trim()
 
     if (!customerName) {
       return res.status(400).json({ success: false, code: 'customer_name_required', error: 'customer_name_required', message: 'Customer name required' })
@@ -764,7 +765,8 @@ export const createDeliveryOrder = async (req, res) => {
       createdByName: req.user?.name,
       deliveryPaymentStatus,
       deliveryPaymentMethod,
-      entryDate
+      entryDate,
+      requestedDeliveryTime
     })
     res.json({ success: true, order })
   } catch (err) {
@@ -800,6 +802,8 @@ export const updateDeliveryCustomer = async (req, res) => {
     const customerName = String(req.body?.customerName ?? '').trim()
     const phone = String(req.body?.phone ?? req.body?.customerPhone ?? '').trim()
     const address = String(req.body?.address ?? req.body?.customerAddress ?? '').trim()
+    const entryDate = String(req.body?.entryDate || '').trim()
+    const requestedDeliveryTime = String(req.body?.requestedDeliveryTime || '').trim()
     const deliveryPaymentStatus = String(req.body?.deliveryPaymentStatus || '').trim()
     const deliveryPaymentMethod = String(req.body?.deliveryPaymentMethod || req.body?.paymentMethod || '').trim()
     const customerId = String(req.body?.customerId || '').trim()
@@ -808,6 +812,8 @@ export const updateDeliveryCustomer = async (req, res) => {
       customerName,
       phone,
       address,
+      entryDate,
+      requestedDeliveryTime,
       deliveryPaymentStatus,
       deliveryPaymentMethod
     })

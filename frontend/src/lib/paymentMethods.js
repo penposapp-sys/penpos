@@ -7,6 +7,8 @@ const normalizeLookupKey = (value) => normalizeText(value)
   .replace(/\s+/g, '_')
   .replace(/[^a-z0-9_]/g, '')
 
+const isCreditMethod = (value) => inferPaymentMethodType(value) === 'credit'
+
 export const inferPaymentMethodType = (value) => {
   const candidates = Array.isArray(value)
     ? value
@@ -51,7 +53,7 @@ export const paymentMethodLabel = (value) => {
 }
 
 export const pickInitialPaymentMethod = (methods = [], currentMethod = '') => {
-  const enabledMethods = (Array.isArray(methods) ? methods : []).filter((method) => method?.isEnabled !== false)
+  const enabledMethods = (Array.isArray(methods) ? methods : []).filter((method) => method?.isEnabled !== false && !isCreditMethod(method))
   const current = normalizeText(currentMethod)
   if (current && enabledMethods.some((method) => String(method?.key || method?.id || '') === current)) {
     return current

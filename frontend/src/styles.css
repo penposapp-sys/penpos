@@ -3435,6 +3435,12 @@ body.modal-open .qr-menu .menu-row:hover {
   font-size: 12px;
 }
 
+.delivery-orders-page .delivery-detail-customer-edit-btn {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
 .delivery-orders-page .delivery-detail-layout {
   --pos-font-base: 13px;
   --pos-font-title: 14px;

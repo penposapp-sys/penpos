@@ -29,6 +29,27 @@ const toMoney = (v) => {
   return Number.isFinite(n) ? n : 0
 }
 
+const parseRequestedDeliveryAt = (entryDate, requestedDeliveryTime, fallbackDate = new Date()) => {
+  const rawTime = String(requestedDeliveryTime || '').trim()
+  if (!rawTime) return null
+  const match = rawTime.match(/^(\d{2}):(\d{2})$/)
+  if (!match) return null
+  const [, hhText, mmText] = match
+  const hours = Number(hhText)
+  const minutes = Number(mmText)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  const baseDate = parseManualEntryDate(entryDate, { now: fallbackDate }) || fallbackDate
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    hours,
+    minutes,
+    0,
+    0
+  )
+}
+
 const normalizeReceiptUsage = (entry = {}) => {
   const rawCashier = entry?.useForCashierReceipt
   const rawKitchen = entry?.useForKitchenReceipt
@@ -827,13 +848,14 @@ export const getWalkInOrdersService = async (tenantId, branchFilter, { status = 
   return { orders: dto }
 }
 
-export const createDeliveryOrderService = async (tenantId, userId, branchId, { customerId, customerName, phone, address, note, createdByName, deliveryPaymentStatus, deliveryPaymentMethod, entryDate } = {}) => {
+export const createDeliveryOrderService = async (tenantId, userId, branchId, { customerId, customerName, phone, address, note, createdByName, deliveryPaymentStatus, deliveryPaymentMethod, entryDate, requestedDeliveryTime } = {}) => {
   const safeCustomerName = String(customerName || '').trim()
   const safePhone = String(phone || '').trim()
   const safeAddress = String(address || '').trim()
   const safeNote = String(note || '').trim()
   const safeCreatedByName = String(createdByName || '').trim()
   const createdAt = parseManualEntryDate(entryDate) || new Date()
+  const requestedDeliveryAt = parseRequestedDeliveryAt(entryDate, requestedDeliveryTime, createdAt)
   const safeDeliveryPaymentStatus = String(deliveryPaymentStatus || '').trim() === 'already_paid'
     ? 'already_paid'
     : (String(deliveryPaymentStatus || '').trim() === 'pay_on_delivery' ? 'pay_on_delivery' : 'unknown')
@@ -879,6 +901,7 @@ export const createDeliveryOrderService = async (tenantId, userId, branchId, { c
     deliveryPaymentMethod: resolvedPlannedMethod?.methodId || '',
     deliveryPaymentMethodLabel: resolvedPlannedMethod?.methodLabel || '',
     deliveryStatus: 'pending',
+    requestedDeliveryAt,
     paymentStatus: 'unpaid',
     createdAt
   })
@@ -899,6 +922,7 @@ export const createDeliveryOrderService = async (tenantId, userId, branchId, { c
     deliveryPaymentMethod: order.deliveryPaymentMethod,
     deliveryPaymentMethodLabel: order.deliveryPaymentMethodLabel,
     deliveryStatus: order.deliveryStatus,
+    requestedDeliveryAt: order.requestedDeliveryAt,
     orderNo: order.orderNo,
     orderDayKey: order.orderDayKey
   }
@@ -1148,7 +1172,7 @@ export const updateDeliveryStatusService = async (tenantId, id, deliveryStatus) 
   return { order: dto }
 }
 
-export const updateDeliveryCustomerService = async (tenantId, id, { customerId, customerName, phone, address, deliveryPaymentStatus, deliveryPaymentMethod } = {}) => {
+export const updateDeliveryCustomerService = async (tenantId, id, { customerId, customerName, phone, address, entryDate, requestedDeliveryTime, deliveryPaymentStatus, deliveryPaymentMethod } = {}) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
   if (order.saleType !== 'delivery') throw error('invalid_request', 'Not a delivery order', 400)
@@ -1157,10 +1181,17 @@ export const updateDeliveryCustomerService = async (tenantId, id, { customerId, 
   if (!safeCustomerName) throw error('invalid_request', 'Customer name required', 400)
   const safePhone = String(phone ?? '').trim().slice(0, 30)
   const safeAddress = String(address ?? '').trim().slice(0, 200)
+  const hasRequestedDeliveryTime = requestedDeliveryTime !== undefined
+  const safeRequestedDeliveryTime = String(requestedDeliveryTime || '').trim()
 
   order.customerName = safeCustomerName
   order.customerPhone = safePhone
   order.customerAddress = safeAddress
+  if (safeRequestedDeliveryTime) {
+    order.requestedDeliveryAt = parseRequestedDeliveryAt(entryDate, safeRequestedDeliveryTime, order.requestedDeliveryAt || order.createdAt || new Date())
+  } else if (hasRequestedDeliveryTime) {
+    order.requestedDeliveryAt = null
+  }
   order.deliveryType = 'package'
   order.deliveryAddress = {
     ...(order.deliveryAddress && typeof order.deliveryAddress === 'object' ? order.deliveryAddress.toObject?.() || order.deliveryAddress : {}),
@@ -1371,6 +1402,7 @@ export const getOrderService = async (tenantId, id) => {
     deliveryPaymentMethod: obj.deliveryPaymentMethod || '',
     deliveryPaymentMethodLabel: obj.deliveryPaymentMethodLabel || '',
     deliveryStatus: obj.deliveryStatus,
+    requestedDeliveryAt: obj.requestedDeliveryAt || null,
     deliveryAt: obj.deliveryAt,
     servingType: getEffectiveServingTypeForOrder(obj),
     servingTypeUpdatedAt: obj.servingTypeUpdatedAt ?? null,
@@ -3233,6 +3265,28 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
   }
   filter = applyBranchFilter(filter, branchIds.length > 0 ? branchIds : (branchId ? [branchId] : []))
 
+  const autoDispatchFilter = applyBranchFilter({
+    ...base,
+    saleType: 'delivery',
+    requestedDeliveryAt: { $ne: null, $lte: new Date(Date.now() + (30 * 60 * 1000)) },
+    items: { $elemMatch: { status: 'open' } }
+  }, branchIds.length > 0 ? branchIds : (branchId ? [branchId] : []))
+
+  const autoDispatchOrders = await Order.find(autoDispatchFilter).select('_id').lean()
+  for (const pendingOrder of autoDispatchOrders) {
+    try {
+      await sendOrderService(tenantId, String(pendingOrder?._id || ''), { servingType: 'package', kitchenEnabled: true })
+    } catch (err) {
+      if (Number(err?.status || 0) !== 409) {
+        logger.warn('[KITCHEN_AUTO_DISPATCH_FAILED]', {
+          tenantId,
+          orderId: String(pendingOrder?._id || ''),
+          message: err?.message || 'Unknown error'
+        })
+      }
+    }
+  }
+
   const orders = await Order.find(filter).sort({ createdAt: -1 }).lean()
 
   const creatorIdsToLookup = Array.from(new Set(
@@ -3320,10 +3374,18 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
         createdByName: String(o.createdByName || userNameById.get(String(o.createdByUserId || o.createdBy)) || ''),
         customerName: o.customerName,
         deliveryStatus: o.deliveryStatus,
+        requestedDeliveryAt: o.requestedDeliveryAt || null,
         batches
       }
     })
     .filter(o => o.status === 'open' || o.status === 'sent')
+    .filter((o) => {
+      if (String(o.saleType || '') !== 'delivery') return true
+      if (!o.requestedDeliveryAt) return true
+      const requestedAt = new Date(o.requestedDeliveryAt)
+      if (Number.isNaN(requestedAt.getTime())) return true
+      return Date.now() >= (requestedAt.getTime() - (30 * 60 * 1000))
+    })
     .filter(o => Array.isArray(o.batches) && o.batches.length > 0)
 
   return cleaned
