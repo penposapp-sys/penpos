@@ -8,7 +8,7 @@ import CanteenQrOrder from '../models/CanteenQrOrder.js'
 import * as customerRepo from '../repositories/canteenCustomerRepository.js'
 import * as collectionRepo from '../repositories/canteenCustomerCollectionRepository.js'
 import * as saleRepo from '../repositories/canteenSaleRepository.js'
-import { resolvePaymentMethodSelection } from '../../../services/paymentSettingsService.js'
+import { resolveCanteenPaymentMethodSelection } from './canteenPaymentMethodsService.js'
 import { createCustomer } from './canteenCustomerService.js'
 import { createSale } from './canteenSalesService.js'
 
@@ -543,7 +543,7 @@ export const updateQrOrderPayment = async (tenantId, branchId, actorUserId, orde
   let paymentDetails = defaultQrPaymentDetails(method)
 
   if (status === 'paid' && requestedMethod && !PAYMENT_METHODS.has(requestedMethod)) {
-    const resolvedMethod = await resolvePaymentMethodSelection(tenantId, branchId, requestedMethod)
+    const resolvedMethod = await resolveCanteenPaymentMethodSelection(tenantId, requestedMethod)
     method = 'already_paid'
     paymentDetails = {
       paymentMethodLabel: String(resolvedMethod?.methodLabel || resolvedMethod?.methodName || '').trim(),

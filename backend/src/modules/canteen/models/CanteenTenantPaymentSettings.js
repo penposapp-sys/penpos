@@ -1,5 +1,15 @@
 import mongoose from 'mongoose'
 
+const paymentMethodSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, default: '' },
+  type: { type: String, enum: ['cash', 'pos', 'bank', 'account', 'other'], default: 'other' },
+  enabled: { type: Boolean, default: true },
+  isDefault: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
+  sortOrder: { type: Number, default: 0 },
+}, { _id: false })
+
 const schema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true },
   cashEnabled: { type: Boolean, default: true },
@@ -10,6 +20,7 @@ const schema = new mongoose.Schema({
   bankEnabled: { type: Boolean, default: false },
   bankText: { type: String, default: '' },
   accountEnabled: { type: Boolean, default: true },
+  paymentMethods: { type: [paymentMethodSchema], default: [] },
   updatedAt: { type: Date, default: Date.now }
 }, { collection: 'canteen_tenant_payment_settings' })
 

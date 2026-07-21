@@ -4,6 +4,7 @@ import Modal from '../../components/Modal.jsx'
 import ProductImage from '../../components/ProductImage.jsx'
 import { api } from '../../lib/apiClient.js'
 import { deleteCustomerPayment } from '../lib/api.js'
+import { buildCanteenPaymentMethods } from '../lib/paymentMethods.js'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 
 const orderStatusOptions = [
@@ -647,15 +648,6 @@ function todayInputValue() {
   return `${year}-${month}-${day}`
 }
 
-function normalizePaymentType(method = {}) {
-  const type = String(method?.type || method?.bucket || method?.methodType || '').trim().toLowerCase()
-  if (type === 'credit' || type === 'account') return 'account'
-  if (type === 'card' || type === 'pos') return 'pos'
-  if (type === 'bank') return 'bank'
-  if (type === 'cash') return 'cash'
-  return 'other'
-}
-
 function mapPaymentTypeToCollectionMethod(type) {
   if (type === 'cash') return 'cash'
   if (type === 'pos' || type === 'card') return 'pos'
@@ -973,16 +965,8 @@ export default function CanteenQrOrdersPage() {
   }
 
   const loadPaymentMethods = async () => {
-    const res = await api('/api/settings/payment-methods', { silent: true })
-    const methods = Array.isArray(res?.paymentMethods) ? res.paymentMethods : []
-    const enabled = methods
-      .filter((method) => method?.enabled === true && method?.isDeleted !== true)
-      .map((method) => ({
-        id: String(method.id || method.key || ''),
-        name: String(method.name || method.label || ''),
-        type: normalizePaymentType(method)
-      }))
-      .filter((method) => method.id && method.name && method.type !== 'account')
+    const res = await api('/api/canteen/payment-settings', { silent: true })
+    const enabled = buildCanteenPaymentMethods(res?.settings || {})
     setPaymentMethods(enabled)
   }
 
@@ -1167,12 +1151,7 @@ export default function CanteenQrOrdersPage() {
   }, [selected?.id, selected?.discountPercent])
 
   const paymentMethodOptions = useMemo(() => {
-    const base = paymentMethods.length > 0 ? paymentMethods : [
-      { id: 'cash', name: 'Nakit', type: 'cash' },
-      { id: 'card', name: 'Kart', type: 'pos' },
-      { id: 'bank', name: 'Banka', type: 'bank' }
-    ]
-    return [...base, { id: 'credit', name: 'Veresiye', type: 'account' }]
+    return paymentMethods
   }, [paymentMethods])
 
   const hasCariRecord = (order) => {
@@ -1686,6 +1665,11 @@ export default function CanteenQrOrdersPage() {
                             </button>
                           ))}
                         </div>
+                        {paymentMethodOptions.length === 0 ? (
+                          <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>
+                            Aktif ödeme yöntemi yok. Kantin ödeme ayarlarından en az bir yöntem açılmalı.
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </>

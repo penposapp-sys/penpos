@@ -7,7 +7,7 @@ import * as batchRepo from '../repositories/canteenProductBatchRepository.js'
 import { findTenantPaymentSettings } from '../repositories/canteenSettingsRepository.js'
 import { findByIdAndTenant as findCustomerById } from '../repositories/canteenCustomerRepository.js'
 import { findAnyByIdAndTenant as findAnyBranchById } from '../repositories/canteenBranchRepository.js'
-import { resolvePaymentMethodSelection } from '../../../services/paymentSettingsService.js'
+import { resolveCanteenPaymentMethodSelection } from './canteenPaymentMethodsService.js'
 import { consumeProductQtyFifo, ensureProductBatches, syncProductFromOpenBatch } from './canteenProductBatchService.js'
 import User from '../../../models/User.js'
 
@@ -312,7 +312,7 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
     throw error('invalid_request', 'Invalid payment amount', 400)
   }
 
-  const resolvedPayment = await resolvePaymentMethodSelection(tenantId, branchId, requestedMethod)
+  const resolvedPayment = await resolveCanteenPaymentMethodSelection(tenantId, requestedMethod)
   const method = String(resolvedPayment.methodId || '').trim()
   const methodName = String(resolvedPayment.methodName || '').trim()
   const rawMethodType = String(resolvedPayment.methodType || '').trim()
@@ -328,7 +328,7 @@ export const createSale = async (tenantId, branchId, actorUserId, input) => {
   const accountEnabled = paySettings ? (paySettings.accountEnabled === undefined ? true : !!paySettings.accountEnabled) : true
 
   if (methodType === 'cash' && !cashEnabled) throw error('payment_disabled', 'Cash disabled', 400)
-  if (methodType === 'card' && !posEnabled) throw error('payment_disabled', 'POS disabled', 400)
+  if ((methodType === 'card' || methodType === 'pos') && !posEnabled) throw error('payment_disabled', 'POS disabled', 400)
   if (methodType === 'bank' && !bankEnabled) throw error('payment_disabled', 'Bank disabled', 400)
   if (methodType === 'account' && !accountEnabled) throw error('payment_disabled', 'Account disabled', 400)
 

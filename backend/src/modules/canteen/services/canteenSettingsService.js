@@ -3,6 +3,7 @@ import { error } from '../../../utils/errors.js'
 import * as repo from '../repositories/canteenSettingsRepository.js'
 import * as branchRepo from '../repositories/canteenBranchRepository.js'
 import { normalizeThemeId } from '../../../utils/themeNormalization.js'
+import { getCanteenPaymentSettingsPayload, updateCanteenPaymentSettings } from './canteenPaymentMethodsService.js'
 
 export const DEFAULT_SETTINGS = Object.freeze({
   allowedBranchIds: [],
@@ -171,34 +172,12 @@ export const updateSettings = async (tenantId, input) => {
 }
 
 export const getPaymentSettings = async (tenantId) => {
-  const doc = await repo.findTenantPaymentSettings(tenantId)
-  const data = doc ? {
-    cashEnabled: !!doc.cashEnabled,
-    cardEnabled: !!doc.cardEnabled,
-    ibanEnabled: !!doc.ibanEnabled,
-    ibanText: String(doc.ibanText || ''),
-    posEnabled: doc.posEnabled === undefined ? !!doc.cardEnabled : !!doc.posEnabled,
-    bankEnabled: doc.bankEnabled === undefined ? !!doc.ibanEnabled : !!doc.bankEnabled,
-    bankText: String(doc.bankText || doc.ibanText || ''),
-    accountEnabled: doc.accountEnabled === undefined ? true : !!doc.accountEnabled
-  } : {}
+  const data = await getCanteenPaymentSettingsPayload(tenantId)
   return { ...DEFAULT_PAYMENT_SETTINGS, ...data }
 }
 
 export const updatePaymentSettings = async (tenantId, input) => {
-  const next = {
-    cashEnabled: input?.cashEnabled === undefined ? undefined : !!input.cashEnabled,
-    cardEnabled: input?.cardEnabled === undefined ? undefined : !!input.cardEnabled,
-    ibanEnabled: input?.ibanEnabled === undefined ? undefined : !!input.ibanEnabled,
-    ibanText: input?.ibanText === undefined ? undefined : String(input.ibanText || ''),
-    posEnabled: input?.posEnabled === undefined ? undefined : !!input.posEnabled,
-    bankEnabled: input?.bankEnabled === undefined ? undefined : !!input.bankEnabled,
-    bankText: input?.bankText === undefined ? undefined : String(input.bankText || ''),
-    accountEnabled: input?.accountEnabled === undefined ? undefined : !!input.accountEnabled
-  }
-  const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined))
-  await repo.upsertTenantPaymentSettings(tenantId, cleaned)
-  return getPaymentSettings(tenantId)
+  return updateCanteenPaymentSettings(tenantId, input || {})
 }
 
 export const updateQrSettings = async (tenantId, branchId, input) => {

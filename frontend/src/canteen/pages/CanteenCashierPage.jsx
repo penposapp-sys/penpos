@@ -7,6 +7,7 @@ import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import useVirtualProductGrid from '../../hooks/useVirtualProductGrid.js'
+import { buildCanteenPaymentMethods } from '../lib/paymentMethods.js'
 import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, isProductImagesDisabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../../lib/perfDebug.js'
 import { resolveProductImageUrl } from '../../lib/productImage.js'
 import { Barcode, Search } from 'lucide-react'
@@ -24,15 +25,6 @@ const roundMoney = (n) => Number(Number(n || 0).toFixed(2))
 const normalize = (s) => String(s || '').toLowerCase().trim()
 const normalizeId = (value) => String(value || '').trim()
 const getSalePrice = (product = {}) => Number(product?.salePrice ?? product?.price ?? 0)
-const normalizePaymentType = (method = {}) => {
-  const type = String(method?.type || method?.bucket || method?.methodType || '').trim().toLowerCase()
-  if (type === 'credit' || type === 'account') return 'account'
-  if (type === 'card' || type === 'pos') return 'pos'
-  if (type === 'bank') return 'bank'
-  if (type === 'cash') return 'cash'
-  return 'other'
-}
-
 const CashierCategoryRail = memo(function CashierCategoryRail({
   categories,
   activeCategoryId,
@@ -298,19 +290,13 @@ export default function CanteenCashierPage() {
   }, [session?.allowedBranchIds])
 
   const loadPaymentMethods = async () => {
-    const res = await api('/api/settings/payment-methods', { silent: true })
-    const methods = Array.isArray(res?.paymentMethods) ? res.paymentMethods : []
-    const enabled = methods
-      .filter((method) => method?.enabled === true && method?.isDeleted !== true)
-      .map((method) => ({
-        id: String(method.id || method.key || ''),
-        name: String(method.name || method.label || ''),
-        type: normalizePaymentType(method),
-        isDefault: method?.isDefault === true,
-      }))
-      .filter((method) => method.id && method.name)
+    const res = await api('/api/canteen/payment-settings', { silent: true })
+    const enabled = buildCanteenPaymentMethods(res?.settings || {})
     setPaymentMethods(enabled)
-    if (enabled.length === 0) return
+    if (enabled.length === 0) {
+      setPayMethod('')
+      return
+    }
     const current = enabled.find((method) => method.id === payMethod)
     if (current) return
     const nextDefault = enabled.find((method) => method.isDefault) || enabled[0]
@@ -1038,6 +1024,10 @@ export default function CanteenCashierPage() {
 
   const completeSale = async () => {
     if (cart.length === 0) return
+    if (paymentMethods.length === 0 || !payMethod) {
+      setError('Aktif ödeme yöntemi yok. Kantin ödeme ayarlarını kontrol edin.')
+      return
+    }
     if (selectedPayMethodType === 'account' && !customerId) {
       setError('Cari seçmelisin')
       return
@@ -1435,6 +1425,11 @@ export default function CanteenCashierPage() {
                 )
               })}
             </div>
+            {paymentMethods.length === 0 && (
+              <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>
+                Aktif ödeme yöntemi yok. Ayarlar ekranından en az bir yöntem açılmalı.
+              </div>
+            )}
 
             <button className="btn btn--primary btn--large onlyDesktop kasaCheckoutButton" type="button" onClick={completeSale} disabled={saving || cart.length === 0}>
               {saving ? 'Kaydediliyor...' : 'Satışı tamamla'}

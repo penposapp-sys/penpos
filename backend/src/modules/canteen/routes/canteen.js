@@ -73,7 +73,17 @@ router.put('/settings/qr', canteenBranchQueryGuard, requireRole(['tenant_admin',
 router.post('/settings/qr/:kind(logo|cover)', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), uploadSingleFile, settingsCtrl.uploadQrMedia)
 router.delete('/settings/qr/:kind(logo|cover)', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.removeQrMedia)
 
-router.get('/payment-settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.getPaymentSettings)
+router.get(
+  '/payment-settings',
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([
+    PERMISSIONS.MANAGE_SETTINGS,
+    PERMISSIONS.CANTEEN_POS_ACCESS,
+    PERMISSIONS.CANTEEN_CUSTOMERS_VIEW,
+    PERMISSIONS.CANTEEN_CUSTOMERS_MANAGE
+  ]),
+  settingsCtrl.getPaymentSettings
+)
 router.put('/payment-settings', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), settingsCtrl.updatePaymentSettings)
 
 router.get('/products/template', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), bulkProductsCtrl.downloadTemplate)

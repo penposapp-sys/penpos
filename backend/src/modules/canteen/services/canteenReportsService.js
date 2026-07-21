@@ -9,7 +9,8 @@ import CanteenStockMovement from '../models/StockMovement.js'
 import * as customerRepo from '../repositories/canteenCustomerRepository.js'
 import * as saleRepo from '../repositories/canteenSaleRepository.js'
 import * as collectionRepo from '../repositories/canteenCustomerCollectionRepository.js'
-import { getPaymentMethodsService, normalizePaymentMethod } from '../../../services/paymentSettingsService.js'
+import { normalizePaymentMethod } from '../../../services/paymentSettingsService.js'
+import { getCanteenPaymentMethods } from './canteenPaymentMethodsService.js'
 import { buildZReportThermalPayload } from '../../../utils/zReportFormatter.js'
 import { addDaysLocal, startOfDayLocal } from '../../../utils/dateRange.js'
 import { parseBranchIds } from '../../../utils/branchIds.js'
@@ -26,8 +27,7 @@ const mapReportMethodType = (value) => {
 }
 
 const buildMethodCatalog = async (tenantId, totals = new Map()) => {
-  const settings = await getPaymentMethodsService(tenantId, { includeDeleted: false })
-  const visible = Array.isArray(settings?.paymentMethods) ? settings.paymentMethods : []
+  const visible = await getCanteenPaymentMethods(tenantId, { includeDeleted: false })
   const catalog = []
   const seen = new Set()
 
