@@ -1092,26 +1092,13 @@ export function SettingsSystemContent() {
                 <div style={{ color: settingsTheme.cardMuted, fontWeight: 700 }}>Şube bulunamadı.</div>
               ) : (
                 (branches || []).map((branch) => (
-                  <label
+                  <SettingsToggle
                     key={branch._id || branch.id}
-                    style={{
-                      borderRadius: 22,
-                      padding: 14,
-                      border: `1px solid ${allowedBranchIds.includes(String(branch._id || branch.id)) ? 'var(--settings-accent)' : 'var(--app-border)'}`,
-                      display: 'flex',
-                      gap: 12,
-                      alignItems: 'flex-start',
-                      background: allowedBranchIds.includes(String(branch._id || branch.id))
-                        ? 'linear-gradient(135deg, color-mix(in srgb, var(--settings-accent) 18%, var(--app-surface-2)), var(--app-surface))'
-                        : 'var(--app-surface-2, var(--app-surface-soft))',
-                    }}
-                  >
-                    <input type="checkbox" checked={allowedBranchIds.includes(String(branch._id || branch.id))} onChange={(e) => toggleAllowedBranch(branch._id || branch.id, e.target.checked)} />
-                    <div style={{ display: 'grid', gap: 4 }}>
-                      <div style={{ fontWeight: 800, color: 'var(--app-text)' }}>{branch.name}</div>
-                      {!!branch.description && <div style={{ fontSize: 12, color: settingsTheme.cardMuted }}>{branch.description}</div>}
-                    </div>
-                  </label>
+                    label={branch.name}
+                    description={branch.description || 'Bu şube işletme yetki alanına dahil edilir.'}
+                    checked={allowedBranchIds.includes(String(branch._id || branch.id))}
+                    onChange={(e) => toggleAllowedBranch(branch._id || branch.id, e.target.checked)}
+                  />
                 ))
               )}
             </div>

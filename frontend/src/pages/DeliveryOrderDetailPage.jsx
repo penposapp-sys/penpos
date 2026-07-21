@@ -649,6 +649,17 @@ export default function DeliveryOrderDetailPage() {
       return
     }
     const isDelivered = String(status) === 'delivered'
+    if (isDelivered) {
+      const gross = Number(order?.total ?? order?.totals?.total ?? order?.totals?.grandTotal ?? 0)
+      const discount = Number(order?.discountTotal ?? order?.totals?.discountTotal ?? (gross * Number(order?.discountPercent ?? 0)) / 100)
+      const net = Number(order?.netTotal ?? order?.totals?.netTotal ?? Math.max(0, gross - discount))
+      const paid = Number(order?.paidTotal ?? order?.totals?.paidTotal ?? 0)
+      const due = Math.max(0, net - paid)
+      if (due > 0.01) {
+        toast.error('Odemesi alinmadi')
+        return
+      }
+    }
     const res = await safeAction((signal) => api(`/api/pos/delivery/orders/${order.id}/status`, {
       method: 'PUT',
       body: JSON.stringify(isDelivered ? { status: 'delivered' } : { deliveryStatus: status }),

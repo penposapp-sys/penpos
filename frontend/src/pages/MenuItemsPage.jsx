@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ProductImage from '../components/ProductImage.jsx'
 import ProductImageUploadField from '../components/ProductImageUploadField.jsx'
 import BranchAccessField from '../components/settings/BranchAccessField.jsx'
+import { SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../lib/apiClient.js'
 import { getSubscriptionStatus } from '../lib/subscription.js'
@@ -871,6 +872,7 @@ export default function MenuItemsPage() {
   return (
     <div className="page-scroll-area scrollbar-hidden">
       <ProductCatalogStyles />
+      <SettingsUiStyles />
       <div className="product-catalog-page">
         <div className="product-shell">
           <section className="product-panel">

@@ -7,7 +7,7 @@ import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import Modal from '../components/Modal.jsx'
 import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
 import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
-import { SettingsToggle } from '../components/settings/SettingsUi.jsx'
+import { SettingsToggle, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
@@ -1286,6 +1286,7 @@ export const SettingsSystemContent = () => {
 
   return (
     <div>
+      <SettingsUiStyles />
       <h3 style={{ marginTop: 0 }}>Sistem Ayarları</h3>
       <form onSubmit={onSave} style={{ display: 'grid', gap: 12, maxWidth: 720 }}>
         <div className="card" style={{ borderColor: 'var(--border)' }}>
