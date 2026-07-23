@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'
+﻿import mongoose from 'mongoose'
 import { error } from '../../../utils/errors.js'
 import * as logger from '../../../utils/logger.js'
 import * as productRepo from '../repositories/canteenProductRepository.js'
@@ -329,11 +329,15 @@ export const finishStockCount = async (tenantId, branchId, actorUserId, sessionI
 export const cancelStockCount = async (tenantId, branchId, actorUserId, sessionId) => {
   if (!mongoose.isValidObjectId(sessionId)) throw error('invalid_request', 'Invalid session id', 400)
   const session = await countRepo.findSessionByIdAndScope(sessionId, tenantId, branchId)
-  if (!session) throw error('not_found', 'SayÄ±m bulunamadÄ±', 404)
-  if (session.status === 'closed') throw error('invalid_request', 'SayÄ±m zaten kapatÄ±ldÄ±', 409)
+  if (!session) throw error('not_found', 'Sayım bulunamadı', 404)
+  if (session.status === 'closed') throw error('invalid_request', 'Sayım zaten kapatıldı', 409)
+  const revertNote = `stock_count_revert:${String(session.id)}`
+  const existingRevert = await movementRepo.findOneByNote(tenantId, branchId, revertNote)
   await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, {
     status: 'closed',
-    closedAt: new Date()
+    closedAt: new Date(),
+    revertedAt: existingRevert?.createdAt || null,
+    revertedBy: existingRevert?.createdBy || null
   })
   return { cancelled: true, sessionId: String(session.id) }
 }
@@ -399,7 +403,10 @@ export const getStockCountSummary = async (tenantId, branchId, sessionId) => {
     productId: String(it.productId || ''),
     barcode: String(it.barcode || ''),
     productName: String(productNameById.get(String(it.productId)) || it?.productSnapshot?.name || ''),
-    countedQty: Number(it.countedQty || 0)
+    countedQty: Number(it.countedQty || 0),
+    currentStockAtStart: Number(it?.currentStockAtStart ?? it?.productSnapshot?.stockQtyAtStart ?? 0),
+    stockQty: Number(it?.currentStockAtStart ?? it?.productSnapshot?.stockQtyAtStart ?? 0),
+    diff: Number(it.countedQty || 0) - Number(it?.currentStockAtStart ?? it?.productSnapshot?.stockQtyAtStart ?? 0)
   }))
 
   return { session: { id: String(session.id), status: String(session.status || 'open') }, items: scannedItems, extra, missing, same }
@@ -526,6 +533,297 @@ export const applyStockCount = async (tenantId, branchId, actorUserId, sessionId
   return { appliedCount: applied.length, applied }
 }
 
+export const revertStockCount = async (tenantId, branchId, actorUserId, sessionId) => {
+  if (!mongoose.isValidObjectId(sessionId)) throw error('invalid_request', 'Invalid session id', 400)
+  const session = await countRepo.findSessionByIdAndScope(sessionId, tenantId, branchId)
+  if (!session) throw error('not_found', 'Sayım bulunamadı', 404)
+  if (session.status !== 'closed') throw error('invalid_request', 'Sadece stoğa uygulanmış sayımlar geri alınabilir', 409)
+  if (session.revertedAt) throw error('invalid_request', 'Bu sayım zaten geri alınmış', 409)
+
+  const applyNote = `stock_count:${String(session.id)}`
+  const revertNote = `stock_count_revert:${String(session.id)}`
+  const existingRevert = await movementRepo.findOneByNote(tenantId, branchId, revertNote)
+  if (existingRevert) {
+    await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, { revertedAt: existingRevert.createdAt || new Date(), revertedBy: existingRevert.createdBy || actorUserId || null })
+    throw error('invalid_request', 'Bu sayım zaten geri alınmış', 409)
+  }
+
+  const appliedMovements = await movementRepo.listByNote(tenantId, branchId, applyNote)
+  if (!Array.isArray(appliedMovements) || appliedMovements.length === 0) {
+    throw error('not_found', 'Bu sayıma ait uygulanmış stok hareketi bulunamadı', 404)
+  }
+
+  const products = await productRepo.listByTenantAndBranch(tenantId, branchId)
+  const productById = new Map((products || []).map((item) => [String(item.id || item._id || ''), item]))
+  const targets = []
+  const seen = new Set()
+  for (const movement of appliedMovements) {
+    const productId = String(movement?.productId || '')
+    if (!productId || seen.has(productId)) continue
+    seen.add(productId)
+    const currentProduct = productById.get(productId)
+    const restoreQty = Number(movement?.previousQty)
+    const currentQty = Number(currentProduct?.stockQty || 0)
+    if (!Number.isFinite(restoreQty)) continue
+    if (Math.abs(currentQty - restoreQty) <= 0.0001) continue
+    targets.push({
+      productId,
+      productName: String(movement?.productName || currentProduct?.name || ''),
+      barcode: String(movement?.barcode || currentProduct?.barcode || ''),
+      from: currentQty,
+      to: restoreQty,
+      costPrice: Number(currentProduct?.costPrice || 0),
+      product: currentProduct || null
+    })
+  }
+
+  const reverted = []
+  const now = new Date()
+
+  const tryTransaction = async () => {
+    const txSession = await mongoose.startSession()
+    try {
+      await txSession.withTransaction(async () => {
+        for (const t of targets) {
+          const financeMeta = buildStockMovementFinanceMeta(
+            { costPrice: t.costPrice },
+            'adjust',
+            t.to,
+            Number(t.from || 0),
+            Number(t.to || 0),
+            applyNote
+          )
+          await CanteenProduct.updateOne({ _id: t.productId, tenantId, branchId, isActive: true }, { $set: { stockQty: t.to } }, { session: txSession })
+          await CanteenStockMovement.create([{
+            tenantId,
+            branchId,
+            productId: t.productId,
+            productName: t.productName,
+            barcode: t.barcode,
+            type: 'adjust',
+            qty: t.to,
+            ...financeMeta,
+            note: revertNote,
+            createdBy: actorUserId || null,
+            createdAt: now
+          }], { session: txSession })
+          reverted.push({ productId: t.productId, from: t.from, to: t.to })
+        }
+        await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, { revertedAt: now, revertedBy: actorUserId || null }, { session: txSession })
+      })
+      return true
+    } finally {
+      try { await txSession.endSession() } catch {}
+    }
+  }
+
+  const tryFallback = async () => {
+    for (const t of targets) {
+      const financeMeta = buildStockMovementFinanceMeta(
+        { costPrice: t.costPrice },
+        'adjust',
+        t.to,
+        Number(t.from || 0),
+        Number(t.to || 0),
+        applyNote
+      )
+      await CanteenProduct.updateOne({ _id: t.productId, tenantId, branchId, isActive: true }, { $set: { stockQty: t.to } })
+      await movementRepo.create({
+        tenantId,
+        branchId,
+        productId: t.productId,
+        productName: t.productName,
+        barcode: t.barcode,
+        type: 'adjust',
+        qty: t.to,
+        ...financeMeta,
+        note: revertNote,
+        createdBy: actorUserId || null,
+        createdAt: now
+      })
+      reverted.push({ productId: t.productId, from: t.from, to: t.to })
+    }
+    await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, { revertedAt: now, revertedBy: actorUserId || null })
+  }
+
+  try {
+    try {
+      await tryTransaction()
+    } catch (err) {
+      const msg = String(err?.message || '')
+      const isReplicaErr = msg.toLowerCase().includes('replica') || msg.toLowerCase().includes('transaction')
+      if (!isReplicaErr) throw err
+      reverted.length = 0
+      await tryFallback()
+    }
+  } catch (err) {
+    logger.error('[CANTEEN_STOCK_COUNT_REVERT_ERR]', { sessionId: String(session.id), tenantId: String(tenantId), branchId: String(branchId), message: String(err?.message || err) })
+    throw error('internal_error', 'Internal server error', 500)
+  }
+
+  for (const t of targets) {
+    const product = productById.get(String(t.productId))
+    if (product?.stockTrackingEnabled !== true) continue
+    await rebuildProductBatchesFromAbsoluteStock({
+      ...product,
+      id: String(product.id || product._id || ''),
+      tenantId,
+      branchId,
+      stockQty: t.to
+    }, t.to, 'Sayım geri alındı', actorUserId)
+  }
+
+  return { revertedCount: reverted.length, reverted }
+}
+
+export const reopenStockCount = async (tenantId, branchId, actorUserId, sessionId) => {
+  if (!mongoose.isValidObjectId(sessionId)) throw error('invalid_request', 'Invalid session id', 400)
+  const session = await countRepo.findSessionByIdAndScope(sessionId, tenantId, branchId)
+  if (!session) throw error('not_found', 'Sayım bulunamadı', 404)
+  if (session.status !== 'closed') throw error('invalid_request', 'Sadece stoğa uygulanmış sayımlar geri alınabilir', 409)
+
+  const applyNote = `stock_count:${String(session.id)}`
+  const revertNote = `stock_count_revert:${String(session.id)}`
+  const appliedMovements = await movementRepo.listByNote(tenantId, branchId, applyNote)
+  if (!Array.isArray(appliedMovements) || appliedMovements.length === 0) {
+    throw error('not_found', 'Bu sayıma ait uygulanmış stok hareketi bulunamadı', 404)
+  }
+
+  const products = await productRepo.listByTenantAndBranch(tenantId, branchId)
+  const productById = new Map((products || []).map((item) => [String(item.id || item._id || ''), item]))
+  const targets = []
+  const seen = new Set()
+  for (const movement of appliedMovements) {
+    const productId = String(movement?.productId || '')
+    if (!productId || seen.has(productId)) continue
+    seen.add(productId)
+    const currentProduct = productById.get(productId)
+    const restoreQty = Number(movement?.previousQty)
+    const currentQty = Number(currentProduct?.stockQty || 0)
+    if (!Number.isFinite(restoreQty)) continue
+    if (Math.abs(currentQty - restoreQty) <= 0.0001) continue
+    targets.push({
+      productId,
+      productName: String(movement?.productName || currentProduct?.name || ''),
+      barcode: String(movement?.barcode || currentProduct?.barcode || ''),
+      from: currentQty,
+      to: restoreQty,
+      costPrice: Number(currentProduct?.costPrice || 0),
+      product: currentProduct || null
+    })
+  }
+
+  const reverted = []
+  const now = new Date()
+  const reopenUpdate = {
+    status: 'open',
+    finishedAt: null,
+    closedAt: null,
+    revertedAt: null,
+    revertedBy: null
+  }
+
+  const tryTransaction = async () => {
+    const txSession = await mongoose.startSession()
+    try {
+      await txSession.withTransaction(async () => {
+        for (const t of targets) {
+          const financeMeta = buildStockMovementFinanceMeta(
+            { costPrice: t.costPrice },
+            'adjust',
+            t.to,
+            Number(t.from || 0),
+            Number(t.to || 0),
+            applyNote
+          )
+          await CanteenProduct.updateOne({ _id: t.productId, tenantId, branchId, isActive: true }, { $set: { stockQty: t.to } }, { session: txSession })
+          await CanteenStockMovement.create([{
+            tenantId,
+            branchId,
+            productId: t.productId,
+            productName: t.productName,
+            barcode: t.barcode,
+            type: 'adjust',
+            qty: t.to,
+            ...financeMeta,
+            note: revertNote,
+            createdBy: actorUserId || null,
+            createdAt: now
+          }], { session: txSession })
+          reverted.push({ productId: t.productId, from: t.from, to: t.to })
+        }
+        await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, reopenUpdate, { session: txSession })
+      })
+      return true
+    } finally {
+      try { await txSession.endSession() } catch {}
+    }
+  }
+
+  const tryFallback = async () => {
+    for (const t of targets) {
+      const financeMeta = buildStockMovementFinanceMeta(
+        { costPrice: t.costPrice },
+        'adjust',
+        t.to,
+        Number(t.from || 0),
+        Number(t.to || 0),
+        applyNote
+      )
+      await CanteenProduct.updateOne({ _id: t.productId, tenantId, branchId, isActive: true }, { $set: { stockQty: t.to } })
+      await movementRepo.create({
+        tenantId,
+        branchId,
+        productId: t.productId,
+        productName: t.productName,
+        barcode: t.barcode,
+        type: 'adjust',
+        qty: t.to,
+        ...financeMeta,
+        note: revertNote,
+        createdBy: actorUserId || null,
+        createdAt: now
+      })
+      reverted.push({ productId: t.productId, from: t.from, to: t.to })
+    }
+    await countRepo.closeSessionByIdAndScope(session.id, tenantId, branchId, reopenUpdate)
+  }
+
+  try {
+    try {
+      await tryTransaction()
+    } catch (err) {
+      const msg = String(err?.message || '')
+      const isReplicaErr = msg.toLowerCase().includes('replica') || msg.toLowerCase().includes('transaction')
+      if (!isReplicaErr) throw err
+      reverted.length = 0
+      await tryFallback()
+    }
+  } catch (err) {
+    logger.error('[CANTEEN_STOCK_COUNT_REOPEN_ERR]', { sessionId: String(session.id), tenantId: String(tenantId), branchId: String(branchId), message: String(err?.message || err) })
+    throw error('internal_error', 'Internal server error', 500)
+  }
+
+  for (const t of targets) {
+    const product = productById.get(String(t.productId))
+    if (product?.stockTrackingEnabled !== true) continue
+    await rebuildProductBatchesFromAbsoluteStock({
+      ...product,
+      id: String(product.id || product._id || ''),
+      tenantId,
+      branchId,
+      stockQty: t.to
+    }, t.to, 'Sayım geri alındı', actorUserId)
+  }
+
+  return {
+    revertedCount: reverted.length,
+    reverted,
+    sessionId: String(session.id),
+    status: 'open'
+  }
+}
+
 export const listStockCounts = async (tenantId, branchId, query = {}) => {
   const limitRaw = Number(query?.limit || 20)
   const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 20))
@@ -545,13 +843,17 @@ export const listStockCounts = async (tenantId, branchId, query = {}) => {
     const sid = String(s?._id || '')
     const st = statById.get(sid) || { lineCount: 0, totalDiff: 0 }
     const createdAt = s.startedAt || s.finishedAt || s.closedAt || null
+    const status = s?.revertedAt
+      ? 'reverted'
+      : (s.status === 'closed' ? 'completed' : (s.status === 'open' ? 'open' : 'finished'))
     return {
       id: sid,
       createdAt,
       createdBy: s.createdBy ? { id: String(s.createdBy._id || ''), name: String(s.createdBy.name || '') } : null,
       lineCount: st.lineCount,
       totalDiff: st.totalDiff,
-      status: s.status === 'closed' ? 'completed' : (s.status === 'open' ? 'open' : 'finished')
+      status,
+      revertedAt: s?.revertedAt || null
     }
   })
 }
@@ -594,45 +896,53 @@ export const getStockCountDetail = async (tenantId, branchId, sessionId) => {
     return qty
   }
 
+  const products = await productRepo.listByTenantAndBranch(tenantId, branchId)
+  const productCostById = new Map((products || []).map((item) => [String(item?.id || item?._id || ''), Number(item?.costPrice || 0)]))
+
   const lines = (items || []).map(it => {
+    const productId = String(it?.productId || '')
     const name = String(it?.productSnapshot?.name || '')
     const barcode = String(it?.barcode || it?.productSnapshot?.barcode || '')
     const systemQty = Number(it?.currentStockAtStart || 0)
     const countedQty = Number(it?.countedQty || 0)
+    const diff = Number(countedQty - systemQty)
+    const costPrice = Number(productCostById.get(productId) || 0)
     return {
-      productId: String(it?.productId || ''),
+      productId,
       name,
       barcode,
       systemQty,
       countedQty,
-      diff: Number(countedQty - systemQty)
+      diff,
+      costPrice,
+      profitLoss: roundMoney(diff * costPrice)
     }
   })
-
   if (lines.length === 0) {
     const note = `stock_count:${String(session._id)}`
     const moves = await CanteenStockMovement
       .find({ tenantId, branchId, note, type: 'adjust' })
       .sort({ createdAt: 1 })
       .lean()
-    if (!Array.isArray(moves) || moves.length === 0) {
-      throw error('stock_count_not_found', 'Bu sayımın satır kaydı bulunamadı', 404)
+    if (Array.isArray(moves) && moves.length > 0) {
+      const fallback = []
+      for (const m of moves) {
+        const countedQty = Number(m?.qty || 0)
+        const systemQty = await computeStockQtyBefore(m?.productId, m?.createdAt)
+        const diff = systemQty === null ? null : Number(countedQty - systemQty)
+        fallback.push({
+          productId: String(m?.productId || ''),
+          name: String(m?.productName || ''),
+          barcode: String(m?.barcode || ''),
+          systemQty,
+          countedQty,
+          diff,
+          costPrice: Number(m?.unitCost || productCostById.get(String(m?.productId || '')) || 0),
+          profitLoss: roundMoney((Number.isFinite(diff) ? diff : 0) * Number(m?.unitCost || productCostById.get(String(m?.productId || '')) || 0))
+        })
+      }
+      lines.push(...fallback)
     }
-    const fallback = []
-    for (const m of moves) {
-      const countedQty = Number(m?.qty || 0)
-      const systemQty = await computeStockQtyBefore(m?.productId, m?.createdAt)
-      const diff = systemQty === null ? null : Number(countedQty - systemQty)
-      fallback.push({
-        productId: String(m?.productId || ''),
-        name: String(m?.productName || ''),
-        barcode: String(m?.barcode || ''),
-        systemQty,
-        countedQty,
-        diff
-      })
-    }
-    lines.push(...fallback)
   }
 
   return {
@@ -640,7 +950,8 @@ export const getStockCountDetail = async (tenantId, branchId, sessionId) => {
       id: String(session._id),
       createdAt: session.startedAt || null,
       createdBy: session.createdBy ? { id: String(session.createdBy._id || ''), name: String(session.createdBy.name || '') } : null,
-      status: session.status === 'closed' ? 'completed' : (session.status === 'open' ? 'open' : 'finished')
+      status: session.status === 'closed' ? 'completed' : (session.status === 'open' ? 'open' : 'finished'),
+      revertedAt: session.revertedAt || null
     },
     lines
   }

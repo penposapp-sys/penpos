@@ -150,6 +150,7 @@ router.get(
   requireRole(['tenant_admin', 'staff']),
   requireAnyPermission([
     PERMISSIONS.CANTEEN_POS_ACCESS,
+    PERMISSIONS.CANTEEN_STOCK_COUNT,
     PERMISSIONS.CANTEEN_PRODUCTS_VIEW,
     PERMISSIONS.MANAGE_MENU,
     PERMISSIONS.MANAGE_SETTINGS
@@ -328,6 +329,13 @@ router.post(
   requireRole(['tenant_admin', 'staff']),
   requireAnyPermission([PERMISSIONS.CANTEEN_STOCK_COUNT, PERMISSIONS.MANAGE_SETTINGS]),
   stockCtrl.applyCount
+)
+router.post(
+  '/stock-counts/:sessionId/revert',
+  canteenBranchHeaderGuard,
+  requireRole(['tenant_admin', 'staff']),
+  requireAnyPermission([PERMISSIONS.CANTEEN_STOCK_COUNT, PERMISSIONS.MANAGE_SETTINGS]),
+  stockCtrl.revertCount
 )
 
 export default router

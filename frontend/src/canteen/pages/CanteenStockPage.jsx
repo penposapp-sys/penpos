@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import { downloadBlob } from '../../lib/download.js'
@@ -47,6 +47,12 @@ const dateLabelFromKey = (key) => {
   return `${day}.${month}.${year}`
 }
 
+const isArchivedCountHistoryItem = (item) => {
+  const status = String(item?.status || '').trim().toLowerCase()
+  if (!item || item?.revertedAt) return false
+  return status === 'completed' || status === 'finished'
+}
+
 const getCountSystemQty = (item) => {
   if (item?.stockQty !== null && item?.stockQty !== undefined) return Number(item.stockQty || 0)
   if (item?.systemQty !== null && item?.systemQty !== undefined) return Number(item.systemQty || 0)
@@ -67,6 +73,104 @@ const mapCountSummaryItems = (items) => (
     savedAt: null
   }))
 )
+
+const releaseModalLock = () => {
+  if (typeof document === 'undefined') return
+  try { document.body.classList.remove('modal-open') } catch {}
+}
+
+const escapeHtml = (value) => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+
+const openPrintableHtml = ({ title, html, autoPrint = true, width = 1100, height = 900 }) => {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank', `noopener,noreferrer,width=${width},height=${height}`)
+  if (!win) throw new Error('Yazdırma penceresi açılamadı')
+  const cleanup = () => window.setTimeout(() => URL.revokeObjectURL(url), 15000)
+  if (autoPrint) {
+    window.setTimeout(() => {
+      try {
+        win.focus()
+        win.print()
+      } catch {}
+      cleanup()
+    }, 250)
+  } else {
+    cleanup()
+  }
+  return win
+}
+
+const buildStockDetailPrintHtml = ({ title, subtitle, sections = [], summaryRows = [] }) => `<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #111827;
+      --muted: #6b7280;
+      --line: #d7deea;
+      --surface: #ffffff;
+      --surface-soft: #f6f8fc;
+      --accent: #0f172a;
+      --good: #166534;
+      --bad: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef2f7; color: var(--ink); font-family: "Segoe UI", Arial, sans-serif; }
+    .page-shell { min-height: 100vh; padding: 16px; display: flex; justify-content: center; }
+    .page { width: 210mm; min-height: 297mm; background: var(--surface); box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18); padding: 10mm 10mm 8mm; }
+    .header { display: grid; gap: 4mm; border-bottom: 2px solid var(--accent); padding-bottom: 4mm; margin-bottom: 5mm; }
+    .title { font-size: 20pt; line-height: 1.1; font-weight: 800; margin: 0; }
+    .subtitle { color: var(--muted); font-size: 10pt; }
+    .section { border: 1px solid var(--line); border-radius: 3mm; overflow: hidden; margin-bottom: 4mm; background: var(--surface); }
+    .section-head { display: flex; justify-content: space-between; gap: 4mm; align-items: center; padding: 3mm; background: var(--surface-soft); border-bottom: 1px solid var(--line); }
+    .section-title { font-weight: 800; font-size: 11pt; }
+    .section-meta { font-size: 8.5pt; color: var(--muted); }
+    .table-wrap { overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+    thead th { background: var(--surface-soft); color: var(--muted); text-align: left; font-weight: 700; padding: 2.2mm 2.4mm; border-bottom: 1px solid var(--line); }
+    tbody td { padding: 2mm 2.4mm; border-bottom: 1px solid #edf1f7; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .num { text-align: right; white-space: nowrap; }
+    .pos { color: var(--good); font-weight: 800; }
+    .neg { color: var(--bad); font-weight: 800; }
+    .summary { margin-top: 6mm; border: 1px solid var(--line); border-radius: 3mm; padding: 4mm; background: var(--surface-soft); display: grid; gap: 2mm; }
+    .summary-title { font-size: 11pt; font-weight: 900; }
+    .summary-row { display: flex; justify-content: space-between; gap: 4mm; font-size: 9pt; }
+    .summary-row strong { text-align: right; }
+    @page { size: A4 portrait; margin: 8mm; }
+    @media print {
+      body { background: #fff; }
+      .page-shell { padding: 0; }
+      .page { width: auto; min-height: auto; box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <main class="page">
+      <header class="header">
+        <h1 class="title">${escapeHtml(title)}</h1>
+        <div class="subtitle">${escapeHtml(subtitle)}</div>
+      </header>
+      ${sections.join('')}
+      ${summaryRows.length ? `
+        <section class="summary">
+          <div class="summary-title">Özet</div>
+          ${summaryRows.map((row) => `<div class="summary-row"><span>${escapeHtml(row.label)}</span><strong class="${row.className || ''}">${escapeHtml(row.value)}</strong></div>`).join('')}
+        </section>
+      ` : ''}
+    </main>
+  </div>
+</body>
+</html>`
 
 const getCountStatusMeta = (status, summary) => {
   const totalDiff = Number(summary?.session?.totalDiff ?? summary?.totalDiff ?? 0)
@@ -156,6 +260,10 @@ export function CanteenStockWorkspace({
     burstDeltaMs: 50,
     humanDeltaMs: 70,
     onScan: (code) => {
+      if (countModalOpen) {
+        countOnScanRef.current?.(code)
+        return
+      }
       if (tab === 'movements') movementOnScanRef.current?.(code)
       else if (tab === 'receipts') receiptOnScanRef.current?.(code)
       else if (tab === 'count') countOnScanRef.current?.(code)
@@ -1045,6 +1153,7 @@ function StockMovementsPanel({
               <input
                 className="input"
                 ref={barcodeRef}
+                data-scanner-capture="true"
                 value={barcode}
                 onChange={(e) => {
                   const nextValue = e.target.value
@@ -1117,6 +1226,7 @@ function StockMovementsPanel({
           <input
             className="input"
             ref={barcodeRef}
+            data-scanner-capture="true"
             value={barcode}
             onChange={(e) => setBarcode(e.target.value)}
             onKeyDown={async (e) => {
@@ -1635,6 +1745,7 @@ function StockReceiptsPanel({
               <input
                 className="input"
                 ref={barcodeRef}
+                data-scanner-capture="true"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 onKeyDown={async (e) => {
@@ -1783,6 +1894,8 @@ function StockReceiptsPanel({
 
 function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
   const barcodeRef = useRef(null)
+  const barcodeEnterTimerRef = useRef(null)
+  const lastBarcodeInputAtRef = useRef(0)
   const [barcode, setBarcode] = useState('')
   const [qty, setQty] = useState('')
   const [autoAddOne, setAutoAddOne] = useState(true)
@@ -1823,9 +1936,35 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
     try { barcodeRef.current?.focus() } catch {}
   }
 
+  const queueBarcodeScan = (inputEl, attempt = 0) => {
+    try {
+      if (barcodeEnterTimerRef.current) clearTimeout(barcodeEnterTimerRef.current)
+    } catch {}
+    barcodeEnterTimerRef.current = setTimeout(() => {
+      const now = Date.now()
+      const sinceLastInput = now - Number(lastBarcodeInputAtRef.current || 0)
+      if (sinceLastInput < 90 && attempt < 4) {
+        queueBarcodeScan(inputEl, attempt + 1)
+        return
+      }
+      const v = String(inputEl?.value || '').trim()
+      if (!v) {
+        focusBarcode()
+        return
+      }
+      setBarcode('')
+      scan(v, autoAddOne ? 1 : qty)
+    }, 80)
+  }
+
   useEffect(() => {
     const t = setTimeout(() => focusBarcode(), 0)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      try {
+        if (barcodeEnterTimerRef.current) clearTimeout(barcodeEnterTimerRef.current)
+      } catch {}
+    }
   }, [])
 
   useEffect(() => {
@@ -1864,7 +2003,11 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
       setHistoryLoading(false)
       return
     }
-    setHistoryItems(Array.isArray(res?.items) ? res.items : [])
+    setHistoryItems(
+      Array.isArray(res?.items)
+        ? res.items.filter(isArchivedCountHistoryItem)
+        : []
+    )
     setHistoryLoading(false)
   }
 
@@ -2149,16 +2292,16 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
               <input
                 className="input"
                 ref={barcodeRef}
+                data-scanner-capture="true"
                 value={barcode}
                 onChange={(e) => {
+                  lastBarcodeInputAtRef.current = Date.now()
                   setBarcode(e.target.value)
                 }}
-                onKeyDown={(e) => {
+                onKeyUp={(e) => {
                   if (e.key !== 'Enter') return
                   e.preventDefault()
-                  const v = String(barcode || '').trim()
-                  setBarcode('')
-                  scan(v, autoAddOne ? 1 : qty)
+                  queueBarcodeScan(e.currentTarget)
                 }}
                 placeholder="Barkod"
                 inputMode="numeric"
@@ -2247,7 +2390,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
               const who = h?.createdBy?.name ? String(h.createdBy.name) : '-'
               const lineCount = Number(h?.lineCount || 0)
               const diff = Number(h?.totalDiff || 0)
-              const status = h?.status === 'completed' ? 'Tamamlandı' : (h?.status === 'open' ? 'Devam ediyor' : 'Hazır')
+              const status = h?.status === 'reverted' ? 'Geri Alındı' : (h?.status === 'completed' ? 'Tamamlandı' : (h?.status === 'open' ? 'Devam ediyor' : 'Hazır'))
               return (
                 <button key={h.id} type="button" className="btn btn--full btn--between" onClick={() => openDetail(h.id)} disabled={!canUse || historyLoading} style={{ justifyContent: 'space-between' }}>
                   <span style={{ display: 'grid', textAlign: 'left' }}>
@@ -2270,7 +2413,14 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
           {detail?.count && (
             <div className="card" style={{ display: 'grid', gap: 6 }}>
               <div style={{ fontWeight: 800 }}>{detail.count.createdAt ? new Date(detail.count.createdAt).toLocaleString('tr-TR') : ''}</div>
-              <div style={{ color: 'var(--muted)', fontSize: 12 }}>Yapan: {detail.count.createdBy?.name || '-'} • Durum: {detail.count.status === 'completed' ? 'Tamamlandı' : (detail.count.status === 'open' ? 'Devam ediyor' : 'Hazır')}</div>
+              <div style={{ color: 'var(--muted)', fontSize: 12 }}>Yapan: {detail.count.createdBy?.name || '-'} • Durum: {detail.count.revertedAt ? 'Geri Alındı' : (detail.count.status === 'completed' ? 'Tamamlandı' : (detail.count.status === 'open' ? 'Devam ediyor' : 'Hazır'))}</div>
+              {!detail.count.revertedAt && detail.count.status === 'completed' ? (
+                <div>
+                  <button className="btn" type="button" onClick={revertDetailCount} disabled={!canUse || revertingDetail}>
+                    {revertingDetail ? 'Geri Alınıyor...' : 'Bu Sayımı Geri Al'}
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
           {(detail?.lines || []).map(l => (
@@ -2357,6 +2507,8 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
 
 function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false }) {
   const barcodeRef = useRef(null)
+  const barcodeEnterTimerRef = useRef(null)
+  const lastBarcodeInputAtRef = useRef(0)
   const [barcode, setBarcode] = useState('')
   const [qty, setQty] = useState('')
   const [autoAddOne, setAutoAddOne] = useState(true)
@@ -2379,6 +2531,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const [detail, setDetail] = useState(null)
+  const [revertingDetail, setRevertingDetail] = useState(false)
 
   const canUse = String(branchId || '').trim().length > 0
   const canViewHistory = (() => {
@@ -2410,6 +2563,27 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
 
   const focusBarcode = () => {
     try { barcodeRef.current?.focus() } catch {}
+  }
+
+  const queueBarcodeScan = (inputEl, attempt = 0) => {
+    try {
+      if (barcodeEnterTimerRef.current) clearTimeout(barcodeEnterTimerRef.current)
+    } catch {}
+    barcodeEnterTimerRef.current = setTimeout(() => {
+      const now = Date.now()
+      const sinceLastInput = now - Number(lastBarcodeInputAtRef.current || 0)
+      if (sinceLastInput < 90 && attempt < 4) {
+        queueBarcodeScan(inputEl, attempt + 1)
+        return
+      }
+      const v = String(inputEl?.value || '').trim()
+      if (!v) {
+        focusBarcode()
+        return
+      }
+      setBarcode('')
+      scan(v, autoAddOne ? 1 : qty)
+    }, 80)
   }
 
   const lookupBarcodeProduct = async (barcodeRaw) => {
@@ -2478,7 +2652,11 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
       setHistoryLoading(false)
       return
     }
-    setHistoryItems(Array.isArray(res?.items) ? res.items : [])
+    setHistoryItems(
+      Array.isArray(res?.items)
+        ? res.items.filter(isArchivedCountHistoryItem)
+        : []
+    )
     setHistoryLoading(false)
   }
 
@@ -2514,9 +2692,41 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
     setDetail({ count: res?.count || null, lines: Array.isArray(res?.lines) ? res.lines : [] })
   }
 
+  const revertDetailCount = async () => {
+    const sid = String(detail?.count?._id || detail?.count?.id || '').trim()
+    if (!sid || !canUse || revertingDetail) return
+    const confirmed = window.confirm('Bu sayımı geri almak istediğine emin misin?')
+    if (!confirmed) return
+    setRevertingDetail(true)
+    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sid)}/revert`, {
+      method: 'POST',
+      headers: { 'x-branch-id': String(branchId) },
+      silent: true
+    })
+    setRevertingDetail(false)
+    if (!res?.ok) {
+      toast.error(res?.message || 'Sayım geri alınamadı')
+      return
+    }
+    toast.success('Sayım geri alındı')
+    setDetailOpen(false)
+    setDetail(null)
+    releaseModalLock()
+    setTimeout(() => releaseModalLock(), 0)
+    try { if (storageKey) localStorage.setItem(storageKey, sid) } catch {}
+    await loadSummary(sid)
+    await loadHistory()
+    focusBarcode()
+  }
+
   useEffect(() => {
     const t = setTimeout(() => focusBarcode(), 0)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      try {
+        if (barcodeEnterTimerRef.current) clearTimeout(barcodeEnterTimerRef.current)
+      } catch {}
+    }
   }, [])
 
   useEffect(() => {
@@ -2763,14 +2973,16 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
               <input
                 ref={barcodeRef}
                 className="input"
+                data-scanner-capture="true"
                 value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                onKeyDown={(e) => {
+                onChange={(e) => {
+                  lastBarcodeInputAtRef.current = Date.now()
+                  setBarcode(e.target.value)
+                }}
+                onKeyUp={(e) => {
                   if (e.key !== 'Enter') return
                   e.preventDefault()
-                  const v = String(barcode || '').trim()
-                  setBarcode('')
-                  scan(v, autoAddOne ? 1 : qty)
+                  queueBarcodeScan(e.currentTarget)
                 }}
                 onBlur={() => {
                   const code = String(barcode || '').trim()
@@ -2982,28 +3194,41 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
           {detail?.count ? (
             <div className="card" style={{ display: 'grid', gap: 6 }}>
               <div style={{ fontWeight: 800 }}>{detail.count.createdAt ? new Date(detail.count.createdAt).toLocaleString('tr-TR') : ''}</div>
-              <div style={{ color: 'var(--muted)', fontSize: 12 }}>Yapan: {detail.count.createdBy?.name || '-'} • Durum: {detail.count.status === 'completed' ? 'Tamamlandı' : (detail.count.status === 'open' ? 'Devam ediyor' : 'Hazır')}</div>
+              {detail.count.status === 'completed' && !detail.count.revertedAt ? (
+                <div>
+                  <button className="btn" type="button" onClick={revertDetailCount} disabled={!canUse || revertingDetail}>
+                    {revertingDetail ? 'Geri Alınıyor...' : 'Bu Sayımı Geri Al'}
+                  </button>
+                </div>
+              ) : null}
+              <div style={{ color: 'var(--muted)', fontSize: 12 }}>Yapan: {detail.count.createdBy?.name || '-'} • Durum: {detail.count.revertedAt ? 'Geri Alındı' : (detail.count.status === 'completed' ? 'Tamamlandı' : (detail.count.status === 'open' ? 'Devam ediyor' : 'Hazır'))}</div>
             </div>
           ) : null}
-          {(detail?.lines || []).map((l) => (
-            <div key={`${l.productId}_${l.barcode}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 10, alignItems: 'center' }}>
-              <div style={{ minWidth: 0 }}>
-                <div className="breakAny" style={{ fontWeight: 800 }}>{l.name || '-'}</div>
-                <div style={{ color: 'var(--muted)', fontSize: 12 }}>{l.barcode || '-'}</div>
-                <div style={{ color: 'var(--muted)', fontSize: 12 }}>
-                  Sistem: {l.systemQty === null || l.systemQty === undefined ? '-' : Number(l.systemQty || 0)}
-                  {' • '}
-                  Sayılan: {l.countedQty === null || l.countedQty === undefined ? '-' : Number(l.countedQty || 0)}
-                  {' • '}
-                  Fark: {l.diff === null || l.diff === undefined ? '-' : Number(l.diff || 0)}
+          {detail?.count?.revertedAt ? (
+            <div style={{ color: 'var(--muted)' }}>Bu sayım geri alındığı için detay satırları gösterilmiyor.</div>
+          ) : (
+            <>
+              {(detail?.lines || []).map((l) => (
+                <div key={`${l.productId}_${l.barcode}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 10, alignItems: 'center' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="breakAny" style={{ fontWeight: 800 }}>{l.name || '-'}</div>
+                    <div style={{ color: 'var(--muted)', fontSize: 12 }}>{l.barcode || '-'}</div>
+                    <div style={{ color: 'var(--muted)', fontSize: 12 }}>
+                      Sistem: {l.systemQty === null || l.systemQty === undefined ? '-' : Number(l.systemQty || 0)}
+                      {' • '}
+                      Sayılan: {l.countedQty === null || l.countedQty === undefined ? '-' : Number(l.countedQty || 0)}
+                      {' • '}
+                      Fark: {l.diff === null || l.diff === undefined ? '-' : Number(l.diff || 0)}
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 800, whiteSpace: 'nowrap', color: getCountDiffColor(Number(l.diff || 0)) }}>
+                    {Number(l.diff || 0) > 0 ? `+${Number(l.diff || 0)}` : Number(l.diff || 0)}
+                  </div>
                 </div>
-              </div>
-              <div style={{ fontWeight: 800, whiteSpace: 'nowrap', color: getCountDiffColor(Number(l.diff || 0)) }}>
-                {Number(l.diff || 0) > 0 ? `+${Number(l.diff || 0)}` : Number(l.diff || 0)}
-              </div>
-            </div>
-          ))}
-          {!detailLoading && detail && (detail.lines || []).length === 0 ? <div style={{ color: 'var(--muted)' }}>Kayıt yok</div> : null}
+              ))}
+              {!detailLoading && detail && (detail.lines || []).length === 0 ? <div style={{ color: 'var(--muted)' }}>Kayıt yok</div> : null}
+            </>
+          )}
         </div>
       </Modal>
     </div>
@@ -3197,7 +3422,7 @@ function StockHistoryPanelLegacy({ branchId, me, isCompact = false }) {
     if (!countRes?.ok && canViewCountHistory) nextError = countRes?.message || 'Sayım geçmişi yüklenemedi'
     if (!movementRes?.ok && !nextError) nextError = movementRes?.message || 'Hareket geçmişi yüklenemedi'
     setError(nextError)
-    setCountItems(Array.isArray(countRes?.items) ? countRes.items : [])
+    setCountItems(Array.isArray(countRes?.items) ? countRes.items.filter(isArchivedCountHistoryItem) : [])
     setMovementItems(Array.isArray(movementRes?.items) ? movementRes.items : [])
     setLoading(false)
   }
@@ -3486,7 +3711,7 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
       if (!countRes?.ok && canViewCountHistory) nextError = countRes?.message || 'Sayım geçmişi yüklenemedi'
       if (!movementRes?.ok && !nextError) nextError = movementRes?.message || 'Hareket geçmişi yüklenemedi'
       setError(nextError)
-      setCountItems(Array.isArray(countRes?.items) ? countRes.items : [])
+      setCountItems(Array.isArray(countRes?.items) ? countRes.items.filter(isArchivedCountHistoryItem) : [])
       setMovementItems(Array.isArray(movementRes?.items) ? movementRes.items : [])
       setLoading(false)
     }
@@ -3524,7 +3749,6 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
   const incomingDays = useMemo(() => groupDays(incomingItems, 'movement'), [incomingItems])
   const outgoingDays = useMemo(() => groupDays(outgoingItems, 'movement'), [outgoingItems])
   const adjustmentDays = useMemo(() => groupDays(adjustmentItems, 'movement'), [adjustmentItems])
-
   const openCountDetail = async (id) => {
     const sid = String(id || '').trim()
     if (!sid || !canUse) return
@@ -3536,6 +3760,14 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
     const res = await getStockCountDetail(branchId, sid)
     setDetailLoading(false)
     if (!res?.ok) {
+      if (String(res?.code || '').trim() === 'stock_count_not_found') {
+        setDetailData({
+          count: { id: sid, createdAt: null, createdBy: null, status: 'completed', revertedAt: null },
+          lines: []
+        })
+        setDetailError('Bu eski sayım için satır detayı bulunamadı.')
+        return
+      }
       setDetailError(res?.message || 'Sayım detayı yüklenemedi')
       return
     }
@@ -3552,19 +3784,41 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
     setDetailData({ dateKey: group.key, dateLabel: group.label, sessions: [] })
     const results = await Promise.all(sessions.map((session) => getStockCountDetail(branchId, session.id)))
     setDetailLoading(false)
-    const failed = results.find((res) => !res?.ok)
-    if (failed) {
+    const normalizedSessions = results.map((res, index) => {
+      if (res?.ok) {
+        return {
+          summary: sessions[index],
+          count: res?.count || null,
+          lines: Array.isArray(res?.lines) ? res.lines : []
+        }
+      }
+      if (String(res?.code || '').trim() === 'stock_count_not_found') {
+        return {
+          summary: sessions[index],
+          count: {
+            id: String(sessions[index]?.id || ''),
+            createdAt: sessions[index]?.createdAt || null,
+            createdBy: sessions[index]?.createdBy || null,
+            status: 'completed',
+            revertedAt: null
+          },
+          lines: []
+        }
+      }
+      return null
+    }).filter(Boolean)
+    if (!normalizedSessions.length) {
+      const failed = results.find((res) => !res?.ok)
       setDetailError(failed?.message || 'Sayım detayları yüklenemedi')
       return
+    }
+    if (normalizedSessions.some((session) => !session.lines.length)) {
+      setDetailError('Bazı eski sayımlarda detay satırı bulunamadı.')
     }
     setDetailData({
       dateKey: group.key,
       dateLabel: group.label,
-      sessions: results.map((res, index) => ({
-        summary: sessions[index],
-        count: res?.count || null,
-        lines: Array.isArray(res?.lines) ? res.lines : []
-      }))
+      sessions: normalizedSessions
     })
   }
 
@@ -3599,65 +3853,220 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
 
   const downloadDetail = () => {
     if (!detailData) return
-    const rows = []
+    const summaryRows = []
+    const sections = []
+
     if (detailKind === 'count-day') {
-      rows.push(['Tarih', 'Saat', 'Ürün', 'Barkod', 'Sistem Stok', 'Sayım Sonucu', 'Fark'])
+      let totalProfitLoss = 0
+      let lineCount = 0
       for (const session of detailData.sessions || []) {
-        for (const line of session.lines || []) {
-          rows.push([
-            detailData.dateLabel || '-',
-            fmtDateTime(session?.count?.createdAt || session?.summary?.createdAt || '').split(' ').slice(1).join(' '),
-            line?.name || '-',
-            line?.barcode || '-',
-            Number(line?.systemQty || 0),
-            Number(line?.countedQty || 0),
-            Number(line?.diff || 0)
-          ])
-        }
+        const rows = (session.lines || []).map((line) => {
+          const diff = Number(line?.diff || 0)
+          const costPrice = Number(line?.costPrice || 0)
+          const profitLoss = Number((line?.profitLoss ?? (diff * costPrice)) || 0)
+          totalProfitLoss += profitLoss
+          lineCount += 1
+          return `
+            <tr>
+              <td>${escapeHtml(line?.name || '-')}</td>
+              <td>${escapeHtml(line?.barcode || '-')}</td>
+              <td class="num">${escapeHtml(String(Number(line?.systemQty || 0)))}</td>
+              <td class="num">${escapeHtml(String(Number(line?.countedQty || 0)))}</td>
+              <td class="num ${diff < 0 ? 'neg' : diff > 0 ? 'pos' : ''}">${escapeHtml(diff > 0 ? `+${diff}` : String(diff))}</td>
+              <td class="num">${escapeHtml(`${money(costPrice)} TL`)}</td>
+              <td class="num ${profitLoss < 0 ? 'neg' : profitLoss > 0 ? 'pos' : ''}">${escapeHtml(`${profitLoss > 0 ? '+' : ''}${money(profitLoss)} TL`)}</td>
+            </tr>
+          `
+        }).join('')
+        sections.push(`
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">${escapeHtml(fmtDateTime(session?.count?.createdAt || session?.summary?.createdAt || '-'))}</div>
+              <div class="section-meta">Yapan: ${escapeHtml(session?.count?.createdBy?.name || session?.summary?.createdBy?.name || '-')}</div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ürün</th>
+                    <th>Barkod</th>
+                    <th class="num">Sistem</th>
+                    <th class="num">Sayım</th>
+                    <th class="num">Fark</th>
+                    <th class="num">Birim Maliyet</th>
+                    <th class="num">Kâr / Zarar</th>
+                  </tr>
+                </thead>
+                <tbody>${rows || '<tr><td colspan="7">Bu sayım için satır bulunamadı.</td></tr>'}</tbody>
+              </table>
+            </div>
+          </section>
+        `)
       }
-    } else if (detailKind === 'incoming-day' || detailKind === 'outgoing-day' || detailKind === 'adjust-day') {
-      rows.push(['Tarih', 'Saat', 'Ürün', 'Barkod', 'İşlem', 'Miktar', 'Kaynak', 'Not'])
-      for (const item of detailData.items || []) {
-        const parts = fmtDateTime(item?.createdAt).split(' ')
-        rows.push([
-          detailData.dateLabel || '-',
-          parts.slice(1).join(' '),
-          item?.productName || '-',
-          item?.barcode || '-',
-          stockActionLabel(item?.type),
-          Number(item?.qty || 0),
-          stockSourceLabel(item?.note),
-          stockNoteLabel(item?.note)
-        ])
-      }
-    } else if (detailKind === 'sale' && detailData?.sale) {
-      rows.push(['Tarih', 'Satış No', 'Ürün', 'Adet', 'Birim Fiyat', 'Tutar'])
-      for (const item of detailData.sale.items || []) {
-        rows.push([
-          fmtDateTime(detailData.sale.createdAt),
-          detailData.sale.saleNo || '-',
-          item?.name || '-',
-          Number(item?.qty || 0),
-          Number(item?.unitPrice || 0),
-          Number(item?.lineTotal || 0)
-        ])
-      }
-    } else if (detailKind === 'count' && detailData?.lines) {
-      rows.push(['Tarih', 'Ürün', 'Barkod', 'Sistem Stok', 'Sayım Sonucu', 'Fark'])
-      for (const line of detailData.lines || []) {
-        rows.push([
-          fmtDateTime(detailData.count?.createdAt),
-          line?.name || '-',
-          line?.barcode || '-',
-          Number(line?.systemQty || 0),
-          Number(line?.countedQty || 0),
-          Number(line?.diff || 0)
-        ])
-      }
+      summaryRows.push({ label: 'Tarih', value: detailData.dateLabel || '-' })
+      summaryRows.push({ label: 'Toplam Satır', value: String(lineCount) })
+      summaryRows.push({ label: 'Toplam Kâr / Zarar', value: `${totalProfitLoss > 0 ? '+' : ''}${money(totalProfitLoss)} TL`, className: totalProfitLoss < 0 ? 'neg' : totalProfitLoss > 0 ? 'pos' : '' })
+      openPrintableHtml({
+        title: 'Sayım Hareket Detayı',
+        subtitle: `${detailData.dateLabel || '-'} tarihli günlük sayım dökümü`,
+        html: buildStockDetailPrintHtml({
+          title: 'Sayım Hareket Detayı',
+          subtitle: `${detailData.dateLabel || '-'} tarihli günlük sayım dökümü`,
+          sections,
+          summaryRows
+        })
+      })
+      return
     }
-    if (!rows.length) return
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(';')).join('\n')
-    downloadBlob(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' }), `stok-gecmisi-${detailData?.dateKey || Date.now()}.csv`)
+
+    if (detailKind === 'count' && detailData?.lines) {
+      let totalProfitLoss = 0
+      const rows = (detailData.lines || []).map((line) => {
+        const diff = Number(line?.diff || 0)
+        const costPrice = Number(line?.costPrice || 0)
+        const profitLoss = Number((line?.profitLoss ?? (diff * costPrice)) || 0)
+        totalProfitLoss += profitLoss
+        return `
+          <tr>
+            <td>${escapeHtml(line?.name || '-')}</td>
+            <td>${escapeHtml(line?.barcode || '-')}</td>
+            <td class="num">${escapeHtml(String(Number(line?.systemQty || 0)))}</td>
+            <td class="num">${escapeHtml(String(Number(line?.countedQty || 0)))}</td>
+            <td class="num ${diff < 0 ? 'neg' : diff > 0 ? 'pos' : ''}">${escapeHtml(diff > 0 ? `+${diff}` : String(diff))}</td>
+            <td class="num">${escapeHtml(`${money(costPrice)} TL`)}</td>
+            <td class="num ${profitLoss < 0 ? 'neg' : profitLoss > 0 ? 'pos' : ''}">${escapeHtml(`${profitLoss > 0 ? '+' : ''}${money(profitLoss)} TL`)}</td>
+          </tr>
+        `
+      }).join('')
+      sections.push(`
+        <section class="section">
+          <div class="section-head">
+            <div class="section-title">${escapeHtml(fmtDateTime(detailData.count?.createdAt || '-'))}</div>
+            <div class="section-meta">Yapan: ${escapeHtml(detailData.count?.createdBy?.name || '-')}</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ürün</th>
+                  <th>Barkod</th>
+                  <th class="num">Sistem</th>
+                  <th class="num">Sayım</th>
+                  <th class="num">Fark</th>
+                  <th class="num">Birim Maliyet</th>
+                  <th class="num">Kâr / Zarar</th>
+                </tr>
+              </thead>
+              <tbody>${rows || '<tr><td colspan="7">Kayıt yok.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </section>
+      `)
+      summaryRows.push({ label: 'Toplam Satır', value: String((detailData.lines || []).length) })
+      summaryRows.push({ label: 'Toplam Kâr / Zarar', value: `${totalProfitLoss > 0 ? '+' : ''}${money(totalProfitLoss)} TL`, className: totalProfitLoss < 0 ? 'neg' : totalProfitLoss > 0 ? 'pos' : '' })
+      openPrintableHtml({
+        title: 'Tek Sayım Detayı',
+        subtitle: `${fmtDateTime(detailData.count?.createdAt || '-')}`,
+        html: buildStockDetailPrintHtml({
+          title: 'Tek Sayım Detayı',
+          subtitle: `${fmtDateTime(detailData.count?.createdAt || '-')}`,
+          sections,
+          summaryRows
+        })
+      })
+      return
+    }
+
+    if (detailKind === 'incoming-day' || detailKind === 'outgoing-day' || detailKind === 'adjust-day') {
+      const rows = (detailData.items || []).map((item) => `
+        <tr>
+          <td>${escapeHtml(fmtDateTime(item?.createdAt || '-'))}</td>
+          <td>${escapeHtml(item?.productName || '-')}</td>
+          <td>${escapeHtml(item?.barcode || '-')}</td>
+          <td>${escapeHtml(stockActionLabel(item?.type))}</td>
+          <td class="num">${escapeHtml(String(Number(item?.qty || 0)))}</td>
+          <td>${escapeHtml(stockSourceLabel(item?.note))}</td>
+          <td>${escapeHtml(stockNoteLabel(item?.note))}</td>
+        </tr>
+      `).join('')
+      sections.push(`
+        <section class="section">
+          <div class="section-head">
+            <div class="section-title">${escapeHtml(detailData.dateLabel || '-')}</div>
+            <div class="section-meta">Toplam kayıt: ${escapeHtml(String((detailData.items || []).length))}</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tarih</th>
+                  <th>Ürün</th>
+                  <th>Barkod</th>
+                  <th>İşlem</th>
+                  <th class="num">Miktar</th>
+                  <th>Kaynak</th>
+                  <th>Not</th>
+                </tr>
+              </thead>
+              <tbody>${rows || '<tr><td colspan="7">Kayıt yok.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </section>
+      `)
+      openPrintableHtml({
+        title: 'Stok Hareket Listesi',
+        subtitle: `${detailData.dateLabel || '-'} tarihli hareket dökümü`,
+        html: buildStockDetailPrintHtml({
+          title: 'Stok Hareket Listesi',
+          subtitle: `${detailData.dateLabel || '-'} tarihli hareket dökümü`,
+          sections,
+          summaryRows: [{ label: 'Toplam Kayıt', value: String((detailData.items || []).length) }]
+        })
+      })
+      return
+    }
+
+    if (detailKind === 'sale' && detailData?.sale) {
+      const rows = (detailData.sale.items || []).map((item) => `
+        <tr>
+          <td>${escapeHtml(item?.name || '-')}</td>
+          <td class="num">${escapeHtml(String(Number(item?.qty || 0)))}</td>
+          <td class="num">${escapeHtml(`${money(item?.unitPrice || 0)} TL`)}</td>
+          <td class="num">${escapeHtml(`${money(item?.lineTotal || 0)} TL`)}</td>
+        </tr>
+      `).join('')
+      sections.push(`
+        <section class="section">
+          <div class="section-head">
+            <div class="section-title">${escapeHtml(detailData.sale.saleNo || 'Satış')}</div>
+            <div class="section-meta">${escapeHtml(fmtDateTime(detailData.sale.createdAt || '-'))}</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ürün</th>
+                  <th class="num">Adet</th>
+                  <th class="num">Birim Fiyat</th>
+                  <th class="num">Tutar</th>
+                </tr>
+              </thead>
+              <tbody>${rows || '<tr><td colspan="4">Kayıt yok.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </section>
+      `)
+      openPrintableHtml({
+        title: 'Satış Detayı',
+        subtitle: `${detailData.sale.saleNo || '-'} numaralı satış dökümü`,
+        html: buildStockDetailPrintHtml({
+          title: 'Satış Detayı',
+          subtitle: `${detailData.sale.saleNo || '-'} numaralı satış dökümü`,
+          sections,
+          summaryRows: [{ label: 'Toplam Tutar', value: `${money((detailData.sale.items || []).reduce((sum, item) => sum + Number(item?.lineTotal || 0), 0))} TL` }]
+        })
+      })
+    }
   }
 
   return (
@@ -3683,9 +4092,9 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-        <HistorySectionCard title="Yapılan Sayımlar" items={countDays} emptyText="Sayım kaydı yok" loading={loading}>
-          {countDays.map((group) => (
-            <DailyGroupButton key={group.key} group={{ ...group, totalQty: group.totalDiff }} typeLabel="Sayım" onClick={() => openCountDay(group)} disabled={!canUse || loading} />
+        <HistorySectionCard title="Yapılan Sayımlar" items={countItems} emptyText="Sayım kaydı yok" loading={loading}>
+          {countItems.map((item) => (
+            <CountHistoryButton key={item.id} item={item} onClick={() => openCountDetail(item.id)} disabled={!canUse || loading} />
           ))}
         </HistorySectionCard>
 
@@ -3714,7 +4123,7 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
           {!!detailError ? <div style={{ color: '#b91c1c' }}>{detailError}</div> : null}
           {!detailLoading && detailData ? (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn" type="button" onClick={downloadDetail}>İndirilebilir Liste</button>
+              <button className="btn" type="button" onClick={downloadDetail}>Yazdırılabilir Liste</button>
             </div>
           ) : null}
 
@@ -3821,6 +4230,19 @@ function DailyGroupButton({ group, typeLabel, onClick, disabled }) {
         <span style={{ color: 'var(--muted)', fontSize: 12 }}>{typeLabel} • Kayıt: {Array.isArray(group?.items) ? group.items.length : Array.isArray(group?.sessions) ? group.sessions.length : 0}</span>
       </span>
       <span style={{ fontWeight: 900 }}>{Number(group?.totalQty ?? group?.totalDiff ?? 0) > 0 ? `+${Number(group?.totalQty ?? group?.totalDiff ?? 0)}` : Number(group?.totalQty ?? group?.totalDiff ?? 0)}</span>
+    </button>
+  )
+}
+
+function CountHistoryButton({ item, onClick, disabled }) {
+  const totalDiff = Number(item?.totalDiff || 0)
+  return (
+    <button type="button" className="btn btn--full btn--between" onClick={onClick} disabled={disabled} style={{ justifyContent: 'space-between' }}>
+      <span style={{ display: 'grid', textAlign: 'left' }}>
+        <span style={{ fontWeight: 800 }}>{fmtDateTime(item?.createdAt || '-')}</span>
+        <span style={{ color: 'var(--muted)', fontSize: 12 }}>Sayım • Satır: {Number(item?.lineCount || 0)}</span>
+      </span>
+      <span style={{ fontWeight: 900 }}>{totalDiff > 0 ? `+${totalDiff}` : totalDiff}</span>
     </button>
   )
 }

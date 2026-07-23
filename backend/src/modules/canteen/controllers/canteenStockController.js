@@ -91,6 +91,15 @@ export const applyCount = async (req, res) => {
   }
 }
 
+export const revertCount = async (req, res) => {
+  try {
+    const result = await service.reopenStockCount(req.user.tenantId, req.canteenBranchId, req.user.id, req.params.sessionId)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const listCounts = async (req, res) => {
   try {
     const items = await service.listStockCounts(req.user.tenantId, req.canteenBranchId, req.query || {})

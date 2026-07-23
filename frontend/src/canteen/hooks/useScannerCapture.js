@@ -10,6 +10,14 @@ const isEditableTarget = (target) => {
   return tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable
 }
 
+const allowsScannerCapture = (target) => {
+  try {
+    return String(target?.dataset?.scannerCapture || '').trim().toLowerCase() === 'true'
+  } catch {
+    return false
+  }
+}
+
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
 
 export default function useScannerCapture({
@@ -92,6 +100,11 @@ export default function useScannerCapture({
       if (!enabled) return
       if (e.defaultPrevented) return
       if (e.ctrlKey || e.metaKey || e.altKey) {
+        reset()
+        return
+      }
+
+      if (isEditableTarget(e.target) && !allowsScannerCapture(e.target)) {
         reset()
         return
       }

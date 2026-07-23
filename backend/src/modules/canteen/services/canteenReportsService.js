@@ -27,7 +27,25 @@ const mapReportMethodType = (value) => {
 }
 
 const buildMethodCatalog = async (tenantId, totals = new Map()) => {
-  const visible = await getCanteenPaymentMethods(tenantId, { includeDeleted: false })
+  let visible = []
+  try {
+    visible = await getCanteenPaymentMethods(tenantId, { includeDeleted: false })
+  } catch (err) {
+    const code = String(err?.code || err?.payload?.code || err?.payload?.error || '')
+    const message = String(err?.message || err?.payload?.message || err || '')
+    if (
+      code !== 'invalid_payment_method'
+      && code !== 'duplicate_payment_method'
+      && code !== 'duplicate_payment_method_name'
+      && !message.toLocaleLowerCase('tr-TR').includes('odeme yontemi')
+    ) throw err
+    console.error('[CANTEEN_REPORTS_PAYMENT_METHODS_INVALID]', {
+      tenantId: String(tenantId || ''),
+      code,
+      message
+    })
+    visible = []
+  }
   const catalog = []
   const seen = new Set()
 
@@ -422,28 +440,52 @@ const buildCashMovementDescription = (sale = {}, barcodeMap = new Map()) => {
 }
 
 const isStockCountMovementNote = (note = '') => String(note || '').trim().toLowerCase().startsWith('stock_count:')
+const isStockCountRevertMovementNote = (note = '') => String(note || '').trim().toLowerCase().startsWith('stock_count_revert:')
+const isStockCountRelatedMovementNote = (note = '') => isStockCountMovementNote(note) || isStockCountRevertMovementNote(note)
+const getStockCountSessionIdFromNote = (note = '') => {
+  const raw = String(note || '').trim()
+  const lower = raw.toLowerCase()
+  if (lower.startsWith('stock_count_revert:')) return raw.slice('stock_count_revert:'.length).trim()
+  if (lower.startsWith('stock_count:')) return raw.slice('stock_count:'.length).trim()
+  return ''
+}
+
+const resolveStockMovementDeltaQty = (movement = {}) => {
+  const directDelta = movement?.deltaQty
+  if (directDelta !== null && directDelta !== undefined && Number.isFinite(Number(directDelta))) {
+    return Number(directDelta || 0)
+  }
+
+  const type = String(movement?.type || '').trim().toLowerCase()
+  const hasPreviousQty = movement?.previousQty !== null && movement?.previousQty !== undefined && Number.isFinite(Number(movement?.previousQty))
+  const hasQty = movement?.qty !== null && movement?.qty !== undefined && Number.isFinite(Number(movement?.qty))
+
+  if (type === 'adjust' && hasPreviousQty && hasQty) {
+    return roundMoney(Number(movement?.qty || 0) - Number(movement?.previousQty || 0))
+  }
+  if (type === 'in' && hasQty) return Number(movement?.qty || 0)
+  if ((type === 'out' || type === 'waste') && hasQty) return -Number(movement?.qty || 0)
+  return null
+}
 
 const resolveStockMovementAmount = (movement = {}, productMap = new Map()) => {
   const directAmount = Number(movement?.totalAmount || 0)
   if (directAmount > 0) return roundMoney(directAmount)
   const product = productMap.get(String(movement?.productId || '')) || {}
   const unitCost = Number(movement?.unitCost || product?.costPrice || 0)
-  const deltaQty = movement?.deltaQty === null || movement?.deltaQty === undefined
-    ? null
-    : Number(movement?.deltaQty || 0)
+  const deltaQty = resolveStockMovementDeltaQty(movement)
   if (deltaQty !== null) return roundMoney(Math.abs(deltaQty) * unitCost)
   return roundMoney(Math.abs(Number(movement?.qty || 0)) * unitCost)
 }
 
 const resolveStockMovementCashEffect = (movement = {}) => {
+  if (isStockCountRevertMovementNote(movement?.note)) return ''
   const direct = String(movement?.cashEffect || '').trim().toLowerCase()
   if (direct === 'income' || direct === 'expense') return direct
   const type = String(movement?.type || '').trim().toLowerCase()
   if (type === 'in') return 'expense'
   if (type === 'adjust' && isStockCountMovementNote(movement?.note)) {
-    const deltaQty = movement?.deltaQty === null || movement?.deltaQty === undefined
-      ? null
-      : Number(movement?.deltaQty || 0)
+    const deltaQty = resolveStockMovementDeltaQty(movement)
     if (deltaQty !== null) {
       if (deltaQty < -0.0001) return 'expense'
       if (deltaQty > 0.0001) return 'income'
@@ -455,10 +497,9 @@ const resolveStockMovementCashEffect = (movement = {}) => {
 const resolveStockMovementReason = (movement = {}) => {
   const type = String(movement?.type || '').trim().toLowerCase()
   if (type === 'in') return 'Urun Girisi'
+  if (isStockCountRevertMovementNote(movement?.note)) return 'Sayim Geri Alma'
   if (type === 'adjust' && isStockCountMovementNote(movement?.note)) {
-    const deltaQty = movement?.deltaQty === null || movement?.deltaQty === undefined
-      ? null
-      : Number(movement?.deltaQty || 0)
+    const deltaQty = resolveStockMovementDeltaQty(movement)
     if (deltaQty !== null && deltaQty < -0.0001) return 'Sayim Eksigi'
     if (deltaQty !== null && deltaQty > 0.0001) return 'Sayim Fazlasi'
     return 'Sayim Duzeltmesi'
@@ -591,6 +632,16 @@ export const cashReport = async (tenantId, branchIds, query = {}) => {
   const productMap = new Map((products || []).map((product) => [String(product._id), product]))
   const customerMap = new Map((customers || []).map((customer) => [String(customer._id), String(customer.name || '').trim()]))
   const branchMap = new Map((branches || []).map((branch) => [String(branch._id), String(branch.name || '').trim()]))
+  const latestRevertAtBySessionId = new Map()
+  for (const movement of stockMovements || []) {
+    if (!isStockCountRevertMovementNote(movement?.note)) continue
+    const sessionId = getStockCountSessionIdFromNote(movement?.note)
+    if (!sessionId) continue
+    const createdAt = movement?.createdAt ? new Date(movement.createdAt) : null
+    const createdAtTime = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : 0
+    const previousTime = latestRevertAtBySessionId.get(sessionId) || 0
+    if (createdAtTime > previousTime) latestRevertAtBySessionId.set(sessionId, createdAtTime)
+  }
 
   const rows = []
   let incomeTotal = 0
@@ -664,6 +715,12 @@ export const cashReport = async (tenantId, branchIds, query = {}) => {
   }
 
   for (const movement of stockMovements || []) {
+    if (isStockCountMovementNote(movement?.note)) {
+      const sessionId = getStockCountSessionIdFromNote(movement?.note)
+      const revertAtTime = latestRevertAtBySessionId.get(sessionId) || 0
+      const movementTime = movement?.createdAt ? new Date(movement.createdAt).getTime() : 0
+      if (revertAtTime && movementTime && movementTime <= revertAtTime) continue
+    }
     const cashEffect = resolveStockMovementCashEffect(movement)
     if (!cashEffect) continue
 

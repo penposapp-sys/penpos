@@ -14,6 +14,16 @@ const normalizeName = (name) => String(name || '').trim()
 const normalizeKey = (name) => normalizeName(name).toLowerCase()
 const normalizeBarcode = (barcode) => String(barcode || '').trim()
 const normalizeText = (value) => String(value || '').trim()
+const normalizeSearchKey = (value) => String(value || '')
+  .toLocaleLowerCase('tr-TR')
+  .replace(/ı/g, 'i')
+  .replace(/ğ/g, 'g')
+  .replace(/ü/g, 'u')
+  .replace(/ş/g, 's')
+  .replace(/ö/g, 'o')
+  .replace(/ç/g, 'c')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
 const normalizeSortOrder = (value) => {
   const num = Number(value)
   return Number.isFinite(num) ? num : 0
@@ -68,6 +78,62 @@ const mapCategoryDto = (category) => ({
 })
 
 const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const levenshteinDistance = (left, right) => {
+  const a = String(left || '')
+  const b = String(right || '')
+  if (!a) return b.length
+  if (!b) return a.length
+  const dp = Array.from({ length: b.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= a.length; i += 1) {
+    let prev = dp[0]
+    dp[0] = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const temp = dp[j]
+      if (a[i - 1] === b[j - 1]) dp[j] = prev
+      else dp[j] = Math.min(prev, dp[j - 1], dp[j]) + 1
+      prev = temp
+    }
+  }
+  return dp[b.length]
+}
+
+const getProductSearchScore = (query, product) => {
+  const q = normalizeSearchKey(query)
+  const rawBarcode = String(product?.barcode || '').trim()
+  const barcode = rawBarcode.replace(/\s+/g, '').toLowerCase()
+  const name = normalizeSearchKey(product?.name)
+  const category = normalizeSearchKey(product?.categoryName)
+  const tokens = [name, ...name.split(' ').filter(Boolean), ...category.split(' ').filter(Boolean)].filter(Boolean)
+  if (!q) return Number.POSITIVE_INFINITY
+
+  if (barcode && barcode === q) return 0
+  if (name === q) return 1
+
+  let best = Number.POSITIVE_INFINITY
+  if (barcode && barcode.startsWith(q)) best = Math.min(best, 2)
+  if (name.startsWith(q)) best = Math.min(best, 3)
+  if (tokens.some((token) => token.startsWith(q))) best = Math.min(best, 4)
+  if (name.includes(q)) best = Math.min(best, 5)
+  if (category.includes(q)) best = Math.min(best, 6)
+
+  for (const token of tokens) {
+    const dist = levenshteinDistance(q, token)
+    if (dist <= 1) best = Math.min(best, 7)
+    else if (q.length >= 4 && dist === 2) best = Math.min(best, 8)
+  }
+
+  if (Number.isFinite(best)) return best
+
+  const compactName = name.replace(/\s+/g, '')
+  const compactQuery = q.replace(/\s+/g, '')
+  if (compactName && compactQuery) {
+    const dist = levenshteinDistance(compactQuery, compactName.slice(0, Math.max(compactQuery.length, 1)))
+    if (dist <= 2) return 9
+  }
+
+  return Number.POSITIVE_INFINITY
+}
 
 const isDuplicateBarcodeError = (err) => {
   const code = Number(err?.code || 0)
@@ -387,21 +453,47 @@ export const searchProducts = async (tenantId, branchId, input) => {
   const q = normalizeName(input?.q)
   const limit = Number(input?.limit || 20)
   if (q.length < 2) throw error('validation_error', 'En az 2 karakter yaz', 400)
-  const items = await prodRepo.searchByNameAndScope(tenantId, branchId, escapeRegex(q), limit)
+  const categoryMap = new Map(
+    (await catRepo.listByTenantAndBranch(tenantId, branchId)).map((item) => [String(item.id || item._id), item])
+  )
+  const branchItems = await prodRepo.listByTenantAndBranch(tenantId, branchId)
+  const ranked = (branchItems || [])
+    .map((item) => {
+      const dto = mapProductDto(item, categoryMap)
+      return { item, dto, score: getProductSearchScore(q, dto) }
+    })
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((left, right) => {
+      if (left.score !== right.score) return left.score - right.score
+      const leftName = normalizeSearchKey(left.dto?.name)
+      const rightName = normalizeSearchKey(right.dto?.name)
+      return leftName.localeCompare(rightName, 'tr')
+    })
+    .slice(0, Math.max(1, Math.min(100, limit)))
+
+  const items = ranked.map((entry) => entry.item)
   const synced = await Promise.all((items || []).map(async (item) => {
     if (item?.stockTrackingEnabled !== true) return item
     await ensureProductBatches(item)
     return syncProductFromOpenBatch(tenantId, branchId, item.id, item)
   }))
-  return synced.map((p) => ({
-    id: p.id,
-    name: p.name,
-    barcode: p.barcode || '',
-    price: Number(p.price || 0),
-    salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
-    stockQty: Number(p.stockQty || 0),
-    minimumStock: normalizeMinimumStock(p.minimumStock, 5)
-  }))
+  return synced
+    .map((p) => mapProductDto(p, categoryMap))
+    .sort((left, right) => {
+      const leftScore = getProductSearchScore(q, left)
+      const rightScore = getProductSearchScore(q, right)
+      if (leftScore !== rightScore) return leftScore - rightScore
+      return normalizeSearchKey(left?.name).localeCompare(normalizeSearchKey(right?.name), 'tr')
+    })
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      barcode: p.barcode || '',
+      price: Number(p.price || 0),
+      salePrice: computeSalePrice(p.price, p.vatRate, p.vatIncluded !== false),
+      stockQty: Number(p.stockQty || 0),
+      minimumStock: normalizeMinimumStock(p.minimumStock, 5)
+    }))
 }
 
 export const removeProduct = async (tenantId, branchId, id) => {

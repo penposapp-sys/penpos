@@ -1,5 +1,8 @@
 import CanteenProduct from '../models/CanteenProduct.js'
 
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const normalizeBarcodeKey = (value) => String(value || '').replace(/\s+/g, '').trim().toLowerCase()
+
 export const listByTenantAndBranch = (tenantId, branchId) =>
   CanteenProduct.find({ tenantId, branchId, isActive: true }).sort({ createdAt: -1 })
 
@@ -15,8 +18,28 @@ export const listByIdsAndTenant = (ids, tenantId) =>
 export const findByIdAndScope = (id, tenantId, branchId) =>
   CanteenProduct.findOne({ _id: id, tenantId, branchId, isActive: true })
 
-export const findByBarcodeAndScope = (barcode, tenantId, branchId) =>
-  CanteenProduct.findOne({ tenantId, branchId, barcode, isActive: true })
+export const findByBarcodeAndScope = async (barcode, tenantId, branchId) => {
+  const raw = String(barcode || '').trim()
+  if (!raw) return null
+
+  const exact = await CanteenProduct.findOne({
+    tenantId,
+    branchId,
+    barcode: raw,
+    isActive: true
+  })
+  if (exact) return exact
+
+  const normalized = normalizeBarcodeKey(raw)
+  const candidates = await CanteenProduct.find({
+    tenantId,
+    branchId,
+    isActive: true,
+    barcode: { $regex: `^${escapeRegex(raw)}$`, $options: 'i' }
+  }).limit(10)
+
+  return (candidates || []).find((item) => normalizeBarcodeKey(item?.barcode) === normalized) || null
+}
 
 export const create = (data) => CanteenProduct.create(data)
 
@@ -43,6 +66,14 @@ export const softDeleteByIdAndScope = (id, tenantId, branchId) =>
   CanteenProduct.findOneAndUpdate({ _id: id, tenantId, branchId }, { isActive: false }, { new: true })
 
 export const searchByNameAndScope = (tenantId, branchId, nameRegex, limit) =>
-  CanteenProduct.find({ tenantId, branchId, isActive: true, name: { $regex: nameRegex, $options: 'i' } })
+  CanteenProduct.find({
+    tenantId,
+    branchId,
+    isActive: true,
+    $or: [
+      { name: { $regex: nameRegex, $options: 'i' } },
+      { barcode: { $regex: nameRegex, $options: 'i' } }
+    ]
+  })
     .sort({ nameNormalized: 1, name: 1 })
     .limit(Math.max(1, Math.min(100, Number(limit || 20))))

@@ -138,6 +138,31 @@ const validateMethods = (methods = []) => {
   }
 }
 
+const sanitizeMethods = (methods = []) => {
+  const sanitized = []
+  const seenIds = new Set()
+  const seenNames = new Set()
+
+  for (const rawMethod of Array.isArray(methods) ? methods : []) {
+    const method = normalizeMethod(rawMethod)
+    const id = normalizeText(method.id)
+    const name = normalizeText(method.name)
+    if (!id || !name) continue
+
+    const nameKey = normalizeNameKey(name)
+    if (seenIds.has(id) || seenNames.has(nameKey)) continue
+
+    seenIds.add(id)
+    seenNames.add(nameKey)
+    sanitized.push(method)
+  }
+
+  const hasAccountMethod = sanitized.some((method) => String(method.id) === FIXED_ACCOUNT_METHOD_ID)
+  if (!hasAccountMethod) sanitized.unshift(buildFixedAccountMethod({ sortOrder: 0 }))
+
+  return ensureSorted(sanitized)
+}
+
 const computeFlagsFromMethods = (methods = [], doc = {}) => {
   const active = methods.filter((method) => method.isDeleted !== true && method.enabled === true)
   return {
@@ -170,8 +195,18 @@ export const getCanteenPaymentMethods = async (tenantId, { includeDeleted = fals
   const rawMethods = Array.isArray(doc?.paymentMethods) && doc.paymentMethods.length > 0
     ? doc.paymentMethods
     : initialMethodsFromLegacyFlags(doc || {})
-  const methods = ensureSorted(rawMethods)
-  validateMethods(methods)
+  let methods = ensureSorted(rawMethods)
+  try {
+    validateMethods(methods)
+  } catch (err) {
+    const code = String(err?.payload?.error || err?.payload?.code || err?.code || '')
+    if (
+      code !== 'invalid_payment_method'
+      && code !== 'duplicate_payment_method'
+      && code !== 'duplicate_payment_method_name'
+    ) throw err
+    methods = sanitizeMethods(rawMethods)
+  }
   return includeDeleted ? methods : methods.filter((method) => method.isDeleted !== true)
 }
 
