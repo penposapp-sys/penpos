@@ -131,7 +131,7 @@ export default function WalkInPosPage() {
     const servingLabel = itemServingType ? servingTypeLabelTR(itemServingType, { fallback: '' }) : ''
     return (
       <div className="sale-cart-line__detail-stack">
-        <div>{detailText}</div>
+        <div className="sale-cart-line__detail-primary">{detailText}</div>
         {servingLabel ? (
           <div className="sale-cart-line__serving-note">
             <span className="sale-cart-line__serving-pill">Servis: {servingLabel}</span>
@@ -1936,7 +1936,7 @@ export default function WalkInPosPage() {
                   return (
                     <SaleCartLine
                       key={row.key}
-                      className={`walkin-cart-line${isTerminal ? ' sale-cart-line--terminal' : ''}`}
+                      className={`walkin-cart-line${isTerminal ? ' sale-cart-line--terminal' : ''}${isCompleted ? ' sale-cart-line--terminal-has-actions' : ''}`}
                       style={{
                         opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
                       }}
