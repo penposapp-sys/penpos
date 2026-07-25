@@ -1799,6 +1799,7 @@ export default function PosPage() {
             const isOpen = opts.type === 'open'
             const isSent = opts.type === 'sent'
             const isTerminal = opts.type === 'other'
+            const isCompleted = isTerminal && String(it?.status || '') === 'completed'
             const isGrouped = opts.grouped === true
             const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
             const isWeightBased = !!it?.isWeightBased
@@ -1977,6 +1978,23 @@ export default function PosPage() {
                         {cartActionLabel('cancel')}
                       </button>
                     </>
+                  )}
+                  {isCompleted && (
+                    <button
+                      className="btn sale-cart-line__action-btn sale-cart-line__action-btn--cancel"
+                      onClick={() => {
+                        if (isMultiGroup) {
+                          toast.info('İptal için Ayrı moduna geç')
+                          return
+                        }
+                        openItemCancelModal(row.itemId)
+                      }}
+                      disabled={disableBase || isCancelLocked}
+                      title={isMultiGroup ? 'İptal için Ayrı moduna geç' : undefined}
+                      style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca', ...(isMultiGroup ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                    >
+                      {cartActionLabel('cancel')}
+                    </button>
                   )}
                 </div>
                 <div className="sale-cart-line__price" style={{ whiteSpace: 'nowrap' }}>{row.subtotal} TL</div>
