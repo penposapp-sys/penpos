@@ -43,6 +43,7 @@ export default function PosPage() {
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
   const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
   const returnToOpenTablesAfterOrder = getSetting('order.returnToOpenTablesAfterOrder', false) === true
+  const kitchenPagesEnabled = getSetting('general.kitchenPagesEnabled', true) !== false
   const showProductImages = true
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
@@ -1171,7 +1172,10 @@ export default function PosPage() {
 
     await flushPendingOrderEdits()
 
-    const payload = { servingType: normalizeServingType(servingType) }
+    const payload = {
+      servingType: normalizeServingType(servingType),
+      kitchenEnabled: kitchenPagesEnabled
+    }
     const result = await safeAction(
       (signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: payload, signal, silent: true }),
       { reload: false }
@@ -1582,7 +1586,10 @@ export default function PosPage() {
     !!order?.tableId &&
     (order?.paymentStatus === 'paid' || balanceDue <= 0.01) &&
     (order?.items || []).length > 0 &&
-    (order?.items || []).every(it => it.status === 'completed' || it.status === 'cancelled')
+    (
+      kitchenPagesEnabled === false ||
+      (order?.items || []).every(it => it.status === 'completed' || it.status === 'cancelled')
+    )
 
   const itemCount = (Array.isArray(order?.items) ? order.items : []).reduce((sum, it) => sum + (Number(it?.qty) || 0), 0)
 
@@ -1760,7 +1767,9 @@ export default function PosPage() {
               (order.items || []).length === 0
             }
           >
-            Mutfağa Gönder ({servingTypeLabelTR(servingType) || '-'})
+            {kitchenPagesEnabled
+              ? `Mutfağa Gönder (${servingTypeLabelTR(servingType) || '-'})`
+              : 'Onayla (Mutfak Kapalı)'}
           </button>
         </div>
       )}
@@ -1770,7 +1779,9 @@ export default function PosPage() {
           {(() => {
             const raw = Array.isArray(order?.items) ? order.items : []
           const openItems = raw.filter(it => it?.status === 'open')
-          const sentItems = raw.filter(it => isKitchenActiveItemStatus(it?.status))
+          const prepItems = raw.filter(it => isKitchenActiveItemStatus(it?.status))
+          const sentItems = kitchenPagesEnabled ? prepItems : []
+          const approvedItems = kitchenPagesEnabled ? [] : prepItems
           const otherItems = raw.filter(it => isKitchenTerminalItemStatus(it?.status))
 
           const otherRender = buildCartRows(otherItems, cartViewMode, 'o')
@@ -2003,6 +2014,7 @@ export default function PosPage() {
           }
 
           const sentRender = buildCartRows(sentItems, cartViewMode, 'gs')
+          const approvedRender = buildCartRows(approvedItems, cartViewMode, 'ga')
 
             return (
               <>
@@ -2012,6 +2024,11 @@ export default function PosPage() {
                   <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Mutfağa Gönderilenler</div>
                 )}
                 {sentRender.map(r => renderLine(r, { type: 'sent', grouped: cartViewMode === 'grouped' }))}
+
+                {approvedItems.length > 0 && (
+                  <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Onaylanan Ürünler</div>
+                )}
+                {approvedRender.map(r => renderLine(r, { type: 'other', grouped: cartViewMode === 'grouped' }))}
 
                 {otherItems.length > 0 && (
                   <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>

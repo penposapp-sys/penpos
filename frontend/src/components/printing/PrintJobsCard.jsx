@@ -3,10 +3,18 @@ import React from 'react'
 export default function PrintJobsCard({ busy, jobs, onCancel }) {
   return (
     <div className="card" style={{ display: 'grid', gap: 10, minWidth: 0, overflow: 'hidden' }}>
-      <div style={{ fontWeight: 800 }}>Son Print Job'lar</div>
+      <div style={{ fontWeight: 800 }}>Son Yazdırma İşleri</div>
       <div style={{ display: 'grid', gap: 8, minWidth: 0 }}>
         {(jobs || []).slice(0, 20).map((job) => {
           const errorMessage = String(job?.lastError?.message || '').trim()
+          const typeLabel = job.type === 'receipt' ? 'Fiş' : job.type === 'label' ? 'Etiket' : String(job.type || '-')
+          const statusLabel =
+            job.status === 'queued' ? 'Kuyrukta'
+              : job.status === 'processing' ? 'İşleniyor'
+                : job.status === 'completed' ? 'Tamamlandı'
+                  : job.status === 'failed' ? 'Başarısız'
+                    : job.status === 'cancelled' ? 'İptal edildi'
+                      : String(job.status || '-')
 
           return (
             <div
@@ -25,7 +33,7 @@ export default function PrintJobsCard({ busy, jobs, onCancel }) {
             >
               <div style={{ minWidth: 0, overflow: 'hidden' }}>
                 <div style={{ fontWeight: 800, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                  {job.type} · {job.status}
+                  {typeLabel} · {statusLabel}
                 </div>
                 <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
                   {job.createdAt ? new Date(job.createdAt).toLocaleString('tr-TR') : ''}
@@ -63,7 +71,7 @@ export default function PrintJobsCard({ busy, jobs, onCancel }) {
           )
         })}
 
-        {(jobs || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Job yok.</div>}
+        {(jobs || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Yazdırma işi yok.</div>}
       </div>
     </div>
   )

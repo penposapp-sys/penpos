@@ -23,6 +23,7 @@ export const defaultBusinessSettings = {
     requireCancelReasonForProduct: false,
     askGuestCountWhenOpeningTable: false,
     trackCashInDrawer: false,
+    kitchenPagesEnabled: true,
   },
   notifications: {
     language: 'tr',
@@ -121,6 +122,7 @@ const withLegacyAliases = (settings) => {
   next.general.requireCancelReason = next.general.requireCancelReasonForProduct
   next.general.askGuestCountOnTableOpen = next.general.askGuestCountWhenOpeningTable
   next.general.trackCashDrawer = next.general.trackCashInDrawer
+  next.general.kitchenEnabled = next.general.kitchenPagesEnabled
   next.general.companyName = next.business.companyName
   next.general.authorizedName = next.business.authorizedName
   next.general.closingTime = next.business.closingTime
@@ -184,6 +186,7 @@ export function mergeBusinessSettings(existingSettings = {}) {
       requireCancelReasonForProduct: general.requireCancelReasonForProduct ?? general.requireCancelReason ?? defaultBusinessSettings.general.requireCancelReasonForProduct,
       askGuestCountWhenOpeningTable: general.askGuestCountWhenOpeningTable ?? general.askGuestCountOnTableOpen ?? defaultBusinessSettings.general.askGuestCountWhenOpeningTable,
       trackCashInDrawer: general.trackCashInDrawer ?? general.trackCashDrawer ?? defaultBusinessSettings.general.trackCashInDrawer,
+      kitchenPagesEnabled: general.kitchenPagesEnabled ?? general.kitchenEnabled ?? defaultBusinessSettings.general.kitchenPagesEnabled,
     },
     notifications: {
       ...defaultBusinessSettings.notifications,

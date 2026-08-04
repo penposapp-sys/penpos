@@ -11,6 +11,8 @@ import mongoose from 'mongoose'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import WaiterCall from '../models/WaiterCall.js'
 import { parseManualEntryDate } from '../utils/manualEntryDate.js'
+import { findTenantById } from '../repositories/tenantRepository.js'
+import { mergeBusinessSettings } from '../utils/businessSettings.js'
 
 const hasBlockingKitchenItems = (order) => {
   const items = Array.isArray(order?.items) ? order.items : []
@@ -309,6 +311,9 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
   }
 
   const order = await Order.findOne({ _id: t.activeOrderId, tenantId })
+  const tenant = await findTenantById(tenantId)
+  const businessSettings = mergeBusinessSettings(tenant?.settings || {})
+  const kitchenPagesEnabled = businessSettings?.general?.kitchenPagesEnabled !== false
 
   if (!order) {
     const e = new Error('Table not closable')
@@ -340,7 +345,7 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
 
   const items = Array.isArray(order.items) ? order.items : []
   const hasPendingItems = items.some(it => it && (it.status === 'open' || it.status === 'sent'))
-  if (hasPendingItems) {
+  if (kitchenPagesEnabled && hasPendingItems) {
     const e = new Error('Kitchen not finished')
     e.status = 409
     e.payload = {

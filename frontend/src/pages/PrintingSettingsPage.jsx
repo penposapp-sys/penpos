@@ -120,24 +120,24 @@ export default function PrintingSettingsPage({ system }) {
   useEffect(() => {
     setAgentError('')
     if ((stations || []).length === 0) {
-      setAgentHint('Önce Print Station oluşturun.')
+      setAgentHint('Önce yazdırma istasyonu oluşturun.')
       setAgentPrinters([])
       return
     }
     if (!activeStation?.id) {
-      setAgentHint('En az 1 aktif Print Station seçin.')
+      setAgentHint('En az 1 aktif yazdırma istasyonu seçin.')
       setAgentPrinters([])
       return
     }
 
     if (agentStatus === 'no_heartbeat') {
-      setAgentHint('Agent bu istasyona bağlanmamış. Agent `config.json` içine `stationId` + `stationSecret` girin ve agent’ı çalıştırın.')
+      setAgentHint('Ajan bu istasyona bağlanmamış. Ajanın `config.json` dosyasına `stationId` ve `stationSecret` girip ajanı çalıştırın.')
     } else if (agentStatus === 'offline') {
       const sec = heartbeatAgeMs !== null ? Math.round(heartbeatAgeMs / 1000) : null
-      setAgentHint(sec ? `Agent offline. Son görüldü: ${sec} sn önce` : 'Agent offline.')
+      setAgentHint(sec ? `Ajan çevrimdışı. Son görüldü: ${sec} sn önce` : 'Ajan çevrimdışı.')
     } else if (agentStatus === 'stale') {
       const sec = heartbeatAgeMs !== null ? Math.round(heartbeatAgeMs / 1000) : null
-      setAgentHint(sec ? `Agent yavaşladı (stale). Son görüldü: ${sec} sn önce` : 'Agent yavaşladı (stale).')
+      setAgentHint(sec ? `Ajan geç yanıt veriyor. Son görüldü: ${sec} sn önce` : 'Ajan geç yanıt veriyor.')
     } else {
       setAgentHint('')
     }
@@ -330,10 +330,10 @@ export default function PrintingSettingsPage({ system }) {
 
   const createStation = async () => {
     const existingNames = new Set((stations || []).map((s) => String(s?.name || '').trim().toLowerCase()).filter(Boolean))
-    let suggestedName = 'Print Station'
+    let suggestedName = 'Yazdırma İstasyonu'
     let nextIndex = 2
     while (existingNames.has(suggestedName.trim().toLowerCase())) {
-      suggestedName = `Print Station ${nextIndex}`
+      suggestedName = `Yazdırma İstasyonu ${nextIndex}`
       nextIndex += 1
     }
     const name = String(window.prompt('İstasyon adı', suggestedName) || '').trim()
@@ -364,7 +364,7 @@ export default function PrintingSettingsPage({ system }) {
     try {
       const res = await api(`/api/printing/stations/${encodeURIComponent(id)}`, { method: 'PATCH', data: { system: sys, isActive: true }, silent: true })
       if (!res?.station?.id) throw new Error(res?.message || 'Aktifleştirme başarısız')
-      toast.success('Aktif Print Station güncellendi')
+      toast.success('Aktif yazdırma istasyonu güncellendi')
       await loadAll()
     } catch (e) {
       toast.error(e?.message || 'Aktifleştirme başarısız')
@@ -380,7 +380,7 @@ export default function PrintingSettingsPage({ system }) {
     try {
       const res = await api(`/api/printing/jobs/${encodeURIComponent(id)}/cancel`, { method: 'PATCH', data: { system: sys }, silent: true })
       if (!res?.success) throw new Error(res?.message || 'İptal başarısız')
-      toast.success('Job iptal edildi')
+      toast.success('Yazdırma işi iptal edildi')
       await loadAll()
     } catch (e) {
       toast.error(e?.message || 'İptal başarısız')

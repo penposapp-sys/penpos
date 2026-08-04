@@ -24,7 +24,7 @@ export default function LabelPrinterSettingsCard({
       <div style={{ fontWeight: 800 }}>Etiket Yazıcısı Ayarları</div>
       <div style={{ display: 'grid', gap: 8 }}>
         <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Etiket Yazıcını Seç</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Etiket yazıcısını seç</div>
           <select className="input" value={printerName} onChange={(e) => setPrinterName(e.target.value)} disabled={!agentOnline || busy}>
             <option value="">Seçiniz</option>
             {(agentPrinters || []).map((printer) => (
@@ -53,7 +53,7 @@ export default function LabelPrinterSettingsCard({
 
         <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="checkbox" checked={printOnReady} onChange={(e) => setPrintOnReady(e.target.checked)} disabled={busy} />
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Hazırlanacaklarda Hazır butonunda etiket yazdır</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Hazırlananlarda Hazır butonunda etiket yazdır</div>
         </label>
 
         <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

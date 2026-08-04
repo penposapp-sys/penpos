@@ -18,14 +18,14 @@ export default function ReceiptPrinterSettingsCard({
       <div style={{ fontWeight: 800 }}>Fiş Yazıcısı Ayarları</div>
       <div style={{ display: 'grid', gap: 8 }}>
         <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş Yazıcını Seç</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş yazıcısını seç</div>
           <select className="input" value={printerName} onChange={(e) => setPrinterName(e.target.value)} disabled={!agentOnline || busy}>
             <option value="">Seçiniz</option>
             {(agentPrinters || []).map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </label>
         <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş Genişliği (mm)</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş genişliği (mm)</div>
           <input className="input" value={widthMm} onChange={(e) => setWidthMm(e.target.value)} placeholder="80" disabled={busy} />
         </label>
         <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

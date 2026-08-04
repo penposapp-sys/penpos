@@ -45,6 +45,7 @@ export default function WalkInPosPage() {
   const { getSetting } = useBusinessSettings()
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
   const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
+  const kitchenPagesEnabled = getSetting('general.kitchenPagesEnabled', true) !== false
   const showProductImages = true
   const canViewAccounts = hasPerm('view_accounts')
   const canManageAccounts = hasPerm('manage_accounts')
@@ -386,7 +387,9 @@ export default function WalkInPosPage() {
     }
   }, [])
 
-  const effectiveKitchenEnabled = typeof order?.kitchenEnabled === 'boolean' ? order.kitchenEnabled : kitchenDefaultRef.current
+  const effectiveKitchenEnabled = kitchenPagesEnabled
+    ? (typeof order?.kitchenEnabled === 'boolean' ? order.kitchenEnabled : kitchenDefaultRef.current)
+    : false
 
   const setKitchenMode = async (next) => {
     const orderId = selectedOrderId || getOrderId(order)
@@ -1822,29 +1825,31 @@ export default function WalkInPosPage() {
                 </div>
               </div>
 
-              <div className="saleCartSubRow" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar’a Düşsün</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="btn btn--toggle btn--xs"
-                    aria-pressed={effectiveKitchenEnabled !== false}
-                    onClick={() => setKitchenMode(true)}
-                    disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
-                  >
-                    Açık
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--toggle btn--xs"
-                    aria-pressed={effectiveKitchenEnabled === false}
-                    onClick={() => setKitchenMode(false)}
-                    disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
-                  >
-                    Kapalı
-                  </button>
+              {kitchenPagesEnabled && (
+                <div className="saleCartSubRow" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar’a Düşsün</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn--toggle btn--xs"
+                      aria-pressed={effectiveKitchenEnabled !== false}
+                      onClick={() => setKitchenMode(true)}
+                      disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
+                    >
+                      Açık
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--toggle btn--xs"
+                      aria-pressed={effectiveKitchenEnabled === false}
+                      onClick={() => setKitchenMode(false)}
+                      disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
+                    >
+                      Kapalı
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {order?.servingType && servingType !== order.servingType && (
                 <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>

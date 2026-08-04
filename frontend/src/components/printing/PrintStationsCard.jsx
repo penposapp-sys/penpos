@@ -24,6 +24,14 @@ const shortId = (id) => {
   return `${v.slice(0, 6)}...${v.slice(-4)}`
 }
 
+const localizeStationName = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return 'Yazdırma İstasyonu'
+  if (raw === 'Print Station') return 'Yazdırma İstasyonu'
+  if (raw.startsWith('Print Station ')) return raw.replace('Print Station ', 'Yazdırma İstasyonu ')
+  return raw
+}
+
 const copyText = async (label, text) => {
   const v = String(text || '')
   if (!v) return
@@ -114,13 +122,13 @@ export default function PrintStationsCard({
     try {
       const res = await api(`/api/printing/stations/${encodeURIComponent(id)}/rotate-secret`, { method: 'POST', data: { system }, silent: true })
       const secret = String(res?.secret || '').trim()
-      if (!secret) throw new Error(res?.message || 'Secret üretilemedi')
+      if (!secret) throw new Error(res?.message || 'Gizli anahtar üretilemedi')
       setRotatedSecret(secret)
       setSecretModalOpen(true)
-      toast.success('Secret yenilendi')
+      toast.success('Gizli anahtar yenilendi')
       if (typeof onReload === 'function') await onReload()
     } catch (e) {
-      toast.error(e?.message || 'Secret yenileme başarısız')
+      toast.error(e?.message || 'Gizli anahtar yenilenemedi')
     } finally {
       setSubmitting(false)
       setRotateStationId('')
@@ -252,8 +260,8 @@ export default function PrintStationsCard({
       <SettingsUiStyles />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompact ? 'flex-start' : 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontWeight: 800 }}>Print Station</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>İstasyon bilgisayar demektir. Birden fazla istasyon aynı anda aktif olabilir ve her istasyonun altına birden fazla fiş ve etiket yazıcısı ekleyebilirsin.</div>
+          <div style={{ fontWeight: 800 }}>Yazdırma İstasyonu</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>İstasyon, yazdırma işlemini yapan bilgisayardır. Aynı anda birden fazla istasyon aktif olabilir ve her istasyona birden fazla fiş veya etiket yazıcısı bağlayabilirsiniz.</div>
         </div>
         <button className="btn" onClick={handleCreate} disabled={blocked} style={{ width: isMobilePortrait ? '100%' : undefined }}>Yeni İstasyon Ekle</button>
       </div>
@@ -261,7 +269,7 @@ export default function PrintStationsCard({
       <div style={{ display: 'grid', gap: 8 }}>
         {(stations || []).map((s) => {
           const st = calcStatus(s.lastHeartbeatAt)
-          const label = st.status === 'online' ? 'Online' : st.status === 'stale' ? 'Stale' : st.status === 'offline' ? 'Offline' : 'Heartbeat yok'
+          const label = st.status === 'online' ? 'Çevrimiçi' : st.status === 'stale' ? 'Geç yanıt' : st.status === 'offline' ? 'Çevrimdışı' : 'Bağlantı sinyali yok'
           const age = typeof st.ageSec === 'number' ? ` · Son görüldü: ${Math.round(st.ageSec)} sn önce` : ''
           const host = String(s.lastHeartbeatMeta?.hostname || '').trim()
           const ver = String(s.lastHeartbeatMeta?.version || '').trim()
@@ -276,19 +284,19 @@ export default function PrintStationsCard({
             <div key={s.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 12, minWidth: 0, overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{s.name}</div>
+                  <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{localizeStationName(s.name)}</div>
                   <div style={{ marginTop: 2, fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div>Station ID: <span style={{ fontFamily: 'monospace' }}>{shortId(s.id)}</span></div>
-                    <button className="btn btn--compact" onClick={() => copyText('Station ID', s.id)} disabled={blocked}>Kopyala</button>
+                    <div>İstasyon ID: <span style={{ fontFamily: 'monospace' }}>{shortId(s.id)}</span></div>
+                    <button className="btn btn--compact" onClick={() => copyText('İstasyon ID', s.id)} disabled={blocked}>Kopyala</button>
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)', display: 'grid', gap: 2 }}>
                     <div>{s.isActive ? 'Aktif' : 'Pasif'} · {label}{age}</div>
-                    <div style={{ overflowWrap: 'anywhere' }}>PC: {host || '-'} · v{ver || '-'} · Agent Yazıcıları: {printersCount} · Tanımlı Kurallar: {configuredPrinters.length}</div>
+                    <div style={{ overflowWrap: 'anywhere' }}>Bilgisayar: {host || '-'} · v{ver || '-'} · Ajan yazıcıları: {printersCount} · Tanımlı kurallar: {configuredPrinters.length}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: isCompact ? '100%' : 'auto' }}>
                   <button className="btn" onClick={() => onActivate(s.id)} disabled={blocked || s.isActive === true} style={{ flex: isCompact ? '1 1 140px' : undefined }}>{s.isActive ? 'Aktif' : 'Aktif Yap'}</button>
-                  <button className="btn" onClick={() => setRotateStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Secret Yenile</button>
+                  <button className="btn" onClick={() => setRotateStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Anahtar Yenile</button>
                   <button className="btn btn--danger" onClick={() => setDeleteStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Sil</button>
                 </div>
               </div>
@@ -508,8 +516,8 @@ export default function PrintStationsCard({
       <ConfirmModal
         open={!!rotateStationId}
         onClose={() => setRotateStationId('')}
-        title="Secret yenilensin mi?"
-        description="Secret yenilenirse bu istasyona bağlı agent yeniden ayarlanmalıdır. Devam edilsin mi?"
+        title="Gizli anahtar yenilensin mi?"
+        description="Gizli anahtar yenilenirse bu istasyona bağlı ajan yeniden ayarlanmalıdır. Devam edilsin mi?"
         confirmText="Yenile"
         cancelText="Vazgeç"
         onConfirm={doRotate}
@@ -521,7 +529,7 @@ export default function PrintStationsCard({
         open={!!deleteStationId}
         onClose={() => setDeleteStationId('')}
         title="İstasyon silinsin mi?"
-        description="Bu istasyon silinecek. İstasyonun kilitlediği joblar failed olacaktır."
+        description="Bu istasyon silinecek. İstasyona bağlı bekleyen yazdırma işleri başarısız duruma düşecektir."
         confirmText="Sil"
         cancelText="Vazgeç"
         danger
@@ -530,12 +538,12 @@ export default function PrintStationsCard({
         cancelDisabled={blocked}
       />
 
-      <Modal open={secretModalOpen} onClose={closeSecretModal} title="Yeni secret">
+      <Modal open={secretModalOpen} onClose={closeSecretModal} title="Yeni gizli anahtar">
         <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bu secret tek sefer gösterilir. Kaybedersen Secret Yenile'ye bas.</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Bu gizli anahtar yalnızca bir kez gösterilir. Kaybederseniz “Anahtar Yenile” seçeneğini kullanın.</div>
           <div className="input" style={{ fontFamily: 'monospace', userSelect: 'all' }}>{rotatedSecret}</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <button className="btn" onClick={() => copyText('Station Secret', rotatedSecret)} disabled={!rotatedSecret}>Kopyala</button>
+            <button className="btn" onClick={() => copyText('İstasyon anahtarı', rotatedSecret)} disabled={!rotatedSecret}>Kopyala</button>
             <button className="btn" onClick={closeSecretModal}>Kapat</button>
           </div>
         </div>

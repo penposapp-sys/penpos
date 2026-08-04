@@ -243,6 +243,7 @@ export default function Layout() {
     const perms = Array.isArray(user?.permissions) ? user.permissions : []
     const canSettings = user.role === 'tenant_admin' || perms.includes('manage_settings') || perms.includes('manage_menu')
     const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
+    const kitchenPagesEnabled = getSetting('general.kitchenPagesEnabled', true) !== false
 
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view'))) {
       items.push({ path: '/kermes/app/dashboard', label: 'Anasayfa', icon: IconHome, show: true })
@@ -251,7 +252,7 @@ export default function Layout() {
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('manage_tables'))) {
       items.push({ path: '/kermes/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
     }
-    if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) {
+    if (!isExpired && kitchenPagesEnabled && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) {
       items.push({ path: '/kermes/app/kitchen', label: 'Hazirlanacaklar', icon: IconUtensils, show: true })
       items.push({ path: '/kermes/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
     }

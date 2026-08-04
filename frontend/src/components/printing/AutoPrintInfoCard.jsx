@@ -18,37 +18,37 @@ export default function AutoPrintInfoCard({
   const isStale = st === 'stale'
   const isOffline = st === 'offline'
   const statusText =
-    st === 'no_station' ? 'Print Station yok'
+    st === 'no_station' ? 'Yazdırma istasyonu yok'
       : st === 'no_active_station' ? 'Aktif istasyon yok'
-        : st === 'no_heartbeat' ? 'Heartbeat yok'
-          : isOnline ? 'Agent online'
-            : isStale ? 'Agent stale'
-              : isOffline ? 'Agent offline'
-                : 'Agent bekleniyor'
+        : st === 'no_heartbeat' ? 'Bağlantı sinyali yok'
+          : isOnline ? 'Ajan çevrimiçi'
+            : isStale ? 'Ajan yavaş yanıt veriyor'
+              : isOffline ? 'Ajan çevrimdışı'
+                : 'Ajan bekleniyor'
   const statusColor = isOnline ? '#22c55e' : isStale ? '#f59e0b' : '#ef4444'
 
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <div>
-          <div style={{ fontWeight: 800 }}>Print Agent</div>
+          <div style={{ fontWeight: 800 }}>Yazdırma Ajanı</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ fontWeight: 800, color: statusColor }}>{statusText}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yazicilar: {Number(printerCount || 0)}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yazıcılar: {Number(printerCount || 0)}</div>
             {typeof lastSeenSec === 'number' && !Number.isNaN(lastSeenSec) && !isOnline ? (
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Son goruldu: {Math.max(0, Math.round(lastSeenSec))} sn once</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Son görüldü: {Math.max(0, Math.round(lastSeenSec))} sn önce</div>
             ) : null}
           </div>
           {(String(hostname || '').trim() || String(version || '').trim()) ? (
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
-              {String(hostname || '').trim() ? `Host: ${String(hostname).trim()}` : ''}
+              {String(hostname || '').trim() ? `Bilgisayar: ${String(hostname).trim()}` : ''}
               {String(hostname || '').trim() && String(version || '').trim() ? ' · ' : ''}
-              {String(version || '').trim() ? `Versiyon: ${String(version).trim()}` : ''}
+              {String(version || '').trim() ? `Sürüm: ${String(version).trim()}` : ''}
             </div>
           ) : null}
           {!!String(latestVersion || '').trim() && (
             <div style={{ marginTop: 4, fontSize: 12, color: updateAvailable ? '#f59e0b' : 'var(--muted)', fontWeight: updateAvailable ? 700 : 500 }}>
-              {updateAvailable ? `Güncelleme var: ${latestVersion}` : `Güncel surum: ${latestVersion}`}
+              {updateAvailable ? `Güncelleme var: ${latestVersion}` : `Güncel sürüm: ${latestVersion}`}
             </div>
           )}
         </div>

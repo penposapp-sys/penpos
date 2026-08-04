@@ -1030,8 +1030,10 @@ export const SettingsSystemContent = () => {
   const [allowedBranchIds, setAllowedBranchIdsLocal] = useState([])
   const [selectedThemeId, setSelectedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
   const [selectedDarkMode, setSelectedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
+  const [kitchenPagesEnabled, setKitchenPagesEnabled] = useState(defaultBusinessSettings.general.kitchenPagesEnabled)
   const [savedThemeId, setSavedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
   const [savedDarkMode, setSavedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
+  const [savedKitchenPagesEnabled, setSavedKitchenPagesEnabled] = useState(defaultBusinessSettings.general.kitchenPagesEnabled)
   const [loading, setLoading] = useState(false)
   const [branchSaving, setBranchSaving] = useState(false)
   const [branchCreateOpen, setBranchCreateOpen] = useState(false)
@@ -1090,6 +1092,7 @@ export const SettingsSystemContent = () => {
     const t = profileRes?.tenant || null
     const nextThemeId = normalizeThemeId(businessRes?.settings?.appearance?.themeId || defaultBusinessSettings.appearance.themeId)
     const nextDarkMode = businessRes?.settings?.appearance?.darkMode === true
+    const nextKitchenPagesEnabled = businessRes?.settings?.general?.kitchenPagesEnabled !== false
     setName(t?.name || '')
     setDescription(t?.description || '')
     setLogoUrl(t?.logoUrl || '')
@@ -1107,8 +1110,10 @@ export const SettingsSystemContent = () => {
     setAllowedBranchIds(nextAllowed)
     setSelectedThemeId(nextThemeId)
     setSelectedDarkMode(nextDarkMode)
+    setKitchenPagesEnabled(nextKitchenPagesEnabled)
     setSavedThemeId(nextThemeId)
     setSavedDarkMode(nextDarkMode)
+    setSavedKitchenPagesEnabled(nextKitchenPagesEnabled)
     setThemeKey(nextThemeId)
     setDarkMode(nextDarkMode)
 
@@ -1277,6 +1282,9 @@ export const SettingsSystemContent = () => {
                 themeId: selectedThemeId,
                 darkMode: selectedDarkMode,
               },
+              general: {
+                kitchenPagesEnabled,
+              },
             },
           }),
           silent: true,
@@ -1302,12 +1310,16 @@ export const SettingsSystemContent = () => {
       setSelectedDarkMode(nextDarkMode)
       setSavedThemeId(nextThemeId)
       setSavedDarkMode(nextDarkMode)
+      setSavedKitchenPagesEnabled(kitchenPagesEnabled)
       setThemeKey(nextThemeId)
       setDarkMode(nextDarkMode)
       setSettingsLocally({
         appearance: {
           themeId: nextThemeId,
           darkMode: nextDarkMode,
+        },
+        general: {
+          kitchenPagesEnabled,
         },
       })
 
@@ -1549,9 +1561,22 @@ export const SettingsSystemContent = () => {
             />
           </div>
 
+          <div className="card" style={{ borderColor: 'var(--border)' }}>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>Mutfak Akışı</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+              Hazırlanacaklar ve toplu hazırlama sayfalarını kullanıp kullanmayacağınızı belirleyin.
+            </div>
+            <SettingsToggle
+              label="Hazırlanacaklar ve mutfak sayfaları aktif"
+              description="Kapalıysa yan bardan gizlenir ve ürünler masa sepetinde mutfak hazır onayı beklemeden hazır kabul edilir."
+              checked={kitchenPagesEnabled}
+              onChange={(e) => setKitchenPagesEnabled(e.target.checked)}
+            />
+          </div>
+
           {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
           {success && <div style={{ color: '#22c55e', fontSize: 13 }}>{success}</div>}
-          <button className="btn" disabled={loading || (selectedThemeId === savedThemeId && selectedDarkMode === savedDarkMode)}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
+          <button className="btn" disabled={loading || (selectedThemeId === savedThemeId && selectedDarkMode === savedDarkMode && kitchenPagesEnabled === savedKitchenPagesEnabled)}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
         </form>
       </div>
 
