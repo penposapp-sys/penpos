@@ -193,7 +193,7 @@ export function ReportsSalesContent({ embedded = false }) {
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={8} style={{ background: '#f9fafb' }}>
+                        <td colSpan={8} style={{ background: 'var(--app-surface-soft, var(--app-surface))', color: 'var(--app-text)' }}>
                           <div style={{ padding: 10, display: 'grid', gap: 8 }}>
                             <div style={{ fontWeight: 800 }}>Sipariş İçeriği</div>
                             {detailsLoadingId === o.id && <div style={{ color: 'var(--muted)' }}>Yükleniyor...</div>}

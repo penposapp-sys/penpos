@@ -1811,6 +1811,7 @@ export default function PosPage() {
             const isSent = opts.type === 'sent'
             const isTerminal = opts.type === 'other'
             const isCompleted = isTerminal && String(it?.status || '') === 'completed'
+            const kitchenModeDisabled = opts.kitchenModeDisabled === true
             const isGrouped = opts.grouped === true
             const isMultiGroup = isGrouped && Array.isArray(row.itemIds) && row.itemIds.length > 1
             const isWeightBased = !!it?.isWeightBased
@@ -1958,21 +1959,23 @@ export default function PosPage() {
                       >
                         {cartActionLabel('note')}
                       </button>
-                      <button
-                        className="btn sale-cart-line__action-btn sale-cart-line__action-btn--ready"
-                        onClick={() => {
-                          if (isMultiGroup) {
-                            toast.info('Hazır için Ayrı moduna geç')
-                            return
-                          }
-                          completeItem(row.itemId)
-                        }}
-                        disabled={disableBase || isCompleteLocked}
-                        title={isMultiGroup ? 'Hazır için Ayrı moduna geç' : undefined}
-                        style={{ backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#6ee7b7', ...(isMultiGroup ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
-                      >
-                        {cartActionLabel('ready')}
-                      </button>
+                      {!kitchenModeDisabled && (
+                        <button
+                          className="btn sale-cart-line__action-btn sale-cart-line__action-btn--ready"
+                          onClick={() => {
+                            if (isMultiGroup) {
+                              toast.info('Hazır için Ayrı moduna geç')
+                              return
+                            }
+                            completeItem(row.itemId)
+                          }}
+                          disabled={disableBase || isCompleteLocked}
+                          title={isMultiGroup ? 'Hazır için Ayrı moduna geç' : undefined}
+                          style={{ backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#6ee7b7', ...(isMultiGroup ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                        >
+                          {cartActionLabel('ready')}
+                        </button>
+                      )}
                       <button
                         className="btn sale-cart-line__action-btn sale-cart-line__action-btn--cancel"
                         onClick={() => {
@@ -2028,7 +2031,7 @@ export default function PosPage() {
                 {approvedItems.length > 0 && (
                   <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Onaylanan Ürünler</div>
                 )}
-                {approvedRender.map(r => renderLine(r, { type: 'other', grouped: cartViewMode === 'grouped' }))}
+                {approvedRender.map(r => renderLine(r, { type: 'sent', grouped: cartViewMode === 'grouped', kitchenModeDisabled: true }))}
 
                 {otherItems.length > 0 && (
                   <div className="saleCartSectionLabel" style={{ fontSize: 12, color: 'var(--muted)' }}>Tamamlanan / İptal</div>

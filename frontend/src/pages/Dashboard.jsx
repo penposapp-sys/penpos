@@ -777,17 +777,17 @@ const buildFallbackOperationsSnapshot = () => ({
     { title: 'Mutfak', note: 'Veri bekleniyor', time: 'Şimdi', dotColor: '#ef4444' }
   ],
   statuses: [
-    { label: 'Yazici', value: 'Bekleniyor', tone: 'orange' },
-    { label: 'API', value: 'Kontrol', tone: 'orange' },
-    { label: 'Internet', value: 'Kontrol', tone: 'orange' },
+    { label: 'Yazıcı', value: 'Bekleniyor', tone: 'orange' },
+    { label: 'API Servisi', value: 'Kontrol Ediliyor', tone: 'orange' },
+    { label: 'İnternet', value: 'Kontrol Ediliyor', tone: 'orange' },
     { label: 'Terminal', value: 'Hazır', tone: 'green' },
-    { label: 'Print Agent', value: 'Bekleniyor', tone: 'orange' },
-    { label: 'Veri Senkron', value: 'Bekleniyor', tone: 'orange' }
+    { label: 'Yazdırma Aracısı', value: 'Bekleniyor', tone: 'orange' },
+    { label: 'Veri Senkronu', value: 'Bekleniyor', tone: 'orange' }
   ],
   alerts: [
-    { title: 'Yazici gecikmesi', badge: 'Takip', message: 'Print Agent baglantisi kontrol edilmeli.', tone: 'orange' },
+    { title: 'Yazıcı gecikmesi', badge: 'Takip', message: 'Yazdırma aracısı bağlantısı kontrol edilmeli.', tone: 'orange' },
     { title: 'Bağlantı sorunu', badge: 'Kontrol', message: 'Canlı servis baglantisi doğrulanıyor.', tone: 'orange' },
-    { title: 'Açık hesap riski', badge: 'Izleme', message: 'Açık hesap verisi hazır oldugunda burada gosterilir.', tone: 'orange' }
+    { title: 'Açık hesap riski', badge: 'İzleme', message: 'Açık hesap verisi hazır olduğunda burada gösterilir.', tone: 'orange' }
   ]
 })
 
@@ -870,33 +870,33 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
     .filter((row) => row.amount > 0)
     .map((row) => ({ label: row.label, value: fmtTl(row.amount) }))
   const statuses = [
-    { label: 'Yazici', value: agentOnline ? 'Bagli' : agentStale ? 'Yavas' : 'Bekliyor', tone: agentOnline ? 'green' : 'orange' },
-    { label: 'API', value: 'Online', tone: 'green' },
-    { label: 'Internet', value: online ? 'Stabil' : 'Sorunlu', tone: online ? 'green' : 'red' },
+    { label: 'Yazıcı', value: agentOnline ? 'Bağlı' : agentStale ? 'Yavaş' : 'Bekliyor', tone: agentOnline ? 'green' : 'orange' },
+    { label: 'API Servisi', value: 'Çevrimiçi', tone: 'green' },
+    { label: 'İnternet', value: online ? 'Stabil' : 'Sorunlu', tone: online ? 'green' : 'red' },
     { label: 'Terminal', value: openTableCount > 0 ? 'Aktif' : 'Hazır', tone: 'green' },
-    { label: 'Print Agent', value: agentOnline ? 'Calisiyor' : agentStale ? 'Gecikmeli' : 'Offline', tone: agentOnline ? 'green' : agentStale ? 'orange' : 'red' },
+    { label: 'Yazdırma Aracısı', value: agentOnline ? 'Çalışıyor' : agentStale ? 'Gecikmeli' : 'Çevrimdışı', tone: agentOnline ? 'green' : agentStale ? 'orange' : 'red' },
     { label: 'Veri Senkron', value: 'Güncel', tone: 'green' }
   ]
 
   const alerts = [
     {
-      title: 'Yazici gecikmesi',
+      title: 'Yazıcı gecikmesi',
       badge: agentOnline ? 'Normal' : 'Dikkat',
-      message: agentOnline ? 'Yazici ve agent yaniti normal gorunuyor.' : 'Print Agent yaniti gecikmeli veya bağlantı bekliyor.',
+      message: agentOnline ? 'Yazıcı ve aracının yanıtı normal görünüyor.' : 'Yazdırma aracısı gecikmeli yanıt veriyor veya bağlantı bekliyor.',
       tone: agentOnline ? 'green' : 'orange',
       bg: agentOnline ? '#ecfdf5' : '#fffbeb'
     },
     {
       title: 'Bağlantı sorunu',
       badge: online ? 'Yok' : 'Kontrol',
-      message: online ? 'Tarayici internet baglantisi aktif gorunuyor.' : 'Tarayici offline bildiriyor, bağlantı kontrol edilmeli.',
+      message: online ? 'Tarayıcı internet bağlantısı aktif görünüyor.' : 'Tarayıcı çevrimdışı bildiriyor, bağlantı kontrol edilmeli.',
       tone: online ? 'green' : 'red',
       bg: online ? '#ecfdf5' : '#fef2f2'
     },
     {
       title: 'Açık hesap riski',
       badge: openAccountValue > 5000 ? 'Takip' : 'Normal',
-      message: openAccountValue > 5000 ? `Açık hesap toplami ${fmtTl(openAccountValue)} seviyesinde.` : 'Açık hesap riski normal seviyede.',
+      message: openAccountValue > 5000 ? `Açık hesap toplamı ${fmtTl(openAccountValue)} seviyesinde.` : 'Açık hesap riski normal seviyede.',
       tone: openAccountValue > 5000 ? 'orange' : 'green',
       bg: openAccountValue > 5000 ? '#fffbeb' : '#ecfdf5'
     }

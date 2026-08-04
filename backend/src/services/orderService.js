@@ -492,6 +492,82 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
   }
 }
 
+const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '', batchId = null }) => {
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
+  if (!order || safeItems.length === 0) return
+
+  const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
+  const { createJob, resolveActiveStationForJob, resolveStationPrinterConfig } = await import('./printingService.js')
+
+  const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
+  const options = labelProfile?.options && typeof labelProfile.options === 'object' ? labelProfile.options : {}
+
+  const menuItemIds = safeItems
+    .map((it) => String(it?.menuItemId || '').trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+
+  const labelCandidateDocs = menuItemIds.length > 0
+    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds } }).select('_id categoryId printLabelEnabled').lean()
+    : []
+
+  const labelCandidateMap = new Map((labelCandidateDocs || []).map((doc) => [
+    String(doc?._id || ''),
+    {
+      categoryId: String(doc?.categoryId || ''),
+      printLabelEnabled: doc?.printLabelEnabled === true
+    }
+  ]))
+  const labelItems = safeItems.filter((it) => labelCandidateMap.has(String(it?.menuItemId || '')))
+  if (labelItems.length === 0) return
+
+  const top = `${await buildLabelTopLine(order)} - İPTAL`
+  for (const it of labelItems) {
+    const itemConfig = labelCandidateMap.get(String(it?.menuItemId || '')) || { categoryId: '', printLabelEnabled: false }
+    const categoryId = String(itemConfig.categoryId || '')
+    const activeStation = await resolveActiveStationForJob({
+      tenantId,
+      system: 'kermes',
+      jobType: 'label',
+      jobMeta: { categoryId, triggerMode: 'item_cancel' }
+    })
+    const stationPrinter = activeStation
+      ? resolveStationPrinterConfig({
+          station: activeStation,
+          jobType: 'label',
+          jobMeta: { categoryId },
+          triggerMode: 'item_cancel'
+        })
+      : null
+    if (itemConfig.printLabelEnabled !== true && !stationPrinter) continue
+    if (activeStation && !stationPrinter) continue
+
+    const name = String(it?.nameSnapshot || '').trim() || '-'
+    const qty = Math.max(1, Number(it?.qty || 1))
+    const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
+    const isWeightBased = it?.isWeightBased === true || weightGrams > 0
+    const amountLine = isWeightBased && weightGrams > 0 ? `${weightGrams} GR` : `${qty} ADET`
+    const noteLine = String(reason || it?.cancelReason || it?.note || '').trim()
+    const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}` : ''}\n`
+
+    await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
+      type: 'label',
+      profileId: labelProfile && labelProfile.isActive !== false ? String(labelProfile.id) : undefined,
+      payload: { type: 'raw', content: payload },
+      meta: {
+        orderId: String(order.id),
+        tableId: order.tableId ? String(order.tableId) : null,
+        kitchenBatchId: batchId ? String(batchId) : (it?.kitchenBatchId ? String(it.kitchenBatchId) : null),
+        menuItemId: it?.menuItemId ? String(it.menuItemId) : null,
+        categoryId: categoryId || null,
+        itemId: it?._id ? String(it._id) : null,
+        qty,
+        triggerMode: 'item_cancel',
+        cancelReason: noteLine
+      }
+    })
+  }
+}
+
 const normalizePrinterCategoryIds = (value) => Array.isArray(value)
   ? value.map(String).filter(Boolean)
   : []
@@ -1751,6 +1827,7 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
     e.payload = { error: 'item_already_cancelled', message: 'Item already cancelled' }
     throw e
   }
+  const originalStatus = it.status
   it.status = 'cancelled'
   it.cancelledAt = new Date()
   it.note = cancelReason || it.note
@@ -1762,6 +1839,18 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
     ? { paymentStatus: 'paid', paidAt: order.paidAt || new Date() }
     : { paymentStatus: 'unpaid', paidAt: null }
   const updated = await updateById(id, { items: order.items, totals, ...paymentUpdates })
+  if (['sent', 'cooking', 'completed'].includes(originalStatus)) {
+    try {
+      await enqueueCancelledItemLabels({
+        tenantId,
+        order,
+        items: [it],
+        reason: cancelReason,
+        batchId: it.kitchenBatchId || null
+      })
+    } catch {
+    }
+  }
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_item_cancel', 'Order', updated.id, { menuItemId, reason })
   const dto = await getOrderService(tenantId, updated.id)
   return { order: dto }
@@ -1796,8 +1885,9 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
       throw e
     }
     const cancelAt = new Date()
+    const cancelledItems = []
     if ((Number(item.qty) || 0) > 1 && !item.isWeightBased) {
-      splitItemAroundUnitSelection({
+      const cancelledItem = splitItemAroundUnitSelection({
         order,
         item,
         selectedUnitIndex: unitIndex,
@@ -1808,11 +1898,13 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
           cancelReason: cancelReason || item.cancelReason || ''
         }
       })
+      if (cancelledItem) cancelledItems.push(cancelledItem)
     } else {
       item.status = 'cancelled'
       item.cancelledAt = cancelAt
       if (cancelReason) item.note = cancelReason
       item.cancelReason = cancelReason || item.cancelReason || ''
+      cancelledItems.push(item)
     }
     if (order.tableId) {
       order.cancelAlertActive = true
@@ -1837,6 +1929,16 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
       order
     })
     await order.save()
+    try {
+      await enqueueCancelledItemLabels({
+        tenantId: user.tenantId,
+        order,
+        items: cancelledItems,
+        reason: cancelReason,
+        batchId: cancelledItems[0]?.kitchenBatchId || null
+      })
+    } catch {
+    }
     const freshOrder = await Order.findById(order.id).lean()
     const dto = decorateOrder(freshOrder)
     return { order: dto }
@@ -1857,6 +1959,7 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
 
   let changed = 0
   const cancelAt = new Date()
+  const cancelledItems = []
   for (const itemId of ids) {
     const item = order.items.id(itemId)
     if (!item) continue
@@ -1865,6 +1968,7 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
     item.cancelledAt = cancelAt
     if (reason) item.note = reason
     changed += 1
+    cancelledItems.push(item)
   }
 
   if (changed === 0) {
@@ -1893,6 +1997,16 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
     order
   })
   await order.save()
+  try {
+    await enqueueCancelledItemLabels({
+      tenantId: user.tenantId,
+      order,
+      items: cancelledItems,
+      reason,
+      batchId: cancelledItems[0]?.kitchenBatchId || null
+    })
+  } catch {
+  }
   const freshOrder = await Order.findById(order.id).lean()
   return { order: decorateOrder(freshOrder) }
 }
