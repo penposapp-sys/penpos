@@ -74,6 +74,10 @@ export default function PrintingSettingsPage({ system }) {
     return pr || null
   }, [printers, receiptProfile?.printerId])
 
+  const latestLabelJob = useMemo(() => {
+    return (jobs || []).find((job) => String(job?.type || '') === 'label') || null
+  }, [jobs])
+
   const loadAll = async () => {
     setBusy(true)
     try {
@@ -295,7 +299,7 @@ export default function PrintingSettingsPage({ system }) {
         silent: true
       })
       if (!res?.success) throw new Error(res?.message || 'Kuyruğa alınamadı')
-      toast.success('Test etiket kuyruğa alındı')
+      toast.success('Test etiket kuyruğa alındı, yazıcıya gönderim bekleniyor')
     } catch (e) {
       toast.error(e?.message || 'Test baskı başarısız')
     } finally {
@@ -465,6 +469,7 @@ export default function PrintingSettingsPage({ system }) {
       <PrintJobsCard
         busy={busy}
         jobs={jobs}
+        latestLabelJob={latestLabelJob}
         onCancel={cancelJob}
       />
     </div>

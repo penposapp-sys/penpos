@@ -326,7 +326,12 @@ export const send = async (req, res) => {
     const servingType = req.body?.servingType
     const kitchenEnabled = req.body?.kitchenEnabled
     const result = await sendOrderService(req.user.tenantId, req.params.id, { servingType, kitchenEnabled })
-    res.json({ success: true, order: result.order })
+    res.json({
+      success: true,
+      order: result.order,
+      labelQueuedCount: Number(result.labelQueuedCount || 0),
+      receiptQueuedCount: Number(result.receiptQueuedCount || 0)
+    })
   } catch (err) {
     sendError(res, err)
   }

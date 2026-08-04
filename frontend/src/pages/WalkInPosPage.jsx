@@ -1188,10 +1188,18 @@ export default function WalkInPosPage() {
       servingType: normalizeServingType(servingType),
       kitchenEnabled: effectiveKitchenEnabled !== false
     }
-    await safeAction(
+    const result = await safeAction(
       (signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: payload, signal, silent: true }),
       { reload: false }
     )
+    if (result) {
+      const labelQueuedCount = Number(result?.labelQueuedCount || 0)
+      if (labelQueuedCount > 0) {
+        toast.success(labelQueuedCount === 1 ? 'Sipariş onaylandı, etiket yazıcıya gönderildi.' : `Sipariş onaylandı, ${labelQueuedCount} etiket yazıcıya gönderildi.`)
+      } else {
+        toast.success('Sipariş onaylandı.')
+      }
+    }
     await reloadOrder().catch(() => null)
   }
 

@@ -1180,6 +1180,14 @@ export default function PosPage() {
       (signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: payload, signal, silent: true }),
       { reload: false }
     )
+    if (result) {
+      const labelQueuedCount = Number(result?.labelQueuedCount || 0)
+      if (labelQueuedCount > 0) {
+        toast.success(labelQueuedCount === 1 ? 'Sipariş onaylandı, etiket yazıcıya gönderildi.' : `Sipariş onaylandı, ${labelQueuedCount} etiket yazıcıya gönderildi.`)
+      } else {
+        toast.success('Sipariş onaylandı.')
+      }
+    }
     if (result && returnToOpenTablesAfterOrder && order?.tableId) {
       nav('/kermes/app/tables')
     }

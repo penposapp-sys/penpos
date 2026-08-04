@@ -1,20 +1,38 @@
 import React from 'react'
 
-export default function PrintJobsCard({ busy, jobs, onCancel }) {
+export default function PrintJobsCard({ busy, jobs, onCancel, latestLabelJob }) {
+  const getStatusLabel = (status) => {
+    if (status === 'queued') return 'Kuyrukta'
+    if (status === 'printing') return 'Yazdırılıyor'
+    if (status === 'printed') return 'Yazdırıldı'
+    if (status === 'failed') return 'Başarısız'
+    if (status === 'canceled' || status === 'cancelled') return 'İptal edildi'
+    return String(status || '-')
+  }
+
+  const getLabelNotice = (job) => {
+    if (!job) return { text: 'Henüz etiket işi yok.', tone: 'var(--muted)' }
+    const typeText = job.type === 'label' ? 'Etiket' : 'İş'
+    if (job.status === 'printed') return { text: `Son ${typeText.toLowerCase()} yazıcıya gönderildi ve tamamlandı.`, tone: '#16a34a' }
+    if (job.status === 'printing') return { text: `Son ${typeText.toLowerCase()} yazdırılıyor, yazıcıya gönderildi.`, tone: '#f59e0b' }
+    if (job.status === 'queued') return { text: `Son ${typeText.toLowerCase()} kuyruğa alındı, yazıcıya gönderim bekliyor.`, tone: '#f59e0b' }
+    if (job.status === 'failed') return { text: `Son ${typeText.toLowerCase()} gönderilemedi.`, tone: '#ef4444' }
+    if (job.status === 'canceled' || job.status === 'cancelled') return { text: `Son ${typeText.toLowerCase()} iptal edildi.`, tone: '#ef4444' }
+    return { text: `Son ${typeText.toLowerCase()} durumu: ${getStatusLabel(job.status)}`, tone: 'var(--muted)' }
+  }
+
+  const latestNotice = getLabelNotice(latestLabelJob)
+
   return (
     <div className="card" style={{ display: 'grid', gap: 10, minWidth: 0, overflow: 'hidden' }}>
       <div style={{ fontWeight: 800 }}>Son Yazdırma İşleri</div>
+      <div style={{ fontSize: 12, color: latestNotice.tone, fontWeight: 700 }}>{latestNotice.text}</div>
+      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Buradaki durum, işin yazdırma kuyruğundaki sonucunu gösterir.</div>
       <div style={{ display: 'grid', gap: 8, minWidth: 0 }}>
         {(jobs || []).slice(0, 20).map((job) => {
           const errorMessage = String(job?.lastError?.message || '').trim()
           const typeLabel = job.type === 'receipt' ? 'Fiş' : job.type === 'label' ? 'Etiket' : String(job.type || '-')
-          const statusLabel =
-            job.status === 'queued' ? 'Kuyrukta'
-              : job.status === 'processing' ? 'İşleniyor'
-                : job.status === 'completed' ? 'Tamamlandı'
-                  : job.status === 'failed' ? 'Başarısız'
-                    : job.status === 'cancelled' ? 'İptal edildi'
-                      : String(job.status || '-')
+          const statusLabel = getStatusLabel(job.status)
 
           return (
             <div

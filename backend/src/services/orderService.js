@@ -407,7 +407,7 @@ const buildLabelTopLine = async (order) => {
 
 const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = null }) => {
   const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
-  if (!order || safeItems.length === 0) return
+  if (!order || safeItems.length === 0) return 0
 
   const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
   const { createJob, resolveActiveStationForJob, resolveStationPrinterConfig } = await import('./printingService.js')
@@ -444,9 +444,10 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     }
   ]))
   const labelItems = safeItems.filter((it) => labelCandidateMap.has(String(it?.menuItemId || '')))
-  if (labelItems.length === 0) return
+  if (labelItems.length === 0) return 0
 
   const top = await buildLabelTopLine(order)
+  let queuedCount = 0
   for (const it of labelItems) {
     const itemConfig = labelCandidateMap.get(String(it?.menuItemId || '')) || { categoryId: '', printLabelEnabled: false }
     const categoryId = String(itemConfig.categoryId || '')
@@ -489,12 +490,14 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
         triggerMode: mode
       }
     })
+    queuedCount += 1
   }
+  return queuedCount
 }
 
 const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '', batchId = null }) => {
   const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
-  if (!order || safeItems.length === 0) return
+  if (!order || safeItems.length === 0) return 0
 
   const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
   const { createJob, resolveActiveStationForJob, resolveStationPrinterConfig } = await import('./printingService.js')
@@ -518,9 +521,10 @@ const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '',
     }
   ]))
   const labelItems = safeItems.filter((it) => labelCandidateMap.has(String(it?.menuItemId || '')))
-  if (labelItems.length === 0) return
+  if (labelItems.length === 0) return 0
 
   const top = `${await buildLabelTopLine(order)} - İPTAL`
+  let queuedCount = 0
   for (const it of labelItems) {
     const itemConfig = labelCandidateMap.get(String(it?.menuItemId || '')) || { categoryId: '', printLabelEnabled: false }
     const categoryId = String(itemConfig.categoryId || '')
@@ -565,7 +569,9 @@ const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '',
         cancelReason: noteLine
       }
     })
+    queuedCount += 1
   }
+  return queuedCount
 }
 
 const normalizePrinterCategoryIds = (value) => Array.isArray(value)
@@ -2514,6 +2520,8 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
 
   const itemsToLabel = []
   const itemsToKitchenReceipt = []
+  let labelQueuedCount = 0
+  let receiptQueuedCount = 0
 
   if (kitchenEnabled !== undefined) {
     order.kitchenEnabled = Boolean(kitchenEnabled)
@@ -2592,16 +2600,17 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
 
   try {
     if (order.kitchenEnabled !== false && order.sendToKitchen !== false && itemsToLabel.length > 0) {
-      await enqueueOrderItemLabels({ tenantId, order, items: itemsToLabel, mode: 'order_send', batchId })
+      labelQueuedCount = await enqueueOrderItemLabels({ tenantId, order, items: itemsToLabel, mode: 'order_send', batchId })
     }
   } catch {
   }
 
   await enqueueKitchenReceiptJobs({ tenantId, order, items: itemsToKitchenReceipt, batchId })
+  receiptQueuedCount = itemsToKitchenReceipt.length
 
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_send', 'Order', order.id, {})
   const fresh = await Order.findById(order.id).lean()
-  return { order: decorateOrder(fresh) }
+  return { order: decorateOrder(fresh), labelQueuedCount, receiptQueuedCount }
 }
 
 export const setKitchenModeService = async (tenantId, id, { kitchenEnabled, sendToKitchen } = {}) => {
