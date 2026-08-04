@@ -27,6 +27,10 @@ const schema = new mongoose.Schema({
     type: new mongoose.Schema({}, { _id: false, strict: false }),
     default: () => ({})
   },
+  navigation: {
+    type: new mongoose.Schema({}, { _id: false, strict: false }),
+    default: () => ({})
+  },
   hero: {
     type: new mongoose.Schema({}, { _id: false, strict: false }),
     default: () => ({})
@@ -43,6 +47,10 @@ const schema = new mongoose.Schema({
   seo: {
     type: new mongoose.Schema({}, { _id: false, strict: false }),
     default: () => ({})
+  },
+  storeVariant: {
+    type: new mongoose.Schema({}, { _id: false, strict: false }),
+    default: null
   },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   publishedAt: { type: Date, default: null }

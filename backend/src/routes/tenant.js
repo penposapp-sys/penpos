@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import multer from 'multer'
 import { requireAuth } from '../middlewares/requireAuth.js'
 import { tenantGuard } from '../middlewares/tenantGuard.js'
 import { sendError } from '../utils/errors.js'
@@ -8,11 +9,32 @@ import { requireRole } from '../middlewares/requireRole.js'
 import { requireAnyPermission } from '../middlewares/requirePermission.js'
 import * as selfAccount from '../services/selfAccountService.js'
 import * as tenantBilling from '../controllers/tenantBillingController.js'
+import {
+  getTenantWebsiteSettings,
+  updateTenantWebsiteSettings,
+  publishTenantWebsite,
+  unpublishTenantWebsite
+} from '../controllers/tenantWebsiteController.js'
+import { uploadWebsiteMedia } from '../controllers/websiteMediaController.js'
 import Category from '../models/Category.js'
 import MenuItem from '../models/MenuItem.js'
 import User from '../models/User.js'
+import { error } from '../utils/errors.js'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../utils/imageUpload.js'
 
 const router = Router()
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES }
+})
+
+const uploadSingleImage = (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (!err) return next()
+    if (err.code === 'LIMIT_FILE_SIZE') return next(error('file_too_large', 'Gorsel boyutu en fazla 5 MB olabilir.', 400))
+    return next(error('invalid_upload', 'Gorsel yukleme hatasi.', 400))
+  })
+}
 
 router.get('/context', requireAuth, tenantGuard, async (req, res) => {
   try {
@@ -115,5 +137,11 @@ router.put('/me/username', requireAuth, tenantGuard, requireRole(['tenant_admin'
     sendError(res, err)
   }
 })
+
+router.get('/website', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['manage_settings', 'manage_menu']), getTenantWebsiteSettings)
+router.put('/website', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['manage_settings', 'manage_menu']), updateTenantWebsiteSettings)
+router.post('/website/media/:kind(logo|cover|gallery|about)', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['manage_settings', 'manage_menu']), uploadSingleImage, uploadWebsiteMedia)
+router.post('/website/publish', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['manage_settings', 'manage_menu']), publishTenantWebsite)
+router.post('/website/unpublish', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), requireAnyPermission(['manage_settings', 'manage_menu']), unpublishTenantWebsite)
 
 export default router

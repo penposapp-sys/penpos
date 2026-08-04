@@ -49,6 +49,8 @@ import DigitalMenuPage from './pages/DigitalMenuPage.tsx'
 import QrMenuSettingsPage from './pages/QrMenuSettingsPage.jsx'
 import OnlineSalesSettingsPage from './pages/OnlineSalesSettingsPage.jsx'
 import OnlineSalesPage from './pages/OnlineSalesPage.jsx'
+import RestaurantWebsiteSettingsPage from './pages/RestaurantWebsiteSettingsPage.jsx'
+import RestaurantWebsitePage from './pages/RestaurantWebsitePage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
@@ -65,9 +67,7 @@ import CanteenReportsPage from './canteen/pages/CanteenReportsPage.jsx'
 import CanteenStockPage from './canteen/pages/CanteenStockPage.jsx'
 import CanteenSettingsLayout from './canteen/pages/CanteenSettingsLayout.jsx'
 import CanteenSettingsSystemPage from './canteen/pages/CanteenSettingsSystemPage.jsx'
-import CanteenSettingsBranchesPage from './canteen/pages/CanteenSettingsBranchesPage.jsx'
 import CanteenSettingsStaffPage from './canteen/pages/CanteenSettingsStaffPage.jsx'
-import CanteenSettingsMePage from './canteen/pages/CanteenSettingsMePage.jsx'
 import CanteenSettingsProductsPage from './canteen/pages/CanteenSettingsProductsPage.jsx'
 import CanteenSettingsPaymentsPage from './canteen/pages/CanteenSettingsPaymentsPage.jsx'
 import CanteenSettingsBillingPage from './canteen/pages/CanteenSettingsBillingPage.jsx'
@@ -339,37 +339,13 @@ export default function App() {
         <Route path="/menu/:tenantSlug" element={<PublicMenuPage />} />
         <Route path="/online/:tenantSlug" element={<OnlineSalesPage />} />
         <Route path="/online/:tenantSlug/:branchSlug" element={<OnlineSalesPage />} />
+        <Route path="/weprestorant/:slug" element={<RestaurantWebsitePage siteType="restaurant" />} />
+        <Route path="/wepmagaza/:slug" element={<RestaurantWebsitePage siteType="store" />} />
+        <Route path="/website/:slug" element={<RestaurantWebsitePage />} />
         <Route path="/qr/:slug" element={<CanteenQrPricePage />} />
         <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
         <Route path="/canteen/login" element={<CanteenLogin />} />
-        <Route
-          path="/canteen/ayarlar/website"
-          element={
-            <ProtectedRoute
-              roles={['tenant_admin', 'staff']}
-              permissions={['manage_settings']}
-              system="canteen"
-              allowExpired
-            >
-              <NotFound />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/kermes/settings/website"
-          element={
-            <ProtectedRoute
-              roles={['tenant_admin', 'staff']}
-              permissions={['manage_settings', 'manage_menu']}
-              permissionsMode="any"
-              system="kermes"
-              allowExpired
-            >
-              <NotFound />
-            </ProtectedRoute>
-          }
-        />
         <Route path="/canteen" element={<CanteenLayout />}>
           <Route index element={<Navigate to="/canteen/kasa" replace />} />
           <Route path="kasa" element={<CanteenCashierPage />} />
@@ -381,9 +357,10 @@ export default function App() {
           <Route path="stok" element={<CanteenStockPage />} />
           <Route path="print-station" element={<CanteenPrintStationPage />} />
           <Route path="ayarlar" element={<CanteenSettingsLayout />}>
-            <Route path="me" element={<CanteenSettingsMePage />} />
+            <Route path="website" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="canteen" allowExpired><RestaurantWebsiteSettingsPage systemType="canteen" /></ProtectedRoute>} />
+            <Route path="me" element={<Navigate to="/canteen/ayarlar/sistem" replace />} />
             <Route path="sistem" element={<CanteenSettingsSystemPage />} />
-            <Route path="subeler" element={<CanteenSettingsBranchesPage />} />
+            <Route path="subeler" element={<Navigate to="/canteen/ayarlar/sistem" replace />} />
             <Route path="personel" element={<CanteenSettingsStaffPage />} />
             <Route path="urunler" element={<CanteenSettingsProductsPage />} />
             <Route path="qr" element={<CanteenSettingsQrPage />} />
@@ -435,9 +412,9 @@ export default function App() {
           <Route path="app/pos" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access']} system="kermes"><PosPage /></ProtectedRoute>} />
           <Route path="app/pos/orders/:id/receipt" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access']} system="kermes"><ReceiptPage /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes" allowExpired><SettingsPage /></ProtectedRoute>}>
-            <Route path="me" element={<ProtectedRoute roles={['tenant_admin', 'staff']} system="kermes" allowExpired><SettingsMePage apiBase="/api/tenant" /></ProtectedRoute>} />
-            <Route path="system" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsSystemContent /></ProtectedRoute>} />
-            <Route path="branches" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><BranchesPage /></ProtectedRoute>} />
+            <Route path="me" element={<Navigate to="/kermes/settings/system" replace />} />
+            <Route path="system" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes"><SettingsSystemContent /></ProtectedRoute>} />
+            <Route path="branches" element={<Navigate to="/kermes/settings/system" replace />} />
             <Route path="staff" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><StaffPage systemType="kermes" /></ProtectedRoute>} />
             <Route path="catalog" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
             <Route path="catalog/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
@@ -450,6 +427,7 @@ export default function App() {
             <Route path="billing" element={<ProtectedRoute roles={['tenant_admin']} system="kermes" allowExpired><UpgradePlan /></ProtectedRoute>} />
             <Route path="qr" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><QrMenuSettingsPage /></ProtectedRoute>} />
             <Route path="online-sales" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><OnlineSalesSettingsPage /></ProtectedRoute>} />
+            <Route path="website" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes" allowExpired><RestaurantWebsiteSettingsPage /></ProtectedRoute>} />
             <Route path="menü" element={<Navigate to="/kermes/settings/catalog" replace />} />
             <Route path="menu/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
             <Route path="menu/items" element={<Navigate to="/kermes/settings/catalog/items" replace />} />

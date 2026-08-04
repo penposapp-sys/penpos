@@ -64,22 +64,20 @@ function getSettingsItems(isExpired) {
   if (isExpired) {
     return [
       { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-      { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'İşletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
+      { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
       { key: 'plan', path: '/canteen/ayarlar/paket', label: 'Uyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
     ]
   }
 
   return [
-    { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-    { key: 'account', path: '/canteen/ayarlar/me', label: 'Hesabim', icon: 'account', filterGroup: 'İşletme', section: 'Hesap', desc: 'Giris bilgileri, sifre ve kullanici hesabi' },
-    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Isletme Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Firma bilgileri, tema, fis ve genel sistem tercihleri' },
-    { key: 'branches', path: '/canteen/ayarlar/subeler', label: 'Sube Ayarlari', icon: 'branches', filterGroup: 'İşletme', section: 'İşletme', desc: 'Sube listesi, aktiflik ve subeye bagli personel' },
+    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
+    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
     { key: 'staff', path: '/canteen/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
+    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri online siparis sayfasi ve yayin ayarlari' },
+    { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
     { key: 'printers', path: '/canteen/ayarlar/yazicilar', label: 'Yazici Ayarlari', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fis ve etiket yazicilari' },
     { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
     { key: 'billing', path: '/canteen/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
-    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
-    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri online siparis sayfasi ve yayin ayarlari' },
   ]
 }
 
@@ -299,11 +297,11 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             color: #ffffff !important;
             box-shadow: 0 12px 24px rgba(47,109,246,0.28);
           }
-          .canteen-settings-home-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+          .canteen-settings-home-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
           .canteen-settings-home-card {
             width: 100%;
             display: grid;
-            justify-items: stretch;
+            grid-template-rows: auto 1fr auto;
             align-items: start;
             align-content: start;
             gap: 0;
@@ -323,7 +321,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             border-color: rgba(47,109,246,0.35);
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
           }
-          .canteen-settings-home-cardtop { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; min-width: 0; }
+          .canteen-settings-home-cardtop { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: start; gap: 12px; margin-bottom: 14px; min-width: 0; min-height: 46px; }
           .canteen-settings-home-icon {
             width: 46px;
             height: 46px;
@@ -336,6 +334,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             flex-shrink: 0;
           }
           .canteen-settings-home-badge {
+            justify-self: end;
             padding: 7px 11px;
             border-radius: 999px;
             background: rgba(255,255,255,0.08);
@@ -348,9 +347,15 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             max-width: min(100%, 132px);
             overflow-wrap: anywhere;
           }
+          .canteen-settings-home-cardcopy {
+            display: grid;
+            align-content: start;
+            gap: 8px;
+            min-width: 0;
+          }
           .canteen-settings-home-card h3 { margin: 0; font-size: clamp(15px, 0.48vw + 13.2px, 17px); line-height: 1.15; font-weight: 950; overflow-wrap: anywhere; }
-          .canteen-settings-home-card p { margin: 8px 0 0; color: var(--settings-text-soft); font-size: clamp(12px, 0.24vw + 11.4px, 13px); line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; }
-          .canteen-settings-home-link { margin-top: 16px; font-size: clamp(12px, 0.24vw + 11.4px, 13px); font-weight: 900; color: var(--settings-text); line-height: 1.4; overflow-wrap: anywhere; }
+          .canteen-settings-home-card p { margin: 0; color: var(--settings-text-soft); font-size: clamp(12px, 0.24vw + 11.4px, 13px); line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; }
+          .canteen-settings-home-link { align-self: end; padding-top: 16px; font-size: clamp(12px, 0.24vw + 11.4px, 13px); font-weight: 900; color: var(--settings-text); line-height: 1.4; overflow-wrap: anywhere; }
           .canteen-settings-home-empty {
             margin-top: 16px;
             padding: 20px;
@@ -358,6 +363,9 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
             border: 1px dashed var(--settings-border-strong);
             color: var(--settings-text-soft);
             font-weight: 700;
+          }
+          @media (max-width: 1480px) {
+            .canteen-settings-home-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
           }
           @media (max-width: 1240px) {
             .canteen-settings-home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -424,8 +432,12 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
                 <div className="canteen-settings-home-icon"><SettingsGlyph icon={item.icon} size={22} /></div>
                 <div className="canteen-settings-home-badge">{item.badge}</div>
               </div>
-              <h3>{item.title}</h3>
-              <p>{item.desc}</p>
+
+              <div className="canteen-settings-home-cardcopy">
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </div>
+
               <div className="canteen-settings-home-link">Ayar sayfasını aç →</div>
             </button>
           ))}
@@ -702,15 +714,10 @@ export default function CanteenSettingsLayout() {
   const filterOptions = useMemo(() => ['Tümü', ...Array.from(new Set(items.map((item) => item.filterGroup)))], [items])
   const visibleCards = useMemo(() => {
     const normalized = searchValue.trim().toLocaleLowerCase('tr-TR')
-    const filtered = items.filter((item) => {
+    return items.filter((item) => {
       const matchesFilter = activeFilter === 'Tümü' || item.filterGroup === activeFilter
       const matchesSearch = !normalized || [item.label, item.desc, item.filterGroup, item.section].some((value) => String(value || '').toLocaleLowerCase('tr-TR').includes(normalized))
       return matchesFilter && matchesSearch
-    })
-    return filtered.sort((left, right) => {
-      if (left.key === 'website' && right.key !== 'website') return 1
-      if (right.key === 'website' && left.key !== 'website') return -1
-      return 0
     })
   }, [activeFilter, items, searchValue])
 

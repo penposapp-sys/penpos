@@ -10,7 +10,7 @@ import {
 
 export const getTenantWebsiteSettings = async (req, res) => {
   try {
-    const result = await getTenantWebsiteSettingsService(req.user.tenantId)
+    const result = await getTenantWebsiteSettingsService(req.user.tenantId, req.query?.siteType || '')
     res.json({ success: true, tenant: result.tenant, settings: result.settings })
   } catch (err) {
     sendError(res, err)
@@ -22,7 +22,8 @@ export const updateTenantWebsiteSettings = async (req, res) => {
     const result = await updateTenantWebsiteSettingsService({
       tenantId: req.user.tenantId,
       actorUserId: req.user.id,
-      payload: req.body || {}
+      payload: req.body || {},
+      siteType: req.query?.siteType || ''
     })
     res.json({ success: true, tenant: result.tenant, settings: result.settings, message: 'Website settings updated' })
   } catch (err) {
@@ -34,7 +35,8 @@ export const publishTenantWebsite = async (req, res) => {
   try {
     const result = await publishTenantWebsiteService({
       tenantId: req.user.tenantId,
-      actorUserId: req.user.id
+      actorUserId: req.user.id,
+      siteType: req.query?.siteType || ''
     })
     res.json({ success: true, tenant: result.tenant, settings: result.settings, message: 'Website published' })
   } catch (err) {
@@ -46,7 +48,8 @@ export const unpublishTenantWebsite = async (req, res) => {
   try {
     const result = await unpublishTenantWebsiteService({
       tenantId: req.user.tenantId,
-      actorUserId: req.user.id
+      actorUserId: req.user.id,
+      siteType: req.query?.siteType || ''
     })
     res.json({ success: true, tenant: result.tenant, settings: result.settings, message: 'Website unpublished' })
   } catch (err) {
@@ -56,7 +59,7 @@ export const unpublishTenantWebsite = async (req, res) => {
 
 export const getPublicTenantWebsite = async (req, res) => {
   try {
-    const result = await getPublicTenantWebsiteBySlugService(req.params.slug)
+    const result = await getPublicTenantWebsiteBySlugService(req.params.slug, req.query?.siteType || '')
     res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)

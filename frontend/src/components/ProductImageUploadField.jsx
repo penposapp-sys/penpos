@@ -18,7 +18,8 @@ export default function ProductImageUploadField({
   descriptionText = 'Yuklenen gorsel ilgili alanda gosterilmek uzere kaydedilir.',
   error = '',
   existingSizeLabel = '',
-  compact = false
+  compact = false,
+  ultraCompact = false
 }) {
   const inputId = useId()
   const [dragActive, setDragActive] = useState(false)
@@ -47,8 +48,23 @@ export default function ProductImageUploadField({
 
   const fileSizeLabel = file ? formatProductImageSize(file.size) : existingSizeLabel
   const previewSrc = previewFailed ? PRODUCT_PLACEHOLDER_SRC : displaySrc
-  const rootStyle = compact ? { gap: 6, padding: 10, borderRadius: 18 } : undefined
-  const dropzoneStyle = compact
+  const useCompact = compact || ultraCompact
+  const rootStyle = ultraCompact
+    ? { gap: 4, padding: 8, borderRadius: 16 }
+    : (useCompact ? { gap: 6, padding: 10, borderRadius: 18 } : undefined)
+  const dropzoneStyle = ultraCompact
+    ? {
+        display: 'grid',
+        gridTemplateColumns: '72px minmax(0, 1fr)',
+        alignItems: 'center',
+        justifyItems: 'stretch',
+        gap: 10,
+        padding: 8,
+        borderRadius: 14,
+        minHeight: 0,
+        textAlign: 'left'
+      }
+    : useCompact
     ? {
         display: 'grid',
         gridTemplateColumns: '120px minmax(0, 1fr)',
@@ -61,10 +77,20 @@ export default function ProductImageUploadField({
         textAlign: 'left'
       }
     : undefined
-  const previewStyle = compact ? { width: '120px', borderRadius: 16, justifySelf: 'start' } : undefined
-  const copyStyle = compact ? { alignContent: 'center', textAlign: 'left', minWidth: 0 } : undefined
-  const strongStyle = compact ? { fontSize: 12, lineHeight: 1.25 } : undefined
-  const textStyle = compact ? { fontSize: 11, lineHeight: 1.35 } : undefined
+  const previewStyle = ultraCompact
+    ? { width: '72px', borderRadius: 12, justifySelf: 'start' }
+    : (useCompact ? { width: '120px', borderRadius: 16, justifySelf: 'start' } : undefined)
+  const copyStyle = useCompact ? { alignContent: 'center', textAlign: 'left', minWidth: 0 } : undefined
+  const strongStyle = ultraCompact
+    ? { fontSize: 11, lineHeight: 1.2 }
+    : (useCompact ? { fontSize: 12, lineHeight: 1.25 } : undefined)
+  const textStyle = ultraCompact
+    ? { fontSize: 10, lineHeight: 1.3 }
+    : (useCompact ? { fontSize: 11, lineHeight: 1.35 } : undefined)
+  const headStyle = ultraCompact ? { alignItems: 'start', gap: 6 } : undefined
+  const helperStyle = ultraCompact ? { fontSize: 10, lineHeight: 1.25 } : undefined
+  const labelStyle = ultraCompact ? { fontSize: 12 } : undefined
+  const actionStyle = ultraCompact ? { minHeight: 32, padding: '0 10px', fontSize: 11, borderRadius: 999 } : undefined
 
   const commitFile = (nextFile) => {
     if (!nextFile) return
@@ -74,12 +100,12 @@ export default function ProductImageUploadField({
 
   return (
     <div className={`product-image-upload${dragActive ? ' is-drag-active' : ''}${disabled ? ' is-disabled' : ''}`} style={rootStyle}>
-      <div className="product-image-upload__head">
+      <div className="product-image-upload__head" style={headStyle}>
         <div>
-          <div className="product-image-upload__label">{label}</div>
-          <div className="product-image-upload__hint">{helperText}</div>
+          <div className="product-image-upload__label" style={labelStyle}>{label}</div>
+          <div className="product-image-upload__hint" style={helperStyle}>{helperText}</div>
         </div>
-        {fileSizeLabel ? <div className="product-image-upload__size">{fileSizeLabel}</div> : null}
+        {fileSizeLabel ? <div className="product-image-upload__size" style={helperStyle}>{fileSizeLabel}</div> : null}
       </div>
 
       <label
@@ -127,16 +153,16 @@ export default function ProductImageUploadField({
       </label>
 
       <div className="product-image-upload__actions">
-        <label htmlFor={inputId} className="product-secondary-btn" aria-disabled={disabled ? 'true' : 'false'}>
+        <label htmlFor={inputId} className="product-secondary-btn" aria-disabled={disabled ? 'true' : 'false'} style={actionStyle}>
           Dosya Sec
         </label>
         {file ? (
-          <button type="button" className="product-secondary-btn" onClick={() => onClearFile?.()} disabled={disabled}>
+          <button type="button" className="product-secondary-btn" onClick={() => onClearFile?.()} disabled={disabled} style={actionStyle}>
             Secimi Temizle
           </button>
         ) : null}
         {!file && currentImageUrl ? (
-          <button type="button" className="product-secondary-btn" onClick={() => onRemoveExisting?.()} disabled={disabled || typeof onRemoveExisting !== 'function'}>
+          <button type="button" className="product-secondary-btn" onClick={() => onRemoveExisting?.()} disabled={disabled || typeof onRemoveExisting !== 'function'} style={actionStyle}>
             Gorseli Kaldir
           </button>
         ) : null}

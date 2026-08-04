@@ -5,9 +5,10 @@ import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import Modal from '../components/Modal.jsx'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
 import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
-import { SettingsToggle, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
+import { SettingsField, SettingsToggle, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
@@ -18,6 +19,7 @@ import { getSubscriptionStatus } from '../lib/subscription.js'
 import { toast } from '../lib/toast.js'
 import { resolveApiOrigin } from '../lib/runtimeApi.js'
 import { validateProductImageFile } from '../lib/productImage.js'
+import { SettingsAccountPanel } from './SettingsMePage.jsx'
 
 const BUSINESS_SETTINGS_SECTIONS = {
   general: [
@@ -409,7 +411,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           color: #ffffff;
           box-shadow: var(--settings-accent-shadow);
         }
-        .settings-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .settings-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
         .settings-module-card {
           appearance: none;
           text-align: left;
@@ -422,9 +424,9 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           cursor: pointer;
           color: var(--app-text);
           font: inherit;
-          display: flex;
-          flex-direction: column;
-          align-items: stretch;
+          display: grid;
+          grid-template-rows: auto 1fr auto;
+          align-items: start;
           min-width: 0;
           min-height: 188px;
         }
@@ -433,7 +435,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           box-shadow: var(--card-shadow);
           border-color: var(--settings-border);
         }
-        .settings-module-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 12px; min-width: 0; }
+        .settings-module-top { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: start; margin-bottom: 12px; gap: 12px; min-width: 0; min-height: 46px; }
         .settings-module-icon {
           width: 46px;
           height: 46px;
@@ -451,9 +453,9 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           align-content: start;
           gap: 8px;
           min-width: 0;
-          flex: 1 1 auto;
         }
         .settings-module-badge {
+          justify-self: end;
           padding: 7px 11px;
           border-radius: 999px;
           background: var(--settings-accent-soft);
@@ -469,7 +471,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
         .settings-module-card h3 { margin: 0; font-size: clamp(15px, 0.48vw + 13.2px, 17px); font-weight: 950; color: var(--app-text); line-height: 1.25; overflow-wrap: anywhere; }
         .settings-module-card p { min-height: 0; margin: 0; color: var(--app-text-secondary); font-size: clamp(12px, 0.24vw + 11.4px, 13px); font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
         .settings-module-link {
-          margin-top: auto;
+          align-self: end;
           padding-top: 14px;
           color: var(--settings-accent-text);
           font-size: clamp(12px, 0.24vw + 11.4px, 13px);
@@ -486,6 +488,9 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           color: var(--app-text-secondary);
           font-weight: 700;
         }
+        @media (max-width: 1480px) {
+          .settings-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
         @media (max-width: 1280px) {
           .settings-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .settings-search-row { grid-template-columns: 1fr; }
@@ -497,6 +502,7 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           .settings-search-box { min-height: 50px; padding: 0 14px; }
           .settings-filter-list button { padding: 9px 12px; font-size: 11px; }
           .settings-card-grid { grid-template-columns: 1fr; }
+          .settings-module-top { grid-template-columns: 46px minmax(0, 1fr); }
         }
       `}</style>
 
@@ -597,133 +603,117 @@ export default function SettingsPage() {
   const isRoot = pathname === basePath || pathname === basePath + '/'
 
   const settingsGroups = useMemo(() => {
-    const groups = [
+    const primaryItems = [
       {
-        title: 'Hesap',
-        items: [{
-          key: 'account',
-          to: '/kermes/settings/me',
-          label: 'Hesabım',
-          icon: 'account',
-          group: 'İşletme',
-          description: 'Giriş bilgileri, şifre ve kullanıcı hesabı'
-        }]
-      }
-    ]
-
-    if (canManageSettings && !isExpired) {
-      groups.push({
-        title: 'İşletme',
-        items: [
-          {
-            key: 'business',
-            to: '/kermes/settings/system',
-            label: 'İşletme Ayarları',
-            icon: 'business',
-            group: 'İşletme',
-            description: 'Firma bilgileri, servis, kapanış saati'
-          },
-          {
-            key: 'branches',
-            to: '/kermes/settings/branches',
-            label: 'Şube Ayarları',
-            icon: 'branches',
-            group: 'İşletme',
-            description: 'Şube listesi, aktiflik ve şubeye bağlı personel'
-          },
-          {
-            key: 'staff',
-            to: '/kermes/settings/staff',
-            label: 'Personel Ayarları',
-            icon: 'staff',
-            group: 'Personel',
-            description: 'Personel, şifre, yetki ve aktiflik yönetimi'
-          },
-          {
-            key: 'tables',
-            to: '/kermes/settings/tables',
-            label: 'Masa Ayarları',
-            icon: 'tables',
-            group: 'Satış',
-            description: 'Masa listesi ve oturma düzeni'
-          },
-          {
-            key: 'printers',
-            to: '/kermes/settings/printers',
-            label: 'Yazıcı Ayarları',
-            icon: 'printers',
-            group: 'Cihaz',
-            description: 'Print Agent, fiş ve etiket yazıcıları'
-          },
-          {
-            key: 'payments',
-            to: '/kermes/settings/payments',
-            label: 'Ödeme Seçenekleri',
-            icon: 'payments',
-            group: 'Satış',
-            description: 'Nakit, kart, banka ve ek ödeme seçenekleri'
-          },
-          {
-            key: 'delivery',
-            to: '/kermes/settings/delivery',
-            label: 'Paket Servis',
-            icon: 'delivery',
-            group: 'Satış',
-            description: 'Paket sipariş davranışları ve otomasyonlar'
-          },
-          ...(user?.role === 'tenant_admin'
-            ? [{
-                key: 'billing',
-                to: '/kermes/settings/billing',
-                label: 'Paket & Satın Alma',
-                icon: 'billing',
-                group: 'Finans',
-                description: 'Abonelik, paket ve satın alma yönetimi'
-              }]
-            : []),
-        ]
-      })
-    }
-
-    if (canManageMenu && !isExpired) {
-      groups.push({
-        title: 'Menü',
-        items: [
-          {
+        key: 'system',
+        to: '/kermes/settings/system',
+        label: 'İşletme Ayarları',
+        icon: 'business',
+        group: 'İşletme',
+        description: 'Hesabım, firma bilgileri, görünüm ve yetkili şubeler'
+      },
+      ...(canManageMenu && !isExpired
+        ? [{
             key: 'catalog',
             to: '/kermes/settings/catalog',
             label: 'Ürün & Kategori',
             icon: 'catalog',
             group: 'Ürün',
             description: 'Ürün, kategori, görünüm ve sıralama ayarları'
-          },
-          {
-            key: 'qr',
-            to: '/kermes/settings/qr',
-            label: 'QR Menü',
-            icon: 'qr',
-            group: 'Dijital',
-            description: 'Public menü, QR indir, masa QR ve görünüm'
-          },
-          {
-            key: 'online-sales',
-            to: '/kermes/settings/online-sales',
-            label: 'Online Satış',
-            icon: 'delivery',
-            group: 'Dijital',
-            description: 'Public sipariş yüzeyi, hedef şube ve paket akışı'
-          },
-          {
-            key: 'website',
-            to: '/kermes/settings/website',
-            label: 'Web Site Ayarları',
-            icon: 'business',
-            group: 'Dijital',
-            description: 'Bu sayfa henüz hazırlanmadı'
-          },
-        ]
-      })
-    }
+          }]
+        : []),
+      ...(canManageSettings && !isExpired
+        ? [
+            {
+              key: 'tables',
+              to: '/kermes/settings/tables',
+              label: 'Masa Ayarları',
+              icon: 'tables',
+              group: 'Satış',
+              description: 'Masa listesi ve oturma düzeni'
+            },
+            {
+              key: 'staff',
+              to: '/kermes/settings/staff',
+              label: 'Personel Ayarları',
+              icon: 'staff',
+              group: 'Personel',
+              description: 'Personel, şifre, yetki ve aktiflik yönetimi'
+            },
+            {
+              key: 'delivery',
+              to: '/kermes/settings/delivery',
+              label: 'Paket Servis',
+              icon: 'delivery',
+              group: 'Satış',
+              description: 'Paket sipariş davranışları ve otomasyonlar'
+            },
+          ]
+        : []),
+      ...(canManageMenu && !isExpired
+        ? [
+            {
+              key: 'qr',
+              to: '/kermes/settings/qr',
+              label: 'QR Menü',
+              icon: 'qr',
+              group: 'Dijital',
+              description: 'Public menü, QR indir, masa QR ve görünüm'
+            },
+            {
+              key: 'online-sales',
+              to: '/kermes/settings/online-sales',
+              label: 'Online Satış',
+              icon: 'delivery',
+              group: 'Dijital',
+              description: 'Public sipariş yüzeyi, hedef şube ve paket akışı'
+            },
+            {
+              key: 'website',
+              to: '/kermes/settings/website',
+              label: 'Web Site Ayarları',
+              icon: 'business',
+              group: 'Dijital',
+              description: 'Bu sayfa henüz hazırlanmadı'
+            },
+          ]
+        : []),
+      ...(canManageSettings && !isExpired
+        ? [
+            {
+              key: 'printers',
+              to: '/kermes/settings/printers',
+              label: 'Yazıcı Ayarları',
+              icon: 'printers',
+              group: 'Cihaz',
+              description: 'Print Agent, fiş ve etiket yazıcıları'
+            },
+            ...(user?.role === 'tenant_admin'
+              ? [{
+                  key: 'billing',
+                  to: '/kermes/settings/billing',
+                  label: 'Paket & Satın Alma',
+                  icon: 'billing',
+                  group: 'Finans',
+                  description: 'Abonelik, paket ve satın alma yönetimi'
+                }]
+              : []),
+            {
+              key: 'payments',
+              to: '/kermes/settings/payments',
+              label: 'Ödeme Seçenekleri',
+              icon: 'payments',
+              group: 'Satış',
+              description: 'Nakit, kart, banka ve ek ödeme seçenekleri'
+            },
+          ]
+        : []),
+    ]
+
+    const groups = [{
+      title: 'Ayarlar',
+      items: primaryItems
+    }]
 
     if (isExpired && user?.role === 'tenant_admin') {
       groups.push({
@@ -812,8 +802,8 @@ export default function SettingsPage() {
       return (
         <div className="main pageMobile settings-scope" style={{ display: 'grid', gap: 16, ...settingsCssVars }}>
           <SettingsPageHeader
-            title="Ayarlar"
-            subtitle="Ayar bölümlerini buradan yönetin"
+            title="Sistem Ayarları"
+            subtitle="Restoran ayar bölümlerini buradan yönetin"
             icon="AY"
             isCompact
             onOpenSystemMenu={openSystemMenu}
@@ -843,7 +833,7 @@ export default function SettingsPage() {
     return (
       <div className="main pageMobile settings-scope" style={{ display: 'grid', gap: 10, position: 'relative', overflowX: 'hidden', padding: 0, ...settingsCssVars }}>
         <SettingsPageHeader
-          title={current?.label || 'Ayarlar'}
+          title={current?.label || 'Sistem Ayarları'}
           subtitle={current?.description || ''}
           icon={current?.icon ? <SettingsIcon icon={current.icon} size={18} /> : 'AY'}
           isCompact
@@ -917,8 +907,8 @@ export default function SettingsPage() {
         {isRoot ? (
           <div style={{ display: 'grid', gap: 12 }}>
             <SettingsPageHeader
-              title="Ayarlar"
-              subtitle="Ayar bölümlerini buradan yönetin"
+              title="Sistem Ayarları"
+              subtitle="Restoran ayar bölümlerini buradan yönetin"
               icon="AY"
               rightSlot={
                 <div style={{ minHeight: 40, padding: '0 14px', borderRadius: 14, border: '1px solid var(--settings-border)', background: 'var(--app-surface)', color: 'var(--app-text)', fontWeight: 900, fontSize: 13, display: 'inline-flex', alignItems: 'center' }}>
@@ -939,7 +929,7 @@ export default function SettingsPage() {
         ) : (
           <div style={{ position: 'relative', display: 'grid', gap: 12, minWidth: 0 }}>
             <SettingsPageHeader
-              title={current?.label || 'Ayarlar'}
+              title={current?.label || 'Sistem Ayarları'}
               subtitle={current?.description || ''}
               icon={current?.icon ? <SettingsIcon icon={current.icon} size={18} /> : 'AY'}
               onToggleMenu={() => setSettingsMenuOpen((value) => !value)}
@@ -1024,6 +1014,13 @@ export default function SettingsPage() {
 }
 
 export const SettingsSystemContent = () => {
+  const getBranchId = (branch) => branch?._id || branch?.id
+  const normalizeBranchRecord = (branch) => ({
+    ...branch,
+    isActive: branch?.isActive !== false,
+    description: branch?.description || '',
+    address: branch?.address || ''
+  })
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -1037,11 +1034,21 @@ export const SettingsSystemContent = () => {
   const [savedDarkMode, setSavedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
   const [loading, setLoading] = useState(false)
   const [branchSaving, setBranchSaving] = useState(false)
+  const [branchCreateOpen, setBranchCreateOpen] = useState(false)
+  const [branchEditOpen, setBranchEditOpen] = useState(false)
+  const [branchDeleteTarget, setBranchDeleteTarget] = useState(null)
+  const [branchFormLoading, setBranchFormLoading] = useState(false)
+  const [branchDeleteLoading, setBranchDeleteLoading] = useState(false)
+  const [branchFormError, setBranchFormError] = useState('')
+  const [selectedBranch, setSelectedBranch] = useState(null)
+  const [createBranchForm, setCreateBranchForm] = useState({ name: '', description: '', address: '' })
+  const [editBranchForm, setEditBranchForm] = useState({ name: '', description: '', address: '', isActive: true })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const { refresh, setAllowedBranchIds } = useAuth()
   const { setSettingsLocally } = useBusinessSettings()
   const { isMobileRuntime, setThemeKey, setDarkMode } = useTheme()
+  const { isMobilePortrait, isTablet } = useResponsiveFlags()
 
   const apiOrigin = React.useMemo(() => resolveApiOrigin(), [])
   const activeBranches = React.useMemo(
@@ -1093,11 +1100,11 @@ export const SettingsSystemContent = () => {
         .map((branch) => String(branch?._id || branch?.id || ''))
         .filter(Boolean)
     )
-    setAllowedBranchIdsLocal(
-      Array.isArray(t?.allowedBranchIds)
-        ? t.allowedBranchIds.map(String).filter((id) => nextActiveBranchIds.has(String(id)))
-        : []
-    )
+    const nextAllowed = Array.isArray(t?.allowedBranchIds)
+      ? t.allowedBranchIds.map(String).filter((id) => nextActiveBranchIds.has(String(id)))
+      : []
+    setAllowedBranchIdsLocal(nextAllowed)
+    setAllowedBranchIds(nextAllowed)
     setSelectedThemeId(nextThemeId)
     setSelectedDarkMode(nextDarkMode)
     setSavedThemeId(nextThemeId)
@@ -1118,6 +1125,101 @@ export const SettingsSystemContent = () => {
     if (checked) set.add(String(branchId))
     else set.delete(String(branchId))
     setAllowedBranchIdsLocal(Array.from(set))
+  }
+
+  const openCreateBranch = () => {
+    setCreateBranchForm({ name: '', description: '', address: '' })
+    setBranchFormError('')
+    setBranchCreateOpen(true)
+  }
+
+  const openEditBranch = (branch) => {
+    setSelectedBranch(branch)
+    setEditBranchForm({
+      name: branch?.name || '',
+      description: branch?.description || '',
+      address: branch?.address || '',
+      isActive: branch?.isActive !== false
+    })
+    setBranchFormError('')
+    setBranchEditOpen(true)
+  }
+
+  const createBranch = async (event) => {
+    event.preventDefault()
+    setBranchFormLoading(true)
+    setBranchFormError('')
+    try {
+      const { branch } = await api('/api/branches', {
+        method: 'POST',
+        body: JSON.stringify(createBranchForm),
+        skipBranchHeader: true
+      })
+      if (branch) {
+        setBranches((prev) => [normalizeBranchRecord(branch), ...prev])
+      }
+      setBranchCreateOpen(false)
+      setSuccess('Şube oluşturuldu')
+      await refresh()
+      await load()
+    } catch (err) {
+      setBranchFormError(err.message || 'Şube oluşturulamadı')
+    } finally {
+      setBranchFormLoading(false)
+    }
+  }
+
+  const editBranch = async (event) => {
+    event.preventDefault()
+    const branchId = getBranchId(selectedBranch)
+    if (!branchId) {
+      setBranchFormError('Şube kaydı bulunamadı')
+      return
+    }
+    setBranchFormLoading(true)
+    setBranchFormError('')
+    try {
+      const { branch } = await api(`/api/branches/${branchId}`, {
+        method: 'PUT',
+        body: JSON.stringify(editBranchForm),
+        skipBranchHeader: true
+      })
+      if (branch) {
+        const normalized = normalizeBranchRecord(branch)
+        setBranches((prev) => prev.map((item) => (String(getBranchId(item)) === String(branchId) ? normalized : item)))
+      }
+      setBranchEditOpen(false)
+      setSelectedBranch(null)
+      setSuccess('Şube güncellendi')
+      await refresh()
+      await load()
+    } catch (err) {
+      setBranchFormError(err.message || 'Şube güncellenemedi')
+    } finally {
+      setBranchFormLoading(false)
+    }
+  }
+
+  const deleteBranch = async () => {
+    const branchId = getBranchId(branchDeleteTarget)
+    if (!branchId) {
+      setError('Şube kaydı bulunamadı')
+      return
+    }
+    setBranchDeleteLoading(true)
+    try {
+      await api(`/api/branches/${branchId}`, { method: 'DELETE', skipBranchHeader: true })
+      setBranches((prev) => prev.filter((item) => String(getBranchId(item)) !== String(branchId)))
+      setAllowedBranchIdsLocal((prev) => prev.filter((id) => String(id) !== String(branchId)))
+      setBranchDeleteTarget(null)
+      setSuccess('Şube silindi')
+      await refresh()
+      await load()
+    } catch (err) {
+      setError(err.message || 'Şube silinemedi')
+    } finally {
+      setBranchDeleteLoading(false)
+    }
   }
 
   const persistAllowedBranches = async () => {
@@ -1288,97 +1390,216 @@ export const SettingsSystemContent = () => {
     <div>
       <SettingsUiStyles />
       <h3 style={{ marginTop: 0 }}>Sistem Ayarları</h3>
-      <form onSubmit={onSave} style={{ display: 'grid', gap: 12, maxWidth: 720 }}>
-        <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Genel</div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>İşletme Adı</div>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
-              <textarea className="input" rows="4" value={description} onChange={(e) => setDescription(e.target.value)} />
-            </label>
-          </div>
+      <div
+        style={{
+          display: 'grid',
+          gap: 12,
+          gridTemplateColumns: isMobilePortrait ? 'minmax(0, 1fr)' : (isTablet ? 'minmax(320px, 360px) minmax(0, 1fr)' : 'minmax(340px, 380px) minmax(0, 1fr)'),
+          alignItems: 'start',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <SettingsAccountPanel apiBase="/api/tenant" compact hideTitle />
         </div>
 
-        <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Restoran Logosu</div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ width: 64, height: 64, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--app-surface)', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-              {logoPreviewSrc ? (
-                <img src={logoPreviewSrc} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+        <form onSubmit={onSave} style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: 12,
+              gridTemplateColumns: isMobilePortrait ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
+            }}
+          >
+            <div className="card" style={{ borderColor: 'var(--border)' }}>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>Genel</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <label>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>İşletme Adı</div>
+                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+                </label>
+                <label>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
+                  <textarea className="input" rows="4" value={description} onChange={(e) => setDescription(e.target.value)} />
+                </label>
+              </div>
+            </div>
+
+            <div className="card" style={{ borderColor: 'var(--border)' }}>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>Restoran Logosu</div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--app-surface)', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+                  {logoPreviewSrc ? (
+                    <img src={logoPreviewSrc} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                  ) : (
+                    <div style={{ color: 'var(--muted)', fontSize: 12 }}>Logo yok</div>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 240, display: 'grid', gap: 8 }}>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => {
+                      const nextFile = e.target.files?.[0] || null
+                      const validationMessage = validateProductImageFile(nextFile)
+                      setLogoFile(validationMessage ? null : nextFile)
+                      setError(validationMessage || '')
+                    }}
+                  />
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>PNG/JPG/WebP, max 5MB. Otomatik olarak 800x800 WebP optimize edilir.</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button type="button" className="btn" disabled={!logoFile || logoLoading} onClick={uploadLogo}>
+                    {logoLoading ? 'Yükleniyor...' : 'Logo Yükle'}
+                  </button>
+                  <button type="button" className="btn" disabled={!logoUrl || logoLoading} onClick={removeLogo}>
+                    Kaldır
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ borderColor: 'var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 800 }}>Yetkili Şubeler</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                  Şube seçimi, yeni şube oluşturma, aktif-pasif ve silme işlemleri bu alandan yönetilir.
+                </div>
+              </div>
+              <button type="button" className="btn" onClick={openCreateBranch}>Yeni Şube</button>
+            </div>
+            <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+              {activeBranches.length === 0 ? (
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>Şube bulunamadı</div>
               ) : (
-                <div style={{ color: 'var(--muted)', fontSize: 12 }}>Logo yok</div>
+                activeBranches.map((b) => (
+                  <SettingsToggle
+                    key={b._id || b.id}
+                    label={b.name}
+                    description={b.description || b.address || 'Bu sube isletme yetki alanina dahil edilir.'}
+                    checked={allowedBranchIds.includes(String(b._id || b.id))}
+                    onChange={(e) => toggleAllowedBranch((b._id || b.id), e.target.checked)}
+                  />
+                ))
               )}
             </div>
-            <div style={{ flex: 1, minWidth: 240, display: 'grid', gap: 8 }}>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => {
-                  const nextFile = e.target.files?.[0] || null
-                  const validationMessage = validateProductImageFile(nextFile)
-                  setLogoFile(validationMessage ? null : nextFile)
-                  setError(validationMessage || '')
-                }}
-              />
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>PNG/JPG/WebP, max 5MB. Otomatik olarak 800x800 WebP optimize edilir.</div>
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>Şube Yönetimi</div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {(branches || []).length === 0 ? (
+                  <div style={{ color: 'var(--muted)', fontSize: 13 }}>Henüz şube yok.</div>
+                ) : (
+                  branches.map((branch) => {
+                    const branchId = String(getBranchId(branch) || '')
+                    const statusColor = branch?.isActive !== false ? '#16a34a' : '#b45309'
+                    return (
+                      <div
+                        key={branchId || branch?.name}
+                        style={{
+                          border: '1px solid var(--border)',
+                          borderRadius: 14,
+                          padding: 12,
+                          display: 'grid',
+                          gap: 8,
+                          background: 'var(--app-surface)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="breakAny" style={{ fontWeight: 800 }}>{branch?.name || 'Şube'}</div>
+                            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
+                              {branch?.description || branch?.address || 'Açıklama yok'}
+                            </div>
+                            {!!String(branch?.address || '').trim() && (
+                              <div className="breakAny" style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
+                                Adres: {branch.address}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: statusColor }}>
+                              {branch?.isActive !== false ? 'Aktif' : 'Pasif'}
+                            </span>
+                            <button type="button" className="btn" onClick={() => openEditBranch(branch)}>Düzenle</button>
+                            <button type="button" className="settings-ui-btn-danger" onClick={() => setBranchDeleteTarget(branch)}>Sil</button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button type="button" className="btn" disabled={!logoFile || logoLoading} onClick={uploadLogo}>
-                {logoLoading ? 'Yükleniyor...' : 'Logo Yükle'}
-              </button>
-              <button type="button" className="btn" disabled={!logoUrl || logoLoading} onClick={removeLogo}>
-                Kaldır
+            <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={persistAllowedBranches} disabled={loading || branchSaving}>
+                {branchSaving ? 'Kaydediliyor...' : 'Yetkili Şubeleri Kaydet'}
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ fontWeight: 800 }}>Yetkili Şubeler</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            POS/Walk-in/Delivery için şube seçimi altyapısı. Birden fazla şube seçilebilir.
+          <div className="card" style={{ borderColor: 'var(--border)' }}>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>Gorunum Modu</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+              Bu paneli beyaz mod veya koyu mod olarak kullanin.
+            </div>
+            <ThemeSelectionCards
+              darkMode={selectedDarkMode}
+              onToggleDarkMode={handleDarkModeToggle}
+            />
           </div>
-          <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-            {activeBranches.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Şube bulunamadı</div>
-            ) : (
-              activeBranches.map((b) => (
-                <SettingsToggle
-                  key={b._id || b.id}
-                  label={b.name}
-                  description={b.description || b.address || 'Bu sube isletme yetki alanina dahil edilir.'}
-                  checked={allowedBranchIds.includes(String(b._id || b.id))}
-                  onChange={(e) => toggleAllowedBranch((b._id || b.id), e.target.checked)}
-                />
-              ))
-            )}
-          </div>
-          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={persistAllowedBranches} disabled={loading || branchSaving}>
-              {branchSaving ? 'Kaydediliyor...' : 'Kaydet'}
-            </button>
-          </div>
-        </div>
 
-        <div className="card" style={{ borderColor: 'var(--border)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Gorunum Modu</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-            Bu paneli beyaz mod veya koyu mod olarak kullanin.
-          </div>
-          <ThemeSelectionCards
-            darkMode={selectedDarkMode}
-            onToggleDarkMode={handleDarkModeToggle}
-          />
-        </div>
+          {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
+          {success && <div style={{ color: '#22c55e', fontSize: 13 }}>{success}</div>}
+          <button className="btn" disabled={loading || (selectedThemeId === savedThemeId && selectedDarkMode === savedDarkMode)}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        </form>
+      </div>
 
-        {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
-        {success && <div style={{ color: '#22c55e', fontSize: 13 }}>{success}</div>}
-        <button className="btn" disabled={loading || (selectedThemeId === savedThemeId && selectedDarkMode === savedDarkMode)}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
-      </form>
+      <Modal open={branchCreateOpen} onClose={() => setBranchCreateOpen(false)} title="Yeni Şube">
+        <form onSubmit={createBranch} style={{ display: 'grid', gap: 12 }}>
+          <SettingsField label="Ad">
+            <input className="settings-ui-input" value={createBranchForm.name} onChange={(event) => setCreateBranchForm({ ...createBranchForm, name: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Açıklama">
+            <input className="settings-ui-input" value={createBranchForm.description} onChange={(event) => setCreateBranchForm({ ...createBranchForm, description: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Adres">
+            <textarea className="settings-ui-textarea" rows="3" value={createBranchForm.address} onChange={(event) => setCreateBranchForm({ ...createBranchForm, address: event.target.value })} />
+          </SettingsField>
+          {branchFormError && <div style={{ color: '#ef4444', fontSize: 13 }}>{branchFormError}</div>}
+          <button className="btn" disabled={branchFormLoading}>{branchFormLoading ? 'Kaydediliyor...' : 'Şubeyi Oluştur'}</button>
+        </form>
+      </Modal>
+
+      <Modal open={branchEditOpen} onClose={() => { setBranchEditOpen(false); setSelectedBranch(null) }} title="Şube Düzenle">
+        <form onSubmit={editBranch} style={{ display: 'grid', gap: 12 }}>
+          <SettingsField label="Ad">
+            <input className="settings-ui-input" value={editBranchForm.name} onChange={(event) => setEditBranchForm({ ...editBranchForm, name: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Açıklama">
+            <input className="settings-ui-input" value={editBranchForm.description} onChange={(event) => setEditBranchForm({ ...editBranchForm, description: event.target.value })} />
+          </SettingsField>
+          <SettingsField label="Adres">
+            <textarea className="settings-ui-textarea" rows="3" value={editBranchForm.address} onChange={(event) => setEditBranchForm({ ...editBranchForm, address: event.target.value })} />
+          </SettingsField>
+          <SettingsToggle label="Aktif" checked={!!editBranchForm.isActive} onChange={(event) => setEditBranchForm({ ...editBranchForm, isActive: event.target.checked })} />
+          {branchFormError && <div style={{ color: '#ef4444', fontSize: 13 }}>{branchFormError}</div>}
+          <button className="btn" disabled={branchFormLoading}>{branchFormLoading ? 'Kaydediliyor...' : 'Kaydet'}</button>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!branchDeleteTarget}
+        title="Şubeyi Sil"
+        message="Bu şube aktif listeden kaldırılacak. Geçmiş satış ve raporlardaki şube adı korunur. Devam etmek istiyor musunuz?"
+        confirmText="Şubeyi Sil"
+        loading={branchDeleteLoading}
+        onConfirm={deleteBranch}
+        onClose={() => {
+          if (branchDeleteLoading) return
+          setBranchDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }

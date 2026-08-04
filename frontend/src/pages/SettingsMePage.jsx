@@ -9,9 +9,9 @@ import { useTheme } from '../theme/ThemeContext.jsx'
 const normalizeUsername = (value) => String(value || '').trim().toLowerCase()
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/
 
-export default function SettingsMePage({ apiBase }) {
+export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = false }) {
   const { refresh } = useAuth()
-  const { themeKey, darkMode, setThemeKey, setDarkMode, isMobileRuntime } = useTheme()
+  const { themeKey, darkMode, setThemeKey, setDarkMode } = useTheme()
   const [me, setMe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
@@ -26,11 +26,6 @@ export default function SettingsMePage({ apiBase }) {
   const [platformDarkMode, setPlatformDarkMode] = useState(darkMode)
 
   const isPlatformMode = apiBase === '/api/platform'
-  const [localThemeId, setLocalThemeId] = useState(themeKey)
-
-  useEffect(() => {
-    setLocalThemeId(themeKey)
-  }, [themeKey])
 
   const load = async () => {
     setLoading(true)
@@ -163,9 +158,9 @@ export default function SettingsMePage({ apiBase }) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16, maxWidth: 920 }}>
+    <div style={{ display: 'grid', gap: 16, maxWidth: compact ? 420 : 920 }}>
       <SettingsUiStyles />
-      <h3 style={{ marginTop: 0 }}>Hesabım</h3>
+      {!hideTitle ? <h3 style={{ marginTop: 0 }}>Hesabım</h3> : null}
       {loading && <div className="settings-ui-table-shell" style={{ padding: 18 }}>Yükleniyor...</div>}
       {!loading && !me && <div className="settings-ui-table-shell" style={{ padding: 18 }}>Kullanıcı bilgisi alınamadı</div>}
       {!loading && me ? (
@@ -212,7 +207,7 @@ export default function SettingsMePage({ apiBase }) {
           </SettingsCard>
 
           {isPlatformMode ? (
-            <SettingsCard title="Gorunum Modu" description="Platform panelini beyaz mod veya koyu mod olarak kullanin." icon="🎨">
+            <SettingsCard title="Görünüm Modu" description="Platform panelini beyaz mod veya koyu mod olarak kullanın." icon="🎨">
               <form onSubmit={savePlatformTheme} style={{ display: 'grid', gap: 14 }}>
                 <ThemeSelectionCards
                   darkMode={platformDarkMode}
@@ -220,7 +215,7 @@ export default function SettingsMePage({ apiBase }) {
                 />
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button className="settings-ui-submit" disabled={saving}>Gorunum Modunu Kaydet</button>
+                  <button className="settings-ui-submit" disabled={saving}>Görünüm Modunu Kaydet</button>
                 </div>
               </form>
             </SettingsCard>
@@ -229,4 +224,8 @@ export default function SettingsMePage({ apiBase }) {
       ) : null}
     </div>
   )
+}
+
+export default function SettingsMePage({ apiBase }) {
+  return <SettingsAccountPanel apiBase={apiBase} />
 }
