@@ -325,7 +325,10 @@ export const send = async (req, res) => {
     }
     const servingType = req.body?.servingType
     const kitchenEnabled = req.body?.kitchenEnabled
-    const result = await sendOrderService(req.user.tenantId, req.params.id, { servingType, kitchenEnabled })
+    const sendToKitchen = req.body && Object.prototype.hasOwnProperty.call(req.body, 'sendToKitchen')
+      ? Boolean(req.body?.sendToKitchen)
+      : undefined
+    const result = await sendOrderService(req.user.tenantId, req.params.id, { servingType, kitchenEnabled, sendToKitchen })
     res.json({
       success: true,
       order: result.order,

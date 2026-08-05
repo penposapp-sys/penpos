@@ -2511,12 +2511,17 @@ export const cancelOrderService = async (tenantId, id) => {
   return { id: order.id, status: order.status }
 }
 
-export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabled } = {}) => {
+export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabled, sendToKitchen } = {}) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
   if (!['open', 'sent'].includes(order.status)) throw error('invalid_state', 'Order not open or sent', 400)
   const now = new Date()
   const batchId = new mongoose.Types.ObjectId().toString()
+  const saleType = String(order.saleType || '').trim()
+  const autoCompleteOnSend = kitchenEnabled === false && saleType === 'table'
+  const effectiveSendToKitchen = sendToKitchen !== undefined
+    ? Boolean(sendToKitchen)
+    : (kitchenEnabled !== undefined ? Boolean(kitchenEnabled) : Boolean(order.sendToKitchen !== false))
 
   const itemsToLabel = []
   const itemsToKitchenReceipt = []
@@ -2525,6 +2530,10 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
 
   if (kitchenEnabled !== undefined) {
     order.kitchenEnabled = Boolean(kitchenEnabled)
+  }
+  if (sendToKitchen !== undefined) {
+    order.sendToKitchen = Boolean(sendToKitchen)
+  } else if (kitchenEnabled !== undefined) {
     order.sendToKitchen = Boolean(kitchenEnabled)
   }
 
@@ -2599,14 +2608,40 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
   await order.save()
 
   try {
-    if (order.kitchenEnabled !== false && order.sendToKitchen !== false && itemsToLabel.length > 0) {
+    if (itemsToLabel.length > 0 && (autoCompleteOnSend || effectiveSendToKitchen !== false)) {
       labelQueuedCount = await enqueueOrderItemLabels({ tenantId, order, items: itemsToLabel, mode: 'order_send', batchId })
     }
   } catch {
   }
 
-  await enqueueKitchenReceiptJobs({ tenantId, order, items: itemsToKitchenReceipt, batchId })
-  receiptQueuedCount = itemsToKitchenReceipt.length
+  if (!autoCompleteOnSend && order.kitchenEnabled !== false && order.sendToKitchen !== false) {
+    await enqueueKitchenReceiptJobs({ tenantId, order, items: itemsToKitchenReceipt, batchId })
+    receiptQueuedCount = itemsToKitchenReceipt.length
+  } else {
+    receiptQueuedCount = 0
+  }
+
+  if (autoCompleteOnSend) {
+    for (const it of order.items || []) {
+      if (String(it?.kitchenBatchId || '') !== batchId) continue
+      if (it.status === 'sent' || it.status === 'cooking') {
+        it.status = 'completed'
+        it.kitchenPrintedAt = now
+      }
+    }
+    if (Array.isArray(order.kitchenBatches)) {
+      order.kitchenBatches = order.kitchenBatches.map((batch) => (
+        String(batch?.batchId || '') === batchId
+          ? { ...batch, completedAt: now }
+          : batch
+      ))
+    }
+    if (String(order.currentKitchenBatchId || '') === batchId) {
+      order.currentKitchenBatchId = null
+    }
+    normalizeLegacyItemStatuses(order)
+    await order.save()
+  }
 
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_send', 'Order', order.id, {})
   const fresh = await Order.findById(order.id).lean()
@@ -2622,13 +2657,19 @@ export const setKitchenModeService = async (tenantId, id, { kitchenEnabled, send
     e.payload = { code: 'order_not_editable', message: 'Order is not editable' }
     throw e
   }
-  const next = kitchenEnabled !== undefined ? Boolean(kitchenEnabled) : (sendToKitchen !== undefined ? Boolean(sendToKitchen) : undefined)
-  if (next === undefined) {
+  const hasKitchenEnabled = kitchenEnabled !== undefined
+  const hasSendToKitchen = sendToKitchen !== undefined
+  if (!hasKitchenEnabled && !hasSendToKitchen) {
     throw error('invalid_request', 'kitchenEnabled or sendToKitchen required', 400)
   }
-  const normalized = Boolean(next)
-  order.sendToKitchen = normalized
-  order.kitchenEnabled = normalized
+  if (hasKitchenEnabled) {
+    order.kitchenEnabled = Boolean(kitchenEnabled)
+  }
+  if (hasSendToKitchen) {
+    order.sendToKitchen = Boolean(sendToKitchen)
+  } else if (hasKitchenEnabled) {
+    order.sendToKitchen = Boolean(kitchenEnabled)
+  }
   await order.save()
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }

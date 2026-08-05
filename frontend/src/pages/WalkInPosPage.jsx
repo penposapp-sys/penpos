@@ -389,15 +389,27 @@ export default function WalkInPosPage() {
 
   const effectiveKitchenEnabled = kitchenPagesEnabled
     ? (typeof order?.kitchenEnabled === 'boolean' ? order.kitchenEnabled : kitchenDefaultRef.current)
-    : false
+    : (typeof order?.sendToKitchen === 'boolean' ? order.sendToKitchen : kitchenDefaultRef.current)
 
   const setKitchenMode = async (next) => {
     const orderId = selectedOrderId || getOrderId(order)
     if (!orderId) return
     const key = `${orderId}:kitchen-mode`
     if (isDebounced(key, 250)) return
+    const desired = Boolean(next)
     const res = await withLock(key, () => safeAction(
-      (signal) => api(`/api/pos/orders/${orderId}/kitchen-mode`, { method: 'PUT', data: { kitchenEnabled: Boolean(next) }, signal, silent: true }),
+      (signal) => api(
+        `/api/pos/orders/${orderId}/kitchen-mode`,
+        {
+          method: 'PUT',
+          data: {
+            kitchenEnabled: kitchenPagesEnabled ? desired : false,
+            sendToKitchen: desired
+          },
+          signal,
+          silent: true
+        }
+      ),
       { reload: false }
     ))
     if (!res) return
@@ -405,10 +417,15 @@ export default function WalkInPosPage() {
     if (fresh) {
       setOrder(fresh)
     } else {
-      setOrder(prev => (prev ? { ...prev, kitchenEnabled: Boolean(next), sendToKitchen: Boolean(next) } : prev))
+      setOrder(prev => (prev ? {
+        ...prev,
+        kitchenEnabled: kitchenPagesEnabled ? desired : false,
+        sendToKitchen: desired
+      } : prev))
     }
     try {
-      localStorage.setItem('pos_send_to_kitchen_default', next ? '1' : '0')
+      localStorage.setItem('pos_send_to_kitchen_default', desired ? '1' : '0')
+      kitchenDefaultRef.current = desired
     } catch {}
     await reloadOrder().catch(() => null)
   }
@@ -419,7 +436,8 @@ export default function WalkInPosPage() {
     if (!oid) return
     if (kitchenDefaultAppliedRef.current.has(String(oid))) return
     const desired = kitchenDefaultRef.current
-    if (typeof order?.kitchenEnabled === 'boolean' && order.kitchenEnabled === desired) {
+    const currentMode = kitchenPagesEnabled ? order?.kitchenEnabled : order?.sendToKitchen
+    if (typeof currentMode === 'boolean' && currentMode === desired) {
       kitchenDefaultAppliedRef.current.add(String(oid))
       return
     }
@@ -432,7 +450,7 @@ export default function WalkInPosPage() {
     }
     kitchenDefaultAppliedRef.current.add(String(oid))
     setKitchenMode(desired)
-  }, [isOrderView, order?.id, order?._id])
+  }, [isOrderView, kitchenPagesEnabled, order?.id, order?._id])
 
   const withLock = async (key, fn) => {
     if (!key) return null
@@ -1186,7 +1204,8 @@ export default function WalkInPosPage() {
 
     const payload = {
       servingType: normalizeServingType(servingType),
-      kitchenEnabled: effectiveKitchenEnabled !== false
+      kitchenEnabled: kitchenPagesEnabled ? (effectiveKitchenEnabled !== false) : false,
+      sendToKitchen: effectiveKitchenEnabled !== false
     }
     const result = await safeAction(
       (signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: payload, signal, silent: true }),
@@ -1833,31 +1852,31 @@ export default function WalkInPosPage() {
                 </div>
               </div>
 
-              {kitchenPagesEnabled && (
-                <div className="saleCartSubRow" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hazırlanacaklar’a Düşsün</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="btn btn--toggle btn--xs"
-                      aria-pressed={effectiveKitchenEnabled !== false}
-                      onClick={() => setKitchenMode(true)}
-                      disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
-                    >
-                      Açık
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--toggle btn--xs"
-                      aria-pressed={effectiveKitchenEnabled === false}
-                      onClick={() => setKitchenMode(false)}
-                      disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
-                    >
-                      Kapalı
-                    </button>
-                  </div>
+              <div className="saleCartSubRow" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  {kitchenPagesEnabled ? 'Mutfağa Düşsün' : 'Etiket Yazdır'}
                 </div>
-              )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn--toggle btn--xs"
+                    aria-pressed={effectiveKitchenEnabled !== false}
+                    onClick={() => setKitchenMode(true)}
+                    disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
+                  >
+                    {kitchenPagesEnabled ? 'Mutfağa Düşsün' : 'Yazdır'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--toggle btn--xs"
+                    aria-pressed={effectiveKitchenEnabled === false}
+                    onClick={() => setKitchenMode(false)}
+                    disabled={busy || !getOrderId(order) || inflightRef.current.get(`${(selectedOrderId || getOrderId(order))}:kitchen-mode`)}
+                  >
+                    {kitchenPagesEnabled ? 'Düşmesin' : 'Yazdırma'}
+                  </button>
+                </div>
+              </div>
 
               {order?.servingType && servingType !== order.servingType && (
                 <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
@@ -1878,8 +1897,10 @@ export default function WalkInPosPage() {
                     }
                   >
                     {effectiveKitchenEnabled === false
-                      ? 'Onayla (Mutfak Kapalı)'
-                      : `Mutfağa Gönder (${servingTypeLabelTR(servingType) || '-'})`}
+                      ? 'Onayla'
+                      : (kitchenPagesEnabled
+                        ? `Mutfağa Gönder (${servingTypeLabelTR(servingType) || '-'})`
+                        : `Etiket Yazdır (${servingTypeLabelTR(servingType) || '-'})`)}
                   </button>
                 </div>
               )}
@@ -1889,7 +1910,7 @@ export default function WalkInPosPage() {
                 {(() => {
                   const raw = Array.isArray(order?.items) ? order.items : []
                   const openItems = raw.filter(it => it?.status === 'open')
-                  const canShowPrep = effectiveKitchenEnabled !== false
+                  const canShowPrep = kitchenPagesEnabled && effectiveKitchenEnabled !== false
                   const prepItems = raw.filter(it => isKitchenActiveItemStatus(it?.status))
                   const sentItems = canShowPrep ? prepItems : []
                   const approvedItems = canShowPrep ? [] : prepItems

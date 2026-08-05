@@ -1777,7 +1777,7 @@ export default function PosPage() {
           >
             {kitchenPagesEnabled
               ? `Mutfağa Gönder (${servingTypeLabelTR(servingType) || '-'})`
-              : 'Onayla (Mutfak Kapalı)'}
+              : 'Onayla'}
           </button>
         </div>
       )}
