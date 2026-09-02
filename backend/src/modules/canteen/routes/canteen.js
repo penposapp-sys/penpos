@@ -176,6 +176,8 @@ router.post('/products', canteenBranchQueryGuard, requireRole(['tenant_admin', '
 router.put('/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.updateProduct)
 router.post('/products/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), uploadSingleFile, catalogCtrl.uploadProductImage)
 router.delete('/products/:id/image', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProductImage)
+router.post('/products/:id/gallery', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), uploadSingleFile, catalogCtrl.addGalleryImage)
+router.delete('/products/:id/gallery', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeGalleryImage)
 router.delete('/products/:id', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_MENU]), catalogCtrl.removeProduct)
 
 router.post('/sales', canteenBranchQueryGuard, requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.CANTEEN_POS_ACCESS]), salesCtrl.create)

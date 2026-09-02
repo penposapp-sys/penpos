@@ -64,6 +64,7 @@ export default function CanteenSettingsProductsPage() {
   const [stockTrackingEnabled, setStockTrackingEnabled] = useState(false)
   const [stockQty, setStockQty] = useState('')
   const [minimumStock, setMinimumStock] = useState('5')
+  const [description, setDescription] = useState('')
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [q, setQ] = useState('')
   const [error, setError] = useState('')
@@ -89,6 +90,8 @@ export default function CanteenSettingsProductsPage() {
   const [editStockTrackingEnabled, setEditStockTrackingEnabled] = useState(false)
   const [editStockQty, setEditStockQty] = useState('')
   const [editMinimumStock, setEditMinimumStock] = useState('5')
+  const [editDescription, setEditDescription] = useState('')
+  const [editGalleryImages, setEditGalleryImages] = useState([])
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [categoryBrowserOpen, setCategoryBrowserOpen] = useState(false)
@@ -274,6 +277,7 @@ export default function CanteenSettingsProductsPage() {
     setStockTrackingEnabled(false)
     setStockQty('')
     setMinimumStock('5')
+    setDescription('')
   }
 
   const openCreateModal = () => {
@@ -349,7 +353,8 @@ export default function CanteenSettingsProductsPage() {
         categoryId: String(categoryId || '').trim() || null,
         stockTrackingEnabled: stockTrackingEnabled === true,
         stockQty: Number(String(stockQty || '').replace(',', '.')) || 0,
-        minimumStock: Number(String(minimumStock || '').replace(',', '.')) || 0
+        minimumStock: Number(String(minimumStock || '').replace(',', '.')) || 0,
+        description: String(description || '').trim()
       },
       silent: true
     })
@@ -393,7 +398,61 @@ export default function CanteenSettingsProductsPage() {
     setEditStockTrackingEnabled(item?.stockTrackingEnabled === true)
     setEditStockQty(String(item?.stockQty ?? ''))
     setEditMinimumStock(String(item?.minimumStock ?? '5'))
+    setEditDescription(String(item?.description ?? ''))
+    setEditGalleryImages(Array.isArray(item?.galleryImages) ? item.galleryImages : [])
     setEditOpen(true)
+  }
+
+  const uploadGalleryImage = async (productId, file, branchId) => {
+    if (!productId || !file || !branchId) return null
+    const preparedFile = await optimizeProductImageForUpload(file)
+    const formData = new FormData()
+    formData.append('file', preparedFile || file)
+    return api(`/api/canteen/products/${encodeURIComponent(productId)}/gallery?branchId=${encodeURIComponent(branchId)}`, {
+      method: 'POST',
+      body: formData,
+      silent: true
+    })
+  }
+
+  const removeGalleryImage = async (productId, imageUrl, branchId) => {
+    if (!productId || !imageUrl || !branchId) return null
+    return api(`/api/canteen/products/${encodeURIComponent(productId)}/gallery?branchId=${encodeURIComponent(branchId)}&imageUrl=${encodeURIComponent(imageUrl)}`, {
+      method: 'DELETE',
+      silent: true
+    })
+  }
+
+  const handleGalleryUpload = async (event) => {
+    const file = event?.target?.files?.[0]
+    if (!file || !editId) return
+    const branchId = String(selectedBranchId || '').trim()
+    if (!branchId) return
+    const response = await uploadGalleryImage(editId, file, branchId)
+    if (!response?.ok) {
+      toast.error(response?.message || 'Gorsel yuklenemedi')
+      return
+    }
+    if (Array.isArray(response?.galleryImages)) {
+      setEditGalleryImages(response.galleryImages)
+    }
+    toast.success('Gorsel eklendi')
+    if (event?.target) event.target.value = ''
+  }
+
+  const handleGalleryRemove = async (imageUrl) => {
+    if (!editId || !imageUrl) return
+    const branchId = String(selectedBranchId || '').trim()
+    if (!branchId) return
+    const response = await removeGalleryImage(editId, imageUrl, branchId)
+    if (!response?.ok) {
+      toast.error(response?.message || 'Gorsel silinemedi')
+      return
+    }
+    if (Array.isArray(response?.galleryImages)) {
+      setEditGalleryImages(response.galleryImages)
+    }
+    toast.success('Gorsel silindi')
   }
 
   const submitEdit = async () => {
@@ -427,7 +486,8 @@ export default function CanteenSettingsProductsPage() {
         categoryId: String(editCategoryId || '').trim() || null,
         stockTrackingEnabled: editStockTrackingEnabled === true,
         stockQty: Number.isFinite(nextStock) ? nextStock : 0,
-        minimumStock: Number(String(editMinimumStock || '').replace(',', '.')) || 0
+        minimumStock: Number(String(editMinimumStock || '').replace(',', '.')) || 0,
+        description: String(editDescription || '').trim()
       },
       silent: true
     })
@@ -1439,6 +1499,18 @@ export default function CanteenSettingsProductsPage() {
                 />
               </div>
               <div className="canteen-create-modal-row">
+                <label htmlFor="create-description">Ürün Açıklaması</label>
+                <textarea
+                  id="create-description"
+                  className="input"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  disabled={!canManage}
+                  placeholder="Online sipariş sayfasında görünecek açıklama"
+                  style={{ minHeight: 72, paddingTop: 10 }}
+                />
+              </div>
+              <div className="canteen-create-modal-row">
                 <label>Stok Takibi</label>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button className={`btn btn--compact ${stockTrackingEnabled ? 'btn--primary' : ''}`} type="button" onClick={() => setStockTrackingEnabled(true)} disabled={!canManage}>Stok Takibi Açık</button>
@@ -1526,6 +1598,10 @@ export default function CanteenSettingsProductsPage() {
               {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
           </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ürün Açıklaması (Online Sipariş)</div>
+            <textarea className="input" value={editDescription} onChange={(event) => setEditDescription(event.target.value)} disabled={!canManage} placeholder="Online sipariş sayfasında görünecek açıklama" style={{ minHeight: 72, paddingTop: 12 }} />
+          </label>
           <div className="stackRow" style={{ justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button className={`btn btn--compact ${editStockTrackingEnabled ? 'btn--primary' : ''}`} type="button" onClick={() => setEditStockTrackingEnabled(true)} disabled={!canManage}>Stok Takibi Açık</button>
@@ -1575,6 +1651,21 @@ export default function CanteenSettingsProductsPage() {
               }}
               onRemoveExisting={removeEditImage}
             />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ek Fotograflar (Online Siparis)</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+              {editGalleryImages.map((img, idx) => (
+                <div key={idx} style={{ position: 'relative', width: 80, height: 80, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--app-border, var(--border))' }}>
+                  <img src={resolveProductImageUrl({ imageUrl: img })} alt={`Galeri ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button type="button" onClick={() => handleGalleryRemove(img)} disabled={!canManage} style={{ position: 'absolute', top: 2, right: 2, width: 22, height: 22, borderRadius: 999, border: 'none', background: 'rgba(239,68,68,0.9)', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>X</button>
+                </div>
+              ))}
+              <label style={{ width: 80, height: 80, borderRadius: 12, border: '2px dashed var(--app-border, var(--border))', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 24, color: 'var(--muted)', background: 'var(--app-surface, var(--panel))' }}>
+                +
+                <input type="file" accept="image/*" onChange={handleGalleryUpload} style={{ display: 'none' }} disabled={!canManage} />
+              </label>
+            </div>
           </label>
           <div className="actionWrap" style={{ justifyContent: 'flex-end', position: 'sticky', bottom: 0, paddingTop: 10, background: 'linear-gradient(180deg, rgba(255,255,255,0), var(--app-surface, #fff) 38%)' }}>
             <button className="btn" type="button" onClick={() => setEditOpen(false)}>Vazgeç</button>

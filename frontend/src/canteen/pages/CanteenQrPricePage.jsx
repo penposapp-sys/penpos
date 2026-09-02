@@ -1754,6 +1754,13 @@ export default function CanteenQrPricePage() {
               <div className="qr-ref-sheet-media">
                 <ProductImage product={selectedProduct} alt={selectedProduct.name} width={500} height={500} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
+              {Array.isArray(selectedProduct.galleryImages) && selectedProduct.galleryImages.length > 0 ? (
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 0' }}>
+                  {selectedProduct.galleryImages.map((img, idx) => (
+                    <img key={idx} src={resolvePublicQrAssetUrl(img, IMAGE_PLACEHOLDER)} alt={`${selectedProduct.name} - ${idx + 1}`} style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--app-border, var(--border))', flexShrink: 0 }} onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }} />
+                  ))}
+                </div>
+              ) : null}
               <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
                 <div className="qr-ref-product-category">{selectedProduct.categoryName || 'Diğer Ürünler'}</div>
                 <h3 style={{ margin: 0, color: 'var(--app-text)', fontSize: 22, fontWeight: 900 }}>{selectedProduct.name}</h3>

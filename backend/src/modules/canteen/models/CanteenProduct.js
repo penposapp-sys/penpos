@@ -15,6 +15,8 @@ const schema = new mongoose.Schema({
   vatRate: { type: Number, default: 0 },
   vatIncluded: { type: Boolean, default: true },
   imageUrl: { type: String, default: '' },
+  description: { type: String, default: '' },
+  galleryImages: { type: [String], default: [] },
   isActive: { type: Boolean, default: true, index: true },
   createdAt: { type: Date, default: Date.now }
 }, { collection: 'canteen_products' })

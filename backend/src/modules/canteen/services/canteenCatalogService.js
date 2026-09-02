@@ -64,7 +64,9 @@ const mapProductDto = (product, categoryById = new Map()) => {
     categoryId: product.categoryId ? String(product.categoryId) : null,
     categoryName: category ? String(category?.name || '') : '',
     categoryImageUrl: category ? String(category?.imageUrl || '') : '',
-    imageUrl: String(product.imageUrl || '')
+    imageUrl: String(product.imageUrl || ''),
+    description: String(product.description || ''),
+    galleryImages: Array.isArray(product.galleryImages) ? product.galleryImages : []
   }
 }
 
@@ -281,6 +283,8 @@ export const createProduct = async (tenantId, branchId, input) => {
       vatRate: Number.isFinite(vatRate) ? vatRate : 0,
       vatIncluded,
       imageUrl: '',
+      description: normalizeText(input?.description),
+      galleryImages: Array.isArray(input?.galleryImages) ? input.galleryImages.map(String).filter(Boolean) : [],
       isActive: true,
       createdAt: new Date()
     })
@@ -300,7 +304,9 @@ export const createProduct = async (tenantId, branchId, input) => {
       vatRate: Number(created.vatRate || 0),
       vatIncluded: created.vatIncluded !== false,
       categoryId: created.categoryId ? String(created.categoryId) : null,
-      imageUrl: String(created.imageUrl || '')
+      imageUrl: String(created.imageUrl || ''),
+      description: String(created.description || ''),
+      galleryImages: Array.isArray(created.galleryImages) ? created.galleryImages : []
     }
   } catch (err) {
     if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayitli', 409)
@@ -347,6 +353,12 @@ export const updateProduct = async (tenantId, branchId, id, input, actorUserId =
   }
   if (input?.vatIncluded !== undefined) {
     update.vatIncluded = input?.vatIncluded !== false
+  }
+  if (input?.description !== undefined) {
+    update.description = normalizeText(input?.description)
+  }
+  if (input?.galleryImages !== undefined) {
+    update.galleryImages = Array.isArray(input.galleryImages) ? input.galleryImages.map(String).filter(Boolean) : []
   }
   if (input?.categoryId !== undefined) {
     update.categoryId = input?.categoryId ? String(input.categoryId) : null
@@ -415,7 +427,9 @@ export const updateProduct = async (tenantId, branchId, id, input, actorUserId =
       vatRate: Number(updated.vatRate || 0),
       vatIncluded: updated.vatIncluded !== false,
       categoryId: updated.categoryId ? String(updated.categoryId) : null,
-      imageUrl: String(updated.imageUrl || '')
+      imageUrl: String(updated.imageUrl || ''),
+      description: String(updated.description || ''),
+      galleryImages: Array.isArray(updated.galleryImages) ? updated.galleryImages : []
     }
   } catch (err) {
     if (isDuplicateBarcodeError(err)) throw error('duplicate_barcode', 'Bu barkod zaten kayitli', 409)
@@ -552,5 +566,41 @@ export const removeProductImage = async (tenantId, branchId, id) => {
     vatIncluded: updated.vatIncluded !== false,
     categoryId: updated.categoryId ? String(updated.categoryId) : null,
     imageUrl: String(updated.imageUrl || '')
+  }
+}
+
+
+export const addGalleryImage = async (tenantId, branchId, id, file) => {
+  const current = await prodRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Urun bulunamadi', 404)
+
+  const saved = await replaceProductImageFile(null, file)
+  const currentGallery = Array.isArray(current.galleryImages) ? [...current.galleryImages] : []
+  currentGallery.push(saved.imageUrl)
+  const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, { galleryImages: currentGallery, updatedAt: new Date() })
+  if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
+
+  return {
+    id: updated.id,
+    galleryImages: Array.isArray(updated.galleryImages) ? updated.galleryImages : []
+  }
+}
+
+export const removeGalleryImage = async (tenantId, branchId, id, imageUrl) => {
+  const current = await prodRepo.findByIdAndScope(id, tenantId, branchId)
+  if (!current) throw error('not_found', 'Urun bulunamadi', 404)
+
+  const currentGallery = Array.isArray(current.galleryImages) ? [...current.galleryImages] : []
+  const targetIndex = currentGallery.findIndex((img) => img === imageUrl)
+  if (targetIndex === -1) throw error('not_found', 'Gorsel bulunamadi', 404)
+
+  await deleteProductImageFile(imageUrl)
+  currentGallery.splice(targetIndex, 1)
+  const updated = await prodRepo.updateByIdAndScope(id, tenantId, branchId, { galleryImages: currentGallery, updatedAt: new Date() })
+  if (!updated) throw error('not_found', 'Urun bulunamadi', 404)
+
+  return {
+    id: updated.id,
+    galleryImages: Array.isArray(updated.galleryImages) ? updated.galleryImages : []
   }
 }

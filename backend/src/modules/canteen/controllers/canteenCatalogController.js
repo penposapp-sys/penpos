@@ -126,3 +126,22 @@ export const searchProducts = async (req, res) => {
     sendError(res, err)
   }
 }
+
+
+export const addGalleryImage = async (req, res) => {
+  try {
+    const result = await service.addGalleryImage(req.user.tenantId, req.canteenBranchId, req.params.id, req.file)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const removeGalleryImage = async (req, res) => {
+  try {
+    const result = await service.removeGalleryImage(req.user.tenantId, req.canteenBranchId, req.params.id, req.query.imageUrl || '')
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
