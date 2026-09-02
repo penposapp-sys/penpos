@@ -311,6 +311,7 @@ export const getPublicOnlineStore = async (req, res) => {
         basePrice: Number(item.price || 0),
         description: String(item.description || ''),
         imageUrl: String(item.imageUrl || ''),
+        galleryImages: Array.isArray(item.galleryImages) ? item.galleryImages : [],
         sortOrder: Number(item.sortOrder || 0),
         isWeightBased: item?.isWeightBased === true,
         weightUnit: String(itemSettings.weightUnit || 'Gram'),

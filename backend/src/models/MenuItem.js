@@ -14,6 +14,7 @@ const menuItemSchema = new mongoose.Schema(
     isWeightBased: { type: Boolean, default: false },
     printLabelEnabled: { type: Boolean, default: false },
     imageUrl: { type: String, default: '' },
+    galleryImages: { type: [String], default: [] },
     settings: { type: Object, default: {} },
     branchIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Branch', default: [] },
     active: { type: Boolean, default: true },

@@ -507,6 +507,8 @@ export default function CanteenQrPricePage() {
   const [successOrder, setSuccessOrder] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expandedOrderId, setExpandedOrderId] = useState('')
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0)
+  const gallerySwipeRef = useRef({ startX: 0, swiping: false })
   const pageRootRef = useRef(null)
   const categoryScrollRef = useRef(null)
   const dragRef = useRef({ isDown: false, startX: 0, scrollLeft: 0 })
@@ -833,6 +835,41 @@ export default function CanteenQrPricePage() {
     '--theme-placeholder': publicTheme.placeholder,
     '--theme-subdued-button-text': publicTheme.subduedButtonText,
     '--theme-logo-placeholder-text': publicTheme.logoPlaceholderText
+  }
+
+  const allProductImages = useMemo(() => {
+    if (!selectedProduct) return []
+    const mainUrl = resolvePublicQrAssetUrl(selectedProduct.imageUrl, IMAGE_PLACEHOLDER)
+    const gallery = (Array.isArray(selectedProduct.galleryImages) ? selectedProduct.galleryImages : [])
+      .map((img) => resolvePublicQrAssetUrl(img, IMAGE_PLACEHOLDER))
+      .filter((url) => url && url !== IMAGE_PLACEHOLDER)
+    const all = [mainUrl, ...gallery]
+    return all.length > 0 ? all : [IMAGE_PLACEHOLDER]
+  }, [selectedProduct])
+
+  useEffect(() => {
+    setSelectedGalleryIndex(0)
+  }, [selectedProduct?.id])
+
+  const navigateGallery = (direction) => {
+    if (allProductImages.length <= 1) return
+    setSelectedGalleryIndex((prev) => {
+      if (direction === 'next') return (prev + 1) % allProductImages.length
+      return (prev - 1 + allProductImages.length) % allProductImages.length
+    })
+  }
+
+  const handleGallerySwipeStart = (clientX) => {
+    gallerySwipeRef.current = { startX: clientX, swiping: true }
+  }
+
+  const handleGallerySwipeEnd = (clientX) => {
+    if (!gallerySwipeRef.current.swiping) return
+    gallerySwipeRef.current.swiping = false
+    const diff = clientX - gallerySwipeRef.current.startX
+    if (Math.abs(diff) > 50) {
+      navigateGallery(diff < 0 ? 'next' : 'prev')
+    }
   }
 
   const openHome = () => {
@@ -1751,13 +1788,92 @@ export default function CanteenQrPricePage() {
                 <h2>Ürün Detayı</h2>
                 <button type="button" className="qr-ref-sheet-close" onClick={() => setSelectedProduct(null)}>×</button>
               </div>
-              <div className="qr-ref-sheet-media">
-                <ProductImage product={selectedProduct} alt={selectedProduct.name} width={500} height={500} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <div style={{ position: 'relative', width: 'min(500px, calc(100vw - 48px))', margin: '0 auto' }}>
+                <div
+                  className="qr-ref-sheet-media"
+                  style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 22, overflow: 'hidden', background: 'var(--app-surface-elevated, #243047)', cursor: allProductImages.length > 1 ? 'grab' : 'default' }}
+                  onTouchStart={(e) => handleGallerySwipeStart(e.touches[0].clientX)}
+                  onTouchEnd={(e) => handleGallerySwipeEnd(e.changedTouches[0].clientX)}
+                  onMouseDown={(e) => handleGallerySwipeStart(e.clientX)}
+                  onMouseUp={(e) => handleGallerySwipeEnd(e.clientX)}
+                >
+                  {allProductImages.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`${selectedProduct.name} - ${idx + 1}`}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        opacity: idx === selectedGalleryIndex ? 1 : 0,
+                        transition: 'opacity 0.25s ease',
+                        pointerEvents: idx === selectedGalleryIndex ? 'auto' : 'none'
+                      }}
+                      onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
+                    />
+                  ))}
+                  {allProductImages.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); navigateGallery('prev') }}
+                        style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 999, border: 'none', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 18, fontWeight: 900, display: 'grid', placeItems: 'center', cursor: 'pointer', zIndex: 2, backdropFilter: 'blur(4px)' }}
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); navigateGallery('next') }}
+                        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 999, border: 'none', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 18, fontWeight: 900, display: 'grid', placeItems: 'center', cursor: 'pointer', zIndex: 2, backdropFilter: 'blur(4px)' }}
+                      >
+                        ›
+                      </button>
+                      <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+                        {allProductImages.map((_, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              width: idx === selectedGalleryIndex ? 18 : 7,
+                              height: 7,
+                              borderRadius: 999,
+                              background: idx === selectedGalleryIndex ? '#fff' : 'rgba(255,255,255,0.4)',
+                              transition: 'all 0.25s ease',
+                              cursor: 'pointer'
+                            }}
+                            onClick={(e) => { e.stopPropagation(); setSelectedGalleryIndex(idx) }}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-              {Array.isArray(selectedProduct.galleryImages) && selectedProduct.galleryImages.length > 0 ? (
-                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 0' }}>
-                  {selectedProduct.galleryImages.map((img, idx) => (
-                    <img key={idx} src={resolvePublicQrAssetUrl(img, IMAGE_PLACEHOLDER)} alt={`${selectedProduct.name} - ${idx + 1}`} style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--app-border, var(--border))', flexShrink: 0 }} onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }} />
+              {allProductImages.length > 1 ? (
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 0', scrollbarWidth: 'none' }}>
+                  {allProductImages.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`${selectedProduct.name} - ${idx + 1}`}
+                      onClick={() => setSelectedGalleryIndex(idx)}
+                      style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 12,
+                        objectFit: 'cover',
+                        flexShrink: 0,
+                        cursor: 'pointer',
+                        border: idx === selectedGalleryIndex
+                          ? '2px solid var(--theme-accent, #ff6a00)'
+                          : '1px solid var(--app-border, rgba(255,255,255,0.12))',
+                        opacity: idx === selectedGalleryIndex ? 1 : 0.6,
+                        transition: 'all 0.2s ease'
+                      }}
+                      onError={(event) => { event.currentTarget.src = IMAGE_PLACEHOLDER }}
+                    />
                   ))}
                 </div>
               ) : null}
