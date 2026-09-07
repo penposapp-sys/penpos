@@ -15,6 +15,7 @@ import SuperadminWebsiteSettings from './pages/SuperadminWebsiteSettings.jsx'
 import PlatformAdminTenants from './pages/PlatformAdminTenants.jsx'
 import PlatformAdminPlans from './pages/PlatformAdminPlans.jsx'
 import PlatformAdminMembershipRequests from './pages/PlatformAdminMembershipRequests.jsx'
+import PlatformAdminAnaokuluRegionAdmins from './pages/PlatformAdminAnaokuluRegionAdmins.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { BusinessSettingsProvider } from './context/BusinessSettingsContext.jsx'
@@ -49,6 +50,18 @@ import DigitalMenuPage from './pages/DigitalMenuPage.tsx'
 import QrMenuSettingsPage from './pages/QrMenuSettingsPage.jsx'
 import OnlineSalesSettingsPage from './pages/OnlineSalesSettingsPage.jsx'
 import OnlineSalesPage from './pages/OnlineSalesPage.jsx'
+import AnaokuluLogin from './pages/AnaokuluLogin.jsx'
+import AnaokuluLayout from './anaokulu/layout/AnaokuluLayout.jsx'
+import DashboardPage from './anaokulu/pages/DashboardPage.jsx'
+import OgrencilerPage from './anaokulu/pages/OgrencilerPage.jsx'
+import UcretPlaniPage from './anaokulu/pages/UcretPlaniPage.jsx'
+import TahsilatlarPage from './anaokulu/pages/TahsilatlarPage.jsx'
+import FaturalarPage from './anaokulu/pages/FaturalarPage.jsx'
+import RaporlarPage from './anaokulu/pages/RaporlarPage.jsx'
+import AyarlarPage from './anaokulu/pages/AyarlarPage.jsx'
+import AnaokuluUyelerPage from './anaokulu/pages/AnaokuluUyelerPage.jsx'
+import RegionAdminOkullarimPage from './anaokulu/pages/RegionAdminOkullarimPage.jsx'
+import { AnaokuluDataProvider } from './anaokulu/context/AnaokuluDataContext.jsx'
 import RestaurantWebsiteSettingsPage from './pages/RestaurantWebsiteSettingsPage.jsx'
 import RestaurantWebsitePage from './pages/RestaurantWebsitePage.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -90,6 +103,8 @@ const EXIT_ROUTES = new Set([
   '/login/restoran',
   '/login/kantin',
   '/canteen/login',
+  '/login/anaokulu',
+  '/anaokulu/login',
 ])
 
 const isNativeApp = () => {
@@ -120,6 +135,12 @@ const resolveBackFallbackPath = (pathname) => {
   if (path.startsWith('/canteen/stok/') && path !== '/canteen/stok') return '/canteen/stok'
   if (path.startsWith('/canteen/raporlar/') && path !== '/canteen/raporlar') return '/canteen/raporlar'
 
+  if (path.startsWith('/anaokulu/ogrenciler/')) return '/anaokulu/ogrenciler'
+  if (path.startsWith('/anaokulu/tahsilatlar/')) return '/anaokulu/tahsilatlar'
+  if (path.startsWith('/anaokulu/faturalar/')) return '/anaokulu/faturalar'
+  if (path.startsWith('/anaokulu/ayarlar/') && path !== '/anaokulu/ayarlar' && path !== '/anaokulu/ayarlar/uyeler') return '/anaokulu/ayarlar'
+  if (path.startsWith('/anaokulu/')) return '/anaokulu'
+
   if (path.startsWith('/platform')) return '/platform/kermes-tenants'
   if (path.startsWith('/superadmin')) return '/superadmin/tenants'
 
@@ -146,14 +167,17 @@ const buildRouteSnapshot = (location) => {
 const hasAnyAuthToken = () => (
   hasAuthToken('token_restaurant') ||
   hasAuthToken('token_canteen') ||
-  hasAuthToken('token_platform')
+  hasAuthToken('token_platform') ||
+  hasAuthToken('token_anaokulu')
 )
 
 const resolveHomePath = (user) => {
   if (!user) return null
   if (user.role === 'superadmin') return '/superadmin/tenants'
   if (user.role === 'platform_admin') return '/platform'
+  if (user.role === 'anaokulu_region_admin') return '/anaokulu'
   if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/canteen'
+  if (user.systemType === 'anaokulu') return '/anaokulu'
   return '/kermes'
 }
 
@@ -266,6 +290,7 @@ const getDefaultRoute = (user, tenantCtx) => {
   if (!user) return null
   if (user.role === 'superadmin') return '/superadmin/tenants'
   if (user.role === 'platform_admin') return '/platform/kermes-tenants'
+  if (user.role === 'anaokulu_region_admin') return '/anaokulu/okullarim'
 
   const perms = Array.isArray(user.permissions) ? user.permissions : []
   const isExpired = isSubscriptionExpired(tenantCtx)
@@ -278,6 +303,7 @@ const getDefaultRoute = (user, tenantCtx) => {
   }
 
   if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/canteen/kasa'
+  if (user.systemType === 'anaokulu') return '/anaokulu/genel-bakis'
 
   if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/kermes/app/dashboard'
   if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/kermes/app/tables'
@@ -317,6 +343,16 @@ const KermesIndexRedirect = () => {
   return <div className="card">Yetkili sayfa yok, yoneticinle gorus</div>
 }
 
+const AnaokuluIndexRoute = () => {
+  const { user, regionCurrentTenantId, isRegionAdmin } = useAuth()
+  if (isRegionAdmin || user?.role === 'anaokulu_region_admin' || user?.role === 'superadmin' || user?.role === 'platform_admin') {
+    if (!regionCurrentTenantId) {
+      return <Navigate to="/anaokulu/okullarim" replace />
+    }
+  }
+  return <Navigate to="/anaokulu/genel-bakis" replace />
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -333,6 +369,8 @@ export default function App() {
         <Route path="/login/platform" element={<Navigate to="/platform-login" replace />} />
         <Route path="/login/restoran" element={<SignIn portal="restaurant" />} />
         <Route path="/login/kantin" element={<Navigate to="/canteen/login" replace />} />
+        <Route path="/login/anaokulu" element={<Navigate to="/anaokulu/login" replace />} />
+        <Route path="/anaokulu/login" element={<AnaokuluLogin />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -346,6 +384,20 @@ export default function App() {
         <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
         <Route path="/canteen/login" element={<CanteenLogin />} />
+
+        <Route path="/anaokulu" element={<AnaokuluDataProvider><ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu"><AnaokuluLayout /></ProtectedRoute></AnaokuluDataProvider>}>
+          <Route index element={<AnaokuluIndexRoute />} />
+          <Route path="genel-bakis" element={<DashboardPage />} />
+          <Route path="ogrenciler" element={<OgrencilerPage />} />
+          <Route path="ucret-taksit" element={<UcretPlaniPage />} />
+          <Route path="tahsilatlar" element={<TahsilatlarPage />} />
+          <Route path="faturalar" element={<FaturalarPage />} />
+          <Route path="raporlar" element={<RaporlarPage />} />
+          <Route path="ayarlar" element={<AyarlarPage />}>
+            <Route path="uyeler" element={<ProtectedRoute roles={['tenant_admin']} system="anaokulu"><AnaokuluUyelerPage /></ProtectedRoute>} />
+          </Route>
+          <Route path="okullarim" element={<ProtectedRoute roles={['anaokulu_region_admin', 'platform_admin', 'superadmin']}><RegionAdminOkullarimPage /></ProtectedRoute>} />
+        </Route>
         <Route path="/canteen" element={<CanteenLayout />}>
           <Route index element={<Navigate to="/canteen/kasa" replace />} />
           <Route path="kasa" element={<CanteenCashierPage />} />
@@ -377,6 +429,8 @@ export default function App() {
           <Route path="platform" element={<Navigate to="/platform/kermes-tenants" replace />} />
           <Route path="platform/kermes-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="kermes" system="kermes" /></ProtectedRoute>} />
           <Route path="platform/canteen-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="canteen" system="canteen" /></ProtectedRoute>} />
+          <Route path="platform/anaokulu-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="anaokulu" system="anaokulu" /></ProtectedRoute>} />
+          <Route path="platform/anaokulu-region-admins" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminAnaokuluRegionAdmins /></ProtectedRoute>} />
           <Route path="platform/plans" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminPlans /></ProtectedRoute>} />
           <Route path="platform/billing-requests" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminMembershipRequests /></ProtectedRoute>} />
           <Route path="platform/payments" element={<Navigate to="/platform/billing-requests" replace />} />
@@ -387,6 +441,7 @@ export default function App() {
 
         <Route path="/platform/tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
         <Route path="/platform-admin/kermes-tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
+        <Route path="/platform-admin/anaokulu-region-admins" element={<Navigate to="/platform/anaokulu-region-admins" replace />} />
         <Route path="/platform-admin/plans" element={<Navigate to="/platform/plans" replace />} />
         <Route path="/platform-admin/billing-requests" element={<Navigate to="/platform/billing-requests" replace />} />
         <Route path="/platform-admin/payments" element={<Navigate to="/platform/billing-requests" replace />} />

@@ -20,11 +20,15 @@ export default function ProtectedRoute({ roles, permissions, permissionsMode = '
 
   if (!user) return <Navigate to="/login" replace />
 
+  if (user.role === 'superadmin' || user.role === 'platform_admin') {
+    return children
+  }
+
   if (roles && !roles.includes(user.role)) {
     return <div className="card">403 - Bu sistem icin yetkiniz yok</div>
   }
 
-  if (system) {
+  if (system && user.role !== 'anaokulu_region_admin') {
     const expectedSystem = normalizeSystemType(system)
     const userSystem = normalizeSystemType(user.systemType)
     const tenantSystem = normalizeSystemType(tenantCtx?.tenant?.systemType)
@@ -38,7 +42,7 @@ export default function ProtectedRoute({ roles, permissions, permissionsMode = '
   }
 
   const required = Array.isArray(permissions) ? permissions : (permissions ? [permissions] : [])
-  if (required.length > 0 && user.role !== 'tenant_admin' && user.role !== 'superadmin') {
+  if (required.length > 0 && user.role !== 'tenant_admin' && user.role !== 'superadmin' && user.role !== 'anaokulu_region_admin') {
     const userPerms = Array.isArray(user.permissions) ? user.permissions : []
     const mode = permissionsMode === 'any' ? 'any' : 'all'
     const ok = mode === 'any'
@@ -48,7 +52,7 @@ export default function ProtectedRoute({ roles, permissions, permissionsMode = '
     if (!ok) return <div className="card">403 - Bu sistem icin yetkiniz yok</div>
   }
 
-  if (!allowExpired && isSubscriptionExpired(tenantCtx)) {
+  if (!allowExpired && user.role !== 'anaokulu_region_admin' && isSubscriptionExpired(tenantCtx)) {
     return <Navigate to={getSubscriptionUpgradePath(pathname)} replace state={{ subscriptionExpired: true }} />
   }
 

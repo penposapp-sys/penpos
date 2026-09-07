@@ -14,15 +14,15 @@ export default function PublicSystemLogin({
   identifierPlaceholder,
   passwordLabel = 'Şifre',
   passwordPlaceholder = 'Şifrenizi girin',
-  identifier,
-  password,
-  onIdentifierChange,
-  onPasswordChange,
-  rememberMe = true,
-  onRememberMeChange,
-  onSubmit,
-  error,
-  loading,
+  identifier: identifierProp,
+  password: passwordProp,
+  onIdentifierChange: onIdentifierChangeProp,
+  onPasswordChange: onPasswordChangeProp,
+  rememberMe: rememberMeProp = true,
+  onRememberMeChange: onRememberMeChangeProp,
+  onSubmit: onSubmitProp,
+  error: errorProp,
+  loading: loadingProp,
   forgotTo = '/forgot-password',
   forgotLabel = 'Şifremi Unuttum?',
   submitLabel = 'Giriş Yap',
@@ -39,14 +39,34 @@ export default function PublicSystemLogin({
   panelCaption,
   showRememberMe = true,
 }) {
+  const [identifierState, setIdentifierState] = useState('')
+  const [passwordState, setPasswordState] = useState('')
+  const [rememberMeState, setRememberMeState] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
+
+  const hasExternalControl = typeof onIdentifierChangeProp === 'function' && typeof onPasswordChangeProp === 'function'
+  const identifier = hasExternalControl ? identifierProp : identifierState
+  const password = hasExternalControl ? passwordProp : passwordState
+  const rememberMe = typeof onRememberMeChangeProp === 'function' ? rememberMeProp : rememberMeState
+  const onIdentifierChange = typeof onIdentifierChangeProp === 'function' ? onIdentifierChangeProp : setIdentifierState
+  const onPasswordChange = typeof onPasswordChangeProp === 'function' ? onPasswordChangeProp : setPasswordState
+  const onRememberMeChange = typeof onRememberMeChangeProp === 'function' ? onRememberMeChangeProp : setRememberMeState
+  const onSubmit = typeof onSubmitProp === 'function'
+    ? onSubmitProp
+    : (event) => {
+        event.preventDefault()
+      }
+  const error = errorProp
+  const loading = loadingProp
 
   const themeClass = useMemo(() => (
     theme === 'canteen'
       ? 'system-login system-login--canteen'
       : theme === 'platform'
         ? 'system-login system-login--platform'
-        : 'system-login system-login--restaurant'
+        : theme === 'anaokulu'
+          ? 'system-login system-login--anaokulu'
+          : 'system-login system-login--restaurant'
   ), [theme])
 
   return (

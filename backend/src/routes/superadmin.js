@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../middlewares/requireAuth.js'
 import { requireRole } from '../middlewares/requireRole.js'
 import { sendError } from '../utils/errors.js'
-import { createTenantService, listTenantsService, extendTrialService, endTrialService, editTenantService, softDeleteTenantService, createTenantAdminService } from '../services/superadminService.js'
+import { createTenantService, listTenantsService, extendTrialService, endTrialService, editTenantService, softDeleteTenantService, createTenantAdminService, listAnaokuluRegionAdminsService, createAnaokuluRegionAdminService, updateAnaokuluRegionAdminService, deleteAnaokuluRegionAdminService } from '../services/superadminService.js'
 import { updateTenantStatusService, hardDeleteTenantService } from '../services/platformAdminService.js'
 import { getSuperadminWebsiteSettings, updateSuperadminWebsiteSettings } from '../controllers/websiteSettingsController.js'
 
@@ -10,8 +10,9 @@ const router = Router()
 
 router.post('/tenants', requireAuth, requireRole(['superadmin']), async (req, res) => {
   try {
-    const { name, slug } = req.body || {}
-    const tenant = await createTenantService({ name, slug }, req.user.id)
+    const { name, slug, systemType, businessType, vertical } = req.body || {}
+    const chosenSystem = systemType || businessType || vertical || 'restaurant'
+    const tenant = await createTenantService({ name, slug, systemType: chosenSystem }, req.user.id)
     res.json({ tenant })
   } catch (err) {
     sendError(res, err)
@@ -93,5 +94,58 @@ router.put('/tenants/:tenantId/trial-end', requireAuth, requireRole(['superadmin
 
 router.get('/website-settings', requireAuth, requireRole(['superadmin']), getSuperadminWebsiteSettings)
 router.put('/website-settings', requireAuth, requireRole(['superadmin']), updateSuperadminWebsiteSettings)
+
+router.get('/anaokulu-region-admins', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const items = await listAnaokuluRegionAdminsService()
+    res.json({ items })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/anaokulu-region-admins', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const b = req.body || {}
+    const result = await createAnaokuluRegionAdminService({
+      name: b.name,
+      email: b.email,
+      password: b.password,
+      phone: b.phone,
+      accessibleTenantIds: b.accessibleTenantIds
+    }, req.user.id)
+    res.json({ success: true, user: result })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.put('/anaokulu-region-admins/:userId', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    const b = req.body || {}
+    const result = await updateAnaokuluRegionAdminService(userId, {
+      name: b.name,
+      email: b.email,
+      phone: b.phone,
+      password: b.password,
+      accessibleTenantIds: b.accessibleTenantIds,
+      isActive: b.isActive
+    }, req.user.id)
+    res.json({ success: true, user: result })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.delete('/anaokulu-region-admins/:userId', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    const result = await deleteAnaokuluRegionAdminService(userId, req.user.id)
+    res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+})
 
 export default router

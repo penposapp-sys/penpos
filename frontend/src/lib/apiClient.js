@@ -42,6 +42,7 @@ const inferPortalFromPathname = (pathname) => {
   const p = String(pathname || '').trim().toLowerCase()
   if (p.startsWith('/canteen')) return 'canteen'
   if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/superadmin') || p.startsWith('/login/platform') || p.startsWith('/platform-login')) return 'platform'
+  if (p.startsWith('/anaokulu') || p.startsWith('/anaokulu-login') || p.startsWith('/anaokul') || p.startsWith('/kres') || p.startsWith('/kreş')) return 'anaokulu'
   return 'restaurant'
 }
 
@@ -91,7 +92,7 @@ const getDefaultCacheTtlMs = (normalizedPath, method) => {
 const getAuthRedirectPath = (portal) => (
   portal === 'canteen'
     ? '/canteen/login'
-    : (portal === 'platform' ? '/platform-login' : '/login/restoran')
+    : (portal === 'platform' ? '/platform-login' : (portal === 'anaokulu' ? '/anaokulu/login' : '/login/restoran'))
 )
 
 const isPublicAuthPath = (pathname) => {
@@ -104,6 +105,8 @@ const isPublicAuthPath = (pathname) => {
     path === '/login/restoran' ||
     path === '/login/kantin' ||
     path === '/canteen/login' ||
+    path === '/anaokulu/login' ||
+    path.startsWith('/anaokulu/login') ||
     path.startsWith('/forgot-password') ||
     path.startsWith('/reset-password')
   )
@@ -136,8 +139,12 @@ export const api = async (path, options = {}) => {
     }
   })()
   const portal = portalOverride || inferPortalFromPathname(pathname)
-  const tokenKey = portal === 'canteen' ? 'token_canteen' : (portal === 'platform' ? 'token_platform' : 'token_restaurant')
-  const branchKey = portal === 'canteen' ? 'selectedBranchId_canteen' : 'selectedBranchId'
+  const tokenKey =
+    portal === 'canteen' ? 'token_canteen' :
+    (portal === 'platform' ? 'token_platform' :
+    (portal === 'anaokulu' ? 'token_anaokulu' : 'token_restaurant'))
+  const branchKey = portal === 'canteen' ? 'selectedBranchId_canteen' :
+    (portal === 'anaokulu' ? 'selectedBranchId_anaokulu' : 'selectedBranchId')
   const allowlistPath = normalizeForAllowlist(path)
   const isAuthPath = allowlistPath.startsWith('/api/auth/')
   const isHealthPath = allowlistPath === '/api/health' || allowlistPath.startsWith('/api/health/')
@@ -152,7 +159,7 @@ export const api = async (path, options = {}) => {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
   const incomingHeaders = { ...(options.headers || {}) }
-  const shouldAttachBranch = portal !== 'platform' && portal !== 'canteen' && !isAuthPath && !isHealthPath
+  const shouldAttachBranch = portal !== 'platform' && portal !== 'canteen' && portal !== 'anaokulu' && !isAuthPath && !isHealthPath
   const headers = {
     ...baseHeaders,
     ...(!skipBranchHeader && shouldAttachBranch && (branchIdOverride || selectedBranchId) ? { 'x-branch-id': String(branchIdOverride || selectedBranchId) } : {}),
@@ -261,10 +268,13 @@ export const api = async (path, options = {}) => {
 
         if (res.status === 402 && code === 'SUBSCRIPTION_EXPIRED') {
           try {
-            const redirectTo = getSubscriptionUpgradePath(pathname)
-            window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
-            if (!isSubscriptionAllowedPath(pathname, pathname)) {
-              window.location.replace(redirectTo)
+            const isAnaokulu = pathname.startsWith('/anaokulu/') || pathname === '/anaokulu' || portal === 'anaokulu'
+            if (!isAnaokulu) {
+              const redirectTo = getSubscriptionUpgradePath(pathname)
+              window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
+              if (!isSubscriptionAllowedPath(pathname, pathname)) {
+                window.location.replace(redirectTo)
+              }
             }
           } catch {}
         }
@@ -386,10 +396,13 @@ export const apiDownload = async (path, options = {}) => {
 
     if (res.status === 402 && code === 'SUBSCRIPTION_EXPIRED') {
       try {
-        const redirectTo = getSubscriptionUpgradePath(pathname)
-        window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
-        if (!isSubscriptionAllowedPath(pathname, pathname)) {
-          window.location.replace(redirectTo)
+        const isAnaokulu = pathname.startsWith('/anaokulu/') || pathname === '/anaokulu'
+        if (!isAnaokulu) {
+          const redirectTo = getSubscriptionUpgradePath(pathname)
+          window.dispatchEvent(new CustomEvent('subscription_expired', { detail: { path: normalizedPath, redirectTo, message } }))
+          if (!isSubscriptionAllowedPath(pathname, pathname)) {
+            window.location.replace(redirectTo)
+          }
         }
       } catch {}
     }

@@ -7,9 +7,9 @@ const tenantSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   logoUrl: { type: String, default: '' },
   allowedBranchIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Branch', default: [] },
-  systemType: { type: String, enum: ['kermes', 'kantin'], default: 'kermes', required: true },
-  vertical: { type: String, enum: ['restaurant', 'canteen'], default: 'restaurant', required: true, index: true },
-  businessType: { type: String, enum: ['restaurant', 'canteen'], default: 'restaurant' },
+  systemType: { type: String, enum: ['kermes', 'kantin', 'anaokulu'], default: 'kermes', required: true },
+  vertical: { type: String, enum: ['restaurant', 'canteen', 'anaokulu'], default: 'restaurant', required: true, index: true },
+  businessType: { type: String, enum: ['restaurant', 'canteen', 'anaokulu'], default: 'restaurant' },
   ownerUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   settings: {
     type: new mongoose.Schema({}, { _id: false, strict: false }),

@@ -1,21 +1,46 @@
 package com.penpos.app;
 
 import android.os.Bundle;
+
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Logger;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginLoadException;
 import com.getcapacitor.PluginManager;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends BridgeActivity {
 
+    private PenposUpdateManager updateManager;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         initialPlugins.add(PenposRuntimePlugin.class);
         super.onCreate(savedInstanceState);
+
+        updateManager = new PenposUpdateManager(this);
+        updateManager.checkForUpdate();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        if (updateManager != null) {
+            updateManager.onResume();
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        if (updateManager != null) {
+            updateManager.destroy();
+        }
+
+        super.onDestroy();
     }
 
     @Override
@@ -41,9 +66,11 @@ public class MainActivity extends BridgeActivity {
                 Logger.info("Firebase config missing. PushNotifications plugin skipped.");
                 continue;
             }
+
             filtered.add(pluginClass);
         }
 
         return filtered;
     }
 }
+

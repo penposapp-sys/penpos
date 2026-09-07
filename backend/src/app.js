@@ -29,6 +29,7 @@ import settingsMenuRouter from './routes/settingsMenu.js'
 import userPreferencesRouter from './routes/userPreferences.js'
 import printingRouter from './routes/printing.js'
 import waiterCallsRouter from './routes/waiterCalls.js'
+import anaokuluRouter from './routes/anaokulu.js'
 import { requireActiveSubscription } from './middlewares/requireActiveSubscription.js'
 import { requireAuth } from './middlewares/requireAuth.js'
 import { tenantGuard } from './middlewares/tenantGuard.js'
@@ -47,19 +48,31 @@ export const createServer = () => {
   if (!isProd) {
     app.set('etag', false)
   }
+  const corsAllowedHeaders = [
+    'Content-Type',
+    'Authorization',
+    'x-branch-id',
+    'X-Request-Id',
+    'x-request-id',
+    'X-Tenant-Id',
+    'x-tenant-id',
+    'x-portal',
+    'x-debug-trace'
+  ]
+
   if (isProd) {
     const opts = corsOrigin
       ? {
           origin: corsOrigin,
           credentials: true,
           methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-          allowedHeaders: ['Content-Type', 'Authorization', 'x-branch-id', 'X-Request-Id'],
+          allowedHeaders: corsAllowedHeaders,
           optionsSuccessStatus: 204
         }
       : {
           credentials: true,
           methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-          allowedHeaders: ['Content-Type', 'Authorization', 'x-branch-id', 'X-Request-Id'],
+          allowedHeaders: corsAllowedHeaders,
           optionsSuccessStatus: 204
         }
     app.use(cors(opts))
@@ -84,7 +97,7 @@ export const createServer = () => {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-branch-id', 'X-Request-Id'],
+      allowedHeaders: corsAllowedHeaders,
       optionsSuccessStatus: 204
     }
     app.use(cors(opts))
@@ -206,6 +219,9 @@ export const createServer = () => {
       })
     console.log('PLATFORM ROUTES REGISTERED:', routes)
   } catch {}
+  // Anaokulu (öğrenci & mali yönetim) — tenant bazlı basit CRUD
+  app.use('/api/anaokulu', anaokuluRouter)
+
   app.get('/api', (req, res) => {
     res.json({ ok: true })
   })

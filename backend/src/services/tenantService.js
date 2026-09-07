@@ -45,12 +45,14 @@ const buildPlanSummary = (tenant, planDoc, status) => {
   }
 }
 
-export const getContext = async (user) => {
+export const getContext = async (user, overrideTenantId = null) => {
   const u = await findUserById(user.id)
   if (!u) throw error('unauthorized', 'Unauthorized', 401)
+  const isRegion = u.role === 'anaokulu_region_admin' && u.regionSystemType === 'anaokulu'
+  let effectiveTenantId = isRegion && overrideTenantId ? overrideTenantId : u.tenantId
   let tenant = null
-  if (u.tenantId) {
-    const t = await findTenantById(u.tenantId)
+  if (effectiveTenantId) {
+    const t = await findTenantById(effectiveTenantId)
     if (t) {
       const subscriptionStatus = getPlanStatus(t)
       const isActiveSubscription = hasActiveSubscription(t)
@@ -80,11 +82,15 @@ export const getContext = async (user) => {
     }
   }
   let paymentPending = false
-  if (u.tenantId) {
+  if (effectiveTenantId) {
     try {
-      paymentPending = !!(await PaymentRequest.exists({ tenantId: u.tenantId, status: 'pending' }))
-      if (!paymentPending) {
-        paymentPending = !!(await MembershipRequest.exists({ tenantId: u.tenantId, status: 'pending' }))
+      const effT = (tenant && String(tenant.id) === String(effectiveTenantId)) ? tenant : (await findTenantById(effectiveTenantId))
+      const isAnaokulu = resolveTenantPackageType(effT) === 'anaokulu'
+      if (!isAnaokulu) {
+        paymentPending = !!(await PaymentRequest.exists({ tenantId: effectiveTenantId, status: 'pending' }))
+        if (!paymentPending) {
+          paymentPending = !!(await MembershipRequest.exists({ tenantId: effectiveTenantId, status: 'pending' }))
+        }
       }
     } catch {}
   }

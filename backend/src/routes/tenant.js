@@ -38,7 +38,8 @@ const uploadSingleImage = (req, res, next) => {
 
 router.get('/context', requireAuth, tenantGuard, async (req, res) => {
   try {
-    const ctx = await getContext(req.user)
+    const overrideId = req.query?.tenantId || req.headers['x-tenant-id'] || null
+    const ctx = await getContext(req.user, overrideId)
     res.json(ctx)
   } catch (err) {
     sendError(res, err)

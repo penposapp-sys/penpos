@@ -15,6 +15,7 @@ const resolvePortalFromPathname = (pathname) => {
     path.startsWith('/platform-login')
   ) return 'platform'
   if (path.startsWith('/canteen') || path.startsWith('/login/kantin')) return 'canteen'
+  if (path.startsWith('/anaokulu') || path.startsWith('/login/anaokulu')) return 'anaokulu'
   return 'restaurant'
 }
 
@@ -22,6 +23,7 @@ const resolveTokenKeyForPortal = (portal) => {
   const normalizedPortal = String(portal || '').trim().toLowerCase()
   if (normalizedPortal === 'platform') return 'token_platform'
   if (normalizedPortal === 'canteen') return 'token_canteen'
+  if (normalizedPortal === 'anaokulu') return 'token_anaokulu'
   return 'token_restaurant'
 }
 
@@ -63,13 +65,15 @@ const normalizeUser = (user) => (user ? { ...user, permissions: normalizePermiss
 const resolvePortalFromUser = (user) => {
   if (!user) return 'restaurant'
   if (user.role === 'platform_admin' || user.role === 'superadmin') return 'platform'
+  if (user.role === 'anaokulu_region_admin') return 'anaokulu'
   if (user.systemType === 'kantin' || user.systemType === 'canteen') return 'canteen'
+  if (user.systemType === 'anaokulu') return 'anaokulu'
   return 'restaurant'
 }
 
 const restorePortalOrder = (pathname) => {
   const currentPortal = resolvePortalFromPathname(pathname)
-  const order = [currentPortal, 'restaurant', 'canteen', 'platform']
+  const order = [currentPortal, 'restaurant', 'canteen', 'anaokulu', 'platform']
   return order.filter((portal, index) => order.indexOf(portal) === index)
 }
 
@@ -78,17 +82,55 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [tenantCtx, setTenantCtx] = useState(null)
   const [allowedBranchIds, setAllowedBranchIds] = useState([])
+  const [accessibleTenantIds, setAccessibleTenantIds] = useState([])
+  const [accessibleTenants, setAccessibleTenants] = useState([])
+  const [regionCurrentTenantId, setRegionCurrentTenantId] = useState(null)
 
   const initInFlightRef = useRef(false)
+
+  const isRegionAdmin = Boolean(user?.role === 'anaokulu_region_admin' && user?.regionSystemType === 'anaokulu')
 
   const hydratePortalState = async (portal, meRes) => {
     const meUser = meRes?.user
     const normalized = normalizeUser(meUser)
     setUser(normalized)
 
-    if (normalized?.tenantId) {
-      const ctxRes = await api('/api/tenant/context', { silent: true, portalOverride: portal })
-      setTenantCtx(ctxRes?.ok ? ctxRes : null)
+    const isRegion = Boolean(normalized?.role === 'anaokulu_region_admin' && normalized?.regionSystemType === 'anaokulu')
+    const accList = Array.isArray(normalized?.accessibleTenants) ? normalized.accessibleTenants : []
+    const accIds = accList.length > 0
+      ? accList.map(t => String(t.id || t._id)).filter(Boolean)
+      : (Array.isArray(normalized?.accessibleTenantIds) ? normalized.accessibleTenantIds.map(String).filter(Boolean) : [])
+    setAccessibleTenantIds(accIds)
+    setAccessibleTenants(accList)
+
+    let effectiveTenantId = normalized?.tenantId || null
+    if (isRegion) {
+      if (accIds.length > 0) {
+        if (!regionCurrentTenantId || !accIds.includes(String(regionCurrentTenantId))) {
+          effectiveTenantId = accIds[0]
+          setRegionCurrentTenantId(effectiveTenantId)
+        } else {
+          effectiveTenantId = regionCurrentTenantId
+        }
+      } else {
+        effectiveTenantId = null
+        setRegionCurrentTenantId(null)
+      }
+    } else {
+      setRegionCurrentTenantId(null)
+      setAccessibleTenants([])
+    }
+
+    if (effectiveTenantId) {
+      try {
+        const url = isRegion
+          ? `/api/tenant/context?tenantId=${encodeURIComponent(effectiveTenantId)}`
+          : '/api/tenant/context'
+        const ctxRes = await api(url, { silent: true, portalOverride: portal })
+        setTenantCtx(ctxRes?.ok ? ctxRes : null)
+      } catch {
+        setTenantCtx(null)
+      }
     } else {
       setTenantCtx(null)
     }
@@ -125,6 +167,31 @@ export const AuthProvider = ({ children }) => {
         }
       })()
 
+      const PUBLIC_LOGIN_ROUTES = [
+        '/platform-login',
+        '/login/platform',
+        '/login/restoran',
+        '/login/kantin',
+        '/canteen/login',
+        '/login/anaokulu',
+        '/anaokulu/login',
+        '/forgot-password',
+        '/reset-password',
+        '/register',
+      ]
+      const isPublicLoginRoute = PUBLIC_LOGIN_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '?') || pathname.startsWith(r + '/'))
+      if (isPublicLoginRoute) {
+        setUser(null)
+        setTenantCtx(null)
+        setAllowedBranchIds([])
+        setAccessibleTenantIds([])
+        setAccessibleTenants([])
+        setRegionCurrentTenantId(null)
+        setLoading(false)
+        initInFlightRef.current = false
+        return
+      }
+
       try {
         for (const portal of restorePortalOrder(pathname)) {
           const tokenKey = resolveTokenKeyForPortal(portal)
@@ -144,6 +211,9 @@ export const AuthProvider = ({ children }) => {
         setUser(null)
         setTenantCtx(null)
         setAllowedBranchIds([])
+        setAccessibleTenantIds([])
+        setAccessibleTenants([])
+        setRegionCurrentTenantId(null)
       } finally {
         setLoading(false)
         initInFlightRef.current = false
@@ -160,6 +230,7 @@ export const AuthProvider = ({ children }) => {
       portal === 'canteen' ? 'canteen' :
       portal === 'kermes' ? 'kermes' :
       portal === 'restaurant' ? 'restaurant' :
+      portal === 'anaokulu' ? 'anaokulu' :
       'restaurant'
     const tokenKey = resolveTokenKeyForPortal(portalOverride)
 
@@ -205,6 +276,9 @@ export const AuthProvider = ({ children }) => {
       if (pathname.startsWith('/canteen') || String(user?.systemType || '') === 'kantin' || String(user?.systemType || '') === 'canteen') {
         return '/canteen/login'
       }
+      if (pathname.startsWith('/anaokulu') || String(user?.systemType || '') === 'anaokulu' || String(user?.role || '') === 'anaokulu_region_admin') {
+        return '/anaokulu/login'
+      }
       return '/login/restoran'
     })()
 
@@ -217,6 +291,9 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
     setTenantCtx(null)
     setAllowedBranchIds([])
+    setAccessibleTenantIds([])
+    setAccessibleTenants([])
+    setRegionCurrentTenantId(null)
     try {
       if (typeof window !== 'undefined') window.location.replace(nextPath)
     } catch {}
@@ -235,8 +312,28 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  useEffect(() => {
+    if (!isRegionAdmin || !regionCurrentTenantId) return undefined
+    if (accessibleTenantIds.length > 0 && !accessibleTenantIds.includes(String(regionCurrentTenantId))) {
+      setRegionCurrentTenantId(accessibleTenantIds[0])
+      return undefined
+    }
+    let cancelled = false
+    const portal = resolvePortalFromUser(user) || 'anaokulu'
+    const run = async () => {
+      try {
+        const ctxRes = await api(`/api/tenant/context?tenantId=${encodeURIComponent(regionCurrentTenantId)}`, { silent: true, portalOverride: portal })
+        if (!cancelled) setTenantCtx(ctxRes?.ok ? ctxRes : null)
+      } catch {
+        if (!cancelled) setTenantCtx(null)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [isRegionAdmin, regionCurrentTenantId, accessibleTenantIds, user])
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh, tenantCtx, allowedBranchIds, setAllowedBranchIds }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh, tenantCtx, allowedBranchIds, setAllowedBranchIds, accessibleTenantIds, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin }}>
       {children}
     </AuthContext.Provider>
   )

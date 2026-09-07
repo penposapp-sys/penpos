@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anaokulu Öğrenci Yönetimi</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#182230;--muted:#697586;--line:#e5e9f0;--primary:#315efb;--green:#14966f;--red:#d84c4c;--yellow:#b77900}
+.anaokulu-app{display:flex;min-height:100vh;background:#f5f7fb;color:#182230;font-family:Inter,'Segoe UI',Arial,sans-serif}
+.anaokulu-app .side{width:250px;background:#111827;color:#dbe3ef;padding:20px 15px;position:fixed;inset:0 auto 0 0}
+.anaokulu-app .brand{font-weight:800;font-size:18px;padding:9px 10px 22px}
+.anaokulu-app .brand small{display:block;color:#91a0b6;font-size:11px;margin-top:5px;font-weight:500}
+.anaokulu-app .nav button{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer;font-size:14px}
+.anaokulu-app .nav button.active,.anaokulu-app .nav button:hover{background:#26334b;color:#fff}
+.anaokulu-app .main{margin-left:250px;width:calc(100% - 250px);padding:28px 34px}
+.anaokulu-app .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:15px;flex-wrap:wrap}
+.anaokulu-app .top h1{margin:0;font-size:26px}.anaokulu-app .top p{margin:5px 0 0;color:var(--muted)}
+.anaokulu-app .actions{display:flex;gap:8px;flex-wrap:wrap}
+.anaokulu-app .btn{border:1px solid var(--line);background:#fff;padding:9px 13px;border-radius:8px;cursor:pointer;font-weight:650;font-size:13px}
+.anaokulu-app .primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.anaokulu-app .green{background:var(--green);border-color:var(--green);color:#fff}
+.anaokulu-app .red{background:var(--red);border-color:var(--red);color:#fff}
+.anaokulu-app .danger{color:#a83232;border-color:#f3caca}
+.anaokulu-app .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-bottom:20px}
+.anaokulu-app .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+.anaokulu-app .label{font-size:12px;color:var(--muted)}
+.anaokulu-app .value{font-size:22px;font-weight:800;margin-top:7px}
+.anaokulu-app .sub{font-size:11px;color:var(--muted);margin-top:4px}
+.anaokulu-app .panel{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.anaokulu-app .panelhead{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.anaokulu-app .panelhead h2{margin:0;font-size:17px}
+.anaokulu-app .filters{display:flex;gap:9px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid var(--line)}
+.anaokulu-app input,.anaokulu-app select{border:1px solid #d7dce5;border-radius:8px;padding:9px 10px;background:#fff;color:var(--text);font-size:13px}
+.anaokulu-app input{min-width:170px}
+.anaokulu-app table{width:100%;border-collapse:collapse;font-size:13px}
+.anaokulu-app th,.anaokulu-app td{padding:11px 12px;border-bottom:1px solid #edf0f4;text-align:left;white-space:nowrap}
+.anaokulu-app th{font-size:11px;color:var(--muted);background:#fafbfc;position:sticky;top:0}
+.anaokulu-app tr:hover td{background:#f8fafd}
+.anaokulu-app .status{display:inline-flex;padding:4px 9px;border-radius:99px;font-size:11px;font-weight:750}
+.anaokulu-app .ok{background:#e8f7f1;color:#087653}
+.anaokulu-app .bad{background:#fdeaea;color:#b13232}
+.anaokulu-app .wait{background:#fff3da;color:#966200}
+.anaokulu-app .info{background:#e6ebff;color:#2748c7}
+.anaokulu-app .muted{color:var(--muted)}
+.anaokulu-app .empty{text-align:center;padding:32px;color:var(--muted)}
+.anaokulu-app .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.anaokulu-app .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:18px}
+.anaokulu-app .field{display:flex;flex-direction:column;gap:5px}
+.anaokulu-app .field label{font-size:12px;font-weight:650;color:var(--muted)}
+.anaokulu-app .wide{grid-column:1/-1}
+.anaokulu-app .sectionpad{padding:18px}
+.anaokulu-app .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.anaokulu-app .mini{border:1px solid var(--line);border-radius:9px;padding:12px}
+.anaokulu-app .mini span{font-size:12px;color:var(--muted)}
+.anaokulu-app .mini b{display:block;font-size:18px;margin-top:5px}
+.anaokulu-app .mini small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.anaokulu-app .modal{display:none;position:fixed;inset:0;background:#0f172a77;align-items:center;justify-content:center;padding:18px;z-index:50}
+.anaokulu-app .modal.show{display:flex}
+.anaokulu-app .dialog{width:min(860px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:14px;padding:20px}
+.anaokulu-app .dialog h3{margin:0 0 15px}
+.anaokulu-app .dialogfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.anaokulu-app .toast{display:none;position:fixed;right:22px;bottom:22px;background:#111827;color:#fff;padding:12px 16px;border-radius:9px;z-index:99;max-width:340px}
+.anaokulu-app .toast.show{display:block}
+.anaokulu-app .tabs{display:flex;gap:7px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.anaokulu-app .tab{border:0;background:#f0f2f6;padding:8px 13px;border-radius:7px;cursor:pointer;font-size:13px}
+.anaokulu-app .tab.active{background:#e6ebff;color:#2748c7;font-weight:700}
+.anaokulu-app .bar{height:7px;background:#eef1f6;border-radius:99px;overflow:hidden;margin-top:6px}
+.anaokulu-app .bar i{display:block;height:100%;background:var(--green)}
+.anaokulu-app .badgepdf{display:inline-block;font-size:10px;background:#eef1f6;border-radius:5px;padding:2px 5px;margin-right:3px;color:#4a5568}
+.anaokulu-app h4.sect{margin:22px 0 10px;font-size:14px;color:#334155}
+.anaokulu-app .linkish{background:none;border:none;color:var(--primary);cursor:pointer;padding:0;font-size:13px;font-weight:650}
+@media print{.anaokulu-app .side,.anaokulu-app .actions,.anaokulu-app .filters,.anaokulu-app .dialogfoot,.anaokulu-app .toast{display:none!important}.anaokulu-app .main{margin:0;width:100%;padding:0}.anaokulu-app{background:#fff}}
+@media(max-width:1050px){.anaokulu-app .cards{grid-template-columns:repeat(2,1fr)}.anaokulu-app .summary{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){
+.anaokulu-app .side{position:fixed;left:0;right:0;top:auto;bottom:0;width:100%;height:68px;padding:5px 4px;z-index:20;border-top:1px solid #263149}
+.anaokulu-app .brand{display:none}
+.anaokulu-app .nav{display:flex;height:100%;overflow-x:auto;gap:2px}
+.anaokulu-app .nav button{min-width:88px;height:58px;margin:0;padding:7px 4px;text-align:center;font-size:10px;white-space:normal}
+.anaokulu-app .main{margin:0;width:100%;padding:16px 12px 86px}
+.anaokulu-app .grid2,.anaokulu-app .formgrid{grid-template-columns:1fr}
+.anaokulu-app .cards{grid-template-columns:repeat(2,1fr)}
+.anaokulu-app .card{padding:12px}.anaokulu-app .value{font-size:18px}
+.anaokulu-app .top{align-items:flex-start;flex-direction:column;margin-bottom:15px}.anaokulu-app .top h1{font-size:22px}
+.anaokulu-app .actions{width:100%}.anaokulu-app .actions .btn{flex:1}
+.anaokulu-app .filters{padding:10px;flex-direction:column}.anaokulu-app .filters input,.anaokulu-app .filters select{width:100%;min-width:0}
+.anaokulu-app .summary{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body class="anaokulu-app">
+
+<div class="app">
+<aside class="side">
+  <div class="brand">🏫 ANAOKULU</div>
+  <div class="nav">
+    <button class="active" data-s="home" onclick="show('home',this)">▣ Genel Bakış</button>
+    <button data-s="students" onclick="show('students',this)">👥 Öğrenciler</button>
+    <button data-s="plans" onclick="show('plans',this)">💳 Ücret & Taksit</button>
+    <button data-s="collections" onclick="show('collections',this)">💰 Tahsilatlar</button>
+    <button data-s="invoices" onclick="show('invoices',this)">🧾 Faturalar</button>
+    <button data-s="reports" onclick="show('reports',this)">📊 Raporlar</button>
+    <button data-s="settings" onclick="show('settings',this)">⚙ Ayarlar</button>
+  </div>
+</aside>
+<main class="main">
+
+<!-- ============ GENEL BAKIŞ ============ -->
+<section id="home">
+  <div class="top">
+    <div><h1>Genel Bakış</h1><p id="homeSub">Okulun öğrenci, ücret, tahsilat ve fatura durumunu tek ekrandan yönetin.</p></div>
+    <div class="actions">
+      <button class="btn primary" onclick="newStudent()">+ Öğrenci</button>
+      <button class="btn green" onclick="newCollection()">+ Tahsilat</button>
+      <button class="btn" onclick="gotoCheck()">↻ Faturaları Kontrol Et</button>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="label">Aktif Öğrenci</div><div class="value" id="k1">0</div><div class="sub">Kayıtlı öğrenci</div></div>
+    <div class="card"><div class="label">Yıllık Planlanan</div><div class="value" id="k2">₺0</div><div class="sub">Aktif öğrenci ücretleri</div></div>
+    <div class="card"><div class="label">Toplam Tahsilat</div><div class="value" id="k3">₺0</div><div class="sub">Kayıtlı ödemeler</div></div>
+    <div class="card"><div class="label">Kalan Bakiye</div><div class="value" id="k4">₺0</div><div class="sub">Planlanan − tahsilat</div></div>
+    <div class="card"><div class="label">Bu Ay Tahsilat</div><div class="value" id="k5">₺0</div><div class="sub" id="k5sub"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="panelhead"><h2>Son Tahsilatlar</h2><button class="btn" onclick="goto('collections')">Tümünü Gör</button></div>
+      <div style="overflow:auto"><table><thead><tr><th>Tarih</th><th>Öğrenci</th><th>Kalem</th><th>Tutar</th><th>Ödeme</th></tr></thead><tbody id="recent"></tbody></table></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h2>Bu Ayın Fatura Durumu</h2><button class="btn" onclick="goto('invoices')">Faturalar</button></div>
+      <div class="sectionpad"><div class="summary" style="grid-template-columns:repeat(2,1fr)">
+        <div class="mini"><span>🟢 Fatura Kesildi</span><b id="m1">0</b></div>
+        <div class="mini"><span>🔴 Kesilmedi</span><b id="m2">0</b></div>
+        <div class="mini"><span>🟡 Tutar Farklı</span><b id="m3">0</b></div>
+        <div class="mini"><span>Beklenen Toplam</span><b id="m4">₺0</b></div>
+      </div>
+      <p class="muted" style="font-size:12px;margin:12px 0 0">Dönem: <b id="m5">—</b> · Kontrol <b id="m6">hiç yapılmadı</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ÖĞRENCİLER ============ -->
+<section id="students" style="display:none">
+  <div class="top"><div><h1>Öğrenci Kayıtları</h1><p>Öğrenci, veli ve kayıt bilgilerini yönetin; öğrenci dosyasını açın.</p></div>
+  <div class="actions"><button class="btn primary" onclick="newStudent()">+ Yeni Öğrenci</button></div></div>
+  <div class="panel">
+    <div class="filters">
+      <input id="sq" placeholder="Öğrenci / veli ara" oninput="renderStudents()">
+      <select id="classFilter" onchange="renderStudents()"><option value="">Tüm sınıflar</option></select>
+      <select id="statusFilter" onchange="renderStudents()"><option value="">Tüm durumlar</option><option value="1">Aktif</option><option value="0">Pasif</option></select>
+    </div>
+    <div style="overflow:auto"><table>
+      <thead><tr><th>Öğrenci</th><th>Sınıf</th><th>Veli</th><th>Telefon</th><th>TC/VKN</th><th>Yıllık Ücret</th><th>Bakiye</th><th>Durum</th><th>İşlem</th></tr></thead>
+      <tbody id="studentBody"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============ ÜCRET & TAKSİT PLANI ============ -->
+<section id="plans" style="display:none">
+  <div class="top"><div><h1>Ücret & Taksit Planı</h1><p>Yıllık ücretin aylık dağılımı, ek kalemler (servis, kırtasiye…) ve öğrenci bazlı bakiye.</p></div>
+  <div class="actions"><button class="btn primary" onclick="newItem()">+ Ücret Kalemi</button></div></div>
+  <div class="panel">
+    <div class="filters">
+      <select id="planStudent" onchange="renderPlans()"></select>
+      <select id="planYear" onchange="renderPlans()"><option>2026-2027</option><option>2027-2028</option></select>
+    </div>
+    <div id="planContent" class="sectionpad"></div>
+  </div>
+</section>
+
+<!-- ============ TAHSİLATLAR ============ -->
+<section id="collections" style="display:none">
+  <div class="top"><div><h1>Tahsilatlar</h1><p>Alınan ödemeleri kaydedin; tarih, tür ve öğrenciye göre süzün.</p></div>
+  <div class="actions"><button class="btn green" onclick="newCollection()">+ Tahsilat Kaydet</button></div></div>
+  <div class="panel">
+    <div class="filters">
+      <input id="cq" placeholder="Öğrenci ara" oninput="renderCollections()">
+      <select id="ct" onchange="renderCollections()"><option value="">Tüm ödeme türleri</option><option>Nakit</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Diğer</option></select>
+      <input id="cfrom" type="date" onchange="renderCollections()">
+      <input id="cto" type="date" onchange="renderCollections()">
+    </div>
+    <div class="summary" style="padding:13px 18px;border-bottom:1px solid var(--line)">
+      <div class="mini"><span>Kayıt</span><b id="cs1">0</b></div>
+      <div class="mini"><span>Brüt Toplam</span><b id="cs2">₺0</b></div>
+      <div class="mini"><span>İçindeki KDV</span><b id="cs3">₺0</b></div>
+      <div class="mini"><span>KDV Hariç</span><b id="cs4">₺0</b></div>
+    </div>
+    <div style="overflow:auto"><table>
+      <thead><tr><th>Tarih</th><th>Öğrenci</th><th>Kalem</th><th>Tutar</th><th>KDV</th><th>Fatura No</th><th>Ödeme</th><th>Açıklama</th><th>İşlem</th></tr></thead>
+      <tbody id="collectionBody"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============ FATURALAR ============ -->
+<section id="invoices" style="display:none">
+  <div class="top"><div><h1>Faturalar <span class="status info" style="vertical-align:middle">Tahsilat & Fatura Takibi</span></h1>
+  <p>Öğrenciye ait tahsilatları ve fatura durumunu bu sekmeden yönetin.</p></div>
+  <div class="actions"><button class="btn primary" onclick="checkInvoices()">↻ Faturaları Kontrol Et</button></div></div>
+  <div class="panel">
+    <div class="filters">
+      <select id="invPeriod" onchange="renderInvoices()"></select>
+      <input id="iq" placeholder="Öğrenci / fatura no ara" oninput="renderInvoices()">
+      <select id="ist" onchange="renderInvoices()"><option value="">Tüm durumlar</option><option value="ok">🟢 Kesildi</option><option value="none">🔴 Kesilmedi</option><option value="diff">🟡 Tutar farklı</option></select>
+      <span class="muted" style="font-size:12px;align-self:center">Eşleşen: <b id="matchInfo">—</b></span>
+    </div>
+    <div class="summary" style="padding:13px 18px;border-bottom:1px solid var(--line)">
+      <div class="mini"><span>Beklenen (öğrenci)</span><b id="is1">0</b><small id="is1b">₺0</small></div>
+      <div class="mini"><span>🟢 Kesildi</span><b id="is2">0</b><small id="is2b">₺0</small></div>
+      <div class="mini"><span>🔴 Kesilmedi</span><b id="is3">0</b><small id="is3b">₺0</small></div>
+      <div class="mini"><span>🟡 Tutar farklı</span><b id="is4">0</b><small id="is4b">₺0</small></div>
+    </div>
+    <div style="overflow:auto;max-height:60vh"><table>
+      <thead><tr><th>Durum</th><th>Öğrenci</th><th>Beklenen</th><th>Fatura No</th><th>Tarih</th><th>VKN/TCKN</th><th>Alıcı</th><th>Matrah</th><th>KDV</th><th>Genel Toplam</th><th>Tip</th><th>UUID</th><th>Belge</th><th>İşlem</th></tr></thead>
+      <tbody id="invoiceBody"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============ RAPORLAR ============ -->
+<section id="reports" style="display:none">
+  <div class="top"><div><h1>Raporlar</h1><p>Günlük / haftalık / aylık / yıllık tahsilat, KDV ve fatura raporları.</p></div>
+  <div class="actions"><button class="btn" onclick="exportCSV()">⬇ CSV indir</button><button class="btn" onclick="window.print()">🖨 Yazdır / PDF</button></div></div>
+  <div class="panel">
+    <div class="filters">
+      <select id="rperiod" onchange="renderReports()"><option value="day">Günlük</option><option value="week">Haftalık</option><option value="month" selected>Aylık</option><option value="year">Yıllık</option><option value="all">Tüm zamanlar</option></select>
+      <input id="rdate" type="date" onchange="renderReports()">
+    </div>
+    <div class="sectionpad">
+      <div class="summary">
+        <div class="mini"><span>Brüt Tahsilat</span><b id="r1">₺0</b></div>
+        <div class="mini"><span>KDV Tutarı</span><b id="r2">₺0</b></div>
+        <div class="mini"><span>KDV Hariç (Matrah)</span><b id="r3">₺0</b></div>
+        <div class="mini"><span>İşlem Sayısı</span><b id="r4">0</b></div>
+      </div>
+      <h4 class="sect">Ödeme türüne göre</h4>
+      <table><thead><tr><th>Ödeme Türü</th><th>İşlem</th><th>Brüt</th><th>KDV</th><th>KDV Hariç</th></tr></thead><tbody id="reportBody"></tbody></table>
+      <h4 class="sect">Seçili dönem fatura durumu</h4>
+      <table><thead><tr><th>Durum</th><th>Öğrenci Sayısı</th><th>Beklenen</th><th>Fatura Tutarı</th></tr></thead><tbody id="invReportBody"></tbody></table>
+      <h4 class="sect">Öğrenci bazlı özet (en yüksek bakiye önce)</h4>
+      <table><thead><tr><th>Öğrenci</th><th>Sınıf</th><th>Planlanan</th><th>Tahsil Edilen</th><th>Kalan Bakiye</th><th>Tamamlanma</th></tr></thead><tbody id="stuReportBody"></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AYARLAR ============ -->
+<section id="settings" style="display:none">
+  <div class="top"><div><h1>Ayarlar</h1><p>Okul, vergi ve entegrasyon parametreleri.</p></div></div>
+  <div class="panel sectionpad">
+    <h3>Okul & Vergi</h3>
+    <div class="formgrid" style="padding:12px 0 0">
+      <div class="field"><label>Okul Adı</label><input id="setSchool"></div>
+      <div class="field"><label>Varsayılan KDV (%)</label><input id="setVat" type="number" min="0" max="100"></div>
+    </div>
+    <p id="lucaNote" class="muted" style="font-size:12px;margin-top:12px"></p>
+  </div>
+  <div class="panel sectionpad">
+    <h3>Veri</h3>
+    <p class="muted" style="font-size:12px">Tüm veriler sunucu tarafında (tenant veritabanı) saklanır. Yedek almak için dışa aktar.</p>
+    <div class="actions" style="padding:10px 0">
+      <button class="btn" onclick="exportData()">⬇ Verileri dışa aktar (JSON)</button>
+      <button class="btn" onclick="document.getElementById('impFile').click()">⬆ Verileri içe aktar</button>
+      <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(this)">
+      <button class="btn red" onclick="resetData()">↺ Örnek verilere sıfırla</button>
+    </div>
+  </div>
+</section>
+</main></div>
+
+<div class="modal" id="modal"><div class="dialog"><h3 id="mtitle"></h3><div id="mcontent"></div><div class="dialogfoot" id="mfoot"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn primary" id="msave">Kaydet</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= VERİ KATMANI ================= */
+const API_BASE = window.ANAOKULU_API_BASE || '/api/anaokulu';
+const SCHOOL_ID = window.ANAOKULU_SCHOOL_ID || 'demo';
+
+const MONTHS=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const YEAR_START='2026-09';
+
+function periodsOfYear(){const a=[];let y=Number(YEAR_START.slice(0,4)),m=Number(YEAR_START.slice(5,7));for(let i=0;i<12;i++){a.push(y+'-'+String(m).padStart(2,'0'));m++;if(m>12){m=1;y++}}return a}
+function periodName(p){const y=p.slice(0,4),m=Number(p.slice(5,7));return MONTHS[m-1]+' '+y}
+function addMonths(p,n){let y=Number(p.slice(0,4)),m=Number(p.slice(5,7));m+=n;y+=Math.floor((m-1)/12);m=((m-1)%12)+1;return y+'-'+String(m).padStart(2,'0')}
+function round2(n){return Math.round((Number(n)||0)*100)/100}
+function hash(str){let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))|0;return Math.abs(h)}
+
+/* ============== API KATMANI ============== */
+async function apiGet(path){const r=await fetch(API_BASE+path,{credentials:'include'});if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(t||r.status+' '+r.statusText)}return r.json()}
+async function apiPost(path,data){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(t||r.status+' '+r.statusText)}return r.json()}
+async function apiPut(path,data){const r=await fetch(API_BASE+path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'include'});if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(t||r.status+' '+r.statusText)}return r.json()}
+async function apiDel(path){const r=await fetch(API_BASE+path,{method:'DELETE',credentials:'include'});if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(t||r.status+' '+r.statusText)}return r.json()}
+
+/* Backend tabanlı veri katmanı. */
+let db = null;
+let dbReady = false;
+
+async function loadDbFromBackend(){
+  try{
+    const d = await apiGet('/');
+    db = {
+      settings: d.settings || {school:'Anaokulu',vat:10,lucaUrl:'',lucaKey:'',matchBy:'tax',mode:'sim'},
+      students: d.students || [],
+      collections: d.collections || [],
+      invoices: d.invoices || [],
+      checks: d.checks || []
+    };
+    dbReady = true;
+    return db;
+  }catch(e){
+    console.warn('Anaokulu backend verisi yüklenemedi, örnek veri kullanılıyor:', e);
+    db = sampleData();
+    dbReady = true;
+    return db;
+  }
+}
+
+function persist(){
+  if(!dbReady) return;
+  try{
+    localStorage.setItem('anaokulu_mali_backend_v1',
+      JSON.stringify({settings:db.settings,students:db.students,collections:db.collections,invoices:db.invoices,checks:db.checks}));
+  }catch(e){}
+}
+
+async function saveToBackend(path,data){
+  try{
+    const payload = {
+      settings: db.settings,
+      students: db.students,
+      collections: db.collections,
+      invoices: db.invoices,
+      checks: db.checks
+    };
+    await apiPost('/', payload);
+  }catch(e){ console.warn('Backend kaydedilemedi, localStorage fallback:', e); }
+  persist();
+}
+
+/* Örnek veri (backend erişilemezken) */
+function sampleData(){
+  const st=(id,name,cls,parent,phone,tax,items,extra)=>Object.assign({id:name?Date.now()+Math.floor(Math.random()*1000):id,name,class:cls,parent,phone,tax,active:true,regDate:'2026-09-01',address:'',note:'',items},extra||{});
+  return {
+    settings:{school:'Gül Anaokulu',vat:10,lucaUrl:'',lucaKey:'',matchBy:'tax',mode:'sim'},
+    simPlan:{'2026-09':{1:'ok',2:'none',3:'ok',4:'diff'}},
+    students:[
+      st(1,'Ahmet Yılmaz','4-A','Mehmet Yılmaz','0532 111 22 33','11111111111',[{name:'Eğitim Ücreti',total:85000,installments:10,start:YEAR_START}]),
+      st(2,'Zeynep Kaya','4-B','Ayşe Kaya','0533 222 33 44','22222222222',[{name:'Eğitim Ücreti',total:75000,installments:10,start:YEAR_START}]),
+      st(3,'Ece Demir','5-A','Ali Demir','0544 333 44 55','33333333333',[{name:'Eğitim Ücreti',total:90000,installments:10,start:YEAR_START}]),
+      st(4,'Mehmet Can','5-B','Fatma Can','0555 444 55 66','44444444444',[{name:'Eğitim Ücreti',total:80000,installments:10,start:YEAR_START},{name:'Kırtasiye',total:2400,installments:1,start:YEAR_START}])
+    ],
+    collections:[
+      {id:101,studentId:1,date:YEAR_START+'-03',item:'Eğitim Ücreti',amount:8500,vatRate:10,vat:850,payment:'Havale/EFT',invoiceNo:'E-2026-000124',note:'Eylül taksiti'},
+      {id:102,studentId:2,date:YEAR_START+'-05',item:'Eğitim Ücreti',amount:3750,vatRate:10,vat:375,payment:'Nakit',invoiceNo:'',note:'Yarım ödeme'},
+      {id:103,studentId:3,date:YEAR_START+'-05',item:'Eğitim Ücreti',amount:9000,vatRate:10,vat:900,payment:'Kredi Kartı',invoiceNo:'E-2026-000131',note:'Eylül taksiti'}
+    ],
+    invoices:[],checks:[]
+  };
+}
+
+/* DB başlangıç */
+async function initDb(){
+  if(db && dbReady) return db;
+  try{
+    const cached = localStorage.getItem('anaokulu_mali_backend_v1');
+    if(cached){
+      try{
+        const parsed = JSON.parse(cached);
+        if(parsed && parsed.students){
+          db = parsed;
+          dbReady = true;
+          try{ await saveToBackend('/', db); }catch(e){ console.warn('Backend senkronizationı başarısız, localStorage kullanılıyor'); }
+          return db;
+        }
+      }catch(e){}
+    }
+  }catch(e){}
+  return loadDbFromBackend();
+}
+
+/* ============== YARDIMCILAR ============== */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}).format(Number(n)||0);
+function trDate(d){if(!d)return '—';return new Date(d+'T00:00:00').toLocaleDateString('tr-TR')}
+function student(id){return db.students.find(s=>s.id==id)}
+function emptyRow(n){return '<tr><td colspan="'+n+'" class="empty">Kayıt bulunamadı.</td></tr>'}
+function toast(t){$('toast').textContent=t;$('toast').classList.add('show');clearTimeout(toast._h);toast._h=setTimeout(()=>$('toast').classList.remove('show'),3000)}
+
+/* ============== MALİ HESAPLAR ============== */
+function itemMonths(it){const a=[];for(let i=0;i<it.installments;i++)a.push(addMonths(it.start||YEAR_START,i));return a}
+function expectedFor(sid,period){const s=student(sid);if(!s)return 0;let t=0;(s.items||[]).forEach(it=>{itemMonths(it).forEach(m=>{if(m===period)t+=it.total/it.installments})});return round2(t)}
+function expectedTotalFor(sid){const s=student(sid);if(!s)return 0;return round2((s.items||[]).reduce((a,i)=>a+i.total,0))}
+function collectedFor(sid,period){return round2(db.collections.filter(c=>(sid==null||c.studentId==sid)&&(!period||c.date.slice(0,7)===period)).reduce((a,c)=>a+c.amount,0))}
+function collectedAll(sid){return collectedFor(sid,null)}
+function balanceFor(sid){return round2(expectedTotalFor(sid)-collectedAll(sid))}
+function expectedAllActive(){return round2(db.students.filter(s=>s.active).reduce((a,s)=>a+expectedTotalFor(s.id),0))}
+
+/* Fatura durumu */
+function invoiceFor(sid,period){return db.invoices.find(i=>i.period===period&&i.studentId==sid)}
+function invStatus(sid,period){
+  const exp=expectedFor(sid,period);
+  const inv=invoiceFor(sid,period);
+  if(!inv)return exp>0?'none':'na';
+  return inv.diff?'diff':'ok';
+}
+
+/* ============== GEZİNME ============== */
+function show(id,btn){
+  document.querySelectorAll('main section').forEach(x=>x.style.display='none');
+  $(id).style.display='block';
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===btn||x.dataset.s===id));
+  refresh();
+}
+function goto(id){const b=document.querySelector('.nav button[data-s="'+id+'"]');show(id,b);window.scrollTo(0,0)}
+function gotoCheck(){goto('invoices');toast('Faturalar sekmesinden "Faturaları Kontrol Et" düğmesini kullanın.')}
+
+async function refresh(){
+  await initDb();
+  updateHome();renderStudents();renderPlans();renderCollections();renderInvoices();renderReports();fillSettingsForm();
+}
+
+/* ============== GENEL BAKIŞ ============== */
+function updateHome(){
+  const active=db.students.filter(s=>s.active);
+  const planned=expectedAllActive();
+  const collected=round2(db.collections.reduce((a,c)=>a+c.amount,0));
+  $('k1').textContent=active.length;
+  $('k2').textContent=money(planned);
+  $('k3').textContent=money(collected);
+  $('k4').textContent=money(planned-collected);
+  const cur=curPeriod();
+  $('k5').textContent=money(collectedFor(null,cur));
+  $('k5sub').textContent=periodName(cur);
+  $('recent').innerHTML=db.collections.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6).map(c=>
+    '<tr><td>'+trDate(c.date)+'</td><td><b>'+esc(student(c.studentId)?.name||'-')+'</b></td><td>'+esc(c.item)+'</td><td><b>'+money(c.amount)+'</b></td><td>'+esc(c.payment)+'</td></tr>').join('')||emptyRow(5);
+  let ok=0,none=0,diff=0,exp=0;
+  active.forEach(s=>{const e=expectedFor(s.id,cur);if(e<=0)return;exp+=e;const stt=invStatus(s.id,cur);if(stt==='ok')ok++;else if(stt==='diff')diff++;else if(stt==='none')none++});
+  $('m1').textContent=ok;$('m2').textContent=none;$('m3').textContent=diff;$('m4').textContent=money(exp);
+  $('m5').textContent=periodName(cur);
+  const last=db.checks.filter(c=>c.period===cur).slice(-1)[0];
+  $('m6').textContent=last?new Date(last.at).toLocaleString('tr-TR'):'hiç yapılmadı';
+}
+function curPeriod(){
+  const now=new Date(),p=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  return periodsOfYear().includes(p)?p:YEAR_START;
+}
+
+/* ============== ÖĞRENCİLER ============== */
+async function renderStudents(){
+  if(!db)return;
+  const q=($('sq')?.value||'').toLowerCase(),cf=$('classFilter')?.value||'',sf=$('statusFilter')?.value||'';
+  const classes=[...new Set(db.students.map(s=>s.class).filter(Boolean))];
+  $('classFilter').innerHTML='<option value="">Tüm sınıflar</option>'+classes.map(x=>'<option '+(x===cf?'selected':'')+'>'+esc(x)+'</option>').join('');
+  const list=db.students.filter(s=>
+    ((s.name||'')+' '+(s.parent||'')).toLowerCase().includes(q)&&(!cf||s.class===cf)&&(sf===''||String(Number(s.active))===sf));
+  $('studentBody').innerHTML=list.map(s=>
+    '<tr><td><b>'+esc(s.name)+'</b><br><span class="muted" style="font-size:11px">Kayıt: '+trDate(s.regDate)+'</span></td>'+
+    '<td>'+esc(s.class||'-')+'</td><td>'+esc(s.parent||'-')+'</td><td>'+esc(s.phone||'-')+'</td><td>'+esc(s.tax||'-')+'</td>'+
+    '<td>'+money(expectedTotalFor(s.id))+'</td>'+
+    '<td><b style="color:'+(balanceFor(s.id)>0?'#d84c4c':'#14966f')+'">'+money(balanceFor(s.id))+'</b></td>'+
+    '<td><span class="status '+(s.active?'ok':'bad')+'">'+(s.active?'Aktif':'Pasif')+'</span></td>'+
+    '<td><button class="btn" onclick="openFile('+s.id+')">Dosya</button> <button class="btn" onclick="editStudent('+s.id+')">Düzenle</button> <button class="btn danger" onclick="delStudent('+s.id+')">Sil</button></td></tr>'
+  ).join('')||emptyRow(9);
+}
+async function delStudent(id){
+  if(!confirm('Bu öğrenciyi ve ilişkili tüm tahsilat/faturaları silmek istediğinize emin misiniz?'))return;
+  try{ await apiDel('/students/'+id); }catch(e){}
+  db.students=db.students.filter(s=>s.id!=id);
+  db.collections=db.collections.filter(c=>c.studentId!=id);
+  db.invoices=db.invoices.filter(i=>i.studentId!=id);
+  persist();refresh();toast('Öğrenci silindi.');
+}
+async function newStudent(){
+  openModal('Yeni Öğrenci',studentForm(null),saveStudent);
+}
+async function editStudent(id){openModal('Öğrenci Bilgileri',studentForm(student(id)),saveStudent);$('msave').dataset.sid=id}
+async function saveStudent(){
+  const name=$('fn').value.trim();
+  if(!name){toast('Ad Soyad zorunlu.');return}
+  const sid=$('msave').dataset.sid?Number($('msave').dataset.sid):null;
+  const total=Number($('fa').value)||0,inst=Math.max(1,Number($('fi').value)||10);
+  if(sid){
+    const s=student(sid);
+    Object.assign(s,{name,class:$('fc').value.trim(),parent:$('fp').value.trim(),phone:$('fph').value.trim(),tax:$('ft').value.trim(),regDate:$('fr').value,address:$('fad').value.trim(),note:$('fno').value.trim(),active:$('fac').value==='1'});
+    if(s.items&&s.items[0]&&s.items[0].name==='Eğitim Ücreti'){s.items[0].total=total;s.items[0].installments=inst}
+    else s.items=[{name:'Eğitim Ücreti',total,installments:inst,start:YEAR_START}].concat(s.items||[]).filter((v,i,a)=>a.indexOf(v)===i);
+    await saveToBackend('/students', db.students);
+    toast('Öğrenci güncellendi.');
+  }else{
+    db.students.push({id:Date.now(),name,class:$('fc').value.trim(),parent:$('fp').value.trim(),phone:$('fph').value.trim(),tax:$('ft').value.trim(),regDate:$('fr').value,address:$('fad').value.trim(),note:$('fno').value.trim(),active:$('fac').value==='1',items:[{name:'Eğitim Ücreti',total,installments:inst,start:YEAR_START}]});
+    await saveToBackend('/students', db.students);
+    toast('Öğrenci kaydedildi.');
+  }
+  delete $('msave').dataset.sid;
+  persist();closeModal();refresh();
+}
+function studentForm(s){
+  s=s||{};
+  return '<div class="formgrid">'+
+  '<div class="field"><label>Ad Soyad *</label><input id="fn" value="'+esc(s.name||'')+'"></div>'+
+  '<div class="field"><label>Sınıf</label><input id="fc" value="'+esc(s.class||'')+'"></div>'+
+  '<div class="field"><label>Veli Ad Soyad</label><input id="fp" value="'+esc(s.parent||'')+'"></div>'+
+  '<div class="field"><label>Telefon</label><input id="fph" value="'+esc(s.phone||'')+'"></div>'+
+  '<div class="field"><label>TC / VKN</label><input id="ft" value="'+esc(s.tax||'')+'"></div>'+
+  '<div class="field"><label>Kayıt Tarihi</label><input id="fr" type="date" value="'+(s.regDate||new Date().toISOString().slice(0,10))+'"></div>'+
+  '<div class="field wide"><label>Adres</label><input id="fad" value="'+esc(s.address||'')+'"></div>'+
+  '<div class="field wide"><label>Not</label><input id="fno" value="'+esc(s.note||'')+'"></div>'+
+  '<div class="field"><label>Durum</label><select id="fac"><option value="1" '+(s.active!==false?'selected':'')+'>Aktif</option><option value="0" '+(s.active===false?'selected':'')+'>Pasif</option></select></div>'+
+  '<div class="field"><label>Yıllık Eğitim Ücreti (₺)</label><input id="fa" type="number" value="'+(s.items&&s.items[0]?s.items[0].total:0)+'"></div>'+
+  '<div class="field"><label>Taksit Sayısı</label><input id="fi" type="number" min="1" max="12" value="'+(s.items&&s.items[0]?s.items[0].installments:10)+'"></div>'+
+  '</div>';
+}
+
+/* --- Öğrenci Dosyası --- */
+let fileSid=null;
+function openFile(id){
+  fileSid=id;openModal('Öğrenci Dosyası',fileHtml('info'),null);
+  $('mfoot').innerHTML='<button class="btn" onclick="closeModal()">Kapat</button> <button class="btn primary" onclick="editStudent('+id+')">Düzenle</button>';
+}
+function fileTab(t){$('mcontent').innerHTML=fileHtml(t)}
+function fileHtml(t){
+  const s=student(fileSid);if(!s)return '';
+  let body='';
+  if(t==='info'){
+    body='<table style="max-width:520px">'+
+    row('Sınıf',esc(s.class||'-'))+row('Veli',esc(s.parent||'-'))+row('Telefon',esc(s.phone||'-'))+
+    row('TC/VKN',esc(s.tax||'-'))+row('Kayıt Tarihi',trDate(s.regDate))+row('Adres',esc(s.address||'-'))+row('Not',esc(s.note||'-'))+
+    row('Durum',s.active?'Aktif':'Pasif')+'</table>';
+  }else if(t==='plan'){
+    body=planTableFor(s);
+  }else if(t==='coll'){
+    const list=db.collections.filter(c=>c.studentId==s.id).sort((a,b)=>b.date.localeCompare(a.date));
+    body='<table><thead><tr><th>Tarih</th><th>Kalem</th><th>Tutar</th><th>Ödeme</th><th>Fatura No</th><th>Açıklama</th></tr></thead><tbody>'+
+    (list.map(c=>'<tr><td>'+trDate(c.date)+'</td><td>'+esc(c.item)+'</td><td><b>'+money(c.amount)+'</b></td><td>'+esc(c.payment)+'</td><td>'+esc(c.invoiceNo||'—')+'</td><td>'+esc(c.note||'')+'</td></tr>').join('')||emptyRow(6))+'</tbody></table>';
+  }else if(t==='inv'){
+    const ps=periodsOfYear();
+    body='<table><thead><tr><th>Dönem</th><th>Beklenen</th><th>Fatura</th><th>Durum</th></tr></thead><tbody>'+
+    ps.map(p=>{const e=expectedFor(s.id,p),stt=invStatus(s.id,p),inv=invoiceFor(s.id,p);
+      const b=stt==='ok'?'<span class="status ok">🟢 Kesildi</span>':stt==='diff'?'<span class="status wait">🟡 Tutar farklı</span>':stt==='none'?'<span class="status bad">🔴 Kesilmedi</span>':'<span class="muted">—</span>';
+      return '<tr><td>'+periodName(p)+'</td><td>'+money(e)+'</td><td>'+(inv?esc(inv.no)+' · '+money(inv.total):'—')+'</td><td>'+b+'</td></tr>'}).join('')+
+    '</tbody></table>';
+  }
+  const tabs=[['info','Bilgiler'],['plan','Taksit Planı'],['coll','Tahsilatlar'],['inv','Faturalar']];
+  const exp=expectedTotalFor(s.id),col=collectedAll(s.id),bal=exp-col;
+  return '<div class="tabs">'+tabs.map(x=>'<button class="tab '+(x[0]===t?'active':'')+'\" onclick="fileTab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>'+
+  '<div class="sectionpad"><div class="summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">'+
+  '<div class="mini"><span>Toplam Borç</span><b>'+money(exp)+'</b></div>'+
+  '<div class="mini"><span>Tahsil Edilen</span><b style="color:#14966f">'+money(col)+'</b></div>'+
+  '<div class="mini"><span>Kalan Bakiye</span><b style="color:'+(bal>0?'#e74c3c':'#14966f')+'">'+money(bal)+'</b><div class="bar"><i style="width:'+(exp>0?Math.min(100,Math.round(col/exp*100)):0)+'%"></i></div></div>'+
+  '</div>'+body+'</div>';
+  function row(k,v){return '<tr><th style="width:130px">'+k+'</th><td>'+v+'</td></tr>'}
+}
+
+/* ============== ÜCRET & TAKSİT PLANI ============== */
+function planTableFor(s){
+  const ps=periodsOfYear();
+  return '<table><thead><tr><th>Ay</th>'+ps.map(p=>'<th style="text-align:center">'+MONTHS[Number(p.slice(5,7))-1].slice(0,3)+'</th>').join('')+'<th>Toplam</th></tr></thead><tbody>'+
+  (s.items||[]).map(it=>{
+    const mm=itemMonths(it);const per=it.total/it.installments;
+    return '<tr><td><b>'+esc(it.name)+'</b><br><span class="muted" style="font-size:11px">'+it.installments+' taksit · '+money(per)+'/ay</span></td>'+
+    ps.map(p=>'<td style="text-align:center">'+(mm.includes(p)?money(per):'·')+'</td>').join('')+
+    '<td><b>'+money(it.total)+'</b></td></tr>';
+  }).join('')+
+  '<tr style="background:#f4f6fb"><td><b>Aylık toplam</b></td>'+ps.map(p=>'<td style="text-align:center"><b>'+money(expectedFor(s.id,p))+'</b></td>').join('')+'<td><b>'+money(expectedTotalFor(s.id))+'</b></td></tr>'+
+  '<tr><td><b>Tahsil edilen</b></td>'+ps.map(p=>{const c=collectedFor(s.id,p);return '<td style="text-align:center;color:#14966f">'+(c>0?money(c):'·')+'</td>'}).join('')+'<td style="color:#14966f"><b>'+money(collectedAll(s.id))+'</b></td></tr>'+
+  '<tr><td><b>Kalan</b></td>'+ps.map(p=>{const k=round2(expectedFor(s.id,p)-collectedFor(s.id,p));return '<td style="text-align:center;color:'+(k>0?'#e74c3c':'#14966f')+'">'+(k!==0?money(k):'✓')+'</td>'}).join('')+'<td style="color:'+(balanceFor(s.id)>0?'#e74c3c':'#14966f')+'"><b>'+money(balanceFor(s.id))+'</b></td></tr>'+
+  '</tbody></table>';
+}
+function renderPlans(){
+  if(!db || !$('planStudent'))return;
+  const old=$('planStudent').value;
+  $('planStudent').innerHTML=db.students.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+  if(old&&db.students.some(s=>s.id==old))$('planStudent').value=old;
+  const s=student($('planStudent').value)||db.students[0];
+  if(!s){$('planContent').innerHTML='<p class="empty">Öğrenci yok. Önce öğrenci ekleyin.</p>';return}
+  $('planContent').innerHTML=
+   '<div class="summary" style="margin-bottom:16px">'+
+   '<div class="mini"><span>Yıllık Planlanan</span><b>'+money(expectedTotalFor(s.id))+'</b></div>'+
+   '<div class="mini"><span>Tahsil Edilen</span><b style="color:#14966f">'+money(collectedAll(s.id))+'</b></div>'+
+   '<div class="mini"><span>Kalan Bakiye</span><b style="color:'+(balanceFor(s.id)>0?'#e74c3c':'#14966f')+'">'+money(balanceFor(s.id))+'</b></div>'+
+   '<div class="mini"><span>Ücret Kalemi</span><b>'+(s.items||[]).length+'</b></div></div>'+
+   '<h4 class="sect" style="margin-top:0">Aylık taksit planı ('+esc(s.name)+')</h4>'+
+   '<div style="overflow:auto">'+planTableFor(s)+'</div>'+
+   '<h4 class="sect">Ücret kalemleri</h4>'+
+   '<table style="max-width:760px"><thead><tr><th>Kalem</th><th>Toplam</th><th>Taksit</th><th>Taksit Tutarı</th><th>Başlangıç</th><th>İşlem</th></tr></thead><tbody>'+
+   ((s.items||[]).map((it,idx)=>'<tr><td><b>'+esc(it.name)+'</b></td><td>'+money(it.total)+'</td><td>'+it.installments+'</td><td>'+money(it.total/it.installments)+'</td><td>'+periodName(it.start||YEAR_START)+'</td>'+
+   '<td><button class="btn" onclick="editItem('+s.id+','+idx+')">Düzenle</button> <button class="btn danger" onclick="delItem('+s.id+','+idx+')">Sil</button></td></tr>').join('')||emptyRow(6))+
+   '</tbody></table>';
+}
+function newItem(){
+  if(!db || !db.students.length){toast('Önce öğrenci ekleyin.');return}
+  itemForm(null);
+}
+function editItem(sid,idx){itemForm({sid,idx})}
+function itemForm(ref){
+  const sid=ref?ref.sid:Number(($('planStudent')&&$('planStudent').value)||db.students[0]?.id);
+  const s=student(sid);if(!s)return;
+  const it=ref?s.items[ref.idx]:null;
+  const opts=db.students.map(x=>'<option value="'+x.id+'" '+(x.id==sid?'selected':'')+'>'+esc(x.name)+'</option>').join('');
+  openModal(ref?'Ücret Kalemini Düzenle':'Yeni Ücret Kalemi',
+  '<div class="formgrid">'+
+  (ref?'':'<div class="field wide"><label>Öğrenci</label><select id="pi_s">'+opts+'</select></div>')+
+  '<div class="field"><label>Kalem Adı</label><select id="pi_n">'+['Eğitim Ücreti','Servis','Kırtasiye','Atölye','Yemek','Etüt','Diğer'].map(n=>'<option '+(it&&it.name===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
+  '<div class="field"><label>Toplam (₺)</label><input id="pi_t" type="number" step="0.01" value="'+(it?it.total:'')+'"></div>'+
+  '<div class="field"><label>Taksit Sayısı</label><input id="pi_i" type="number" min="1" max="12" value="'+(it?it.installments:1)+'"></div>'+
+  '<div class="field"><label>Başlangıç Ayı</label><select id="pi_st">'+periodsOfYear().map(p=>'<option value="'+p+'" '+((it?(it.start||YEAR_START):YEAR_START)===p?'selected':'')+'>'+periodName(p)+'</option>').join('')+'</select></div>'+
+  '</div>',
+  ()=>{saveItem(ref,sid)});
+}
+async function saveItem(ref,sid){
+  const target=ref?student(sid):student(Number($('pi_s').value));
+  if(!target)return;
+  const name=$('pi_n').value,total=Number($('pi_t').value)||0,inst=Math.max(1,Number($('pi_i').value)||1),start=$('pi_st').value;
+  if(total<=0){toast('Toplam tutar girin.');return}
+  const it={name,total,installments:inst,start};
+  if(ref)target.items[ref.idx]=it;else{target.items=target.items||[];target.items.push(it)}
+  await saveToBackend('/students', db.students);
+  persist();closeModal();refresh();toast('Ücret kalemi kaydedildi.');
+}
+function delItem(sid,idx){
+  const s=student(sid);const it=s.items[idx];
+  if(!confirm('"'+it.name+'" kalemi silinsin mi?'))return;
+  s.items.splice(idx,1);
+  saveToBackend('/students',db.students);
+  persist();refresh();toast('Kalem silindi.');
+}
+
+/* ============== TAHSİLATLAR ============== */
+async function newCollection(){
+  if(!db || !db.students.length){toast('Önce öğrenci ekleyin.');return}
+  const opts=db.students.map(s=>'<option value="'+s.id+'">'+esc(s.name)+' — kalan '+money(balanceFor(s.id))+'</option>').join('');
+  openModal('Tahsilat Kaydet',
+  '<div class="formgrid">'+
+  '<div class="field"><label>Öğrenci *</label><select id="cs" onchange="collHint()">'+opts+'</select></div>'+
+  '<div class="field"><label>Tarih</label><input id="cd" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+  '<div class="field"><label>Kalem</label><input id="ci" value="Eğitim Ücreti"></div>'+
+  '<div class="field"><label>Tutar (₺) *</label><input id="ca" type="number" step="0.01"></div>'+
+  '<div class="field"><label>KDV Oranı (%)</label><input id="cv" type="number" value="'+(db.settings.vat||0)+'"></div>'+
+  '<div class="field"><label>Ödeme Türü</label><select id="cp"><option>Nakit</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Diğer</option></select></div>'+
+  '<div class="field"><label>Fatura No</label><input id="cinv" placeholder="örn. E-2026-000124"></div>'+
+  '<div class="field wide"><label>Açıklama</label><input id="cn"></div>'+
+  '<div class="field wide" id="collHintBox"></div>'+
+  '</div>',saveCollection);
+  collHint();
+}
+function collHint(){
+  const s=student(Number($('cs').value));if(!s)return;
+  const p=$('cd').value.slice(0,7);
+  const exp=expectedFor(s.id,p),got=collectedFor(s.id,p);
+  $('collHintBox').innerHTML='<div class="mini"><span>'+esc(s.name)+' · '+periodName(p)+' beklenen</span><b>'+money(exp)+'</b><small>Bu ay tahsil edilen: '+money(got)+' · Kalan: '+money(Math.max(0,exp-got))+'</small></div>';
+}
+async function saveCollection(){
+  const amount=Number($('ca').value)||0;
+  if(amount<=0){toast('Tutar girin.');return}
+  const vatRate=Number($('cv').value)||0;
+  db.collections.push({id:Date.now(),studentId:Number($('cs').value),date:$('cd').value,item:$('ci').value.trim()||'Eğitim Ücreti',
+    amount:round2(amount),vatRate,vat:round2(amount*vatRate/100),payment:$('cp').value,invoiceNo:$('cinv').value.trim(),note:$('cn').value.trim()});
+  await saveToBackend('/collections', db.collections);
+  persist();closeModal();refresh();toast('Tahsilat kaydedildi.');
+}
+async function delCollection(id){
+  if(!confirm('Bu tahsilat silinsin mi?'))return;
+  try{ await apiDel('/collections/'+id); }catch(e){}
+  db.collections=db.collections.filter(c=>c.id!=id);
+  persist();refresh();toast('Tahsilat silindi.');
+}
+function renderCollections(){
+  if(!db || !$('collectionBody'))return;
+  const q=($('cq')?.value||'').toLowerCase(),t=$('ct')?.value||'',from=$('cfrom')?.value||'',to=$('cto')?.value||'';
+  const a=db.collections.filter(c=>
+    (student(c.studentId)?.name||'').toLowerCase().includes(q)&&(!t||c.payment===t)&&(!from||c.date>=from)&&(!to||c.date<=to))
+    .sort((x,y)=>y.date.localeCompare(x.date));
+  const tot=a.reduce((x,c)=>x+c.amount,0),vat=a.reduce((x,c)=>x+c.vat,0);
+  $('cs1').textContent=a.length;$('cs2').textContent=money(tot);$('cs3').textContent=money(vat);$('cs4').textContent=money(tot-vat);
+  $('collectionBody').innerHTML=a.map(c=>
+    '<tr><td>'+trDate(c.date)+'</td><td><b>'+esc(student(c.studentId)?.name||'-')+'</b></td><td>'+esc(c.item)+'</td>'+
+    '<td><b>'+money(c.amount)+'</b></td><td>'+money(c.vat)+'</td><td>'+esc(c.invoiceNo||'—')+'</td><td>'+esc(c.payment)+'</td><td>'+esc(c.note||'')+'</td>'+
+    '<td><button class="btn danger" onclick="delCollection('+c.id+')">Sil</button></td></tr>').join('')||emptyRow(9);
+}
+
+/* ============== FATURALAR ============== */
+function uuidLike(seed){let h=hash(seed).toString(16).padStart(8,'0');const r=()=>Math.floor(Math.random()*65536).toString(16).padStart(4,'0');return h+'-4'+r().slice(0,3)+'-'+r()+'-'+r()+'-'+r()+r()+r()}
+function makeInvoice(s,period,total,forceDiff){
+  const vatRate=Number(db.settings.vat)||0;
+  const base=round2(total/(1+vatRate/100)),vat=round2(total-base);
+  const seq=100000+(hash(s.id+'x'+period)%899999);
+  return {uuid:uuidLike(s.id+period),no:'E-'+period.slice(0,4)+'-'+seq,date:period+'-05',
+    taxId:s.tax||'',buyer:s.parent||'',base,vat,total:round2(total),
+    type:(String(s.tax||'').length===11?'e-Arşiv':'e-Fatura'),status:'Kesildi',pdf:true,xml:true,
+    period,studentId:s.id,diff:!!forceDiff};
+}
+function simulate(period){
+  const out=[];
+  db.students.filter(s=>s.active).forEach(s=>{
+    const exp=expectedFor(s.id,period);
+    if(exp<=0)return;
+    let rule=(db.simPlan&&db.simPlan[period]&&db.simPlan[period][s.id])||['ok','ok','ok','ok','ok','ok','none','diff','ok','none'][hash(s.id+period)%10];
+    if(rule==='ok')out.push(makeInvoice(s,period,exp));
+    else if(rule==='diff')out.push(makeInvoice(s,period,round2(Math.max(50,exp*0.8)),true));
+  });
+  return out;
+}
+async function checkInvoices(){
+  if(!db)return;
+  const period=$('invPeriod')?$('invPeriod').value:curPeriod();
+  const fetched=simulate(period);
+  let matched=0;
+  fetched.forEach(inv=>{
+    const byTax=db.students.find(s=>s.active&&s.tax&&s.tax===inv.taxId);
+    const byParent=db.students.find(s=>s.active&&s.parent&&s.parent.toLowerCase()===String(inv.buyer||'').toLowerCase());
+    const rule=db.settings.matchBy||'tax';
+    const s=rule==='parent'?byParent:(byTax||byParent);
+    if(s){inv.studentId=s.id;inv.matchBy=byTax&&rule!=='parent'?'TCKN/TCKN':'Veli adı';matched++}
+    else{inv.studentId=null;inv.matchBy=null}
+  });
+  db.invoices=db.invoices.filter(i=>i.period!==period).concat(fetched);
+  db.checks.push({period,at:Date.now(),found:fetched.length,matched});
+  await saveToBackend('/invoices', db.invoices);
+  persist();renderInvoices();updateHome();
+  const none=db.students.filter(s=>s.active&&expectedFor(s.id,period)>0&&!invoiceFor(s.id,period)).length;
+  toast('Kontrol tamam: '+fetched.length+' fatura bulundu, '+matched+' eşleştirildi, '+none+' öğrenci için fatura yok.');
+}
+function renderInvoices(){
+  if(!db || !$('invoiceBody'))return;
+  const ps=periodsOfYear(),cur=curPeriod();
+  $('invPeriod').innerHTML=ps.map(p=>'<option value="'+p+'" '+(p===cur?'selected':'')+'>'+periodName(p)+'</option>').join('');
+  const period=$('invPeriod').value||cur;
+  const q=($('iq')?.value||'').toLowerCase(),stf=$('ist')?.value||'';
+  let matched=0;
+  const rows=db.students.filter(s=>s.active).map(s=>{
+    const exp=expectedFor(s.id,period);
+    if(exp<=0)return null;
+    const inv=invoiceFor(s.id,period);
+    const stt=inv?(inv.diff?'diff':'ok'):'none';
+    if(inv&&inv.studentId==s.id)matched++;
+    return {s,exp,inv,stt};
+  }).filter(Boolean).filter(x=>
+    ((x.s.name||'')+' '+(x.inv?x.inv.no:'')).toLowerCase().includes(q)&&(!stf||x.stt===stf));
+  $('matchInfo').textContent=matched+'/'+rows.length;
+  const sum=k=>rows.filter(r=>r.stt===k).reduce((a,r)=>a+(r.inv?r.inv.total:r.exp),0);
+  $('is1').textContent=rows.length;$('is1b').textContent=money(rows.reduce((a,r)=>a+r.exp,0));
+  $('is2').textContent=rows.filter(r=>r.stt==='ok').length;$('is2b').textContent=money(sum('ok'));
+  $('is3').textContent=rows.filter(r=>r.stt==='none').length;$('is3b').textContent=money(sum('none'));
+  $('is4').textContent=rows.filter(r=>r.stt==='diff').length;$('is4b').textContent=money(sum('diff'));
+  $('invoiceBody').innerHTML=rows.map(x=>{
+    const badge=x.stt==='ok'?'<span class="status ok">🟢 Kesildi</span>':x.stt==='diff'?'<span class="status wait">🟡 Tutar farklı</span>':'<span class="status bad">🔴 Kesilmedi</span>';
+    const inv=x.inv;
+    if(!inv)return '<tr><td>'+badge+'</td><td><b>'+esc(x.s.name)+'</b></td><td>'+money(x.exp)+'</td><td colspan="11" class="muted">İlgili dönem faturası bulunamadı</td></tr>';
+    const diffNote=x.stt==='diff'?' <span class="status wait">fark: '+money(x.inv.total-x.exp)+'</span>':'';
+    return '<tr><td>'+badge+diffNote+'</td><td><b>'+esc(x.s.name)+'</b><br><span class="muted" style="font-size:11px">'+(inv.studentId==x.s.id?'eşleştirme: '+esc(inv.matchBy||'—'):'<b style="color:#b13232">eşleşmedi</b>')+'</span></td>'+
+    '<td>'+money(x.exp)+'</td><td><a href="#" onclick="invDetail(\''+inv.uuid+'\');return false"><b>'+esc(inv.no)+'</b></a></td><td>'+trDate(inv.date)+'</td>'+
+    '<td>'+esc(inv.taxId||'—')+'</td><td>'+esc(inv.buyer||'—')+'</td><td>'+money(inv.base)+'</td><td>'+money(inv.vat)+'</td><td><b>'+money(inv.total)+'</b></td>'+
+    '<td>'+esc(inv.type)+'</td><td style="font-size:10px" class="muted">'+esc((inv.uuid||'').slice(0,13))+'…</td>'+
+    '<td>'+(inv.pdf?'<span class="badgepdf">PDF</span>':'')+(inv.xml?'<span class="badgepdf">XML</span>':'')+'</td>'+
+    '<td>'+(inv.studentId==x.s.id?'<button class="btn" onclick="invDetail(\''+inv.uuid+'\')">Detay</button>':'<button class="btn primary" onclick="manualMatch(\''+inv.uuid+'\')">Eşleştir</button>')+'</td></tr>';
+  }).join('')||emptyRow(14);
+}
+function manualMatch(uuid){
+  const inv=db.invoices.find(i=>i.uuid===uuid);if(!inv)return;
+  const opts=db.students.map(s=>'<option value="'+s.id+'">'+esc(s.name)+' ('+esc(s.tax||'—')+' / '+esc(s.parent||'—')+')</option>').join('');
+  openModal('Faturayı Öğrenciyle Eşleştir',
+  '<p class="muted" style="font-size:13px">'+esc(inv.no)+' · '+money(inv.total)+' · Alıcı: '+esc(inv.buyer||'—')+'</p>'+
+  '<div class="field"><label>Öğrenci</label><select id="mm_s">'+opts+'</select></div>',
+  ()=>{inv.studentId=Number($('mm_s').value);inv.matchBy='Manuel';db.invoices=db.invoices.map(i=>i.uuid===uuid?inv:i);saveToBackend('/invoices',db.invoices);persist();closeModal();refresh();toast('Fatura eşleştirildi.')});
+}
+function invDetail(uuid){
+  const inv=db.invoices.find(i=>i.uuid===uuid);if(!inv)return;
+  const s=student(inv.studentId);
+  openModal('Fatura Detayı · '+esc(inv.no),null,null);
+  $('mfoot').innerHTML='<button class="btn" onclick="closeModal()">Kapat</button>'+(s?'':'<button class="btn primary" onclick="manualMatch(\''+uuid+'\')">Eşleştir</button>');
+  $('mcontent').innerHTML='<div class="sectionpad" style="padding:0">'+
+  '<table style="max-width:560px">'+
+  '<tr><th style="width:150px">Fatura No</th><td><b>'+esc(inv.no)+'</b></td></tr>'+
+  '<tr><th>Tarih</th><td>'+trDate(inv.date)+'</td></tr>'+
+  '<tr><th>Dönem</th><td>'+periodName(inv.period)+'</td></tr>'+
+  '<tr><th>VKN/TCKN</th><td>'+esc(inv.taxId||'—')+'</td></tr>'+
+  '<tr><th>Alıcı</th><td>'+esc(inv.buyer||'—')+'</td></tr>'+
+  '<tr><th>Matrah</th><td>'+money(inv.base)+'</td></tr>'+
+  '<tr><th>KDV</th><td>'+money(inv.vat)+'</td></tr>'+
+  '<tr><th>Genel Toplam</th><td><b>'+money(inv.total)+'</b></td></tr>'+
+  '<tr><th>Fatura Tipi</th><td>'+esc(inv.type)+'</td></tr>'+
+  '<tr><th>UUID</th><td style="font-size:11px">'+esc(inv.uuid||'—')+'</td></tr>'+
+  '<tr><th>Durum</th><td>'+esc(inv.status)+'</td></tr>'+
+  '<tr><th>Belge</th><td>'+(inv.pdf?'<span class="badgepdf">PDF mevcut</span>':'')+(inv.xml?'<span class="badgepdf">XML mevcut</span>':'')+'</td></tr>'+
+  '<tr><th>Öğrenci</th><td>'+(s?'<b>'+esc(s.name)+'</b> ('+esc(s.class||'-')+') · eşleştirme: '+esc(inv.matchBy||'—'):'<b style="color:#b13232">Eşleşmedi</b>')+'</td></tr>'+
+  '</table></div>';
+}
+
+/* ============== RAPORLAR ============== */
+function inPeriod(d,base,p){
+  if(p==='all')return true;
+  const x=new Date(d+'T00:00:00'),b=new Date(base+'T00:00:00');
+  if(p==='day')return d===base;
+  if(p==='month')return x.getFullYear()===b.getFullYear()&&x.getMonth()===b.getMonth();
+  if(p==='year')return x.getFullYear()===b.getFullYear();
+  if(p==='week'){const day=(b.getDay()+6)%7,start=new Date(b);start.setDate(b.getDate()-day);const end=new Date(start);end.setDate(start.getDate()+6);return x>=start&&x<=end}
+  return true;
+}
+function periodLabel(p){
+  const map={day:'Günlük',week:'Haftalık',month:'Aylık',year:'Yıllık',all:'Tüm zamanlar'};
+  return map[p]||p;
+}
+function renderReports(){
+  if(!db || !$('reportBody'))return;
+  if(!$('rdate').value)$('rdate').value=new Date().toISOString().slice(0,10);
+  const p=$('rperiod').value,base=$('rdate').value;
+  const a=db.collections.filter(c=>inPeriod(c.date,base,p));
+  const tot=a.reduce((x,c)=>x+c.amount,0),vat=a.reduce((x,c)=>x+c.vat,0);
+  $('r1').textContent=money(tot);$('r2').textContent=money(vat);$('r3').textContent=money(tot-vat);$('r4').textContent=a.length;
+  const types=[...new Set(a.map(x=>x.payment))];
+  $('reportBody').innerHTML=types.map(t=>{
+    const z=a.filter(x=>x.payment===t),b=z.reduce((x,c)=>x+c.amount,0),v=z.reduce((x,c)=>x+c.vat,0);
+    return '<tr><td>'+esc(t)+'</td><td>'+z.length+'</td><td>'+money(b)+'</td><td>'+money(v)+'</td><td>'+money(b-v)+'</td></tr>';
+  }).join('')||emptyRow(5);
+  const months=(p==='month')?[base.slice(0,7)]:periodsOfYear();
+  let ok=0,none=0,diff=0,exp=0,invTot=0;
+  months.forEach(m=>db.students.filter(s=>s.active).forEach(s=>{
+    const e=expectedFor(s.id,m);if(e<=0)return;exp+=e;
+    const stt=invStatus(s.id,m);
+    if(stt==='ok'){ok++;invTot+=invoiceFor(s.id,m).total}
+    else if(stt==='diff'){diff++;invTot+=invoiceFor(s.id,m).total}
+    else none++;
+  }));
+  $('invReportBody').innerHTML=
+   '<tr><td><span class="status ok">🟢 Kesildi</span></td><td>'+ok+'</td><td>'+money(exp)+'</td><td>'+money(invTot)+'</td></tr>'+
+   '<tr><td><span class="status wait">🟡 Tutar farklı</span></td><td>'+diff+'</td><td>'+money(exp)+'</td><td>—</td></tr>'+
+   '<tr><td><span class="status bad">🔴 Kesilmedi</span></td><td>'+none+'</td><td>'+money(exp)+'</td><td>—</td></tr>';
+  $('stuReportBody').innerHTML=db.students.slice().sort((x,y)=>balanceFor(y.id)-balanceFor(x.id)).map(s=>{
+    const exp=expectedTotalFor(s.id),col=collectedAll(s.id),bal=exp-col;
+    const pct=exp>0?Math.min(100,Math.round(col/exp*100)):0;
+    return '<tr><td><b>'+esc(s.name)+'</b></td><td>'+esc(s.class||'-')+'</td><td>'+money(exp)+'</td><td style="color:#14966f">'+money(col)+'</td>'+
+    '<td style="color:'+(bal>0?'#e74c3c':'#14966f')+'"><b>'+money(bal)+'</b></td>'+
+    '<td style="min-width:120px">'+pct+'%<div class="bar"><i style="width:'+pct+'%"></i></div></td></tr>';
+  }).join('')||emptyRow(6);
+}
+function exportCSV(){
+  if(!db)return;
+  const p=$('rperiod').value,base=$('rdate').value;
+  const a=db.collections.filter(c=>inPeriod(c.date,base,p)).sort((x,y)=>y.date.localeCompare(x.date));
+  const head=['Tarih','Ogrenci','Kalem','Tutar','KDV','KDV Haric','Odeme','Fatura No','Aciklama'];
+  const lines=[head.join(';')].concat(a.map(c=>[c.date,student(c.studentId)?.name||'',c.item,c.amount,c.vat,round2(c.amount-c.vat),c.payment,c.invoiceNo||'',(c.note||'').replace(/;/g,',')].join(';')));
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const el=document.createElement('a');el.href=URL.createObjectURL(blob);el.download='tahsilat_raporu.csv';el.click();
+  toast('CSV indirildi ('+a.length+' kayıt).');
+}
+
+/* ============== AYARLAR ============== */
+function fillSettingsForm(){
+  if(!db || !$('setSchool'))return;
+  $('setSchool').value=db.settings.school||'';
+  $('setVat').value=db.settings.vat||0;
+  $('lucaNote').textContent='Veriler sunucu tarafında saklanır.';
+  ['setSchool','setVat'].forEach(id=>{ $(id).onchange=saveSettings });
+}
+async function saveSettings(){
+  if(!db)return;
+  db.settings={school:$('setSchool').value.trim()||'Anaokulu',vat:Number($('setVat').value)||0};
+  await saveToBackend('/school', db.settings);
+  persist();fillSettingsForm();toast('Ayarlar kaydedildi.');
+}
+async function exportData(){
+  if(!db)return;
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const el=document.createElement('a');el.href=URL.createObjectURL(blob);el.download='anaokulu_yedek.json';el.click();
+  toast('Yedek indirildi.');
+}
+function importData(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.students)throw 0;db=d;dbReady=true;persist();refresh();toast('Veriler içe aktarıldı.')}catch(e){toast('Geçersiz yedek dosyası.')}inp.value=''};
+  r.readAsText(f);
+}
+async function resetData(){
+  if(!confirm('Tüm veriler silinip örnek veriler yüklenecek. Emin misiniz?')){return}
+  db=sampleData();dbReady=true;
+  await saveToBackend('/', db);
+  persist();refresh();toast('Örnek veriler yüklendi.');
+}
+
+/* ============== MODAL ============== */
+function openModal(title,content,fn){
+  $('mtitle').textContent=title;
+  $('mcontent').innerHTML=content||'';
+  $('mfoot').innerHTML='<button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn primary" id="msave">Kaydet</button>';
+  if(fn)$('msave').onclick=fn;else $('mfoot').style.display='none';
+  if(fn)$('mfoot').style.display='flex';
+  $('modal').classList.add('show');
+}
+function closeModal(){$('modal').classList.remove('show');delete $('msave').dataset.sid}
+
+/* ============== BAŞLAT ============== */
+(async function(){
+  try{
+    await refresh();
+  }catch(e){
+    console.error(e);
+    document.body.insertAdjacentHTML('afterbegin','<div style="padding:14px;background:#fee2e2;color:#991b1b;font-family:Arial">Panel yüklenirken hata: '+esc(e.message)+'</div>');
+  }
+})();
+</script>
+</body>
+</html>

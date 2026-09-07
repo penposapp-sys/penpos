@@ -25,7 +25,10 @@ const persistInitialBranchSelection = (portal, user) => {
 
 export default function RegisterPage() {
   const [searchParams] = useSearchParams()
-  const initialType = String(searchParams.get('type') || '').trim().toLowerCase() === 'market' ? 'market' : 'restaurant'
+  const rawType = String(searchParams.get('type') || '').trim().toLowerCase()
+  const initialType =
+    rawType === 'market' ? 'market' :
+    'restaurant'
   const [settings, setSettings] = useState(defaultWebsiteSettings)
   const [form, setForm] = useState({
     businessType: initialType,
@@ -76,7 +79,17 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
-    const systemType = form.businessType === 'market' ? 'canteen' : 'restaurant'
+    if (form.businessType === 'anaokulu') {
+      const msg = 'Anaokulu üyeliği sadece yönetici tarafından oluşturulabilir. Lütfen iletişime geçin.'
+      setError(msg)
+      toast.error(msg)
+      setLoading(false)
+      return
+    }
+
+    const systemType =
+      form.businessType === 'market' ? 'canteen' :
+      'restaurant'
     const payload = {
       systemType,
       businessType: form.businessType,
@@ -112,7 +125,9 @@ export default function RegisterPage() {
     } catch {}
 
     toast.success('Üyelik oluşturuldu. Deneme süresi başlatıldı.')
-    window.location.href = res.redirectTo || (res.portal === 'canteen' ? '/canteen' : '/kermes')
+    const defaultRedirect =
+      res.portal === 'canteen' ? '/canteen' : '/kermes'
+    window.location.href = res.redirectTo || defaultRedirect
   }
 
   return (
@@ -248,7 +263,10 @@ export default function RegisterPage() {
             </button>
             <Link
               className="marketing-btn marketing-btn--ghost"
-              to={form.businessType === 'market' ? settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login' : settings.restaurantLoginUrl || '/login/restoran'}
+              to={
+                form.businessType === 'market' ? (settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login') :
+                (settings.restaurantLoginUrl || '/login/restoran')
+              }
             >
               Mevcut Hesabım Var
             </Link>

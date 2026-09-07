@@ -21,10 +21,18 @@ function getPlanMeta(tenant) {
   return { key: 'inactive', label: 'Pasif', tone: 'neutral' }
 }
 
+const SYSTEM_TYPE_LABEL = (value) => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (['anaokulu', 'kindergarten', 'kre'].includes(raw)) return 'ANAOKULU'
+  if (['canteen', 'kantin', 'market'].includes(raw)) return 'KANTİN'
+  return 'RESTORAN'
+}
+
 export default function SuperadminTenants() {
   const [tenants, setTenants] = useState([])
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  const [createSystemType, setCreateSystemType] = useState('restaurant')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -70,12 +78,14 @@ export default function SuperadminTenants() {
     setLoading(true)
     setError('')
     try {
+      const body = { name, slug, systemType: createSystemType, businessType: createSystemType, vertical: createSystemType }
       const { tenant } = await api('/api/superadmin/tenants', {
         method: 'POST',
-        body: JSON.stringify({ name, slug }),
+        body: JSON.stringify(body),
       })
       setName('')
       setSlug('')
+      setCreateSystemType('restaurant')
       setCreateOpen(false)
       setTenants((prev) => [tenant, ...prev])
     } catch (err) {
@@ -258,19 +268,21 @@ export default function SuperadminTenants() {
             <div className="admin-table-scroll">
               <table className="admin-table">
                 <colgroup>
-                  <col style={{ width: '24%' }} />
-                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '12%' }} />
                   <col style={{ width: '10%' }} />
-                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '10%' }} />
                   <col style={{ width: '12%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
                   <col style={{ width: '12%' }} />
-                  <col style={{ width: '14%' }} />
                   <col style={{ width: 140 }} />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>İşletme</th>
                     <th>Kod</th>
+                    <th>Sistem</th>
                     <th>Durum</th>
                     <th>Plan</th>
                     <th>Plan Durumu</th>
@@ -288,6 +300,11 @@ export default function SuperadminTenants() {
                       <tr key={tenant.id} className="admin-table-row">
                         <td title={tenant.name || ''}><span className="admin-cell-ellipsis">{tenant.name}</span></td>
                         <td title={tenant.slug || ''}><span className="admin-cell-ellipsis admin-cell-secondary">{tenant.slug || 'Kod yok'}</span></td>
+                        <td>
+                          <AdminStatusBadge tone={(tenant.systemType || tenant.vertical || '') === 'anaokulu' ? 'info' : (tenant.systemType === 'kantin' || tenant.vertical === 'canteen' ? 'warning' : 'success')}>
+                            {SYSTEM_TYPE_LABEL(tenant.systemType || tenant.vertical || tenant.businessType || 'restaurant')}
+                          </AdminStatusBadge>
+                        </td>
                         <td>
                           <AdminStatusBadge tone={isActive ? 'success' : 'neutral'}>
                             {isActive ? 'Aktif' : 'Pasif'}
@@ -331,6 +348,14 @@ export default function SuperadminTenants() {
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kod</div>
             <input className="input" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="pendik-sofrasi" />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sistem Tipi</div>
+            <select className="input" value={createSystemType} onChange={(e) => setCreateSystemType(e.target.value)}>
+              <option value="restaurant">🍽️ Restoran / Cafe / Kermes</option>
+              <option value="canteen">🛒 Mağaza / Market / Kantin</option>
+              <option value="anaokulu">🏫 Anaokulu / Kreş</option>
+            </select>
           </label>
           {error ? <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div> : null}
           <button className="btn btn--primary" disabled={loading}>{loading ? 'Gönderiliyor...' : 'Oluştur'}</button>

@@ -114,6 +114,7 @@ export default function Layout() {
     else if (pathname.startsWith('/platform/billing-requests')) document.title = 'PenPOS - Uyelik Talepleri'
     else if (pathname.startsWith('/platform/kermes-tenants')) document.title = 'PenPOS - Kermes Uyeler'
     else if (pathname.startsWith('/platform/canteen-tenants')) document.title = 'PenPOS - Mağaza Üyeleri'
+    else if (pathname.startsWith('/platform/anaokulu-tenants')) document.title = 'PenPOS - Anaokulu Üyeleri'
     else if (pathname.startsWith('/platform/plans')) document.title = 'PenPOS - Paketler'
     else if (pathname.startsWith('/kermes')) document.title = 'PenPOS - Kermes'
     else document.title = 'PenPOS'
@@ -229,12 +230,16 @@ export default function Layout() {
     items.push({ path: '/superadmin/website-settings', label: 'Web Site Ayarlari', icon: IconWebsite, show: true })
     items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
     items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/anaokulu-tenants', label: '🏫 Anaokulu Üyeleri', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/anaokulu-region-admins', label: '🏫 Okul Süper Adminleri', icon: IconUserCog, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
     items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })
   } else if (user.role === 'platform_admin') {
     items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
     items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/anaokulu-tenants', label: '🏫 Anaokulu Üyeleri', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/anaokulu-region-admins', label: '🏫 Okul Süper Adminleri', icon: IconUserCog, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
     items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })

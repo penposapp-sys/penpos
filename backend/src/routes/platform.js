@@ -5,6 +5,7 @@ import { sendError } from '../utils/errors.js'
 import { error } from '../utils/errors.js'
 import * as selfAccount from '../services/selfAccountService.js'
 import { createTenantWithOwnerService, listPlatformTenantsService, updateTenantStatusService, createPlanService, listPlansService, listPlansForTenantService, updatePlanService, deletePlanService, assignTenantPlanService, trialExtendService, trialEndService, editTenantService, softDeleteTenantService, hardDeleteTenantService, setPlatformUserPasswordService } from '../services/platformAdminService.js'
+import { listAnaokuluRegionAdminsService, createAnaokuluRegionAdminService, updateAnaokuluRegionAdminService, deleteAnaokuluRegionAdminService } from '../services/superadminService.js'
 import { listPaymentRequestsService, approvePaymentRequestService, rejectPaymentRequestService } from '../services/paymentService.js'
 import { listMembershipRequestsService, approveMembershipRequestService, rejectMembershipRequestService } from '../services/platformBillingService.js'
 
@@ -66,6 +67,37 @@ router.post('/tenants/canteen', requireAuth, requireRole(['platform_admin', 'sup
     }
     const result = await createTenantWithOwnerService({ ...incoming, systemType: 'canteen' })
     res.json({ success: true, id: result.tenant?._id || null })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/tenants/anaokulu', requireAuth, requireRole(['platform_admin', 'superadmin', 'anaokulu_region_admin']), async (req, res) => {
+  try {
+    const incoming = req.body || {}
+    if (incoming.systemType !== undefined && !['anaokulu', 'anaokulu', 'kindergarten', 'kres', 'kreş'].includes(String(incoming.systemType))) {
+      throw error('invalid_request', 'Invalid system type', 400)
+    }
+    const phoneVal = String(incoming.ownerPhone || incoming.phone || '').trim()
+    const result = await createTenantWithOwnerService({
+      ...incoming,
+      ownerPhone: phoneVal,
+      phone: phoneVal,
+      systemType: 'anaokulu'
+    })
+    const newTenantId = result?.tenant?._id || result?.tenant?.id
+    if (newTenantId && req.user?.role === 'anaokulu_region_admin') {
+      const User = (await import('../models/User.js')).default
+      const adminUser = await User.findById(req.user.id)
+      if (adminUser) {
+        const existingIds = Array.isArray(adminUser.accessibleTenantIds) ? adminUser.accessibleTenantIds.map(String) : []
+        if (!existingIds.includes(String(newTenantId))) {
+          adminUser.accessibleTenantIds = [...existingIds, String(newTenantId)]
+          await adminUser.save().catch(() => {})
+        }
+      }
+    }
+    res.json({ success: true, ok: true, id: newTenantId || null, tenant: result.tenant, owner: result.owner || null })
   } catch (err) {
     sendError(res, err)
   }
@@ -244,6 +276,133 @@ router.put('/users/:id/password', requireAuth, requireRole(['platform_admin', 's
     const password = req.body?.password
     const result = await setPlatformUserPasswordService(req.params.id, password, req.user.id)
     res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.get('/anaokulu-region-admins', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const items = await listAnaokuluRegionAdminsService()
+    res.json({ items })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/anaokulu-region-admins', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const b = req.body || {}
+    const result = await createAnaokuluRegionAdminService({
+      name: b.name,
+      email: b.email,
+      password: b.password,
+      phone: b.phone,
+      accessibleTenantIds: b.accessibleTenantIds
+    }, req.user.id)
+    res.json({ success: true, user: result })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.put('/anaokulu-region-admins/:userId', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    const b = req.body || {}
+    const result = await updateAnaokuluRegionAdminService(userId, {
+      name: b.name,
+      email: b.email,
+      phone: b.phone,
+      password: b.password,
+      accessibleTenantIds: b.accessibleTenantIds,
+      isActive: b.isActive
+    }, req.user.id)
+    res.json({ success: true, user: result })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.delete('/anaokulu-region-admins/:userId', requireAuth, requireRole(['superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    const result = await deleteAnaokuluRegionAdminService(userId, req.user.id)
+    res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+// Region admin kendi adına yeni anaokulu oluşturur (kendine otomatik atanır)
+router.post('/region-admin/create-school', requireAuth, requireRole(['anaokulu_region_admin', 'superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const actorId = req.user?.id
+    if (!actorId) throw error('unauthorized', 'Kimlik doğrulaması gerekli', 401)
+
+    const incoming = req.body || {}
+    if (!incoming.name || !String(incoming.name).trim()) {
+      throw error('invalid_request', 'Okul adı zorunludur', 400)
+    }
+
+    // Create the new tenant with owner
+    const phoneVal = String(incoming.ownerPhone || incoming.phone || '').trim()
+    const result = await createTenantWithOwnerService({
+      ...incoming,
+      ownerPhone: phoneVal,
+      phone: phoneVal,
+      systemType: 'anaokulu'
+    })
+    const newTenantId = result?.tenant?._id || result?.tenant?.id
+    if (!newTenantId) throw error('server_error', 'Okul oluşturulamadı', 500)
+
+    // Auto-assign this new tenant to the requesting user if region admin
+    const User = (await import('../models/User.js')).default
+    const adminUser = await User.findById(actorId)
+    if (adminUser) {
+      const existingIds = Array.isArray(adminUser.accessibleTenantIds)
+        ? adminUser.accessibleTenantIds.map(String)
+        : []
+      const newId = String(newTenantId)
+      if (!existingIds.includes(newId)) {
+        adminUser.accessibleTenantIds = [...existingIds, newId]
+        await adminUser.save().catch(() => {})
+      }
+    }
+
+    res.json({ ok: true, success: true, tenant: result.tenant, owner: result.owner, tenantId: String(newTenantId) })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+// Region admin'e yeni tenant atama (platform admin tarafından)
+router.post('/anaokulu-region-admins/:userId/assign-tenant', requireAuth, requireRole(['superadmin', 'platform_admin', 'anaokulu_region_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    const { tenantId } = req.body || {}
+
+    // Region admin sadece kendi ID'si için işlem yapabilir
+    if (req.user.role === 'anaokulu_region_admin' && String(req.user.id) !== String(userId)) {
+      throw error('forbidden', 'Yalnızca kendi hesabınıza atama yapabilirsiniz', 403)
+    }
+
+    if (!tenantId) throw error('invalid_request', 'Tenant ID zorunludur', 400)
+
+    const User = (await import('../models/User.js')).default
+    const adminUser = await User.findById(userId)
+    if (!adminUser) throw error('not_found', 'Kullanıcı bulunamadı', 404)
+
+    const existingIds = Array.isArray(adminUser.accessibleTenantIds)
+      ? adminUser.accessibleTenantIds.map(String)
+      : []
+    const newId = String(tenantId)
+    if (!existingIds.includes(newId)) {
+      adminUser.accessibleTenantIds = [...existingIds, newId]
+      await adminUser.save()
+    }
+
+    res.json({ ok: true, success: true, accessibleTenantIds: adminUser.accessibleTenantIds.map(String) })
   } catch (err) {
     sendError(res, err)
   }

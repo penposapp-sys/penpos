@@ -1,0 +1,1360 @@
+<div role="dialog" aria-live="polite" aria-label="cookieconsent" aria-describedby="cookieconsent:desc" class="cc-window cc-banner cc-type-info cc-theme-block cc-bottom cc-color-override-518783274 " style=""><!--googleoff: all--><span id="cookieconsent:desc" class="cc-message">Bu sitede, kullanıcı deneyimini geliştirmek ve internet sitesinin verimli çalışmasını sağlamak amacıyla çerezler kullanılmaktadır. Şirketimiz ve ziyaretçi bilgilerinin korunmasıyla ilgili daha detaylı bilgi için Çerez politikamıza bakabilirsiniz. <a aria-label="learn more about cookies" role="button" tabindex="0" class="cc-link" href="/Files/Pdf/Turmobluca-cerez-politikasi.pdf" rel="noopener noreferrer nofollow" target="_blank">Çerez politikamız</a></span><div class="cc-compliance"><a aria-label="dismiss cookie message" role="button" tabindex="0" class="cc-btn cc-dismiss">Tamam</a></div><!--googleon: all--></div>
+
+
+
+<nav class="left-menu" left-menu="" id="left-menu">
+    <div class="logo-container">
+        <a href="/" class="logo">
+            <img src="/images/logo.png" alt="TÜRMOB Luca e belge portali">
+            <img class="logo-inverse" src="/images/ebelgeportalibeyaz.png" alt="TÜRMOB Luca e belge portali">
+        </a>
+    </div>
+
+    <div class="left-menu-inner scroll-pane jspScrollable" tabindex="0" style="overflow: hidden; padding: 0px; width: 219px;">
+        
+    <div class="jspContainer" style="width: 219px; height: 520px;"><div class="jspPane" style="padding: 0px; top: 0px; width: 213px;"><ul class="left-menu-list left-menu-list-root list-unstyled">
+            <!--//Todo: Girmemesi için false eklendi, kaldırılacak sonradan-->
+            
+
+            <li class="left-menu-item left-menu-list-active">
+                <a class="left-menu-link" href="/"><i class="left-menu-link-icon icmn-home"></i> Anasayfa </a>
+            </li>
+
+                <li class="left-menu-list-separator"></li>
+                <li class="left-menu-item">
+                    <a class="left-menu-link" href="/Invoice/CreateQuick"><i class="left-menu-link-icon icmn-file-text"></i> Hızlı Fatura Oluştur </a>
+                </li>
+            <li class="left-menu-list-separator"></li>
+
+            <li class="left-menu-item" id="CampanyInfo">
+                <a class="left-menu-link" href="/Company/"><i class="left-menu-link-icon icmn-office"></i> Firma Bilgileri </a>
+            </li>
+
+            <li class="left-menu-list-separator"></li>
+
+            <li class="left-menu-list-submenu" id="CreateInvoice">
+                <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-files-empty2"></i> e-Belge Oluştur </a>
+                <ul class="left-menu-list list-unstyled">
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/Invoice/Create"><i class="left-menu-link-icon icmn-file-empty"></i> e-Fatura/e-Arşiv Oluştur </a>
+                        </li>
+                </ul>
+            </li>
+
+                <li class="left-menu-list-separator"><!-- --></li>
+                <li class="left-menu-list-submenu">
+                    <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-files-empty2"></i> e-Fatura İşlemleri </a>
+                    <ul class="left-menu-list list-unstyled">
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/OutgoingInvoice/StagingInvoiceList"><i class="left-menu-link-icon icmn-file-text2"></i> Taslak e-Faturalar</a>
+                        </li>
+                            <li class="left-menu-list-separator"></li>
+                            <li class="left-menu-list-item">
+                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingInvoiceList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Fatura </a>
+                            </li>
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/IncomingInvoice/IncomingInvoiceList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-download"></i> Gelen e-Fatura </a>
+                        </li>
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/IncomingInvoice/InvoiceToApproveList?scenario=1"><i class="left-menu-link-icon fa fa-check-square-o"></i> Gelen Temel e-Fatura Onayla-Reddet </a>
+                        </li>
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/IncomingInvoice/InvoiceToApproveList?scenario=2"><i class="left-menu-link-icon fa fa-check-square-o"></i> Gelen Ticari e-Fatura Onayla-Reddet </a>
+                        </li>
+                    </ul>
+                </li>
+                                        <li class="left-menu-list-separator"><!-- --></li>
+                <li class="left-menu-list-submenu">
+                    <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-files-empty2"></i> e-Arşiv İşlemleri </a>
+                    <ul class="left-menu-list list-unstyled">
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/OutgoingInvoice/StagingArchiveList"><i class="left-menu-link-icon icmn-file-text2"></i> Taslak e-Arşiv</a>
+                        </li>
+
+                            <li class="left-menu-list-separator"></li>
+                            <li class="left-menu-list-item">
+                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingArchiveList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Arşiv </a>
+                            </li>
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/OutgoingInvoice/CancelEArchiveList"><i class="left-menu-link-icon fa fa-file-excel-o"></i> İptal Faturalar</a>
+                        </li>
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/OutgoingInvoice/ContestEArchiveList"><i class="left-menu-link-icon fa fa-file-excel-o"></i> İtiraz Faturalar</a>
+                        </li>
+                    </ul>
+                </li>
+                        
+            <li class="left-menu-list-separator"></li>
+            <li class="left-menu-list-submenu" id="DetailInvoiceReport">
+                <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-stats-dots"></i> Raporlar </a>
+                <ul class="left-menu-list list-unstyled">
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/Report/Index"><i class="left-menu-link-icon icmn-paste"></i> Detaylı Fatura(Fiş) Raporları </a>
+                        </li>
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/ArchiveInvoice/ArchiveInvoiceList"><i class="left-menu-link-icon icmn-books"></i> Arşivlenmiş Faturalar </a>
+                        </li>
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/DeletedInvoice/DeletedInvoiceList"><i class="left-menu-link-icon icmn-bin"></i> Silinmiş Faturalar </a>
+                        </li>
+
+
+
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/ArchiveMailCheck/ArchiveMailCheckList"><i class="left-menu-link-icon fa fa-envelope-o"></i> Mail Gönderimi Tamamlanmayan Faturalar </a>
+                        </li>
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/FaultyArchive/FaultyArchiveList"><i class="left-menu-link-icon fa fa-minus-square-o"></i> Rapor Gönderimi Hata Alan E-Arşiv Faturaları </a>
+                        </li>
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/Import/ImportedInvoiceList"><i class="left-menu-link-icon icmn-history"></i> Geçmiş Faturalar </a>
+                        </li>
+                         <!-- <li class="left-menu-list-separator"></li>
+						<li class="left-menu-list-item">
+							<a class="left-menu-link" href="~/Report/CompanyInvoiceList"><i class="left-menu-link-icon fa fa-map-signs"></i> Gelen Faturalar Hareket Raporu </a>
+						</li> -->
+                </ul>
+            </li>
+
+            <li class="left-menu-list-separator"></li>
+            <li class="left-menu-list-submenu">
+                <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-user-tie"></i> Kullanıcı-Rol-Akış </a>
+                <ul class="left-menu-list list-unstyled">
+
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/User/Index"><i class="left-menu-link-icon icmn-user-plus"></i> Kullanıcı Bilgileri </a>
+                        </li>
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/Role/Index"><i class="left-menu-link-icon icmn-vcard"></i> Rol Bilgileri </a>
+                        </li>
+                        <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/ApprovalFlow/Index"><i class="left-menu-link-icon icmn-users"></i> Onay Akış </a>
+                        </li>
+
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/DistributionFlow/Index"><i class="left-menu-link-icon fa fa-sitemap"></i> Dağıtım Akış </a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="left-menu-list-separator"></li>
+            <li class="left-menu-list-submenu">
+                <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-coins"></i> Fatura Tahsilat Sistemi </a>
+                <ul class="left-menu-list list-unstyled">
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/Payment/CommonPaymentCollection"><i class="left-menu-link-icon icmn-coin-dollar"></i> MOKA UNITED Tahsilat Sistemi </a>
+                    </li>
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/Payment/CommonPaymentList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-download"></i> Fatura Ödeme Listesi </a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="left-menu-list-separator"></li>
+            <li class="left-menu-list-submenu">
+                <a class="left-menu-link" href="javascript: void(0);"><i class="left-menu-link-icon icmn-wrench3"></i> Araçlar </a>
+                <ul class="left-menu-list list-unstyled">
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/Product/Index"><i class="left-menu-link-icon fa fa-barcode"></i> Ürün Bilgileri </a>
+                    </li>
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/Recipient/Index"><i class="left-menu-link-icon icmn-address-book"></i> Alıcı Bilgileri </a>
+                    </li>
+
+                                            <li class="left-menu-list-separator"></li>
+                        <li class="left-menu-list-item">
+                            <a class="left-menu-link" href="/ExportRecipient/Index"><i class="left-menu-link-icon fa fa-ship"></i> İhracat Alıcı Bilgileri </a>
+                        </li>
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/Carrier/Index"><i class="left-menu-link-icon icmn-truck"></i> Taşıyıcı Bilgileri </a>
+                    </li>
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/CompanyMail/Index"><i class="left-menu-link-icon icmn-mail"></i> Firma E-Posta Bilgileri </a>
+                    </li>
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/Bank/Index"><i class="left-menu-link-icon icmn-bag"></i> Banka Bilgileri </a>
+                    </li>
+                    <li class="left-menu-list-separator"></li>
+                    <li class="left-menu-list-item">
+                        <a class="left-menu-link" href="/CompanyPrivateState/Index"><i class="left-menu-link-icon icmn-stack"></i> Özel Durum Bilgileri </a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="left-menu-list-separator"></li>
+            <li class="left-menu-list-item">
+                <a class="left-menu-link" href="/Import/Index"><i class="left-menu-link-icon icmn-folder-download"></i> Yükleme Araçları </a>
+            </li>
+
+                <li class="left-menu-list-separator"></li>
+                <li class="left-menu-list-item" id="FileBox">
+                    <a class="left-menu-link" href="/Inbox/"><i class="left-menu-link-icon icmn-box"></i> Dosya Kutusu </a>
+                </li>
+
+                <li class="left-menu-list-separator"></li>
+                <li class="left-menu-list-item">
+                    <a class="left-menu-link" href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank">
+                        <i class="left-menu-link-icon fa fa-credit-card-alt"></i> Kontör Satın Al
+                    </a>
+                </li>
+
+            <li class="left-menu-list-separator"></li>
+            <li class="left-menu-list-item" id="OpenFeedBack">
+                <a class="left-menu-link" href="https://internet.luca.com.tr/destek/destek_talep.php" target="_blank"><i class="left-menu-link-icon fa fa-send"></i> Geri Bildirim - Öneri</a>
+            </li>
+        </ul></div><div class="jspVerticalBar"><div class="jspCap jspCapTop"></div><div class="jspTrack" style="height: 520px;"><div class="jspDrag" style="height: 326px;"><div class="jspDragTop"></div><div class="jspDragBottom"></div></div></div><div class="jspCap jspCapBottom"></div></div></div></div>
+</nav>
+<!-- /sidebar menu -->
+
+
+    <nav class="top-menu">
+    <div class="menu-icon-container hidden-md-up">
+        <div class="animate-menu-button left-menu-toggle">
+            <div><!-- --></div>
+        </div>
+    </div>
+
+
+    <div class="menu">
+        <div class="menu-user-block">
+            <div class="turmob-account-center">
+                <div class="turmob-announcement-slot" title="Duyurular">
+                    
+<link href="/Content/css/announcement.css" rel="stylesheet">
+
+<div class="dropdown">
+    <button data-toggle="dropdown" aria-expanded="true" id="Notification" style="border: none; outline: none;">
+        <i class="icmn-envelop5" style="font-size: 30px; color: #3498db;"></i>
+        <span class="badge zoom-in-zoom-out" id="notifyBadge" style="display: block;">
+            <span id="TotalNotify">+18</span>
+        </span>
+    </button>
+    <ul class="dropdown-menu" aria-labelledby="" role="menu" style="width:400px; border-color: cornflowerblue; left: -250px !important; ">
+        <div class="widget-header dropdown-item" id="DuyuruSelector">
+            <i class="icmn-bullhorn" style="font-size: 20px; color: #3498db;"></i><strong> Duyurular (<span id="TotalNotifyForTitle">18</span>)</strong>
+            <a href="/Announcement/Index" style="position:absolute;right:25px;font-size:medium;" id="arsivDuyuruSelector">[Arşiv]</a>
+        </div>
+        <div class="widget-body dropdown-item">
+            <div class="conversation-block custom-scroll" style="height: 485px; overflow: hidden; padding: 0px; width: 0px;">
+                
+
+            <div class="jspContainer" style="width: 0px; height: 485px;"><div class="jspPane" style="padding: 0px; top: 0px; left: 0px; width: 0px;"><div id="NotifyDiv"></div></div></div></div>
+        </div>
+    </ul>
+</div>
+<script src="/Scripts/dompurify.js"></script>
+<script src="/bundles/scripts/announcement?v=FQwLyA14OnGOOG9ZblTZVC6kZ45HNdw8aTbY8ac7RUc1"></script>
+
+
+
+
+                </div>
+
+                <div class="dropdown" id="UserMenuInfo">
+                <a href="javascript: void(0);" class="dropdown-toggle dropdown-inline-button turmob-user-trigger" data-toggle="dropdown" aria-expanded="false">
+                    <span class="turmob-user-trigger__avatar"><i class="icmn-user"></i></span>
+                    <span class="turmob-user-trigger__content hidden-lg-down">
+                        <span class="turmob-user-trigger__label">Kullanıcı</span>
+                        <span class="turmob-user-trigger__name">İBRAHİM AKMAN</span>
+                    </span>
+                    <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="" role="menu" style="left: -60px !important;">
+                        <a class="dropdown-item" href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank"><i class="dropdown-icon icmn-cart"></i> Kontör Satın Al </a>
+                        <div class="dropdown-divider"></div>
+
+                    <a class="dropdown-item " href="#" id="OpenChangePassword"> <i class="dropdown-icon icmn-key"></i> Şifre Değiştir </a>
+
+                    <div class="dropdown-divider"></div>
+
+                    <a class="dropdown-item " href="#" id="OpenSettingsAndSecurity"> <i class="dropdown-icon icmn-power"></i> Ayarlar / Güvenlik </a>
+
+                    <div class="dropdown-divider"></div>
+
+                    <a class="dropdown-item " href="#" id="OpenUserInformation"> <i class="dropdown-icon icmn-power"></i> Kullanıcı Bilgilerim </a>
+
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="/Company/"><i class="dropdown-icon icmn-office"></i> Firma Bilgileri </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" target="_blank" href="http://www.efatura.gov.tr/duyurular.html"><i class="dropdown-icon icmn-circle-right"></i> Gib Duyuruları </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="/TransactionHistory/"><i class="dropdown-icon icmn-office"></i> Bakiye Bilgileri </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="#"><i class="dropdown-icon icmn-earth"></i> turmob-20 </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" target="_blank" href="/Files/Pdf/HizmetKatalogu.pdf"><i class="dropdown-icon icmn-circle-right"></i> Servis Kataloğu </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" target="_blank" href="https://lucayazilim.freshdesk.com/support/solutions/folders/67000484240/page/1?url_locale="><i class="dropdown-icon icmn-question"></i> Sıkça Sorulan Sorular</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" target="_blank" href="https://youtube.com/playlist?list=PLwGePyTd7vJG3WPCEJRxd3l-vZ2Erb_Xq"><i class="dropdown-icon icmn-question"></i> Yardım Videoları</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" onclick="triggerModal(); return false;"><i class="dropdown-icon icmn-question"></i> Klavye Kısayol Tuşları</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="/Account/LogOff"><i class="dropdown-icon icmn-exit"></i> Güvenli Çıkış </a>
+                </ul>
+                </div>
+            </div>
+        </div>
+        <div class="menu-info-block">
+            <div class="pull-left">
+                <div class="header-buttons">
+                    <div class="dropdown turmob-company-select">
+                            <div class="form-group width-300  firma">
+        <select class="form-control select2  select2-hidden-accessible" id="CompanyId" name="CompanyId" required="" tabindex="-1" aria-hidden="true">
+                        <option selected="" value="180214">PENDİK EĞİTİM KURUMLARI TİC. LTD. ŞTİ.</option>
+        </select><span class="select2 select2-container select2-container--default" dir="ltr" style="width: 250px;"><span class="selection"><span class="select2-selection select2-selection--single" role="combobox" aria-haspopup="true" aria-expanded="false" tabindex="0" aria-labelledby="select2-CompanyId-container"><span class="select2-selection__rendered" id="select2-CompanyId-container" title="PENDİK EĞİTİM KURUMLARI TİC. LTD. ŞTİ.">PENDİK EĞİTİM KURUMLARI TİC. LTD. ŞTİ.</span><span class="select2-selection__arrow" role="presentation"><b role="presentation"></b></span></span></span><span class="dropdown-wrapper" aria-hidden="true"></span></span>
+    </div>
+
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $("#CompanyId").select2();
+
+
+        $('#CompanyId').on('change', function (e) {
+            var optionSelected = $("option:selected", this);
+            var valueSelected = this.value;
+            window.location.href = "../../Home/ChangeActiveCompany?CompanyId=" + valueSelected;
+        });
+    });
+</script>
+                    </div>
+                </div>
+            </div>
+            
+
+
+                <div class="turmob-top-actions">
+                    <a href="/TransactionHistory/" class="turmob-top-action turmob-top-action--balance " id="kontorInfo" title="Bakiye hareketlerini görüntüle">
+                        <span class="turmob-top-action__icon"><i class="fa fa-ticket"></i></span>
+                        <span class="turmob-top-action__content">
+                            <span class="turmob-top-action__label">KALAN KONTÖR</span>
+                            <span class="turmob-top-action__value">1781</span>
+                        </span>
+                    </a>
+
+                    <a href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--buy" id="buyKontorTurmob" title="Kontör satın al">
+                        <span class="turmob-top-action__icon"><i class="fa fa-credit-card-alt"></i></span>
+                        <span class="turmob-top-action__content">
+                            <span class="turmob-top-action__label">KONTÖR</span>
+                            <span class="turmob-top-action__value">SATIN AL</span>
+                        </span>
+                    </a>
+
+                    <a href="https://lucayazilim.freshdesk.com/support/solutions/folders/67000484240/page/1?url_locale=" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--help turmob-top-action--faq" id="faqTurmob" title="SIKÇA SORULAN SORULAR">
+                        <span class="turmob-top-action__icon"><i class="icmn-question"></i></span>
+                        <span class="turmob-top-action__content">
+                            <span class="turmob-top-action__label">YARDIM</span>
+                            <span class="turmob-top-action__value">SSO</span>
+                        </span>
+                    </a>
+
+                    <a href="https://youtube.com/playlist?list=PLwGePyTd7vJG3WPCEJRxd3l-vZ2Erb_Xq" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--help turmob-top-action--education" id="helpVideoTurmob" title="VİDEO YARDIM">
+                        <span class="turmob-top-action__icon"><i class="fa fa-play"></i></span>
+                        <span class="turmob-top-action__content">
+                            <span class="turmob-top-action__label">EĞİTİM</span>
+                            <span class="turmob-top-action__value">VİDEO YARDIM</span>
+                        </span>
+                    </a>
+                     <a href="/Company/" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--help" id="companyInfoTurmob" title="FİRMA BİLGİLERİ">
+                        <span class="turmob-top-action__icon"><i class="fa fa-info"></i></span>
+                        <span class="turmob-top-action__content">
+                            <span class="turmob-top-action__label">FİRMA BİLGİLERİ</span>
+                            <span class="turmob-top-action__value">7820647929</span>
+                            
+                        </span>
+                    </a>
+
+ 
+
+                </div>
+                    </div>
+
+    </div>
+
+    <script>
+        $(document).ready(function () {
+
+            $('#OpenChangePassword').click(function () {
+
+                $('#FeedbackEmptyModal').modal('show').find('.modal-body').empty();
+                $('#FeedbackEmptyModal').modal('show').find('.modal-body').load("../../Account/ChangePassword");
+                $("#exampleFeedbackModalLabel").text("Şifre Değiştir");
+            });
+
+            $('#OpenSettingsAndSecurity').click(function () {
+
+                $('#FeedbackEmptyModal').modal('show').find('.modal-body').empty();
+                $('#FeedbackEmptyModal').modal('show').find('.modal-body').load("../../Account/OpenSettingsAndSecurity");
+                $("#exampleFeedbackModalLabel").text("Ayarlar & Güvenlik");
+            });
+
+            $('#OpenUserInformation').click(function () {
+
+                $('#FeedbackEmptyModal').modal('show').find('.modal-body').empty();
+                $('#FeedbackEmptyModal').modal('show').find('.modal-body').load("../../Account/UserInformation");
+                $("#exampleFeedbackModalLabel").text("Kullanıcı Bilgilerim");
+            });
+
+        });
+    </script>
+</nav>
+
+
+    <section class="page-content" id="page-content">
+        <div class="page-content-inner page-content-resp">
+
+            <section class="panel">
+                <div class="panel-heading">
+                    <div class="expand-menu-button left-menu-expand" id="showhideLeftMenu">
+                        <div><!-- --></div>
+                    </div>
+                    <h4 style="display: inline; margin:-2px; padding: inherit">Anasayfa</h4>
+                </div>
+                <div class="panel-body">
+                    <input name="__RequestVerificationToken" type="hidden" value="XYO2LWt_KALyPuIrVoSDLHSzvJuiBHWeLBniwYJkmyaicGijfr71nZicVaINUGTpMx6SWrg_RjytwCgBAx_loKOWI88vN_ZrKtLGhqougrVKDoA-eyq6Iwh5DUOcOgzB0">
+                    
+
+
+<!-- Dashboard -->
+<div class="dashboard-container">
+    <div class="row">
+<div class="col-md-6">
+    <div class="card  " style="border-color: #1B4F72; border-width: inherit; ">
+        <div class="card-header background-secondary" style="text-align: center;">
+             <span class="text-uppercase font-size-16 font-weight-bold color-white">E-FATURA</span>
+            
+        </div>
+        <div class="card-body" style="margin:5px;">
+            <div class="row">
+<a href="../IncomingInvoice/InvoiceToApproveList?scenario=2">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-info" id="ticariInvoiceToApproveCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Gelen Ticari Onay Bekleyen</h5>
+                    <i class="counter-icon icmn-file-download"></i>
+                    <span class="counter-count">
+                        <span class="ticari-invoice-to-approve-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../IncomingInvoice/IncomingInvoiceList?getUnreaded=1">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-2" id="unReadInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Gelen Okunmayan E-Fatura</h5>
+                    <i class="counter-icon icmn-file-download"></i>
+                    <span class="counter-count">
+                        <span class="unread-invoice-counter">74</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../IncomingInvoice/InvoiceToApproveList?scenario=1">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-info" id="temelInvoiceToApproveCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Gelen Temel Onay Bekleyen</h5>
+                    <i class="counter-icon icmn-file-download"></i>
+                    <span class="counter-count">
+                        <span class="temel-invoice-to-approve-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../IncomingInvoice/IncomingInvoiceList">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-2" id="incomingInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Gelen E-Fatura</h5>
+                    <i class="counter-icon icmn-file-download"></i>
+                    <span class="counter-count">
+                        <span class="incoming-invoice-counter">86</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/StagingInvoiceList">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-green" id="stagingInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Taslak E-Fatura</h5>
+                    <i class="counter-icon icmn-file-eye"></i>
+                    <span class="counter-count">
+                        <span class="staging-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/OutgoingInvoiceList?minDate=2026-09-01">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-2" id="outGoingInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Bu Ay Giden E-Fatura</h5>
+                    <i class="counter-icon icmn-file-upload"></i>
+                    <span class="counter-count">
+                        <span class="outgoing-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/OutgoingInvoiceList?scenario=2&amp;state=25&amp;minDate=2026-09-01">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-danger" id="outGoingRejectedInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Bu Ay Giden Reddedilen Ticari Faturalar</h5>
+                    <i class="counter-icon icmn-file-minus2"></i>
+                    <span class="counter-count">
+                        <span class="outgoing-rejected-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/OutgoingInvoiceList?state=16|22|37&amp;multiSelect=1&amp;minDate=2026-09-01">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-warning" id="faultyInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Bu Ay Giden Hata Alan Faturalar</h5>
+                    <i class="counter-icon icmn-file-minus"></i>
+                    <span class="counter-count">
+                        <span class="faulty-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/StagingInvoiceList?approveState=0">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-transparent" id="stagingInvoiceToApproveCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Onayda Bekleyen Taslak Faturalar</h5>
+                    <i class="counter-icon icmn-file-empty"></i>
+                    <span class="counter-count">
+                        <span class="staging-approve-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../DeletedInvoice/DeletedInvoiceList?invoiceType=1">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-danger" id="deletedInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Silinmiş Taslak Faturalar</h5>
+                    <i class="counter-icon icmn-bin"></i>
+                    <span class="counter-count">
+                        <span class="deleted-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a>                
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>                <div class="col-md-6">
+    <div class="card  " style="border-color: #1B4F72; border-width: inherit; ">
+        <div class="card-header background-secondary" style="text-align: center;">
+             <span class="text-uppercase font-size-16 font-weight-bold color-white">E-ARŞİV</span>
+            
+        </div>
+        <div class="card-body" style="margin:5px;">
+            <div class="row">
+<a href="../OutgoingInvoice/StagingArchiveList">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-green" id="stagingArchiveCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Taslak E-Arşiv</h5>
+                    <i class="counter-icon icmn-file-eye"></i>
+                    <span class="counter-count">
+                        <span class="staging-archive-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/OutgoingArchiveList?minDate=2026-09-01">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-info" id="outGoingArchiveCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Bu Ay Giden E-Arşiv</h5>
+                    <i class="counter-icon icmn-file-upload"></i>
+                    <span class="counter-count">
+                        <span class="outgoing-archive-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../ArchiveMailCheck/ArchiveMailCheckList">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-warning" id="archiveMailCheckCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Mail Gönderimi Tamamlanmayan E-Arsiv Faturalar</h5>
+                    <i class="counter-icon icmn-file-minus"></i>
+                    <span class="counter-count">
+                        <span class="archive-mail-check-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../FaultyArchive/FaultyArchiveList">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-warning" id="faultyArchiveReportCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Rapor Gönderimi Hata Alan E-Arsiv Faturalar</h5>
+                    <i class="counter-icon icmn-file-minus"></i>
+                    <span class="counter-count">
+                        <span class="faulty-archive-report-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../DeletedInvoice/DeletedInvoiceList?invoiceType=2">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-danger" id="deletedArchiveInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">Silinmiş E-Arşiv Faturalar</h5>
+                    <i class="counter-icon icmn-bin"></i>
+                    <span class="counter-count">
+                        <span class="deleted-archive-invoice-counter">5</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a><a href="../OutgoingInvoice/CancelEArchiveList">
+    <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
+        <div class="widget widget-seven background-info" id="canceledArchiveInvoiceCount" style="position: relative;">
+            <div class="widget-body">
+                <div href="javascript: void(0);" class="widget-body-inner">
+                    <h5 style="font-weight:bold !important" class="text-uppercase">İptal Edilen E-Arşiv Faturalar</h5>
+                    <i class="counter-icon icmn-file-upload"></i>
+                    <span class="counter-count">
+                        <span class="canceled-archive-invoice-counter">0</span>
+
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</a>                
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>                    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade modal-size-large" id="EmptyModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title float-left" id="exampleModalLabel"></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modal-container">
+                <div id="Loading" class="js-loading" style="position: relative;">
+                    <br>
+                    <br>
+                    <br>
+                <div class="js-loading-indicator triple" style="width: 0px; height: 0px; top: 0px; left: 0px;"></div><div class="js-loading-overlay" style=""></div></div>
+            </div>
+            <div class="modal-footer" id="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $(document).ready(function () {
+
+        $('#Loading').loading({ circles: 3, overlay: true });
+
+    });
+</script>
+
+
+<div class="modal fade" id="Bilgilendirme1" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" data-backdrop="false" data-keyboard="false">
+    <div class="modal-dialog" style="width: 100%; max-width: 1260px !important;" role="document">
+        <div class="modal-content" style="width: 100%; background-color: #1182D8;">
+
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="color: #FFF; text-shadow: 0px 0px !important; opacity: 1 !important; margin-right: 30px; font-weight: 100 "> Kapat</button>
+            </div>
+            <div style="display: flex; gap: 0px;">
+                <div id="popup1" class="modal-body mb-0 p-0 center">
+                    <img src="/Content/LoginContent/images/mini-App.png" width="600" height="600">
+                </div>
+                <div id="popup2" class="modal-body mb-0 p-0 center">
+                        <a href="https://www.isnet.net.tr/iletisim/urunbasvuruformu?product=86a51455-a4ef-b94e-905b-aa2899e54665&amp;discount_code=NETTEFATURA" target="_blank">
+                            <img src="/Content/LoginContent/images/moka_popup.png" width="600" height="600">
+                        </a>
+                </div>
+                
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<script>
+            $(document).ready(function () {
+
+                if ('TURMOB' != "TURMOB" && true && true) {
+                      $('#EmptyModal').modal({
+                          backdrop: 'static'
+                      });
+                      $('#EmptyModal').modal('show').find('.modal-body').empty();
+                      $('#EmptyModal').modal('show').find('.modal-body').load("../../Questionnaire/MMAnket");
+                      $('#EmptyModal .modal-header').addClass(" btn-info");
+                      $("#exampleModalLabel").removeClass("float-left");
+                      $("#exampleModalLabel").addClass(" text-center");
+                      $("#exampleModalLabel").text("Gelişimimize katkıda bulunmak istermisiniz?");
+                  }
+
+                $('#faultyInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#faultyArchiveReportCount').loading({ circles: 3, overlay: true });
+                $('#incomingInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#outGoingArchiveCount').loading({ circles: 3, overlay: true });
+                $('#outGoingInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#outGoingRejectedInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#stagingArchiveCount').loading({ circles: 3, overlay: true });
+                $('#stagingInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#stagingInvoiceToApproveCount').loading({ circles: 3, overlay: true });
+                $('#deletedInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#deletedArchiveInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#canceledArchiveInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#temelInvoiceToApproveCount').loading({ circles: 3, overlay: true });
+                $('#unReadInvoiceCount').loading({ circles: 3, overlay: true });
+                $('#archiveMailCheckCount').loading({ circles: 3, overlay: true });
+                $('#ticariInvoiceToApproveCount').loading({ circles: 3, overlay: true });
+                $('#stagingEsmmCount').loading({ circles: 3, overlay: true });
+                $('#outgoingEsmmCount').loading({ circles: 3, overlay: true });
+                $('#deletedEsmmCount').loading({ circles: 3, overlay: true });
+                $('#canceledEsmmCount').loading({ circles: 3, overlay: true });
+                $('#faultReportEsmmCount').loading({ circles: 3, overlay: true });
+                $('#stagingEmmCount').loading({ circles: 3, overlay: true });
+                $('#outgoingEmmCount').loading({ circles: 3, overlay: true });
+                $('#deletedEmmCount').loading({ circles: 3, overlay: true });
+                $('#canceledEmmCount').loading({ circles: 3, overlay: true });
+                $('#faultReportEmmCount').loading({ circles: 3, overlay: true });
+                $('#unReadDespatchCount').loading({ circles: 3, overlay: true });
+                $('#incomingDespatchCount').loading({ circles: 3, overlay: true });
+                $('#stagingDespatchCount').loading({ circles: 3, overlay: true });
+                $('#despatchToApproveCount').loading({ circles: 3, overlay: true });
+                $('#outgoingDespatchCount').loading({ circles: 3, overlay: true });
+                $('#outgoingRejectedDespatchCount').loading({ circles: 3, overlay: true });
+                $('#faultyDespatchCount').loading({ circles: 3, overlay: true });
+
+                var companyId = $("#CompanyId option:selected").val();
+
+                var filterData = {
+                    "CompanyIdFilter": companyId,
+                }
+
+                var filterJson = JSON.stringify(filterData)
+                $.ajax({
+                    type: "POST",
+                    url: '/Home/GetDashboardSummary',
+                    contentType: "application/json; charset=utf-8",
+                    data: filterJson,
+                    dataType: "json",
+                    success: function (dashboardSummary) {
+
+                        if (dashboardSummary != null && dashboardSummary != undefined) {
+
+                            var taslakEArsiv = dashboardSummary.TaslakEArsiv;
+                            var taslakESMM = dashboardSummary.TaslakEsmm;
+                            var taslakEMM = dashboardSummary.TaslakEmm;
+                            var taslakIrsaliye = dashboardSummary.TaslakIrsaliye;
+                            var taslakFatura = dashboardSummary.TaslakFatura;
+
+
+                            var backgroundClasses = {
+                                archive: "",
+                                irsaliye: "",
+                                esmm: "",
+                                emm: "",
+                                fatura: ""
+                            };
+
+
+                            function determineBackgroundClass(value) {
+
+                                return value > 0 ? "background-blink" : "background-green";
+                            }
+
+
+                            backgroundClasses.archive = determineBackgroundClass(taslakEArsiv);
+                            backgroundClasses.irsaliye = determineBackgroundClass(taslakIrsaliye);
+                            backgroundClasses.esmm = determineBackgroundClass(taslakESMM);
+                            backgroundClasses.emm = determineBackgroundClass(taslakEMM);
+                            backgroundClasses.fatura = determineBackgroundClass(taslakFatura);
+
+
+                            $("#stagingArchiveCount").addClass(backgroundClasses.archive);
+                            $("#stagingDespatchCount").addClass(backgroundClasses.irsaliye);
+                            $("#stagingEsmmCount").addClass(backgroundClasses.esmm);
+                            $("#stagingEmmCount").addClass(backgroundClasses.emm);
+                            $("#stagingInvoiceCount").addClass(backgroundClasses.fatura);
+
+                            $('.faulty-invoice-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenHataliFatura });
+                            $('.faulty-archive-report-counter').countTo({ from: 0, to: dashboardSummary.RaporGonderimiHataAlanFaturalar });
+                            $('.archive-mail-check-counter').countTo({ from: 0, to: dashboardSummary.MailGonderimiTamamlanmayanFaturalar });
+                            $('.incoming-invoice-counter').countTo({ from: 0, to: dashboardSummary.GelenFatura });
+                            $('.outgoing-archive-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenEArsiv });
+                            $('.outgoing-invoice-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenFatura });
+                            $('.outgoing-rejected-invoice-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenReddedilenFatura });
+                            $('.staging-archive-counter').countTo({ from: 0, to: dashboardSummary.TaslakEArsiv });
+                            $('.staging-invoice-counter').countTo({ from: 0, to: dashboardSummary.TaslakFatura });
+                            $('.staging-approve-invoice-counter').countTo({ from: 0, to: dashboardSummary.GidenOnayBekleyen });
+                            $('.temel-invoice-to-approve-counter').countTo({ from: 0, to: dashboardSummary.GelenTemelOnayBekleyen });
+                            $('.unread-invoice-counter').countTo({ from: 0, to: dashboardSummary.GelenOkunmayanFatura });
+                            $('.ticari-invoice-to-approve-counter').countTo({ from: 0, to: dashboardSummary.GelenTicariOnayBekleyen });
+                            $('.deleted-invoice-counter').countTo({ from: 0, to: dashboardSummary.SilinenFaturalar });
+                            $('.deleted-archive-invoice-counter').countTo({ from: 0, to: dashboardSummary.SilinenArsivFaturalar });
+                            $('.canceled-archive-invoice-counter').countTo({ from: 0, to: dashboardSummary.IptalArsivFaturalar });
+                            $('.staging-esmm-counter').countTo({ from: 0, to: dashboardSummary.TaslakEsmm });
+                            $('.outgoing-esmm-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenEsmm });
+                            $('.deleted-esmm-counter').countTo({ from: 0, to: dashboardSummary.SilinenEsmm });
+                            $('.canceled-esmm-counter').countTo({ from: 0, to: dashboardSummary.IptalEsmm });
+                            $('.faultReport-esmm-counter').countTo({ from: 0, to: dashboardSummary.RaporGonderimiHataAlanEsmm });
+                            $('.staging-emm-counter').countTo({ from: 0, to: dashboardSummary.TaslakEmm });
+                            $('.outgoing-emm-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenEmm });
+                            $('.deleted-emm-counter').countTo({ from: 0, to: dashboardSummary.SilinenEmm });
+                            $('.canceled-emm-counter').countTo({ from: 0, to: dashboardSummary.IptalEmm });
+                            $('.faultReport-emm-counter').countTo({ from: 0, to: dashboardSummary.RaporGonderimiHataAlanEmm });
+                            $('.unread-despatch-counter').countTo({ from: 0, to: dashboardSummary.GelenOkunmayanIrsaliye });
+                            $('.incoming-despatch-counter').countTo({ from: 0, to: dashboardSummary.GelenIrsaliye });
+                            $('.staging-despatch-counter').countTo({ from: 0, to: dashboardSummary.TaslakIrsaliye });
+                            $('.despatch-to-approve-counter').countTo({ from: 0, to: dashboardSummary.GelenOnayBekleyenIrsaliye });
+                            $('.outgoing-despatch-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenIrsaliye });
+                            $('.outgoing-rejected-despatch-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenReddedilenIrsaliye });
+                            $('.faulty-despatch-counter').countTo({ from: 0, to: dashboardSummary.BuAyGidenHataliIrsaliye });
+                        }
+                    },
+                    error: function (xhr, textStatus, errorThrown) {
+                        console.log(xhr)
+                        if (xhr.readyState < 4) {
+                            return true;
+                        }
+
+                        $('.faulty-invoice-counter').text('-');
+                        $('.faulty-archive-report-counter').text('-');
+                        $('.archive-mail-check-counter').text('-');
+                        $('.incoming-invoice-counter').text('-');
+                        $('.outgoing-archive-counter').text('-');
+                        $('.outgoing-invoice-counter').text('-');
+                        $('.outgoing-rejected-invoice-counter').text('-');
+                        $('.staging-archive-counter').text('-');
+                        $('.staging-invoice-counter').text('-');
+                        $('.staging-approve-invoice-counter').text('-');
+                        $('.temel-invoice-to-approve-counter').text('-');
+                        $('.unread-invoice-counter').text('-');
+                        $('.ticari-invoice-to-approve-counter').text('-');
+                        $('.deleted-invoice-counter').text('-');
+                        $('.canceled-invoice-counter').text('-');
+                        $('.deleted-archive-invoice-counte').text('-');
+                        $('.staging-esmm-counter').text('-');
+                        $('.outgoing-esmm-counter').text('-');
+                        $('.deleted-esmm-counter').text('-');
+                        $('.canceled-esmm-counter').text('-');
+                        $('.faultReport-esmm-counter').text('-');
+                        $('.staging-emm-counter').text('-');
+                        $('.outgoing-emm-counter').text('-');
+                        $('.deleted-emm-counter').text('-');
+                        $('.canceled-emm-counter').text('-');
+                        $('.faultReport-emm-counter').text('-');
+                        $('.unread-despatch-counter').text('-');
+                        $('.incoming-despatch-counter').text('-');
+                        $('.staging-despatch-counter').text('-');
+                        $('.despatch-to-approve-counter').text('-');
+                        $('.outgoing-despatch-counter').text('-');
+                        $('.outgoing-rejected-despatch-counter').text('-');
+                        $('.faulty-despatch-counter').text('-');
+                    },
+                    complete: function (data) {
+                        $('#faultyInvoiceCount').loading({ hide: true });
+                        $('#faultyInvoiceCount').loading({ destroy: true });
+
+                        $('#faultyArchiveReportCount').loading({ hide: true });
+                        $('#faultyArchiveReportCount').loading({ destroy: true });
+
+                        $('#archiveMailCheckCount').loading({ hide: true });
+                        $('#archiveMailCheckCount').loading({ destroy: true });
+
+                        $('#incomingInvoiceCount').loading({ hide: true });
+                        $('#incomingInvoiceCount').loading({ destroy: true });
+
+                        $('#outGoingArchiveCount').loading({ hide: true });
+                        $('#outGoingArchiveCount').loading({ destroy: true });
+
+                        $('#outGoingInvoiceCount').loading({ hide: true });
+                        $('#outGoingInvoiceCount').loading({ destroy: true });
+
+                        $('#outGoingRejectedInvoiceCount').loading({ hide: true });
+                        $('#outGoingRejectedInvoiceCount').loading({ destroy: true });
+
+                        $('#stagingArchiveCount').loading({ hide: true });
+                        $('#stagingArchiveCount').loading({ destroy: true });
+
+                        $('#stagingInvoiceCount').loading({ hide: true });
+                        $('#stagingInvoiceCount').loading({ destroy: true });
+
+                        $('#stagingInvoiceToApproveCount').loading({ hide: true });
+                        $('#stagingInvoiceToApproveCount').loading({ destroy: true });
+
+                        $('#deletedInvoiceCount').loading({ hide: true });
+                        $('#deletedInvoiceCount').loading({ destroy: true });
+
+                        $('#deletedArchiveInvoiceCount').loading({ hide: true });
+                        $('#deletedArchiveInvoiceCount').loading({ destroy: true });
+
+                        $('#canceledArchiveInvoiceCount').loading({ hide: true });
+                        $('#canceledArchiveInvoiceCount').loading({ destroy: true });
+
+                        $('#temelInvoiceToApproveCount').loading({ hide: true });
+                        $('#temelInvoiceToApproveCount').loading({ destroy: true });
+
+                        $('#unReadInvoiceCount').loading({ hide: true });
+                        $('#unReadInvoiceCount').loading({ destroy: true });
+
+                        $('#ticariInvoiceToApproveCount').loading({ hide: true });
+                        $('#ticariInvoiceToApproveCount').loading({ destroy: true });
+
+                        $('#stagingEsmmCount').loading({ hide: true });
+                        $('#stagingEsmmCount').loading({ destroy: true });
+
+                        $('#outgoingEsmmCount').loading({ hide: true });
+                        $('#outgoingEsmmCount').loading({ destroy: true });
+
+                        $('#deletedEsmmCount').loading({ hide: true });
+                        $('#deletedEsmmCount').loading({ destroy: true });
+
+                        $('#canceledEsmmCount').loading({ hide: true });
+                        $('#canceledEsmmCount').loading({ destroy: true });
+
+                        $('#faultReportEsmmCount').loading({ hide: true });
+                        $('#faultReportEsmmCount').loading({ destroy: true });
+
+                        $('#stagingEmmCount').loading({ hide: true });
+                        $('#stagingEmmCount').loading({ destroy: true });
+
+                        $('#outgoingEmmCount').loading({ hide: true });
+                        $('#outgoingEmmCount').loading({ destroy: true });
+
+                        $('#deletedEmmCount').loading({ hide: true });
+                        $('#deletedEmmCount').loading({ destroy: true });
+
+                        $('#canceledEmmCount').loading({ hide: true });
+                        $('#canceledEmmCount').loading({ destroy: true });
+
+                        $('#faultReportEmmCount').loading({ hide: true });
+                        $('#faultReportEmmCount').loading({ destroy: true });
+
+                        $('#unReadDespatchCount').loading({ hide: true });
+                        $('#unReadDespatchCount').loading({ destroy: true });
+
+                        $('#incomingDespatchCount').loading({ hide: true });
+                        $('#incomingDespatchCount').loading({ destroy: true });
+
+                        $('#stagingDespatchCount').loading({ hide: true });
+                        $('#stagingDespatchCount').loading({ destroy: true });
+
+                        $('#despatchToApproveCount').loading({ hide: true });
+                        $('#despatchToApproveCount').loading({ destroy: true });
+
+                        $('#outgoingDespatchCount').loading({ hide: true });
+                        $('#outgoingDespatchCount').loading({ destroy: true });
+
+                        $('#outgoingRejectedDespatchCount').loading({ hide: true });
+                        $('#outgoingRejectedDespatchCount').loading({ destroy: true });
+
+                        $('#faultyDespatchCount').loading({ hide: true });
+                        $('#faultyDespatchCount').loading({ destroy: true });
+
+                    }
+                });
+
+                showHomeHint();
+            });
+</script>
+
+<link href="/Content/vendors/CookieConsents/cookieconsent.min.css" rel="stylesheet">
+<script src="/Content/vendors/CookieConsents/cookieconsent.min.js"></script>
+
+
+
+    <script>
+        window.addEventListener("load", function () {
+            window.cookieconsent.initialise({
+                "palette": {
+                    "popup": {
+                        "background": "#FFF"
+                    },
+                    "button": {
+                        "background": "#0275d8"
+                    }
+                },
+                "content": {
+                    "message": "Bu sitede, kullanıcı deneyimini geliştirmek ve internet sitesinin verimli çalışmasını sağlamak amacıyla çerezler kullanılmaktadır. Şirketimiz ve ziyaretçi bilgilerinin korunmasıyla ilgili daha detaylı bilgi için Çerez politikamıza bakabilirsiniz.",
+                    "dismiss": "Tamam",
+                    "link": "Çerez politikamız",
+                    "href": "/Files/Pdf/Turmobluca-cerez-politikasi.pdf"
+                }
+            })
+        });
+    </script>
+
+
+                </div>
+            </section>
+        </div>
+    </section>
+
+    
+<div class="row">
+
+    <div class="page-content-inner isbankfooter">
+        <div class="panel">
+
+                <div class="col-lg-11 panel">
+                    <img src="/images/turmobkurulusudur.png">
+                </div>
+                <div class="col-lg-1 panel">
+                    <a href="#" target="_blank">
+                        <img style="width:50px; height:60px" src="data:image/jpeg;base64, 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">
+                    </a>
+                </div>
+
+
+        </div>
+    </div>
+   <!--  <div style="text-align:center; font-size:11px; color:#999; margin-top:10px;">
+        Icons made available by
+        <a href="https://www.flaticon.com/" target="_blank">Flaticon</a>
+    </div> -->
+</div>
+
+
+    <div class="main-backdrop"><!-- --></div>
+
+    <!-- Modal -->
+<div class="modal fade modal-size-large" id="FeedbackEmptyModal" tabindex="-1" role="dialog" aria-labelledby="exampleFeedbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title float-left" id="exampleFeedbackModalLabel"></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modal-container">
+            </div>
+            <div class="modal-footer" id="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Page Scripts -->
+    <script>
+
+        var ua = window.navigator.userAgent;
+        var msie = ua.indexOf("Mozilla");
+
+
+
+
+/**/
+/**/
+/**/
+/**/
+
+
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+/**/
+
+
+
+
+                              ownerCompany = 'TURMOB';
+
+        if (msie > 0) // If Internet Explorer, return version number
+        {
+            $('.modal').removeClass('fade');
+        }
+        else  // If another browser, return 0
+        {
+            //alert('otherbrowser');
+        }
+
+        filterAdd();
+
+        Ladda.bind('#searchButton', {
+            callback:
+                function (instance) {
+                    filterAdd();
+                }
+        });
+
+        $(function () {
+            ///////////////////////////////////////////////////////////
+            // CUSTOM SCROLL
+            if (!cleanUI.hasTouch) {
+                $('.custom-scroll').each(function () {
+                    $(this).jScrollPane({
+                        autoReinitialise: true,
+                        autoReinitialiseDelay: 100
+                    });
+                    var api = $(this).data('jsp'),
+                            throttleTimeout;
+                    $(window).bind('resize', function () {
+                        if (!throttleTimeout) {
+                            throttleTimeout = setTimeout(function () {
+                                api.reinitialise();
+                                throttleTimeout = null;
+                            }, 50);
+                        }
+                    });
+                });
+            }
+
+
+            var type = "warning";
+            var msg = ""
+            var showMsg = false;
+            var title = "Uyarı";
+            var btnClass = "btn-warning";
+
+
+            if (showMsg) {
+
+                swal({
+                    title: title,
+                    text: msg,
+                    type: type,
+                    showCancelButton: false,
+                    confirmButtonClass: btnClass,
+                    confirmButtonText: "Kapat",
+                    closeOnConfirm: true
+                });
+            }
+        });
+
+        $('ul .left-menu-list a').click(function (event) {
+
+            //$(this).parent().toggleClass('left-menu-list-opened');
+            //$(this).closest("ul").attr('style', 'display: block !important;');
+            //console.log($(this).closest("ul"))
+            var a_href = $(this).attr('href');
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            window.location = a_href;
+            console.log(a_href)
+        });
+
+
+        $(function () {
+            $('#showhideLeftMenu').on('click', function () {
+                console.log($('#left-menu').css('width'))
+                $('#left-menu').animate({
+                    'width': $('#left-menu').css('width') == '220px' ? '0px' : '220px'
+                }, 200);
+                $('#page-content').animate({
+                    'margin-left': $('#page-content').css('margin-left') == '0px' ? '220px' : '0px'
+                }, 200);
+            });
+        });
+
+        // Ü, ü     \u00dc, \u00fc
+        // Ä, ä     \u00c4, \u00e4
+        // Ö, ö     \u00d6, \u00f6
+        // ß        \u00df
+        function ReplaceTurkish(value) {
+            value = value.replace(new RegExp('&#220;', 'g'), 'Ü');
+            value = value.replace(new RegExp('&#252;', 'g'), 'ü');
+            value = value.replace(new RegExp('&#199;', 'g'), 'Ç');
+            value = value.replace(new RegExp('&#231;', 'g'), 'ç');
+            value = value.replace(new RegExp('&#214;', 'g'), 'Ö');
+            value = value.replace(new RegExp('&#246;', 'g'), 'ö');
+            value = value.replace(new RegExp('&#248;', 'g'), 'ø');
+
+            value = value.replace(new RegExp('&#39;', 'g'), '\'');
+
+            return value;
+        }
+
+        function openNav() {
+            document.getElementById("left-menu").style.width = "220px";
+            document.getElementById("page-content").style.marginLeft = "220px";
+        }
+
+        function closeNav() {
+            document.getElementById("left-menu").style.width = "0";
+            document.getElementById("page-content").style.marginLeft = "0";
+        }
+
+        /*menu handler*/
+        $(function () {
+            function stripTrailingSlash(str) {
+                if (str.substr(-1) == '/') {
+                    return str.substr(0, str.length - 1);
+                }
+                return str;
+            }
+
+            var url = window.location.pathname;
+            var activePage = stripTrailingSlash(url);
+            console.log(activePage)
+            $('nav li a').each(function () {
+                var currentPage = stripTrailingSlash($(this).attr('href'));
+                if (activePage == currentPage) {
+                    $(this).parent().addClass('left-menu-list-active');
+                }
+            });
+        });
+
+    </script>
+    <!-- End Page Scripts -->
+		<!--TURMOBGELISTIRME DEFER OLARAK EKLENDI -->
+        <script defer="" src="/Scripts/shortkeys.js"></script>
+        <script defer="" src="/Scripts/turmob_batch_log_modal.js"></script>
+        <script defer="" src="/Scripts/turmob_para_tutar_format.js"></script>
+        <script defer="" src="/Scripts/irsaliye-detay-aktarim.js"></script>
+        <script defer="" src="/Scripts/turmob_taslak_esmm_gonder.js"></script>
+        <script defer="" src="/Scripts/turmob_konaklama_vergi.js"></script>
+        <script defer="" src="/Scripts/turmob_istisna.js"></script>
+        <script defer="" src="/Scripts/turmob_invoice_menu_manager.js"></script>
+        <script defer="" src="/Scripts/turmob_emm_rapor_batch.js"></script>
+   
+        <div id="chatContent">
+            <script>
+	window.fwSettings={
+	'widget_id':67000002590
+	};
+	!function(){if("function"!=typeof window.FreshworksWidget){var n=function(){n.q.push(arguments)};n.q=[],window.FreshworksWidget=n}}() 
+</script>
+<script type="text/javascript" src="https://widget.freshworks.com/widgets/67000002590.js" async="" defer=""></script>
+<script type="text/javascript"> 
+  
+  FreshworksWidget('prefill', 'ticketForm', {
+ 
+  
+  custom_fields: {
+    cf_rn: 'e-Belge PortalÄ±',
+	
+  }
+});
+  FreshworksWidget('disable', 'ticketForm', ['custom_fields.cf_rn']);
+  FreshworksWidget ( 'hideChoices' ,  'ticketForm' ,  { 
+  
+   type:['Banka Entegrasyonu - Banka Talimat OnayÄ±','SatÄ±n Alma, TanÄ±tÄ±m ve Demo Talep'],
+  'custom_fields' :  { 
+    'cf_rn' :  [ 'Luca Net Kobi Ticari' , 'Luca Mali MÃ¼ÅŸavir Paketi', 'Luca Denetim','Luca Rota','Luca Koza YazÄ±lÄ±m'] 
+  } 
+});
+
+
+
+</script>
+        </div>
+
+
+    
+
+
+
+<div class="enjoyhint enjoyhint-step-1"><div class="enjoyhint_svg_wrapper enjoyhint_svg_transparent"><svg width="1120" height="840" class="enjoyhint_canvas enjoyhint_svg"><defs><marker id="arrowMarker" viewBox="0 0 36 21" refX="21" refY="10" markerUnits="strokeWidth" orient="auto" markerWidth="16" markerHeight="12"><path style="fill:none; stroke:rgb(255,255,255); stroke-width:2" d="M0,0 c30,11 30,9 0,20"></path></marker></defs><path style="fill:none; stroke:rgb(255,255,255); stroke-width:3" marker-end="url(#arrowMarker)" d="M646,258 Q719,258 719,130" id="enjoyhint_arrpw_line"></path></svg></div><div id="kinetic_container"><div class="kineticjs-content" role="presentation" style="position: relative; display: inline-block; width: 1120px; height: 840px;"><canvas width="1120" height="840" style="padding: 0px; margin: 0px; border: 0px; background: transparent; position: absolute; top: 0px; left: 0px; width: 1120px; height: 840px;"></canvas></div></div><canvas id="enj_canvas" width="1120" height="840" class="enjoyhint_canvas"></canvas><div class="enjoyhint_disable_events" style="top: 0px; left: 0px; height: 0px;"></div><div class="enjoyhint_disable_events" style="top: 110px; left: 0px;"></div><div class="enjoyhint_disable_events" style="top: 0px; left: 0px; width: 649px;"></div><div class="enjoyhint_disable_events" style="top: 0px; left: 789px;"></div><div class="enjoyhint_skip_btn" style="left: 274px; top: 311px;">Kapat</div><div class="enjoyhint_next_btn" style="left: 164px; top: 311px;">İlerle</div><div class="enjoyhint_close_btn" style="right: 10px; top: 10px;"></div><div class="enjoy_hint_label" id="enjoyhint_label" style="top: 225px; left: 164px;">Kontör satın alma, firma bilgileri güncelleme gibi  <br>işlemlerinizi buradan yapabilirsiniz..</div></div><div id="freshworks-container" data-html2canvas-ignore="true" style="width: 0px; height: 0px; bottom: 0px; right: 0px; z-index: 2147483647;"><div aria-live="polite"><iframe allowfullscreen="" id="launcher-frame" title="Help widget launcher" data-testid="launcher-frame" style="right: 22px; bottom: 22px; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; position: fixed; min-width: 104px; max-width: 156px; height: 56px; z-index: 2147483000; visibility: visible;"></iframe><iframe allowfullscreen="" id="lightbox-frame" data-testid="lightbox-frame" style="display: none;"></iframe></div></div><iframe title="FreshworksWidget" id="freshworks-frame" data-html2canvas-ignore="true" style="display: none;"></iframe>

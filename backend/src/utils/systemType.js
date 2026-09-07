@@ -18,6 +18,7 @@ export const normalizeSystemType = (value, fallback = null) => {
   if (!raw) return fallback
   if (['restaurant', 'restoran', 'cafe', 'restaurant-cafe', 'kermes'].includes(raw)) return 'restaurant'
   if (['canteen', 'kantin', 'market', 'canteen-market'].includes(raw)) return 'canteen'
+  if (['anaokulu', 'anaokullari', 'anaokulu-kres', 'anaokulu-kres', 'kindergarten', 'kres', 'kre-s', 'kre-s', 'okul-oncesi', 'okul-Once-si', 'okul-oncesi'].includes(raw)) return 'anaokulu'
   return fallback
 }
 
@@ -27,6 +28,7 @@ export const toLegacySystemType = (value, fallback = null) => {
   const packageType = normalizeSystemType(value)
   if (packageType === 'restaurant') return 'kermes'
   if (packageType === 'canteen') return 'kantin'
+  if (packageType === 'anaokulu') return 'anaokulu'
   return fallback
 }
 
@@ -34,6 +36,7 @@ export const toPanelSystemLabel = (value) => {
   const normalized = normalizeSystemType(value)
   if (normalized === 'restaurant') return 'RESTORAN'
   if (normalized === 'canteen') return 'KANTİN'
+  if (normalized === 'anaokulu') return 'ANAOKULU'
   return String(value || '')
 }
 
@@ -61,7 +64,10 @@ export const getSystemTypeAliases = (value) => {
   if (normalizedType === 'restaurant') {
     return ['restaurant', 'restoran', 'RESTORAN', 'cafe', 'restaurant-cafe', 'kermes']
   }
-  return ['canteen', 'kantin', 'KANTİN', 'market', 'canteen-market', 'kantin']
+  if (normalizedType === 'canteen') {
+    return ['canteen', 'kantin', 'KANTİN', 'market', 'canteen-market', 'kantin']
+  }
+  return ['anaokulu', 'ANAOKULU', 'kindergarten', 'kres', 'kre-s', 'kre-s', 'kre', 'kres', 'okul-oncesi', 'okul-Once-si', 'okul-oncesi']
 }
 
 export const buildPlanTypeMatchQuery = (value) => {

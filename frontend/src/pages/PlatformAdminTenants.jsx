@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import Modal from '../components/Modal.jsx'
@@ -28,7 +29,23 @@ function getTenantStateMeta(item) {
 }
 
 export default function PlatformAdminTenants({ system = 'kermes' }) {
+  const navigate = useNavigate()
   const [items, setItems] = useState([])
+  const isValidObjectId = (v) => {
+    const s = String(v || '').trim()
+    if (s.length !== 24) return false
+    return /^[0-9a-fA-F]{24}$/.test(s)
+  }
+  const anaokuluItems = (Array.isArray(items) ? items : []).filter((t) => {
+    const idOk = isValidObjectId(t?._id || t?.id)
+    if (!idOk) return false
+    const tt = String(t?.systemType || t?.vertical || t?.businessType || t?.packageType || t?.pkg || '').trim().toLowerCase()
+    const typeOk = tt === 'anaokulu' || tt.startsWith('anaokul') || tt.startsWith('kres') || tt.startsWith('kreş')
+    if (!typeOk) return false
+    const nm = String(t?.name || '').trim()
+    if (nm.length < 2) return false
+    return true
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -57,12 +74,34 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [planStatusFilter, setPlanStatusFilter] = useState('all')
+  const [raListOpen, setRaListOpen] = useState(false)
+  const [raItems, setRaItems] = useState([])
+  const [raListLoading, setRaListLoading] = useState(false)
+  const [raCreateOpen, setRaCreateOpen] = useState(false)
+  const [raEditOpen, setRaEditOpen] = useState(false)
+  const [raTarget, setRaTarget] = useState(null)
+  const [raForm, setRaForm] = useState({ name: '', email: '', phone: '', password: '', accessibleTenantIds: [] })
+  const [raError, setRaError] = useState('')
+  const [raFormLoading, setRaFormLoading] = useState(false)
+  const [raPassOpen, setRaPassOpen] = useState(false)
+  const [raPassTarget, setRaPassTarget] = useState(null)
+  const [raPassForm, setRaPassForm] = useState({ password: '' })
+  const [raPassError, setRaPassError] = useState('')
+  const [raPassLoading, setRaPassLoading] = useState(false)
+  const [raDelOpen, setRaDelOpen] = useState(false)
+  const [raDelTarget, setRaDelTarget] = useState(null)
+  const [raSearch, setRaSearch] = useState('')
 
-  const pagePlanType = system === 'canteen' ? 'canteen' : 'restaurant'
-  const pageTitle = pagePlanType === 'canteen' ? 'Mağaza Üyeleri' : 'Restoran Üyeleri'
-  const pageSubtitle = pagePlanType === 'canteen'
-    ? 'Mağaza üye listesini paket süreleriyle birlikte yönetin.'
-    : 'Restoran üye listesini paket süreleriyle birlikte yönetin.'
+  const pagePlanType =
+    system === 'canteen' ? 'canteen' :
+    (system === 'anaokulu' ? 'anaokulu' : 'restaurant')
+  const pageTitle =
+    pagePlanType === 'canteen' ? 'Mağaza Üyeleri' :
+    (pagePlanType === 'anaokulu' ? 'Anaokulu Üyeleri' : 'Restoran Üyeleri')
+  const pageSubtitle =
+    pagePlanType === 'canteen' ? 'Mağaza üye listesini paket süreleriyle birlikte yönetin.' :
+    (pagePlanType === 'anaokulu' ? 'Anaokulu üye listesini paket süreleriyle birlikte yönetin, yönetici ve personel ekleyin.' :
+    'Restoran üye listesini paket süreleriyle birlikte yönetin.')
 
   const load = async () => {
     setLoading(true)
@@ -96,8 +135,27 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
     setFormLoading(true)
     setFormError('')
     try {
-      const target = pagePlanType === 'canteen' ? '/api/platform/tenants/canteen' : '/api/platform/tenants/kermes'
-      await api(target, { method: 'POST', body: JSON.stringify({ ...form }), portalOverride: 'platform' })
+      const required = [
+        { key: 'name', label: 'Isletme Adi' },
+        { key: 'ownerName', label: 'Sahip Adi' },
+        { key: 'ownerEmail', label: 'Sahip E-posta' },
+        { key: 'ownerPhone', label: 'Telefon' },
+        { key: 'ownerPassword', label: 'Sifre' }
+      ]
+      const missingFields = required.filter(r => !String(form?.[r.key] || '').trim())
+      if (missingFields.length > 0) {
+        throw new Error(`Lutfen doldurun: ${missingFields.map(x => x.label).join(', ')}`)
+      }
+      if (String(form?.ownerPassword || '').length < 6) {
+        throw new Error('Sifre en az 6 karakter olmalidir')
+      }
+      const target =
+        pagePlanType === 'canteen' ? '/api/platform/tenants/canteen' :
+        (pagePlanType === 'anaokulu' ? '/api/platform/tenants/anaokulu' : '/api/platform/tenants/kermes')
+      const res = await api(target, { method: 'POST', body: JSON.stringify({ ...form }), portalOverride: 'platform' })
+      if (!res?.ok) {
+        throw new Error(res?.message || 'Uye olusturulamadi')
+      }
       setModalOpen(false)
       await load()
       toast.success('Uye olusturuldu')
@@ -285,6 +343,198 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
     }
   }
 
+  const loadRaList = async () => {
+    setRaListLoading(true)
+    try {
+      const res = await api('/api/platform/anaokulu-region-admins', { portalOverride: 'platform' })
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res?.items) ? res.items : []
+      setRaItems(list)
+    } catch (err) {
+      toast.error(err.message)
+      setRaItems([])
+    } finally {
+      setRaListLoading(false)
+    }
+  }
+
+  const openRaList = async () => {
+    setRaListOpen(true)
+    setRaSearch('')
+    await loadRaList()
+  }
+
+  const toggleRaTenant = (tenantId) => {
+    const sid = String(tenantId || '').trim()
+    if (!sid || sid.length < 2) return
+    if (!isValidObjectId(sid)) return
+    setRaForm((prev) => {
+      const current = Array.isArray(prev.accessibleTenantIds) ? [...prev.accessibleTenantIds] : []
+      const idx = current.findIndex((x) => String(x) === sid)
+      if (idx >= 0) current.splice(idx, 1)
+      else current.push(sid)
+      return { ...prev, accessibleTenantIds: current }
+    })
+  }
+
+  const openRaCreate = () => {
+    setRaForm({ name: '', email: '', phone: '', password: '', accessibleTenantIds: [] })
+    setRaError('')
+    setRaCreateOpen(true)
+  }
+
+  const openRaEdit = (row) => {
+    setRaTarget(row)
+    setRaForm({
+      name: row?.name || row?.fullName || '',
+      email: row?.email || '',
+      phone: row?.phone || '',
+      password: '',
+      accessibleTenantIds: Array.isArray(row?.accessibleTenantIds) ? row.accessibleTenantIds.map(String) : []
+    })
+    setRaError('')
+    setRaEditOpen(true)
+  }
+
+  const openRaPass = (row) => {
+    setRaPassTarget(row)
+    setRaPassForm({ password: '' })
+    setRaPassError('')
+    setRaPassOpen(true)
+  }
+
+  const openRaDel = (row) => {
+    setRaDelTarget(row)
+    setRaDelOpen(true)
+  }
+
+  const onCreateRa = async (event) => {
+    event.preventDefault()
+    setRaFormLoading(true)
+    setRaError('')
+    try {
+      if (!raForm.name || !raForm.email) throw new Error('Ad soyad ve e-posta zorunludur')
+      if (!raForm.password || String(raForm.password).length < 6) throw new Error('Sifre en az 6 karakter olmalidir')
+      if (!Array.isArray(raForm.accessibleTenantIds) || raForm.accessibleTenantIds.length === 0) {
+        throw new Error('En az bir anaokulu secmelisiniz. Once Anaokulu Uyesi olusturup listeden secin')
+      }
+      const validIds = raForm.accessibleTenantIds.filter((x) => isValidObjectId(x))
+      if (validIds.length === 0) {
+        throw new Error('Secilen anaokullarindan hicbiri gecerli degil. Listeden tekrar secim yapin')
+      }
+      const res = await api('/api/platform/anaokulu-region-admins', {
+        method: 'POST',
+        data: {
+          name: raForm.name,
+          email: raForm.email,
+          phone: raForm.phone,
+          password: raForm.password,
+          accessibleTenantIds: validIds
+        },
+        portalOverride: 'platform'
+      })
+      if (!res?.ok) {
+        const err = new Error(res?.message || res?.error || 'Okul süper admin oluşturulamadı')
+        err.code = res?.code
+        throw err
+      }
+      setRaCreateOpen(false)
+      toast.success('Okul süper admin oluşturuldu')
+      await loadRaList()
+    } catch (err) {
+      setRaError(err.code === 'email_taken' || err.code === 'email_in_use' ? (err.message || 'Bu e-posta zaten kullanılıyor') : err.message)
+    } finally {
+      setRaFormLoading(false)
+    }
+  }
+
+  const onEditRa = async (event) => {
+    event.preventDefault()
+    if (!raTarget) return
+    setRaFormLoading(true)
+    setRaError('')
+    try {
+      if (!raForm.name || !raForm.email) throw new Error('Ad soyad ve e-posta zorunludur')
+      if (!Array.isArray(raForm.accessibleTenantIds) || raForm.accessibleTenantIds.length === 0) {
+        throw new Error('En az bir anaokulu secmelisiniz. Once Anaokulu Uyesi olusturup listeden secin')
+      }
+      const validIds = raForm.accessibleTenantIds.filter((x) => isValidObjectId(x))
+      if (validIds.length === 0) {
+        throw new Error('Secilen anaokullarindan hicbiri gecerli degil. Listeden tekrar secim yapin')
+      }
+      const resEdit = await api(`/api/platform/anaokulu-region-admins/${encodeURIComponent(raTarget._id || raTarget.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: raForm.name,
+          email: raForm.email,
+          phone: raForm.phone,
+          accessibleTenantIds: validIds
+        }),
+        portalOverride: 'platform'
+      })
+      if (!resEdit?.ok) {
+        const err = new Error(resEdit?.message || resEdit?.error || 'Okul süper admin güncellenemedi')
+        err.code = resEdit?.code
+        throw err
+      }
+      setRaEditOpen(false)
+      setRaTarget(null)
+      toast.success('Okul süper admin güncellendi')
+      await loadRaList()
+    } catch (err) {
+      setRaError(err.code === 'email_taken' || err.code === 'email_in_use' ? (err.message || 'Bu e-posta zaten kullanılıyor') : err.message)
+    } finally {
+      setRaFormLoading(false)
+    }
+  }
+
+  const onRaPassSubmit = async (event) => {
+    event.preventDefault()
+    if (!raPassTarget) return
+    setRaPassLoading(true)
+    setRaPassError('')
+    try {
+      if (!raPassForm.password || String(raPassForm.password).length < 6) throw new Error('Sifre en az 6 karakter olmalidir')
+      const resPass = await api(`/api/platform/anaokulu-region-admins/${encodeURIComponent(raPassTarget._id || raPassTarget.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ password: raPassForm.password }),
+        portalOverride: 'platform'
+      })
+      if (!resPass?.ok) throw new Error(resPass?.message || 'Sifre sifirlanamadi')
+      setRaPassOpen(false)
+      setRaPassTarget(null)
+      toast.success('Sifre sifirlandi')
+    } catch (err) {
+      setRaPassError(err.message)
+    } finally {
+      setRaPassLoading(false)
+    }
+  }
+
+  const confirmRaDel = async () => {
+    if (!raDelTarget) return
+    try {
+      const resDel = await api(`/api/platform/anaokulu-region-admins/${encodeURIComponent(raDelTarget._id || raDelTarget.id)}`, {
+        method: 'DELETE',
+        portalOverride: 'platform'
+      })
+      if (!resDel?.ok) throw new Error(resDel?.message || 'Okul süper admin silinemedi')
+      setRaDelOpen(false)
+      setRaDelTarget(null)
+      toast.success('Okul süper admin silindi')
+      await loadRaList()
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const raFiltered = raItems.filter((row) => {
+    const q = raSearch.trim().toLocaleLowerCase('tr-TR')
+    if (!q) return true
+    return [row?.name, row?.email, row?.phone].some((v) =>
+      String(v || '').toLocaleLowerCase('tr-TR').includes(q)
+    )
+  })
+
   const filteredItems = items.filter((item) => {
     const query = search.trim().toLocaleLowerCase('tr-TR')
     const planName = getPlanDisplayName(item)
@@ -310,7 +560,20 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
         <AdminPageHeader
           title={pageTitle}
           subtitle={pageSubtitle}
-          action={<button className="btn btn--primary" onClick={openCreate}>Yeni Uye</button>}
+          action={
+            <div style={{ display: 'flex', gap: 8 }}>
+              {system === 'anaokulu' && (
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => navigate('/platform/anaokulu-region-admins')}
+                >
+                  🏫 Okul Süper Adminleri
+                </button>
+              )}
+              <button className="btn btn--primary" onClick={openCreate}>Yeni Uye</button>
+            </div>
+          }
         />
 
         <AdminFilterBar>
@@ -531,6 +794,192 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
         cancelText="Vazgec"
         danger={true}
         onConfirm={confirmDelete}
+      />
+
+      <Modal open={raListOpen} onClose={() => setRaListOpen(false)} title="🏫 Okul Süper Adminleri" wide>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+            <input
+              className="input admin-filter-input"
+              value={raSearch}
+              onChange={(event) => setRaSearch(event.target.value)}
+              placeholder="Ad, e-posta veya telefon ara"
+              style={{ maxWidth: 320 }}
+            />
+            <button className="btn btn--primary" onClick={openRaCreate}>➕ Okul Süper Admin Oluştur</button>
+          </div>
+          <AdminTableCard>
+            {raListLoading ? (
+              <div style={{ padding: 22, fontWeight: 700, color: '#64748b' }}>Yukleniyor...</div>
+            ) : raFiltered.length === 0 ? (
+              <AdminEmptyState
+                title="Okul süper admin bulunamadı"
+                description="Sağ üstteki buton ile ilk kaydı ekleyin."
+              />
+            ) : (
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <colgroup>
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: 140 }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Ad Soyad</th>
+                      <th>E-posta</th>
+                      <th>Telefon</th>
+                      <th>Anaokulu Sayisi</th>
+                      <th>Durum</th>
+                      <th className="admin-actions-cell">Islemler</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {raFiltered.map((row) => {
+                      const scount = Array.isArray(row.accessibleTenantIds) ? row.accessibleTenantIds.length : 0
+                      const active = row.isActive !== false
+                      return (
+                        <tr key={row._id || row.id} className="admin-table-row">
+                          <td title={row.name || ''}>
+                            <span className="admin-cell-ellipsis">{row.name || 'Isimsiz'}</span>
+                          </td>
+                          <td title={row.email || ''}>
+                            <span className="admin-cell-ellipsis admin-cell-secondary">{row.email || '-'}</span>
+                          </td>
+                          <td title={row.phone || ''}>
+                            <span className="admin-cell-ellipsis">{row.phone || '-'}</span>
+                          </td>
+                          <td>
+                            <AdminStatusBadge tone={scount > 0 ? 'info' : 'neutral'}>{scount} okul</AdminStatusBadge>
+                          </td>
+                          <td>
+                            <AdminStatusBadge tone={active ? 'success' : 'neutral'}>{active ? 'Aktif' : 'Pasif'}</AdminStatusBadge>
+                          </td>
+                          <td className="admin-actions-cell">
+                            <AdminActionMenu
+                              items={[
+                                { label: 'Duzenle', onClick: () => openRaEdit(row) },
+                                { label: 'Sifre Sifirla', onClick: () => openRaPass(row) },
+                                { label: 'Sil', onClick: () => openRaDel(row), danger: true },
+                              ]}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AdminTableCard>
+        </div>
+      </Modal>
+
+      <Modal open={raCreateOpen} onClose={() => setRaCreateOpen(false)} title="🏫 Yeni Okul Süper Admin Oluştur">
+        <form onSubmit={onCreateRa} style={{ display: 'grid', gap: 12 }}>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad Soyad *</div>
+            <input className="input" value={raForm.name} onChange={(event) => setRaForm({ ...raForm, name: event.target.value })} placeholder="Orn: Ahmet Yilmaz" />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta *</div>
+            <input type="email" className="input" value={raForm.email} onChange={(event) => setRaForm({ ...raForm, email: event.target.value })} placeholder="yonetici@okul.com" />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Telefon</div>
+            <input className="input" value={raForm.phone} onChange={(event) => setRaForm({ ...raForm, phone: event.target.value })} placeholder="05xx xxx xx xx" />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sifre * (min 6 karakter)</div>
+            <input type="password" className="input" value={raForm.password} onChange={(event) => setRaForm({ ...raForm, password: event.target.value })} />
+          </label>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Erişilebilir Anaokulları *</div>
+            <div className="card" style={{ maxHeight: 240, overflowY: 'auto', display: 'grid', gap: 6, padding: 10 }}>
+              {anaokuluItems.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>Once en az bir anaokulu uyesi olusturun.</div>
+              ) : anaokuluItems.map((t) => {
+                const checked = raForm.accessibleTenantIds.includes(String(t._id || t.id))
+                return (
+                  <label key={t._id || t.id} style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', padding: '4px 6px', borderRadius: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleRaTenant(t._id || t.id)}
+                    />
+                    <span style={{ fontSize: 14 }}>{t.name || 'Isimsiz'}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+          {raError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{raError}</div> : null}
+          <button className="btn btn--primary" disabled={raFormLoading}>{raFormLoading ? 'Gonderiliyor...' : 'Olustur'}</button>
+        </form>
+      </Modal>
+
+      <Modal open={raEditOpen} onClose={() => setRaEditOpen(false)} title={`🏫 Okul Süper Admini Düzenle${raTarget ? ` • ${raTarget.name}` : ''}`}>
+        <form onSubmit={onEditRa} style={{ display: 'grid', gap: 12 }}>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad Soyad *</div>
+            <input className="input" value={raForm.name} onChange={(event) => setRaForm({ ...raForm, name: event.target.value })} />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>E-posta *</div>
+            <input type="email" className="input" value={raForm.email} onChange={(event) => setRaForm({ ...raForm, email: event.target.value })} />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Telefon</div>
+            <input className="input" value={raForm.phone} onChange={(event) => setRaForm({ ...raForm, phone: event.target.value })} />
+          </label>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Erişilebilir Anaokulları *</div>
+            <div className="card" style={{ maxHeight: 240, overflowY: 'auto', display: 'grid', gap: 6, padding: 10 }}>
+              {anaokuluItems.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>Once en az bir anaokulu uyesi olusturun.</div>
+              ) : anaokuluItems.map((t) => {
+                const checked = raForm.accessibleTenantIds.includes(String(t._id || t.id))
+                return (
+                  <label key={t._id || t.id} style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', padding: '4px 6px', borderRadius: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleRaTenant(t._id || t.id)}
+                    />
+                    <span style={{ fontSize: 14 }}>{t.name || 'Isimsiz'}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+          {raError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{raError}</div> : null}
+          <button className="btn btn--primary" disabled={raFormLoading}>{raFormLoading ? 'Gonderiliyor...' : 'Kaydet'}</button>
+        </form>
+      </Modal>
+
+      <Modal open={raPassOpen} onClose={() => setRaPassOpen(false)} title={`🔑 Şifre Sıfırla${raPassTarget ? ` • ${raPassTarget.name}` : ''}`}>
+        <form onSubmit={onRaPassSubmit} style={{ display: 'grid', gap: 12 }}>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni Şifre * (min 6 karakter)</div>
+            <input type="password" className="input" value={raPassForm.password} onChange={(event) => setRaPassForm({ ...raPassForm, password: event.target.value })} />
+          </label>
+          {raPassError ? <div style={{ color: '#ef4444', fontSize: 13 }}>{raPassError}</div> : null}
+          <button className="btn btn--primary" disabled={raPassLoading}>{raPassLoading ? 'Gonderiliyor...' : 'Sifirla'}</button>
+        </form>
+      </Modal>
+
+      <ConfirmModal
+        open={raDelOpen}
+        onClose={() => setRaDelOpen(false)}
+        title="🏫 Okul Süper Admini Sil"
+        description={raDelTarget ? `${raDelTarget.name || 'Bu yonetici'} icin tum girisler iptal edilecektir. Silmek istediginize emin misiniz?` : 'Bu islem geri alinamaz.'}
+        confirmText="Evet, Sil"
+        cancelText="Vazgec"
+        danger={true}
+        onConfirm={confirmRaDel}
       />
     </div>
   )

@@ -16,6 +16,7 @@ export default function LoginSelectionPage() {
   useEffect(() => {
     if (type === 'restaurant') nav('/login/restoran', { replace: true })
     if (type === 'market') nav('/canteen/login', { replace: true })
+    if (type === 'anaokulu' || type === 'kres' || type === 'kreş' || type === 'kindergarten') nav('/anaokulu/login', { replace: true })
   }, [nav, type])
 
   const handleCardKeyDown = (event, target) => {

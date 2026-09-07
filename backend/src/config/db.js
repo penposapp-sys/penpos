@@ -16,6 +16,16 @@ const syncUserIndexes = async () => {
       await collection.dropIndex(legacyEmailUnique.name)
       logger.info(`Dropped legacy users index: ${legacyEmailUnique.name}`)
     }
+    const legacyTenantUsername = indexes.find((idx) => idx.name === 'tenantId_1_username_1' && !idx.partialFilterExpression)
+    if (legacyTenantUsername) {
+      await collection.dropIndex(legacyTenantUsername.name)
+      logger.info(`Dropped legacy users index: ${legacyTenantUsername.name}`)
+    }
+    const legacyEmailSystemType = indexes.find((idx) => idx.name === 'email_1_systemType_1' && !idx.partialFilterExpression)
+    if (legacyEmailSystemType) {
+      await collection.dropIndex(legacyEmailSystemType.name)
+      logger.info(`Dropped legacy users index: ${legacyEmailSystemType.name}`)
+    }
     await User.syncIndexes()
   } catch (err) {
     logger.warn('User index sync failed', err?.message || String(err))

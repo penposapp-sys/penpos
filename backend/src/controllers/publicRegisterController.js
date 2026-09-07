@@ -15,6 +15,11 @@ export const registerPublicTenant = async (req, res) => {
   try {
     const body = req.body || {}
     const { packageType, legacySystemType } = normalizeSystemType(body.systemType || body.businessType)
+
+    if (packageType === 'anaokulu' || legacySystemType === 'anaokulu') {
+      throw error('restricted', 'Anaokulu üyeliği yalnızca platform yöneticisi tarafından oluşturulabilir.', 403)
+    }
+
     const name = String(body.businessName || body.name || '').trim()
     const ownerName = String(body.ownerName || '').trim()
     const ownerEmail = String(body.email || body.ownerEmail || '').trim()
@@ -27,8 +32,16 @@ export const registerPublicTenant = async (req, res) => {
     }
 
     const created = await createTenantWithOwnerService({ name, ownerName, ownerEmail, ownerPhone, ownerPassword, systemType: packageType, description })
-    const portal = legacySystemType === 'kantin' ? 'canteen' : 'kermes'
+    const portal = legacySystemType === 'kantin'
+      ? 'canteen'
+      : (legacySystemType === 'anaokulu' ? 'anaokulu' : 'kermes')
     const loginResult = await login(ownerEmail, ownerPassword, portal, { requestId: req.requestId })
+
+    const defaultRedirect = (() => {
+      if (portal === 'canteen') return '/canteen'
+      if (portal === 'anaokulu') return '/anaokulu'
+      return '/kermes'
+    })()
 
     res.json({
       success: true,
@@ -36,7 +49,7 @@ export const registerPublicTenant = async (req, res) => {
       user: loginResult.user,
       tenant: created.tenant,
       portal,
-      redirectTo: portal === 'canteen' ? '/canteen' : '/kermes'
+      redirectTo: defaultRedirect
     })
   } catch (err) {
     sendError(res, err)

@@ -42,7 +42,10 @@ const slugifyTenantName = (value) => {
 }
 
 const generateUniqueTenantSlug = async (name, packageType) => {
-  const base = `${slugifyTenantName(name)}-${packageType === 'canteen' ? 'kantin' : 'restoran'}`
+  const suffix =
+    packageType === 'canteen' ? 'kantin' :
+    (packageType === 'anaokulu' ? 'anaokulu' : 'restoran')
+  const base = `${slugifyTenantName(name)}-${suffix}`
   let slug = base
   let counter = 2
   while (await Tenant.exists({ slug })) {
@@ -75,8 +78,14 @@ export const setPlatformUserPasswordService = async (userId, password, actorUser
 }
 
 export const createTenantWithOwnerService = async ({ name, ownerName, ownerEmail, ownerPassword, ownerPhone, systemType, description }) => {
-  if (!name || !ownerName || !ownerEmail || !ownerPassword || !ownerPhone || !systemType) {
-    throw error('validation_error', 'Missing required fields', 400)
+  const missing = []
+  if (!String(name || '').trim()) missing.push('name (Isletme Adi)')
+  if (!String(ownerName || '').trim()) missing.push('ownerName (Sahip Adi)')
+  if (!String(ownerEmail || '').trim()) missing.push('ownerEmail (Sahip E-posta)')
+  if (!String(ownerPassword || '').trim()) missing.push('ownerPassword (Sifre)')
+  if (!String(systemType || '').trim()) missing.push('systemType')
+  if (missing.length > 0) {
+    throw error('validation_error', `Missing required fields: ${missing.join(', ')}`, 400)
   }
   if (String(ownerPassword || '').length < 6) {
     throw error('validation_error', 'Password must be at least 6 characters', 400)
@@ -88,15 +97,34 @@ export const createTenantWithOwnerService = async ({ name, ownerName, ownerEmail
     throw error('validation_error', 'Invalid system type', 400)
   }
 
+  const isAnaokulu = packageType === 'anaokulu'
   const normalizedOwnerEmail = String(ownerEmail || '').trim().toLowerCase()
-  const existingUser = await User.findOne({ email: normalizedOwnerEmail, systemType: legacySystemType }).select('_id').lean()
-  if (existingUser) {
-    throw error('email_in_use', 'Bu e-posta ile bu sistem tipi için zaten üyelik var.', 409)
+
+  const existingConflict = await User.findOne({
+    email: normalizedOwnerEmail,
+    $or: [
+      { systemType: legacySystemType },
+      { regionSystemType: isAnaokulu ? 'anaokulu' : null }
+    ]
+  }).select('email systemType regionSystemType role tenantId name').lean()
+  if (existingConflict) {
+    const portalLabel = existingConflict.regionSystemType === 'anaokulu'
+      ? `Bölge Yöneticisi (${existingConflict.role})`
+      : `${existingConflict.systemType === 'kantin' ? 'Mağaza' : existingConflict.systemType === 'anaokulu' ? 'Anaokulu' : existingConflict.systemType === 'kermes' ? 'Restoran' : String(existingConflict.systemType || 'Bilinmiyor')} portalinda (${existingConflict.role || 'kullanici'})`
+    const detail = existingConflict.name ? ` (${existingConflict.name})` : ''
+    throw error(
+      'email_in_use',
+      `Bu e-posta ${portalLabel}${detail} için zaten kayıtlı. Aynı e-postayı farklı portallarda kullanmak için +alias kullanabilirsin (ornek: ${normalizedOwnerEmail.replace('@', `+${legacySystemType}@`)}).`,
+      409
+    )
   }
 
-  const trialPlan = await findTrialPlanForSystemType(packageType)
   const now = new Date()
   const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  let trialPlan = null
+  if (!isAnaokulu) {
+    trialPlan = await findTrialPlanForSystemType(packageType)
+  }
   const slug = await generateUniqueTenantSlug(name, packageType)
   const branchName = normalizeBranchName(name)
 
@@ -105,7 +133,7 @@ export const createTenantWithOwnerService = async ({ name, ownerName, ownerEmail
     session = await mongoose.startSession()
     session.startTransaction()
 
-    const tenant = new Tenant({
+    const tenantBase = {
       name,
       slug,
       description: String(description || '').trim(),
@@ -114,15 +142,28 @@ export const createTenantWithOwnerService = async ({ name, ownerName, ownerEmail
       isActive: true,
       systemType: legacySystemType,
       vertical: packageType,
-      businessType: packageType,
-      planId: trialPlan._id,
-      packageId: trialPlan._id,
-      planStartedAt: now,
-      planEndsAt: trialEndsAt,
-      trialStartsAt: now,
-      trialEndsAt,
-      subscriptionStatus: 'trial'
-    })
+      businessType: packageType
+    }
+    const tenantPlanFields = isAnaokulu
+      ? {
+          planId: null,
+          packageId: null,
+          planStartedAt: null,
+          planEndsAt: null,
+          trialStartsAt: null,
+          trialEndsAt: null,
+          subscriptionStatus: 'active'
+        }
+      : {
+          planId: trialPlan._id,
+          packageId: trialPlan._id,
+          planStartedAt: now,
+          planEndsAt: trialEndsAt,
+          trialStartsAt: now,
+          trialEndsAt,
+          subscriptionStatus: 'trial'
+        }
+    const tenant = new Tenant({ ...tenantBase, ...tenantPlanFields })
     await tenant.save({ session })
 
     let initialBranchId = null
@@ -176,8 +217,10 @@ export const createTenantWithOwnerService = async ({ name, ownerName, ownerEmail
 
     await session.commitTransaction()
 
-    await auditLog(tenant.id, user.id, 'tenant_plan_degisti', 'Tenant', tenant.id, { planId: trialPlan.id, planName: trialPlan.name })
-    await auditLog(tenant.id, user.id, 'tenant_olusturuldu', 'Tenant', tenant.id, { name, systemType: legacySystemType, vertical: packageType })
+    if (!isAnaokulu) {
+      await auditLog(tenant.id, user.id, 'tenant_plan_degisti', 'Tenant', tenant.id, { planId: trialPlan.id, planName: trialPlan.name })
+    }
+    await auditLog(tenant.id, user.id, 'tenant_olusturuldu', 'Tenant', tenant.id, { name, systemType: legacySystemType, vertical: packageType, isAnaokulu })
     await auditLog(tenant.id, user.id, 'tenant_admin_olusturuldu', 'User', user.id, { email: normalizedOwnerEmail, phone: ownerPhone })
 
     return {
@@ -220,7 +263,7 @@ export const listPlatformTenantsService = async (system) => {
     let hasMatchingPlan = false
     let ownerEmail = null
     let ownerPhone = null
-    const tenantType = resolveTenantPackageType(t, normalizeSystemType(t.systemType, 'restaurant'))
+    const tenantType = resolveTenantPackageType(t)
     if (t.planId) {
       try {
         const p = await findPlanById(t.planId)
@@ -251,7 +294,7 @@ export const listPlatformTenantsService = async (system) => {
       ownerPhone,
       phone: t.phone || ownerPhone || '',
       systemType: t.systemType,
-      vertical: t.vertical || normalizeSystemType(t.systemType, 'restaurant'),
+      vertical: t.vertical || t.systemType || t.businessType,
       subscriptionStatus: t.subscriptionStatus || 'inactive',
       planStatus: hasMatchingPlan ? planStatus : 'inactive',
       planStartedAt: t.planStartedAt || t.trialStartsAt || null,
@@ -261,10 +304,17 @@ export const listPlatformTenantsService = async (system) => {
       packageStatus: hasMatchingPlan ? (isActivePlan ? 'active' : (planName ? 'expired' : 'none')) : 'none'
     })
   }
-  const normalized = String(system || '').trim().toLowerCase()
-  if (normalized === 'kermes') return items.filter((i) => i.systemType === 'kermes')
-  if (normalized === 'canteen') return items.filter((i) => i.systemType === 'kantin')
-  if (normalized) throw error('invalid_request', 'Invalid system filter', 400)
+  const normalizedFilter = normalizeSystemType(system) || (system ? String(system).trim().toLowerCase() : null)
+  if (normalizedFilter === 'restaurant' || normalizedFilter === 'kermes') {
+    return items.filter((i) => resolveTenantPackageType(i) === 'restaurant')
+  }
+  if (normalizedFilter === 'canteen' || normalizedFilter === 'kantin') {
+    return items.filter((i) => resolveTenantPackageType(i) === 'canteen')
+  }
+  if (normalizedFilter === 'anaokulu') {
+    return items.filter((i) => resolveTenantPackageType(i) === 'anaokulu')
+  }
+  if (normalizedFilter) throw error('invalid_request', 'Invalid system filter', 400)
   return items
 }
 

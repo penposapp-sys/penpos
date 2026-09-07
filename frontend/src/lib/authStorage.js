@@ -14,7 +14,7 @@ const getSessionStorage = () => {
   }
 }
 
-export const AUTH_TOKEN_KEYS = ['token_restaurant', 'token_canteen', 'token_platform']
+export const AUTH_TOKEN_KEYS = ['token_restaurant', 'token_canteen', 'token_platform', 'token_anaokulu']
 
 export const getAuthToken = (tokenKey) => {
   const sessionValue = getSessionStorage()?.getItem(tokenKey)

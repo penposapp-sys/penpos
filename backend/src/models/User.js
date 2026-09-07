@@ -17,7 +17,9 @@ const userSchema = new mongoose.Schema({
   branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
   branchIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Branch', default: [] },
   accessibleBranchIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Branch', default: [] },
-  systemType: { type: String, enum: ['kermes', 'kantin'], default: null },
+  accessibleTenantIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Tenant', default: [] },
+  regionSystemType: { type: String, enum: ['anaokulu'], default: null },
+  systemType: { type: String, enum: ['kermes', 'kantin', 'anaokulu'], default: null },
   name: { type: String, required: true },
   username: {
     type: String,
@@ -42,7 +44,7 @@ const userSchema = new mongoose.Schema({
   },
   phone: { type: String, default: '' },
   passwordHash: { type: String, required: true },
-  role: { type: String, enum: ['superadmin', 'platform_admin', 'tenant_admin', 'staff'], required: true },
+  role: { type: String, enum: ['superadmin', 'platform_admin', 'tenant_admin', 'staff', 'anaokulu_region_admin'], required: true },
   active: { type: Boolean, default: true },
   isActive: { type: Boolean, default: true },
   isDeleted: { type: Boolean, default: false, index: true },
@@ -55,14 +57,26 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 })
 
-userSchema.index({ email: 1, systemType: 1 }, { unique: true })
+userSchema.index({ email: 1, systemType: 1 }, { unique: true, partialFilterExpression: { systemType: { $type: 'string' } } })
+userSchema.index({ email: 1, regionSystemType: 1 }, { unique: true, partialFilterExpression: { regionSystemType: { $type: 'string' } } })
 userSchema.index({ tenantId: 1, email: 1 })
-userSchema.index({ tenantId: 1, username: 1 }, { unique: true, sparse: true })
+userSchema.index(
+  { tenantId: 1, username: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      tenantId: { $type: 'objectId' },
+      username: { $type: 'string' }
+    }
+  }
+)
 userSchema.index({ tenantId: 1, isActive: 1 })
 userSchema.index({ tenantId: 1, isDeleted: 1, status: 1 })
 userSchema.index({ tenantId: 1, branchId: 1 })
 userSchema.index({ tenantId: 1, branchIds: 1 })
 userSchema.index({ tenantId: 1, accessibleBranchIds: 1 })
+userSchema.index({ accessibleTenantIds: 1 })
 userSchema.index({ tenantId: 1, role: 1 })
+userSchema.index({ role: 1, regionSystemType: 1 })
 
 export default mongoose.model('User', userSchema)

@@ -11387,6 +11387,125 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   --login-muted: #6f6258;
 }
 
+body .system-login.system-login--anaokulu {
+  --login-accent: #a855f7;
+  --login-accent-strong: #7c3aed;
+  --login-soft: #e9d5ff;
+  --login-surface: #faf5ff;
+  --login-panel: #1a0d2e;
+  --login-panel-2: #4c1d95;
+  --login-text: #faf5ff;
+  --login-muted: rgba(250, 245, 255, 0.72);
+}
+
+body .system-login.system-login--anaokulu {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(168, 85, 247, 0.34), transparent 42%),
+    radial-gradient(circle at 88% 82%, rgba(236, 72, 153, 0.26), transparent 48%),
+    linear-gradient(135deg, #2e1065 0%, #3b0764 50%, #4a044e 100%);
+  color: var(--login-text);
+}
+
+body .system-login.system-login--anaokulu .system-login__visual {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(236, 72, 153, 0.35), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.30), transparent 50%),
+    linear-gradient(160deg, #5b21b6 0%, #7c3aed 45%, #ec4899 100%);
+}
+
+body .system-login.system-login--anaokulu .system-login__eyebrow,
+body .system-login.system-login--anaokulu .system-login__lead,
+body .system-login.system-login--anaokulu .system-login__chip,
+body .system-login.system-login--anaokulu .system-login__quote p,
+body .system-login.system-login--anaokulu .system-login__quote strong {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+body .system-login.system-login--anaokulu .system-login__chip {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+}
+
+body .system-login.system-login--anaokulu .system-login__form-side {
+  background:
+    radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 38%),
+    linear-gradient(180deg, #faf5ff 0%, #f3e8ff 100%);
+  color: #2e1065;
+}
+
+body .system-login.system-login--anaokulu .system-login__back,
+body .system-login.system-login--anaokulu .system-login__logo-sub,
+body .system-login.system-login--anaokulu .system-login__form-head p,
+body .system-login.system-login--anaokulu .system-login__field span,
+body .system-login.system-login--anaokulu .system-login__register-copy,
+body .system-login.system-login--anaokulu .system-login__register p,
+body .system-login.system-login--anaokulu .system-login__support-item,
+body .system-login.system-login--anaokulu .system-login__meta label,
+body .system-login.system-login--anaokulu .system-login__meta span {
+  color: #6b21a8;
+}
+
+body .system-login.system-login--anaokulu .system-login__form-head h2 {
+  color: #3b0764;
+}
+
+body .system-login.system-login--anaokulu .system-login__text-link,
+body .system-login.system-login--anaokulu .system-login__toggle {
+  color: #7c3aed;
+}
+
+body .system-login.system-login--anaokulu .system-login__text-link {
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
+body .system-login.system-login--anaokulu .system-login__input {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(168, 85, 247, 0.34);
+  color: #3b0764;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.48);
+}
+
+body .system-login.system-login--anaokulu .system-login__input::placeholder {
+  color: #a78bfa;
+}
+
+body .system-login.system-login--anaokulu .system-login__input:focus {
+  border-color: rgba(124, 58, 237, 0.70);
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.18);
+}
+
+body .system-login.system-login--anaokulu .system-login__submit {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 45%, #ec4899 100%);
+  color: #ffffff;
+  border: 1px solid rgba(124, 58, 237, 0.32);
+  box-shadow: 0 18px 32px rgba(168, 85, 247, 0.28);
+}
+
+body .system-login.system-login--anaokulu .system-login__submit:hover:not(:disabled) {
+  filter: brightness(1.04);
+  box-shadow: 0 22px 40px rgba(236, 72, 153, 0.32);
+}
+
+body .system-login.system-login--anaokulu .system-login__error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #991b1b;
+}
+
+body .system-login.system-login--anaokulu .system-login__support {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(168, 85, 247, 0.2);
+}
+
+body .system-login.system-login--anaokulu .system-login__support strong {
+  color: #7c3aed;
+}
+
+body .system-login.system-login--anaokulu .system-login__support-item b {
+  color: #4c1d95;
+}
+
 .system-login--platform .system-login__form-side {
   background:
     radial-gradient(circle at top left, rgba(217, 181, 111, 0.16), transparent 34%),

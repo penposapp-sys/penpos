@@ -100,10 +100,21 @@ export default function UpgradePlan() {
   const remainingMeta = getRemainingPlanMeta(infoPlan || {})
   const planName = getPlanDisplayName(infoPlan)
   const latestRequest = Array.isArray(requests) && requests.length > 0 ? requests[0] : null
+  const isAnaokulu = window.location.pathname.startsWith('/anaokulu/') || window.location.pathname === '/anaokulu'
 
   return (
     <div className="main" style={{ display: 'grid', gap: 12 }}>
-      {(infoPlan || subscriptionStatus === 'expired') && (
+      {isAnaokulu ? (
+        <div className="card" style={{ borderColor: '#10b981' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ fontSize: 28 }}>🏫</div>
+            <div style={{ display: 'grid', gap: 4 }}>
+              <div style={{ fontWeight: 800, color: '#10b981', fontSize: 16 }}>Anaokulu Portali: Ücretsiz Kullanım</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Anaokulu üyeleri icin plan satin almak veya abonelik yenilemek <strong>zorunlu degildir</strong>. Sistemi ucretsiz kullanabilirsiniz.</div>
+            </div>
+          </div>
+        </div>
+      ) : ((infoPlan || subscriptionStatus === 'expired') && (
         <div className="card" style={{ borderColor: subscriptionStatus === 'expired' ? '#dc2626' : '#f59e0b' }}>
           {paymentPending ? (
             <div style={{ fontWeight: 700, color: '#f59e0b' }}>Uyelik talebiniz onay bekliyor.</div>
@@ -116,7 +127,7 @@ export default function UpgradePlan() {
             <div style={{ fontWeight: 700, color: '#f59e0b' }}>Uyelik surenizin bitmesine {remainingMeta.days || 0} gun kaldi.</div>
           )}
         </div>
-      )}
+      ))}
 
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -131,7 +142,16 @@ export default function UpgradePlan() {
           )}
         </div>
 
-        {!planName ? (
+        {isAnaokulu ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontWeight: 900, fontSize: 18 }}>🎁 Ucretsiz Abonelik</div>
+            <div style={{ display: 'grid', gap: 6, color: 'var(--muted)', fontSize: 13 }}>
+              <div>Baslangic: Ilk uyelik tarihinizden itibaren</div>
+              <div>Bitis: Sure siniri yok</div>
+              <div>Kalan sure: <span style={{ color: '#10b981', fontWeight: 800 }}>Sınırsız</span></div>
+            </div>
+          </div>
+        ) : !planName ? (
           <div style={{ color: 'var(--muted)' }}>Plan bilgisi bulunamadi</div>
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>

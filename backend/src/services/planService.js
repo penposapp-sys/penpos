@@ -21,6 +21,7 @@ export const ensureFeature = async (tenantId, featureKey) => {
 export const findTrialPlanForSystemType = async (systemType) => {
   const normalizedType = normalizeSystemType(systemType)
   if (!normalizedType) throw error('invalid_system_type', 'Invalid system type', 400)
+  if (normalizedType === 'anaokulu') return null
 
   const plan = await Plan.findOne({
     $and: [
@@ -44,6 +45,13 @@ export const getPlanStatus = (tenant) => {
   const subscriptionStatus = String(tenant?.subscriptionStatus || '').trim().toLowerCase()
   const trialEndsAt = tenant?.trialEndsAt ? new Date(tenant.trialEndsAt) : null
   const planEndsAt = tenant?.planEndsAt ? new Date(tenant.planEndsAt) : null
+  const isAnaokulu = resolveTenantPackageType(tenant) === 'anaokulu'
+
+  if (isAnaokulu) {
+    if (subscriptionStatus === 'inactive') return 'inactive'
+    if (subscriptionStatus === 'expired') return 'active'
+    if (subscriptionStatus === 'trial' || subscriptionStatus === 'active' || !subscriptionStatus) return 'active'
+  }
 
   if (subscriptionStatus === 'trial') {
     if (!trialEndsAt) return 'expired'
@@ -61,7 +69,7 @@ export const getPlanStatus = (tenant) => {
 
   if (trialEndsAt) return trialEndsAt > now ? 'trial' : 'expired'
   if (planEndsAt) return planEndsAt > now ? 'active' : 'expired'
-  return 'inactive'
+  return isAnaokulu ? 'active' : 'inactive'
 }
 
 export const getPlanDaysLeft = (tenant) => {
@@ -83,6 +91,7 @@ export const hasActiveSubscription = (tenant) => {
 
 export const ensureNotExpired = async (tenantId, actorUserId) => {
   const tenant = await findTenantById(tenantId)
+  if (resolveTenantPackageType(tenant) === 'anaokulu') return
   if (!hasActiveSubscription(tenant)) {
     await auditLog(tenantId, actorUserId || null, 'plan_expired_block', 'Tenant', tenantId, {})
     throw error('SUBSCRIPTION_EXPIRED', 'Paket süreniz doldu. Lütfen planınızı yükseltin.', 402)
@@ -97,8 +106,11 @@ export const listActivePlans = async (systemTypeFilter, { includeTrials = false 
     if (!includeTrials && isTrialPlan(plan)) return false
     const st = normalizeSystemType(plan.systemType || resolvePlanPackageType(plan), null)
     if (!normalized) return true
-    if (normalized === 'restaurant' || normalized === 'canteen') return st === normalized || resolvePlanPackageType(plan) === normalized
+    if (normalized === 'restaurant' || normalized === 'canteen' || normalized === 'anaokulu') {
+      return st === normalized || resolvePlanPackageType(plan) === normalized
+    }
     if (normalized === 'kermes' || normalized === 'kantin') return toLegacySystemType(st, st) === normalized
+    if (normalized === 'anaokullari' || normalized === 'anaokulları' || normalized === 'kres' || normalized === 'kreş') return resolvePlanPackageType(plan) === 'anaokulu'
     throw error('invalid_request', 'Invalid systemType filter', 400)
   }).map((plan) => ({
     id: plan.id,

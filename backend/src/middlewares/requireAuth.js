@@ -9,7 +9,7 @@ export const requireAuth = async (req, res, next) => {
   if (!token) return next(error('unauthorized', 'Unauthorized', 401))
   try {
     const payload = verifyToken(token)
-    const user = await User.findById(payload.sub).select('name role tenantId permissions branchId branchIds accessibleBranchIds active isActive isDeleted status')
+    const user = await User.findById(payload.sub).select('name role tenantId permissions branchId branchIds accessibleBranchIds accessibleTenantIds regionSystemType systemType active isActive isDeleted status')
     if (!user || user.isDeleted === true || user.isActive === false || user.active === false || String(user.status || '') === 'deleted') {
       return next(error('unauthorized', 'Unauthorized', 401))
     }
@@ -25,6 +25,9 @@ export const requireAuth = async (req, res, next) => {
       permissions: Array.isArray(user.permissions) ? user.permissions : [],
       branchId: resolvedBranchId,
       branchIds: accessibleBranchIds,
+      accessibleTenantIds: Array.isArray(user.accessibleTenantIds) ? user.accessibleTenantIds.map(String) : [],
+      regionSystemType: user.regionSystemType || null,
+      systemType: user.systemType || null,
       modules: Array.isArray(payload.modules) ? payload.modules : []
     }
     next()
