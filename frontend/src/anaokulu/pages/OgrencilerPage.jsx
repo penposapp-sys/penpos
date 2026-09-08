@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
   money, trDate, expectedTotalFor, balanceFor, getStudent,
@@ -20,6 +21,7 @@ const InputCls = {
 }
 
 export default function OgrencilerPage() {
+  const { isAdminPanelMode } = useAuth()
   const { state, actions } = useAnaokuluData()
   const students = state?.students || []
   const ys = getYearStart(state)
@@ -156,7 +158,7 @@ export default function OgrencilerPage() {
     )
     return (
       <div style={{ padding: '12px 4px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           {field('Ad Soyad *', (
             <input style={{ ...InputCls, width: '100%' }} value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ad Soyad" />
@@ -392,8 +394,8 @@ export default function OgrencilerPage() {
 
     return (
       <div>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+        <div className="ak-stats-grid" style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12,
           padding: 14, marginBottom: 14, background: '#f8fafc', borderRadius: 12
         }}>
           <div style={{ padding: 10 }}>
@@ -415,7 +417,7 @@ export default function OgrencilerPage() {
             </div>
           </div>
         </div>
-        <div style={{ borderBottom: '1px solid #e6ebf3', marginBottom: 16 }}>
+        <div className="ak-tab-bar" style={{ borderBottom: '1px solid #e6ebf3', marginBottom: 16, display: 'flex' }}>
           {[
             ['info', 'Bilgiler'],
             ['plan', 'Taksit Planı'],
@@ -458,22 +460,43 @@ export default function OgrencilerPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+      <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>👥 Öğrenciler</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
-            {students.length} öğrenci · {list.length} listeleniyor
+            {isAdminPanelMode
+              ? `Süper Admin Paneli · Tüm okullar: ${students.length} öğrenci · ${list.length} listeleniyor`
+              : `${students.length} öğrenci · ${list.length} listeleniyor`}
           </p>
         </div>
-        <button onClick={() => openForm(null)} style={{
-          ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
-          boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
-        }}>
-          <span style={{ fontSize: 16 }}>+</span> Yeni Öğrenci
-        </button>
+        {!isAdminPanelMode && (
+          <div className="ak-actions">
+            <button onClick={() => openForm(null)} style={{
+              ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
+              boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
+            }}>
+              <span style={{ fontSize: 16 }}>+</span> Yeni Öğrenci
+            </button>
+          </div>
+        )}
       </div>
 
-      <div style={{
+      {isAdminPanelMode && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(16,185,129,0.06)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          <span style={{ fontSize: 18 }}>🏢</span>
+          <div style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>
+            Süper Admin Paneli modundasınız. Bu görünüm tüm okulların öğrencilerini birleştirerek listeler.
+            Değişiklik yapmak için üstten bir okul seçiniz.
+          </div>
+        </div>
+      )}
+
+      <div className="ak-panel ak-filter-bar" style={{
         ...panel, marginBottom: 16, padding: '14px 16px',
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center'
       }}>
@@ -490,11 +513,12 @@ export default function OgrencilerPage() {
         </select>
       </div>
 
-      <div style={panel}>
-        <div style={{ overflow: 'auto' }}>
+      <div className="ak-panel" style={panel}>
+        <div className="ak-table-wrap" style={{ overflow: 'auto' }}>
           <table style={table}>
             <thead>
               <tr>
+                {isAdminPanelMode && <th style={th}>🏫 Okul</th>}
                 <th style={th}>Öğrenci</th>
                 <th style={th}>Sınıf</th>
                 <th style={th}>Veli</th>
@@ -503,13 +527,13 @@ export default function OgrencilerPage() {
                 <th style={{ ...th, textAlign: 'right' }}>Planlanan</th>
                 <th style={{ ...th, textAlign: 'right' }}>Kalan</th>
                 <th style={th}>Durum</th>
-                <th style={{ ...th, minWidth: 240 }}>İşlemler</th>
+                <th style={{ ...th, minWidth: isAdminPanelMode ? 120 : 240 }}>İşlemler</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
-                <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '40px 12px' }}>
-                  Henüz öğrenci yok. Sağ üstten "Yeni Öğrenci" ekleyin.
+                <tr><td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '40px 12px' }}>
+                  Henüz öğrenci yok. {!isAdminPanelMode ? 'Sağ üstten "Yeni Öğrenci" ekleyin.' : ''}
                 </td></tr>
               ) : list.map(s => {
                 const bal = balanceFor(state, s.id)
@@ -517,6 +541,19 @@ export default function OgrencilerPage() {
                   <tr key={String(s.id || s._id)} style={{ transition: 'background 0.15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    {isAdminPanelMode && (
+                      <td style={td}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 10px', borderRadius: 20,
+                          fontSize: 11, fontWeight: 700,
+                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                          border: '1px solid rgba(99,102,241,0.18)'
+                        }}>
+                          🏫 {s._schoolName || '—'}
+                        </span>
+                      </td>
+                    )}
                     <td style={td}>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{s.name || '-'}</div>
                       <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Kayıt: {trDate(s.regDate)}</div>
@@ -557,12 +594,16 @@ export default function OgrencilerPage() {
                         <button onClick={() => { setFileTab('info'); openFile(s.id) }} style={{
                           ...Btn, background: '#f1f5f9', color: '#0f172a'
                         }}>Dosya</button>
-                        <button onClick={() => openForm(s)} style={{
-                          ...Btn, background: '#eef2ff', color: '#4338ca'
-                        }}>Düzenle</button>
-                        <button onClick={() => handleDelete(s.id)} style={{
-                          ...Btn, background: '#fee2e2', color: '#991b1b'
-                        }}>Sil</button>
+                        {!isAdminPanelMode && (
+                          <>
+                            <button onClick={() => openForm(s)} style={{
+                              ...Btn, background: '#eef2ff', color: '#4338ca'
+                            }}>Düzenle</button>
+                            <button onClick={() => handleDelete(s.id)} style={{
+                              ...Btn, background: '#fee2e2', color: '#991b1b'
+                            }}>Sil</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

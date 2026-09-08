@@ -1,0 +1,268 @@
+/* =========================================================
+   ANAOKULU GLOBAL RESPONSIVE STYLES
+   Mobil (<=768px) ve küçük tablet (<=1024px) uyumlu düzenler
+   ========================================================= */
+
+/* ─── Reset & Base ─────────────────────────────────────── */
+.anaokulu-layout-shell {
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.anaokulu-layout-main {
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Tüm anaokulu içerik kutularının taşmasını engelle */
+.anaokulu-layout-main > * {
+  min-width: 0;
+}
+
+/* ─── Tables – Mobilde yatay kaydırma ─────────────────── */
+.ak-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+/* ─── Mobile Global ≤ 768px ───────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Header */
+  .anaokulu-layout-header {
+    padding: 0 !important;
+  }
+
+  /* Summary stat boxes → stacked grid */
+  .ak-stats-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .ak-stats-grid > * {
+    min-width: 0 !important;
+  }
+
+  /* Filter bar → stacked */
+  .ak-filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .ak-filter-bar select,
+  .ak-filter-bar input {
+    width: 100% !important;
+    font-size: 14px !important;
+  }
+
+  /* Top header row → stacked */
+  .ak-page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .ak-page-header h2 {
+    font-size: 18px !important;
+    line-height: 1.3 !important;
+    word-break: break-word !important;
+  }
+
+  .ak-page-header p {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Action buttons group → wrap */
+  .ak-actions {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .ak-actions > * {
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    justify-content: center !important;
+    text-align: center !important;
+    font-size: 12px !important;
+  }
+
+  /* Tables */
+  .ak-table-wrap {
+    overflow-x: auto;
+    margin: 0 -4px;
+    padding: 0 4px;
+  }
+
+  .ak-table-wrap table {
+    min-width: 600px;
+    font-size: 12px !important;
+  }
+
+  .ak-table-wrap th,
+  .ak-table-wrap td {
+    padding: 8px 8px !important;
+    font-size: 12px !important;
+    white-space: normal !important;
+  }
+
+  /* Student / collection cards */
+  .ak-student-card {
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+  }
+
+  /* Period picker row → wrap */
+  .ak-period-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .ak-period-row select {
+    font-size: 13px !important;
+    max-width: 100% !important;
+  }
+
+  /* Modals */
+  .ak-modal-box {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 0 !important;
+    border-radius: 16px !important;
+  }
+
+  /* Panel boxes → reduce padding */
+  .ak-panel {
+    border-radius: 10px !important;
+  }
+
+  /* Summary mini boxes */
+  .ak-mini-box {
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+
+  .ak-mini-box .ak-mini-value {
+    font-size: 15px !important;
+  }
+
+  /* School filter buttons → wrap */
+  .ak-school-filter {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .ak-school-filter button {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+  }
+
+  /* Page subtitle / description */
+  .ak-page-desc {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Diff warning badge */
+  .ak-diff-badge {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+
+  /* Overview / Genel Bakış cards */
+  .ak-overview-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Rapor tab bar */
+  .ak-tab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .ak-tab-bar button {
+    white-space: nowrap;
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Compact info boxes */
+  .ak-info-box {
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+  }
+
+  /* Scope selector */
+  .ak-scope-bar {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .ak-scope-bar button {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+  }
+
+  /* Hide non-essential columns on mobile via class */
+  .ak-col-hide-mobile {
+    display: none !important;
+  }
+}
+
+/* ─── Small Mobile ≤ 420px ────────────────────────────── */
+@media (max-width: 420px) {
+
+  .ak-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ak-overview-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ak-page-header h2 {
+    font-size: 16px !important;
+  }
+
+  .ak-mini-box .ak-mini-value {
+    font-size: 13px !important;
+  }
+
+  .ak-actions > * {
+    font-size: 11px !important;
+    padding: 7px 10px !important;
+  }
+
+  .ak-table-wrap table {
+    min-width: 480px;
+  }
+}
+
+/* ─── Tablet ≤ 1024px ─────────────────────────────────── */
+@media (max-width: 1024px) and (min-width: 769px) {
+
+  .ak-table-wrap table {
+    font-size: 13px;
+  }
+
+  .ak-table-wrap th,
+  .ak-table-wrap td {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .ak-stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}

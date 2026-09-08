@@ -393,8 +393,8 @@ export default function App() {
           <Route path="tahsilatlar" element={<TahsilatlarPage />} />
           <Route path="faturalar" element={<FaturalarPage />} />
           <Route path="raporlar" element={<RaporlarPage />} />
-          <Route path="ayarlar" element={<AyarlarPage />}>
-            <Route path="uyeler" element={<ProtectedRoute roles={['tenant_admin']} system="anaokulu"><AnaokuluUyelerPage /></ProtectedRoute>} />
+          <Route path="ayarlar" element={<ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu"><AyarlarPage /></ProtectedRoute>}>
+            <Route path="uyeler" element={<ProtectedRoute roles={['tenant_admin', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu"><AnaokuluUyelerPage /></ProtectedRoute>} />
           </Route>
           <Route path="okullarim" element={<ProtectedRoute roles={['anaokulu_region_admin', 'platform_admin', 'superadmin']}><RegionAdminOkullarimPage /></ProtectedRoute>} />
         </Route>

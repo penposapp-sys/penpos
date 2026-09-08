@@ -1,12 +1,31 @@
 import React from 'react'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { money, trDate, periodName, getDashboardStats, getStudent } from '../utils/calculations.js'
 
 export default function DashboardPage() {
+  const { isAdminPanelMode, accessibleTenants } = useAuth()
   const { state } = useAnaokuluData()
   const stats = getDashboardStats(state)
   const students = state?.students || []
   const loaded = state?.loaded
+
+  const perSchoolStats = (() => {
+    if (!isAdminPanelMode) return []
+    const map = {}
+    ;(accessibleTenants || []).forEach(t => {
+      map[String(t.id || t._id)] = { schoolId: String(t.id || t._id), schoolName: t.name, studentCount: 0, collected: 0 }
+    })
+    students.forEach(s => {
+      const sid = String(s._schoolId || '')
+      if (map[sid]) map[sid].studentCount++
+    })
+    ;(state?.collections || []).forEach(c => {
+      const sid = String(c._schoolId || '')
+      if (map[sid]) map[sid].collected += Number(c.amount) || 0
+    })
+    return Object.values(map)
+  })()
 
   const cardWrap = {
     display: 'grid',
@@ -51,9 +70,31 @@ export default function DashboardPage() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>🏠 Genel Bakış</h2>
         <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
-          {loaded ? `${students.length} öğrenci kayıtlı · ${stats.currentPeriodName} dönemi aktif` : 'Veriler yükleniyor...'}
+          {isAdminPanelMode
+            ? `Süper Admin Paneli · Toplam ${perSchoolStats.length} okul · ${students.length} öğrenci`
+            : (loaded ? `${students.length} öğrenci kayıtlı · ${stats.currentPeriodName} dönemi aktif` : 'Veriler yükleniyor...')}
         </p>
       </div>
+
+      {isAdminPanelMode && (
+        <div style={{
+          padding: '16px 20px', borderRadius: 16, marginBottom: 18,
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(99,102,241,0.06))',
+          border: '1.5px solid rgba(16,185,129,0.25)',
+          display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 28 }}>🏢</span>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#065f46', marginBottom: 2 }}>
+              Süper Admin Paneli — Tüm Okullar Toplu Görünüm
+            </div>
+            <div style={{ fontSize: 12, color: '#475569' }}>
+              Aşağıdaki rakamlar yönettiğiniz <b>{perSchoolStats.length} okulun</b> tamamının birleştirilmiş verileridir.
+              Tek bir okula inmek için üstten okul seçin veya <b>Okullarım</b> sayfasına gidin.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={cardWrap}>
         <div style={kpi()}>
@@ -177,6 +218,34 @@ export default function DashboardPage() {
           </span>
         </div>
       </div>
+
+      {isAdminPanelMode && perSchoolStats.length > 0 && (
+        <div style={panel}>
+          <h3 style={{ margin: '0 0 14px 0', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+            🏫 Okul Bazlı Dağılım
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={table}>
+              <thead>
+                <tr>
+                  <th style={th}>Okul Adı</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Öğrenci Sayısı</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Toplam Tahsilat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perSchoolStats.map(ps => (
+                  <tr key={ps.schoolId}>
+                    <td style={{ ...td, fontWeight: 600 }}>🏫 {ps.schoolName}</td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#6366f1' }}>{ps.studentCount}</td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{money(ps.collected)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

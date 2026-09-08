@@ -21,15 +21,31 @@ const InputCls = {
 }
 
 export default function RaporlarPage() {
-  const { user, isRegionAdmin } = useAuth()
+  const { user, isRegionAdmin, isAdminPanelMode, accessibleTenants } = useAuth()
   const isManager = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
   const [reportTab, setReportTab] = useState('single')
+  const [selectedSchoolId, setSelectedSchoolId] = useState('')
 
   const { state } = useAnaokuluData()
-  const students = state?.students || []
-  const collections = state?.collections || []
-  const invoices = state?.invoices || []
+  const rawStudents = state?.students || []
+  const rawCollections = state?.collections || []
+  const rawInvoices = state?.invoices || []
   const ys = getYearStart(state)
+
+  const students = useMemo(() => {
+    if (!selectedSchoolId) return rawStudents
+    return rawStudents.filter(s => String(s._schoolId) === String(selectedSchoolId))
+  }, [rawStudents, selectedSchoolId])
+
+  const collections = useMemo(() => {
+    if (!selectedSchoolId) return rawCollections
+    return rawCollections.filter(c => String(c._schoolId) === String(selectedSchoolId))
+  }, [rawCollections, selectedSchoolId])
+
+  const invoices = useMemo(() => {
+    if (!selectedSchoolId) return rawInvoices
+    return rawInvoices.filter(i => String(i._schoolId) === String(selectedSchoolId))
+  }, [rawInvoices, selectedSchoolId])
 
   const [periodType, setPeriodType] = useState('month')
   const [rdate, setRdate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -125,7 +141,7 @@ export default function RaporlarPage() {
               marginBottom: -2, display: 'inline-flex', alignItems: 'center', gap: 6
             }}
           >
-            🏫 Seçili Okul Raporu
+            {isAdminPanelMode ? '🏫 Konsolide / Seçili Okul Raporu' : '🏫 Seçili Okul Raporu'}
           </button>
           <button
             type="button"
@@ -172,6 +188,20 @@ export default function RaporlarPage() {
         ...panel, marginBottom: 16, padding: '14px 16px',
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center'
       }}>
+        {/* Okul Seçici */}
+        {(isAdminPanelMode || (accessibleTenants && accessibleTenants.length > 0)) && (
+          <select
+            style={{ ...InputCls, fontWeight: 700, minWidth: 180, background: '#f8fafc' }}
+            value={selectedSchoolId}
+            onChange={e => setSelectedSchoolId(e.target.value)}
+          >
+            <option value="">🏫 Tüm Okullar (Konsolide)</option>
+            {accessibleTenants.map(t => (
+              <option key={t.id || t._id} value={t.id || t._id}>🏫 {t.name}</option>
+            ))}
+          </select>
+        )}
+
         <select style={{ ...InputCls, minWidth: 160, fontWeight: 600 }} value={periodType}
           onChange={e => setPeriodType(e.target.value)}>
           <option value="day">Günlük</option>
@@ -291,6 +321,7 @@ export default function RaporlarPage() {
             <table style={tbl}>
               <thead>
                 <tr>
+                  {isAdminPanelMode && !selectedSchoolId && <th style={th}>🏫 Okul</th>}
                   <th style={th}>Öğrenci</th>
                   <th style={th}>Sınıf</th>
                   <th style={{ ...th, textAlign: 'right' }}>Planlanan</th>
@@ -300,8 +331,21 @@ export default function RaporlarPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.stuRows.length === 0 ? emptyRow(6) : data.stuRows.map(({ s, exp, col, bal, pct }) => (
+                {data.stuRows.length === 0 ? emptyRow(isAdminPanelMode && !selectedSchoolId ? 7 : 6) : data.stuRows.map(({ s, exp, col, bal, pct }) => (
                   <tr key={String(s.id)}>
+                    {isAdminPanelMode && !selectedSchoolId && (
+                      <td style={td}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px', borderRadius: 6,
+                          fontSize: 11, fontWeight: 700,
+                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                          border: '1px solid rgba(99,102,241,0.2)'
+                        }}>
+                          🏫 {s._schoolName || '—'}
+                        </span>
+                      </td>
+                    )}
                     <td style={{ ...td, fontWeight: 700 }}>{s.name}</td>
                     <td style={td}>{s.class || '-'}</td>
                     <td style={{ ...td, textAlign: 'right' }}>{money(exp)}</td>

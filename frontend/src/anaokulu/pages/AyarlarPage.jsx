@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { api } from '../../lib/apiClient.js'
 import { exportDataJSON, getYearStart, periodsOfYear, periodName, DEFAULT_YEAR_START, DEFAULT_PERIODS } from '../utils/calculations.js'
 
 const Btn = {
@@ -28,6 +30,16 @@ export default function AyarlarPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const isUyeler = location.pathname.includes('/uyeler')
+
+  const { user, refresh, isAdminPanelMode } = useAuth()
+  const isStaff = user?.role === 'staff'
+
+  // Admin panel modunda /uyeler'i açabilir; sadece staff rolü engellensin
+  useEffect(() => {
+    if (isStaff && isUyeler) {
+      navigate('/anaokulu/ayarlar', { replace: true })
+    }
+  }, [isStaff, isUyeler, navigate])
 
   const { state, actions } = useAnaokuluData()
   const s = state?.settings || {}
@@ -66,9 +78,22 @@ export default function AyarlarPage() {
   )
   const [newDiscount, setNewDiscount] = useState({ name: '', type: 'percent', value: 0 })
 
-  const [activeTab, setActiveTab] = useState('genel')
+  const [activeTab, setActiveTab] = useState((isStaff || isAdminPanelMode) ? 'hesap' : 'genel')
   const [toastMsg, setToastMsg] = useState('')
   const fileRef = useRef(null)
+
+  const [emailForm, setEmailForm] = useState({
+    email: user?.email || '',
+    currentPassword: ''
+  })
+  const [emailSaving, setEmailSaving] = useState(false)
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    newPasswordRepeat: ''
+  })
+  const [passwordSaving, setPasswordSaving] = useState(false)
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3000) }
 
@@ -187,6 +212,61 @@ export default function AyarlarPage() {
     r.readAsText(f)
   }
 
+  const handleEmailSubmit = async () => {
+    if (!emailForm.email.trim()) { toast('E-posta boş olamaz.'); return }
+    if (!emailForm.currentPassword) { toast('Mevcut şifrenizi girmelisiniz.'); return }
+    setEmailSaving(true)
+    try {
+      const res = await api('/api/tenant/me/email', {
+        method: 'PUT',
+        data: { email: emailForm.email.trim(), currentPassword: emailForm.currentPassword },
+        portalOverride: 'anaokulu'
+      })
+      if (res?.ok === false || res?.success === false) {
+        toast(res?.message || 'E-posta güncellenemedi.')
+      } else {
+        toast('✓ E-posta başarıyla güncellendi.')
+        setEmailForm(prev => ({ ...prev, currentPassword: '' }))
+        await refresh()
+      }
+    } catch (e) {
+      toast(e?.message || 'E-posta güncellenemedi.')
+    } finally {
+      setEmailSaving(false)
+    }
+  }
+
+  const handlePasswordSubmit = async () => {
+    if (!passwordForm.currentPassword) { toast('Mevcut şifrenizi girmelisiniz.'); return }
+    if (!passwordForm.newPassword || passwordForm.newPassword.length < 8) {
+      toast('Yeni şifre en az 8 karakter olmalıdır.'); return
+    }
+    if (passwordForm.newPassword !== passwordForm.newPasswordRepeat) {
+      toast('Yeni şifreler eşleşmiyor.'); return
+    }
+    setPasswordSaving(true)
+    try {
+      const res = await api('/api/tenant/me/password', {
+        method: 'PUT',
+        data: {
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        },
+        portalOverride: 'anaokulu'
+      })
+      if (res?.ok === false || res?.success === false) {
+        toast(res?.message || 'Şifre güncellenemedi.')
+      } else {
+        toast('✓ Şifre başarıyla güncellendi.')
+        setPasswordForm({ currentPassword: '', newPassword: '', newPasswordRepeat: '' })
+      }
+    } catch (e) {
+      toast(e?.message || 'Şifre güncellenemedi.')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
   const panel = {
     background: '#fff', borderRadius: 14, border: '1px solid #e6ebf3',
     boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
@@ -197,22 +277,45 @@ export default function AyarlarPage() {
   const td = { padding: '10px 12px', fontSize: 13, borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }
   const tbl = { width: '100%', borderCollapse: 'collapse' }
 
-  const tabs = [
-    { key: 'genel', label: '🏫 Genel' },
-    { key: 'ucretler', label: '💰 Ücret Kalemleri' },
-    { key: 'indirimler', label: '🏷️ İndirimler' },
-    { key: 'luca', label: '🧾 TÜRMOB Luca e-Fatura' },
-    { key: 'veri', label: '💾 Veri' }
+  const allTabs = [
+    { key: 'genel', label: '🏫 Genel', staffHide: true, adminPanelHide: true },
+    { key: 'ucretler', label: '💰 Ücret Kalemleri', staffHide: true, adminPanelHide: true },
+    { key: 'indirimler', label: '🏷️ İndirimler', staffHide: true, adminPanelHide: true },
+    { key: 'luca', label: '🧾 TÜRMOB Luca e-Fatura', staffHide: true, adminPanelHide: true },
+    { key: 'veri', label: '💾 Veri', staffHide: true, adminPanelHide: true },
+    { key: 'hesap', label: '👤 Hesap Ayarları' }
   ]
+  const tabs = allTabs.filter(t => !((isStaff && t.staffHide) || (isAdminPanelMode && t.adminPanelHide)))
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>⚙️ Ayarlar</h2>
         <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
-          Okul, vergi, ücret kalemleri ve indirim parametreleri
+          {isAdminPanelMode
+            ? 'Süper admin hesap ayarlarınızı buradan yönetebilirsiniz. Okul ayarları için bir okul seçin.'
+            : 'Okul, vergi, ücret kalemleri ve indirim parametreleri'}
         </p>
       </div>
+
+      {isAdminPanelMode && (
+        <div style={{
+          padding: '14px 18px', borderRadius: 14, marginBottom: 18,
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(99,102,241,0.06))',
+          border: '1.5px solid rgba(16,185,129,0.25)',
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <span style={{ fontSize: 22 }}>🏢</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
+              Şu an Süper Admin Panel modundasınız
+            </div>
+            <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+              Bu ekranda yalnızca <b>kişisel hesap ayarlarınızı</b> görebilirsiniz. Bir okulun ayarlarını düzenlemek için üstten okul seçimi yapın veya Okullarım sayfasına gidin.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', borderBottom: '2px solid #e6ebf3', paddingBottom: 0 }}>
@@ -229,13 +332,15 @@ export default function AyarlarPage() {
           }}>{t.label}</button>
         ))}
 
-        <NavLink to="/anaokulu/ayarlar/uyeler" style={({ isActive }) => ({
-          padding: '10px 16px', textDecoration: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-          background: 'transparent', borderRadius: '8px 8px 0 0',
-          borderBottom: isActive ? '2px solid #6366f1' : '2px solid transparent',
-          color: isActive ? '#6366f1' : '#64748b',
-          marginBottom: -2, display: 'inline-flex', alignItems: 'center'
-        })}>👤 Üyeler</NavLink>
+        {!isStaff && (
+          <NavLink to="/anaokulu/ayarlar/uyeler" style={({ isActive }) => ({
+            padding: '10px 16px', textDecoration: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+            background: 'transparent', borderRadius: '8px 8px 0 0',
+            borderBottom: isActive ? '2px solid #6366f1' : '2px solid transparent',
+            color: isActive ? '#6366f1' : '#64748b',
+            marginBottom: -2, display: 'inline-flex', alignItems: 'center'
+          })}>👤 Üyeler</NavLink>
+        )}
       </div>
 
       {isUyeler ? (
@@ -244,7 +349,7 @@ export default function AyarlarPage() {
         <>
 
       {/* Genel Ayarlar */}
-      {activeTab === 'genel' && (
+      {!isStaff && !isAdminPanelMode && activeTab === 'genel' && (
         <div style={panel}>
           <h3 style={h3}>🏫 Okul &amp; Vergi</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
@@ -287,7 +392,7 @@ export default function AyarlarPage() {
       )}
 
       {/* Ücret Kalemleri */}
-      {activeTab === 'ucretler' && (
+      {!isStaff && !isAdminPanelMode && activeTab === 'ucretler' && (
         <div style={panel}>
           <h3 style={h3}>💰 Ücret Kalemleri</h3>
           <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px 0' }}>
@@ -390,7 +495,7 @@ export default function AyarlarPage() {
       )}
 
       {/* İndirimler */}
-      {activeTab === 'indirimler' && (
+      {!isStaff && !isAdminPanelMode && activeTab === 'indirimler' && (
         <div style={panel}>
           <h3 style={h3}>🏷️ İndirim Tanımları</h3>
           <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px 0' }}>
@@ -485,7 +590,7 @@ export default function AyarlarPage() {
       )}
 
       {/* TÜRMOB Luca e-Fatura Entegrasyonu */}
-      {activeTab === 'luca' && (
+      {!isStaff && !isAdminPanelMode && activeTab === 'luca' && (
         <div style={panel}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
             <div>
@@ -577,7 +682,7 @@ export default function AyarlarPage() {
       )}
 
       {/* Veri */}
-      {activeTab === 'veri' && (
+      {!isStaff && !isAdminPanelMode && activeTab === 'veri' && (
         <div style={panel}>
           <h3 style={h3}>💾 Veri</h3>
           <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 14px 0' }}>
@@ -599,6 +704,109 @@ export default function AyarlarPage() {
             </span>
           </div>
         </div>
+      )}
+
+      {/* Hesap Ayarları (Tüm roller için - özellikle staff) */}
+      {activeTab === 'hesap' && (
+        <>
+          <div style={panel}>
+            <h3 style={h3}>📧 E-posta Adresini Değiştir</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+              <div style={FieldCls}>
+                <label style={LabelCls}>Mevcut E-posta</label>
+                <div style={{ ...InputCls, background: '#f8fafc', color: '#64748b', fontWeight: 500, userSelect: 'none' }}>
+                  {user?.email || '—'}
+                </div>
+              </div>
+              <div style={FieldCls}>
+                <label style={LabelCls}>Yeni E-posta *</label>
+                <input
+                  style={InputCls}
+                  type="email"
+                  placeholder="ornek@email.com"
+                  value={emailForm.email}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div style={FieldCls}>
+                <label style={LabelCls}>Mevcut Şifre *</label>
+                <input
+                  style={InputCls}
+                  type="password"
+                  placeholder="••••••••"
+                  value={emailForm.currentPassword}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: 10, textAlign: 'right' }}>
+              <button
+                onClick={handleEmailSubmit}
+                disabled={emailSaving}
+                style={{
+                  ...Btn,
+                  background: emailSaving ? '#94a3b8' : 'linear-gradient(135deg,#0ea5e9,#3b82f6)',
+                  color: '#fff',
+                  boxShadow: emailSaving ? 'none' : '0 4px 12px rgba(59,130,246,0.25)',
+                  cursor: emailSaving ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {emailSaving ? '⏳ Kaydediliyor...' : '💾 E-postayı Güncelle'}
+              </button>
+            </div>
+          </div>
+
+          <div style={panel}>
+            <h3 style={h3}>🔐 Şifre Değiştir</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+              <div style={FieldCls}>
+                <label style={LabelCls}>Mevcut Şifre *</label>
+                <input
+                  style={InputCls}
+                  type="password"
+                  placeholder="••••••••"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                />
+              </div>
+              <div style={FieldCls}>
+                <label style={LabelCls}>Yeni Şifre * (en az 8 karakter)</label>
+                <input
+                  style={InputCls}
+                  type="password"
+                  placeholder="••••••••"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                />
+              </div>
+              <div style={FieldCls}>
+                <label style={LabelCls}>Yeni Şifre (Tekrar) *</label>
+                <input
+                  style={InputCls}
+                  type="password"
+                  placeholder="••••••••"
+                  value={passwordForm.newPasswordRepeat}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, newPasswordRepeat: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: 10, textAlign: 'right' }}>
+              <button
+                onClick={handlePasswordSubmit}
+                disabled={passwordSaving}
+                style={{
+                  ...Btn,
+                  background: passwordSaving ? '#94a3b8' : 'linear-gradient(135deg,#f59e0b,#ef4444)',
+                  color: '#fff',
+                  boxShadow: passwordSaving ? 'none' : '0 4px 12px rgba(245,158,11,0.25)',
+                  cursor: passwordSaving ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {passwordSaving ? '⏳ Kaydediliyor...' : '🔐 Şifreyi Güncelle'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
         </>
       )}

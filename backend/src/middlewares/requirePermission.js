@@ -24,7 +24,7 @@ export const requirePermission = (perms, options = {}) => {
   const required = normalizePermissions(requiredInput)
   return (req, res, next) => {
     const role = req.user.role
-    if (role === 'tenant_admin' || role === 'superadmin') return next()
+    if (role === 'tenant_admin' || role === 'superadmin' || role === 'platform_admin' || role === 'anaokulu_region_admin') return next()
     const userPerms = normalizePermissions(req.user.permissions)
     const ok = mode === 'any'
       ? required.some(p => userPerms.includes(p))

@@ -20,7 +20,7 @@ const INPUT_STYLE = {
 const LABEL_STYLE = { fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 4, display: 'block' }
 
 export default function RegionAdminOkullarimPage() {
-  const { user, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, refresh } = useAuth()
+  const { user, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isAdminPanelMode, refresh } = useAuth()
   const navigate = useNavigate()
 
   const [pageTab, setPageTab] = useState('okullarim')
@@ -163,29 +163,53 @@ export default function RegionAdminOkullarimPage() {
                 Okullarim
               </h1>
               <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
-                Yonetiminiz altindaki anaokulu ve kresleri goruntuleyin, secin veya yeni ekleyin.
+                {isAdminPanelMode
+                  ? 'Süper Admin Paneli · Yönetiminiz altındaki anaokulu ve kreşleri görüntüleyin, seçin veya yeni ekleyin.'
+                  : 'Yonetiminiz altindaki anaokulu ve kresleri goruntuleyin, secin veya yeni ekleyin.'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '11px 20px', borderRadius: 12,
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                color: '#fff', border: 'none', cursor: 'pointer',
-                fontWeight: 700, fontSize: 14,
-                boxShadow: '0 6px 20px rgba(99,102,241,0.3)'
-              }}
-            >
-              + Yeni Anaokulu Ekle
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {!isAdminPanelMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegionCurrentTenantId(null)
+                    navigate('/anaokulu/genel-bakis')
+                  }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '11px 18px', borderRadius: 12,
+                    background: 'rgba(16,185,129,0.12)',
+                    color: '#065f46',
+                    border: '1.5px solid rgba(16,185,129,0.3)',
+                    cursor: 'pointer',
+                    fontWeight: 800, fontSize: 13
+                  }}
+                >
+                  ← Ana Panel'e Dön
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '11px 20px', borderRadius: 12,
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  color: '#fff', border: 'none', cursor: 'pointer',
+                  fontWeight: 700, fontSize: 14,
+                  boxShadow: '0 6px 20px rgba(99,102,241,0.3)'
+                }}
+              >
+                + Yeni Anaokulu Ekle
+              </button>
+            </div>
           </div>
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         {[
           { label: 'Toplam Okul', value: schools.length, color: '#6366f1' },
-          { label: 'Aktif Secili', value: schools.filter(s => String(s.id) === String(regionCurrentTenantId)).length, color: '#10b981' }
+          { label: isAdminPanelMode ? 'Admin Paneli' : 'Aktif Secili', value: isAdminPanelMode ? 1 : schools.filter(s => String(s.id) === String(regionCurrentTenantId)).length, color: '#10b981' }
         ].map(stat => (
           <div key={stat.label} style={{
             padding: '16px 24px', borderRadius: 14,

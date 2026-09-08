@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
   money, expectedTotalFor, collectedAll, getStudent,
@@ -57,6 +58,7 @@ function formatTrFullDate(dateStr) {
 }
 
 export default function UcretPlaniPage() {
+  const { isAdminPanelMode, accessibleTenants } = useAuth()
   const { state, actions } = useAnaokuluData()
   const students = state?.students || []
   const collections = state?.collections || []
@@ -64,6 +66,7 @@ export default function UcretPlaniPage() {
   const feeCategories = Array.isArray(state?.settings?.feeCategories) ? state.settings.feeCategories : []
   const discountDefs = Array.isArray(state?.settings?.discounts) ? state.settings.discounts : []
 
+  const [selectedSchoolId, setSelectedSchoolId] = useState('')
   const [selStudentId, setSelStudentId] = useState(null)
   const [selectedPlanIdx, setSelectedPlanIdx] = useState(0)
   const [studentSearch, setStudentSearch] = useState('')
@@ -165,14 +168,19 @@ export default function UcretPlaniPage() {
   }, [selStudent, selectedPlanIdx])
 
   const filteredStudents = useMemo(() => {
-    if (!studentSearch.trim()) return students
+    let list = students
+    if (selectedSchoolId) {
+      list = list.filter(s => String(s._schoolId) === String(selectedSchoolId))
+    }
+    if (!studentSearch.trim()) return list
     const q = studentSearch.toLowerCase().trim()
-    return students.filter(s =>
+    return list.filter(s =>
       (s.name || '').toLowerCase().includes(q) ||
       (s.class || '').toLowerCase().includes(q) ||
-      (s.parent || '').toLowerCase().includes(q)
+      (s.parent || '').toLowerCase().includes(q) ||
+      (s._schoolName || '').toLowerCase().includes(q)
     )
-  }, [students, studentSearch])
+  }, [students, studentSearch, selectedSchoolId])
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 2800) }
 
@@ -1010,6 +1018,21 @@ export default function UcretPlaniPage() {
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
               {s.class ? `Sınıf: ${s.class}` : 'Sınıf belirtilmemiş'}
             </div>
+            {s._schoolName && (
+              <span style={{
+                display: 'inline-block',
+                fontSize: 10,
+                fontWeight: 700,
+                marginTop: 3,
+                padding: '1px 6px',
+                borderRadius: 6,
+                background: 'rgba(99,102,241,0.08)',
+                color: '#4f46e5',
+                border: '1px solid rgba(99,102,241,0.2)'
+              }}>
+                🏫 {s._schoolName}
+              </span>
+            )}
           </div>
         </div>
 
@@ -1041,6 +1064,20 @@ export default function UcretPlaniPage() {
           Planlara tıklayarak alt alta taksit dökümünü görüntüleyin, vade gecikmelerini takip edin, tahsilat yapın veya eski tahsilatları düzenleyin
         </p>
       </div>
+
+      {isAdminPanelMode && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(16,185,129,0.06)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          <span style={{ fontSize: 18 }}>🏢</span>
+          <div style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>
+            Süper Admin Paneli modundasınız. Tüm okulların ücret ve taksit planları listelenmektedir. Belirli bir okul için sağdaki listeden veya üstten filtreleme yapabilirsiniz.
+          </div>
+        </div>
+      )}
 
       {/* COMPACT SCREEN: Quick Student Switcher Bar */}
       {isCompact && (
@@ -1096,6 +1133,20 @@ export default function UcretPlaniPage() {
           background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
           padding: '14px', marginBottom: 16, boxShadow: '0 4px 14px rgba(15,23,42,0.08)'
         }}>
+          {(isAdminPanelMode || (accessibleTenants && accessibleTenants.length > 0)) && (
+            <div style={{ marginBottom: 10 }}>
+              <select
+                value={selectedSchoolId}
+                onChange={e => setSelectedSchoolId(e.target.value)}
+                style={{ ...InputCls, padding: '7px 10px', fontSize: 12, background: '#fff', cursor: 'pointer' }}
+              >
+                <option value="">🏫 Tüm Okullar ({accessibleTenants?.length || 'Tümü'})</option>
+                {accessibleTenants?.map(t => (
+                  <option key={t.id || t._id} value={t.id || t._id}>🏫 {t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>👥 Öğrenci Listesi ({filteredStudents.length})</div>
             <input
@@ -1810,7 +1861,25 @@ export default function UcretPlaniPage() {
               </div>
 
               {/* Quick Search */}
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(isAdminPanelMode || (accessibleTenants && accessibleTenants.length > 0)) && (
+                  <select
+                    value={selectedSchoolId}
+                    onChange={e => setSelectedSchoolId(e.target.value)}
+                    style={{
+                      ...InputCls,
+                      padding: '6px 9px',
+                      fontSize: 12,
+                      background: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">🏫 Tüm Okullar ({accessibleTenants?.length || 'Tümü'})</option>
+                    {accessibleTenants?.map(t => (
+                      <option key={t.id || t._id} value={t.id || t._id}>🏫 {t.name}</option>
+                    ))}
+                  </select>
+                )}
                 <input
                   type="text"
                   placeholder="🔍 Öğrenci veya sınıf ara..."
@@ -2987,6 +3056,12 @@ export default function UcretPlaniPage() {
                                 marginLeft: 8, padding: '1px 7px', borderRadius: 6,
                                 fontSize: 11, fontWeight: 700, background: '#fca5a5', color: '#7f1d1d'
                               }}>{student.class}</span>
+                            )}
+                            {student._schoolName && (
+                              <span style={{
+                                marginLeft: 8, padding: '1px 7px', borderRadius: 6,
+                                fontSize: 11, fontWeight: 700, background: '#e0e7ff', color: '#4338ca'
+                              }}>🏫 {student._schoolName}</span>
                             )}
                           </div>
                           {student.parent && (

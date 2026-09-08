@@ -383,6 +383,8 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
           id: `${student.id || student._id}-${plan.name}-${installmentNo}-${installmentPeriod}`,
           student,
           studentId: student.id || student._id,
+          schoolName: student._schoolName || '',
+          schoolId: student._schoolId || '',
           studentName: student.name || '—',
           parent: student.parent || '—',
           tax: student.tax || '—',

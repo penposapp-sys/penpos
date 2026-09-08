@@ -1,4 +1,23 @@
 import puppeteer from 'puppeteer';
+import { existsSync } from 'fs';
+
+// Linux production sunucusu için Chrome/Chromium binary tespiti
+const detectChromiumPath = () => {
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/snap/bin/chromium',
+    '/usr/local/bin/chromium',
+  ].filter(Boolean)
+
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+  return null // Puppeteer'ın kendi indirdiği chrome'u kullan
+}
 
 class LucaScraperService {
   constructor() {
@@ -12,10 +31,52 @@ class LucaScraperService {
     }
 
     console.log(`[LucaScraper] ${tckn} için giriş yapılıyor... (Dönem: ${startDate} - ${endDate})`);
-    const browser = await puppeteer.launch({
+
+    // Linux üretim sunucuları için gerekli tüm argümanlar
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--disable-gpu',
+      '--window-size=1400,900',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--disable-blink-features=AutomationControlled',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+    ]
+
+    const executablePath = detectChromiumPath()
+    const launchOptions = {
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
+      args: launchArgs,
+      ...(executablePath ? { executablePath } : {}),
+      timeout: 30000,
+    }
+
+    if (executablePath) {
+      console.log(`[LucaScraper] Chromium yolu: ${executablePath}`)
+    }
+
+    let browser
+    try {
+      browser = await puppeteer.launch(launchOptions)
+    } catch (launchErr) {
+      const msg = launchErr?.message || String(launchErr)
+      const isLibErr = msg.includes('cannot open shared object') || msg.includes('error while loading shared lib') || msg.includes('No such file or directory')
+      if (isLibErr) {
+        throw new Error(
+          'Sunucuda Chrome/Chromium sistem kütüphaneleri eksik. Lütfen sunucuya Chromium yükleyin:\n' +
+          'Ubuntu/Debian: apt-get install -y chromium-browser\n' +
+          'veya: apt-get install -y chromium\n' +
+          'CentOS/RHEL: yum install -y chromium\n' +
+          'Alternatif olarak PUPPETEER_EXECUTABLE_PATH ortam değişkenini ayarlayın.'
+        )
+      }
+      throw new Error(`Tarayıcı başlatılamadı: ${msg}`)
+    }
 
     try {
       const page = await browser.newPage();

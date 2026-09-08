@@ -89,6 +89,7 @@ export const AuthProvider = ({ children }) => {
   const initInFlightRef = useRef(false)
 
   const isRegionAdmin = Boolean(user?.role === 'anaokulu_region_admin' && user?.regionSystemType === 'anaokulu')
+  const isAdminPanelMode = Boolean(isRegionAdmin && !regionCurrentTenantId)
 
   const hydratePortalState = async (portal, meRes) => {
     const meUser = meRes?.user
@@ -106,11 +107,11 @@ export const AuthProvider = ({ children }) => {
     let effectiveTenantId = normalized?.tenantId || null
     if (isRegion) {
       if (accIds.length > 0) {
-        if (!regionCurrentTenantId || !accIds.includes(String(regionCurrentTenantId))) {
-          effectiveTenantId = accIds[0]
-          setRegionCurrentTenantId(effectiveTenantId)
-        } else {
+        if (regionCurrentTenantId && accIds.includes(String(regionCurrentTenantId))) {
           effectiveTenantId = regionCurrentTenantId
+        } else {
+          effectiveTenantId = null
+          setRegionCurrentTenantId(null)
         }
       } else {
         effectiveTenantId = null
@@ -333,7 +334,7 @@ export const AuthProvider = ({ children }) => {
   }, [isRegionAdmin, regionCurrentTenantId, accessibleTenantIds, user])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh, tenantCtx, allowedBranchIds, setAllowedBranchIds, accessibleTenantIds, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh, tenantCtx, allowedBranchIds, setAllowedBranchIds, accessibleTenantIds, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin, isAdminPanelMode }}>
       {children}
     </AuthContext.Provider>
   )

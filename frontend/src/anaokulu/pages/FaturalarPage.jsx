@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { api } from '../../lib/apiClient.js'
 import {
@@ -19,11 +20,13 @@ const InputCls = {
 }
 
 export default function FaturalarPage() {
+  const { isAdminPanelMode, accessibleTenants } = useAuth()
   const { state, actions } = useAnaokuluData()
   const invoices = state?.invoices || []
   const ys = getYearStart(state)
   const lucaSettings = state?.settings?.luca || {}
 
+  const [selectedSchoolId, setSelectedSchoolId] = useState('')
   const [period, setPeriod] = useState(() => {
     const now = new Date()
     const cur = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
@@ -56,7 +59,8 @@ export default function FaturalarPage() {
     const needle = q.toLowerCase().trim()
 
     const filtered = rawRows.filter(r => {
-      const searchTarget = `${r.studentName} ${r.parent} ${r.tax} ${r.planName} ${r.invoiceNo}`.toLowerCase()
+      const hitSchool = !selectedSchoolId || String(r.schoolId) === String(selectedSchoolId)
+      const searchTarget = `${r.schoolName} ${r.studentName} ${r.parent} ${r.tax} ${r.planName} ${r.invoiceNo}`.toLowerCase()
       const hitSearch = !needle || searchTarget.includes(needle)
       
       let hitInv = true
@@ -65,7 +69,7 @@ export default function FaturalarPage() {
       else if (invoiceFilter === 'diff') hitInv = Boolean(r.hasDiff)
 
       const hitCol = !collectionFilter || r.collectionStatus === collectionFilter
-      return hitSearch && hitInv && hitCol
+      return hitSchool && hitSearch && hitInv && hitCol
     })
 
     const totalPlanned = rawRows.reduce((s, r) => s + r.amount, 0)
@@ -95,7 +99,7 @@ export default function FaturalarPage() {
       diffItems,
       totalDiffAmount
     }
-  }, [rawRows, q, invoiceFilter, collectionFilter])
+  }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId])
 
   // TÜRMOB Luca sorgulaması — Bot üzerinden gerçek API çağrısı
   const runCheckInvoices = async () => {
@@ -187,14 +191,16 @@ export default function FaturalarPage() {
   return (
     <div>
       {/* Üst Başlık ve Luca Aksiyonları */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>🧾 Faturalar & Taksit Takibi</h2>
-          <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
-            Tahsilatı yapılmış veyahut yapılmamış olsun, <strong>o ayın taksitleri</strong>, fatura ve tahsilat durumu ile KDV detayları
+          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📄 Faturalar ve Dönem Taksitleri</h2>
+          <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
+            {isAdminPanelMode
+              ? `Süper Admin Paneli · Tüm Okullar · ${processedData.totalCount} faturalanabilir taksit · ${processedData.filteredCount} listeleniyor`
+              : 'Dönem taksitlerinin faturalandırılma ve tahsilat takibi'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="ak-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a
             href="https://turmobefatura.luca.com.tr/Account/Login"
             target="_blank"
@@ -243,11 +249,43 @@ export default function FaturalarPage() {
         </div>
       </div>
 
+      {isAdminPanelMode && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(16,185,129,0.06)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          <span style={{ fontSize: 18 }}>🏢</span>
+          <div style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>
+            Süper Admin Paneli modundasınız. Tüm okulların faturalanabilir taksitleri ve fatura eşleşmeleri listelenir.
+            Aşağıdaki filtreyi kullanarak belirli bir okula ait taksitleri de seçebilirsiniz.
+          </div>
+        </div>
+      )}
+
       {/* Filtre ve Arama Alanı */}
-      <div style={{
-        ...panel, marginBottom: 16, padding: '14px 16px',
-        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center'
+      <div className="ak-filter-bar" style={{
+        ...panel, padding: '14px 18px', marginBottom: 16,
+        display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center'
       }}>
+        {/* Okul Seçici */}
+        {(isAdminPanelMode || (accessibleTenants && accessibleTenants.length > 0)) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Okul:</span>
+            <select
+              style={{ ...InputCls, minWidth: 160, fontWeight: 600, background: '#f8fafc' }}
+              value={selectedSchoolId}
+              onChange={e => setSelectedSchoolId(e.target.value)}
+            >
+              <option value="">🏫 Tüm Okullar ({accessibleTenants?.length || 'Tümü'})</option>
+              {accessibleTenants?.map(t => (
+                <option key={t.id || t._id} value={t.id || t._id}>🏫 {t.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Ay Seçici */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Dönem (Ay):</span>
@@ -307,8 +345,8 @@ export default function FaturalarPage() {
         padding: '12px 18px', background: '#fff', borderRadius: 14,
         border: '1px solid #e6ebf3', marginBottom: 16
       }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12
+        <div className="ak-stats-grid" style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12
         }}>
           {/* Toplam Taksit */}
           <div style={miniBox}>
@@ -415,10 +453,11 @@ export default function FaturalarPage() {
 
       {/* Taksitler ve Faturalar Tablosu */}
       <div style={panel}>
-        <div style={{ overflow: 'auto', maxHeight: '64vh' }}>
+        <div className="ak-table-wrap" style={{ overflow: 'auto', maxHeight: '64vh' }}>
           <table style={{ ...tbl, minWidth: 1200 }}>
             <thead>
               <tr>
+                {isAdminPanelMode && <th style={th}>🏫 Okul</th>}
                 <th style={{ ...th, width: 140 }}>Fatura Durumu</th>
                 <th style={{ ...th, width: 140 }}>Tahsilat Durumu</th>
                 <th style={th}>Öğrenci Adı</th>
@@ -437,7 +476,7 @@ export default function FaturalarPage() {
             <tbody>
               {processedData.list.length === 0 ? (
                 <tr>
-                  <td colSpan={13} style={{
+                  <td colSpan={isAdminPanelMode ? 14 : 13} style={{
                     ...td, textAlign: 'center', color: '#94a3b8', padding: '48px 12px'
                   }}>
                     Bu dönem için kayıtlı faturalı taksit bulunamadı.
@@ -452,7 +491,26 @@ export default function FaturalarPage() {
                 const isPartial = row.collectionStatus === 'partial'
 
                 return (
-                  <tr key={row.id} style={{ transition: 'background 0.15s' }}>
+                  <tr key={row.id} style={{
+                    background: row.hasDiff ? 'rgba(245,158,11,0.06)' : undefined,
+                    transition: 'background 0.15s'
+                  }}>
+                    {/* Okul */}
+                    {isAdminPanelMode && (
+                      <td style={td}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 8px', borderRadius: 6,
+                          fontSize: 11, fontWeight: 700,
+                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                          border: '1px solid rgba(99,102,241,0.2)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          🏫 {row.schoolName || row.student?._schoolName || '—'}
+                        </span>
+                      </td>
+                    )}
+
                     {/* Fatura Durumu */}
                     <td style={td}>
                       {isBilled ? (
@@ -789,6 +847,7 @@ export default function FaturalarPage() {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                {(detailRow?.schoolName || inv.schoolName) && <div><strong>Okul:</strong> 🏫 {detailRow?.schoolName || inv.schoolName}</div>}
                 <div><strong>Fatura No:</strong> <span style={{ color: '#2563eb', fontWeight: 700 }}>{inv.no}</span></div>
                 <div><strong>Tarih:</strong> {inv.date}</div>
                 <div><strong>Alıcı:</strong> {inv.buyer || '—'}</div>

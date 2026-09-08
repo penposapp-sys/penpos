@@ -408,4 +408,180 @@ router.post('/anaokulu-region-admins/:userId/assign-tenant', requireAuth, requir
   }
 })
 
+// Region Admin Kendi Hesabı İçin Üye (Yönetici/Asistan) Yönetimi
+router.get('/region-admin/members', requireAuth, requireRole(['anaokulu_region_admin', 'superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const User = (await import('../models/User.js')).default
+    const isSuper = req.user.role === 'superadmin' || req.user.role === 'platform_admin'
+    
+    let query = {
+      role: 'anaokulu_region_admin',
+      isDeleted: { $ne: true }
+    }
+    if (!isSuper) {
+      const myTenantIds = Array.isArray(req.user.accessibleTenantIds) ? req.user.accessibleTenantIds.map(String) : []
+      query = {
+        role: 'anaokulu_region_admin',
+        isDeleted: { $ne: true },
+        $or: [
+          { _id: req.user.id },
+          { creatorId: req.user.id },
+          { accessibleTenantIds: { $in: myTenantIds } }
+        ]
+      }
+    }
+
+    const items = await User.find(query)
+      .sort({ createdAt: -1 })
+      .select('_id name email username phone role isActive status createdAt accessibleTenantIds creatorId')
+      .lean()
+
+    res.json({ success: true, items: items.map(u => ({ ...u, id: String(u._id) })) })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.post('/region-admin/members', requireAuth, requireRole(['anaokulu_region_admin', 'superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { name, email, username, phone, password } = req.body || {}
+    if (!name || !String(name).trim()) throw error('invalid_request', 'Ad Soyad zorunludur', 400)
+    if (!email || !String(email).trim()) throw error('invalid_request', 'E-posta zorunludur', 400)
+    if (!password || String(password).length < 6) throw error('invalid_request', 'Şifre en az 6 karakter olmalıdır', 400)
+
+    const cleanEmail = String(email).trim().toLowerCase()
+    const cleanUsername = username ? String(username).trim().toLowerCase() : undefined
+
+    const User = (await import('../models/User.js')).default
+    const bcrypt = (await import('bcryptjs')).default
+
+    const existingEmail = await User.findOne({ email: cleanEmail, isDeleted: { $ne: true } })
+    if (existingEmail) throw error('duplicate_email', 'Bu e-posta zaten kullanımda', 409)
+
+    if (cleanUsername) {
+      const existingUser = await User.findOne({ username: cleanUsername, isDeleted: { $ne: true } })
+      if (existingUser) throw error('duplicate_username', 'Bu kullanıcı adı zaten kullanımda', 409)
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const targetTenantIds = Array.isArray(req.user.accessibleTenantIds)
+      ? req.user.accessibleTenantIds.map(String)
+      : []
+
+    const user = await User.create({
+      name: String(name).trim(),
+      email: cleanEmail,
+      username: cleanUsername,
+      phone: phone ? String(phone).trim() : '',
+      passwordHash,
+      role: 'anaokulu_region_admin',
+      regionSystemType: 'anaokulu',
+      systemType: null,
+      accessibleTenantIds: targetTenantIds,
+      accessibleBranchIds: [],
+      creatorId: req.user.id,
+      isActive: true,
+      status: 'active'
+    })
+
+    res.json({
+      success: true,
+      user: {
+        id: String(user._id),
+        _id: String(user._id),
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        phone: user.phone,
+        role: user.role,
+        isActive: user.isActive,
+        accessibleTenantIds: user.accessibleTenantIds
+      }
+    })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.put('/region-admin/members/:userId', requireAuth, requireRole(['anaokulu_region_admin', 'superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    const { name, email, username, phone, password, isActive } = req.body || {}
+    const User = (await import('../models/User.js')).default
+    const bcrypt = (await import('bcryptjs')).default
+
+    const user = await User.findById(userId)
+    if (!user || user.isDeleted) throw error('not_found', 'Kullanıcı bulunamadı', 404)
+
+    if (name !== undefined) user.name = String(name).trim()
+    if (phone !== undefined) user.phone = String(phone).trim()
+    if (isActive !== undefined) {
+      user.isActive = Boolean(isActive)
+      user.active = Boolean(isActive)
+    }
+
+    if (email && String(email).trim().toLowerCase() !== user.email) {
+      const cleanEmail = String(email).trim().toLowerCase()
+      const existing = await User.findOne({ email: cleanEmail, _id: { $ne: user._id }, isDeleted: { $ne: true } })
+      if (existing) throw error('duplicate_email', 'Bu e-posta başka bir kullanıcı tarafından kullanılıyor', 409)
+      user.email = cleanEmail
+    }
+
+    if (username !== undefined) {
+      const cleanUsername = username ? String(username).trim().toLowerCase() : undefined
+      if (cleanUsername && cleanUsername !== user.username) {
+        const existingU = await User.findOne({ username: cleanUsername, _id: { $ne: user._id }, isDeleted: { $ne: true } })
+        if (existingU) throw error('duplicate_username', 'Bu kullanıcı adı zaten kullanımda', 409)
+      }
+      user.username = cleanUsername
+    }
+
+    if (password && String(password).length >= 6) {
+      user.passwordHash = await bcrypt.hash(password, 10)
+    }
+
+    await user.save()
+
+    res.json({
+      success: true,
+      user: {
+        id: String(user._id),
+        _id: String(user._id),
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        phone: user.phone,
+        role: user.role,
+        isActive: user.isActive,
+        accessibleTenantIds: user.accessibleTenantIds
+      }
+    })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.delete('/region-admin/members/:userId', requireAuth, requireRole(['anaokulu_region_admin', 'superadmin', 'platform_admin']), async (req, res) => {
+  try {
+    const { userId } = req.params
+    if (String(req.user.id) === String(userId)) {
+      throw error('invalid_request', 'Kendi hesabınızı silemezsiniz', 400)
+    }
+    const User = (await import('../models/User.js')).default
+    const user = await User.findById(userId)
+    if (!user || user.isDeleted) throw error('not_found', 'Kullanıcı bulunamadı', 404)
+
+    user.isDeleted = true
+    user.isActive = false
+    user.active = false
+    user.status = 'deleted'
+    user.deletedAt = new Date()
+    await user.save()
+
+    res.json({ ok: true, success: true })
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
 export default router

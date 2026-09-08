@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { money, trDate, getStudent, round2, isCollectionInvoiced } from '../utils/calculations.js'
 
@@ -39,8 +40,8 @@ const S = {
 }
 
 /* ─── Export: CSV ─────────────────────────────────────────── */
-function exportCSV(rows, state) {
-  const header = ['Tarih', 'Öğrenci', 'Sınıf', 'Kalem', 'Ödeme Türü', 'Tutar (₺)', 'KDV (₺)', 'Net (₺)', 'Fatura No', 'Açıklama']
+function exportCSV(rows, state, isAdminPanelMode) {
+  const header = ['Tarih', ...(isAdminPanelMode ? ['Okul'] : []), 'Öğrenci', 'Sınıf', 'Kalem', 'Ödeme Türü', 'Tutar (₺)', 'KDV (₺)', 'Net (₺)', 'Fatura No', 'Açıklama']
   const lines = [header.join(';')]
   rows.forEach(c => {
     const s = getStudent(state, c.studentId)
@@ -48,6 +49,7 @@ function exportCSV(rows, state) {
     const vat = invoiced ? (c.vat || 0) : 0
     lines.push([
       c.date || '',
+      ...(isAdminPanelMode ? [s?._schoolName || c._schoolName || '-'] : []),
       s?.name || '-',
       s?.class || '-',
       c.item || '-',
@@ -67,14 +69,15 @@ function exportCSV(rows, state) {
 }
 
 /* ─── Export: PDF / Print ─────────────────────────────────── */
-function exportPDF(rows, state, totals, dateFrom, dateTo) {
+function exportPDF(rows, state, totals, dateFrom, dateTo, isAdminPanelMode) {
   const range = (dateFrom || dateTo) ? `${dateFrom || '—'} → ${dateTo || '—'}` : 'Tüm Tarihler'
   const trRows = rows.map(c => {
     const s = getStudent(state, c.studentId)
     const invoiced = isCollectionInvoiced(state, c, s)
     const vat = invoiced ? (c.vat || 0) : 0
+    const schoolCell = isAdminPanelMode ? `<td>${s?._schoolName || c._schoolName || '-'}</td>` : ''
     return `<tr>
-      <td>${c.date || ''}</td><td>${s?.name || '-'}</td><td>${c.item || '-'}</td>
+      <td>${c.date || ''}</td>${schoolCell}<td>${s?.name || '-'}</td><td>${c.item || '-'}</td>
       <td>${c.payment || '-'}</td>
       <td style="text-align:right">${money(c.amount)}</td>
       <td style="text-align:right">${invoiced ? money(vat) : '—'}</td>
@@ -103,7 +106,7 @@ function exportPDF(rows, state, totals, dateFrom, dateTo) {
   <div class="sbox"><div class="sbox-label">KDV HARİÇ NET</div><div class="sbox-val">${money(totals.net)}</div></div>
 </div>
 <table><thead><tr>
-  <th>Tarih</th><th>Öğrenci</th><th>Kalem</th><th>Ödeme</th>
+  <th>Tarih</th>${isAdminPanelMode ? '<th>Okul</th>' : ''}<th>Öğrenci</th><th>Kalem</th><th>Ödeme</th>
   <th style="text-align:right">Tutar</th><th style="text-align:right">KDV</th>
   <th>Fatura No</th><th>Açıklama</th>
 </tr></thead><tbody>${trRows}</tbody></table>
@@ -116,10 +119,12 @@ function exportPDF(rows, state, totals, dateFrom, dateTo) {
 
 /* ─── Page ────────────────────────────────────────────────── */
 export default function TahsilatlarPage() {
+  const { isAdminPanelMode, accessibleTenants } = useAuth()
   const { state } = useAnaokuluData()
   const collections = state?.collections || []
 
   // Varsayılan: bugün → bugün
+  const [selectedSchoolId, setSelectedSchoolId] = useState('')
   const [dateFrom, setDateFrom] = useState(todayStr())
   const [dateTo, setDateTo] = useState(todayStr())
   const [q, setQ] = useState('')
@@ -129,13 +134,14 @@ export default function TahsilatlarPage() {
     const needle = q.toLowerCase()
     return collections.filter(c => {
       const s = getStudent(state, c.studentId)
-      const hitSearch = ((s?.name || '') + '').toLowerCase().includes(needle)
+      const hitSchool = !selectedSchoolId || (s?._schoolId === selectedSchoolId) || (c._schoolId === selectedSchoolId)
+      const hitSearch = ((s?.name || '') + ' ' + (s?._schoolName || '') + ' ' + (c._schoolName || '')).toLowerCase().includes(needle)
       const hitType = !typeFilter || c.payment === typeFilter
       const hitFrom = !dateFrom || (c.date || '') >= dateFrom
       const hitTo = !dateTo || (c.date || '') <= dateTo
-      return hitSearch && hitType && hitFrom && hitTo
+      return hitSchool && hitSearch && hitType && hitFrom && hitTo
     }).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  }, [collections, q, typeFilter, dateFrom, dateTo, state]) // eslint-disable-line
+  }, [collections, q, typeFilter, dateFrom, dateTo, selectedSchoolId, state]) // eslint-disable-line
 
   const totals = useMemo(() => {
     const total = filtered.reduce((a, c) => a + (c.amount || 0), 0)
@@ -159,17 +165,19 @@ export default function TahsilatlarPage() {
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📊 Tahsilat Raporu</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
-            Yalnızca görüntüleme · {collections.length} toplam kayıt
+            {isAdminPanelMode
+              ? `Süper Admin Paneli · Tüm Okullar · ${collections.length} toplam kayıt · ${filtered.length} listeleniyor`
+              : `Yalnızca görüntüleme · ${collections.length} toplam kayıt`}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="ak-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
-            onClick={() => exportCSV(filtered, state)}
+            onClick={() => exportCSV(filtered, state, isAdminPanelMode)}
             disabled={!canExport}
             style={{
               ...S.btn,
@@ -181,7 +189,7 @@ export default function TahsilatlarPage() {
             ⬇ Excel (CSV)
           </button>
           <button
-            onClick={() => exportPDF(filtered, state, totals, dateFrom, dateTo)}
+            onClick={() => exportPDF(filtered, state, totals, dateFrom, dateTo, isAdminPanelMode)}
             disabled={!canExport}
             style={{
               ...S.btn,
@@ -195,8 +203,23 @@ export default function TahsilatlarPage() {
         </div>
       </div>
 
+      {isAdminPanelMode && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(16,185,129,0.06)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          <span style={{ fontSize: 18 }}>🏢</span>
+          <div style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>
+            Süper Admin Paneli modundasınız. Bu sayfada tüm okulların tahsilatları birleştirilerek listelenir.
+            Aşağıdaki filtreyi kullanarak belirli bir okulun tahsilatlarını da görüntüleyebilirsiniz.
+          </div>
+        </div>
+      )}
+
       {/* ── Summary cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+      <div className="ak-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
         <div style={S.miniBox}>
           <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Kayıt Sayısı</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{totals.count}</div>
@@ -216,13 +239,27 @@ export default function TahsilatlarPage() {
       </div>
 
       {/* ── Filters ── */}
-      <div style={{
+      <div className="ak-panel ak-filter-bar" style={{
         ...S.panel, marginBottom: 18, padding: '14px 18px',
         display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center'
       }}>
+        {/* School selector for superadmin */}
+        {(isAdminPanelMode || (accessibleTenants && accessibleTenants.length > 0)) && (
+          <select
+            style={{ ...S.input, minWidth: 160, fontWeight: 600, background: '#f8fafc' }}
+            value={selectedSchoolId}
+            onChange={e => setSelectedSchoolId(e.target.value)}
+          >
+            <option value="">🏫 Tüm Okullar ({accessibleTenants?.length || 'Tümü'})</option>
+            {accessibleTenants?.map(t => (
+              <option key={t.id || t._id} value={t.id || t._id}>🏫 {t.name}</option>
+            ))}
+          </select>
+        )}
+
         {/* Date range */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>📅 Tarih Aralığı:</span>
+          <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>📅 Tarih:</span>
           <input type="date" style={S.input} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
           <span style={{ color: '#94a3b8', fontWeight: 600 }}>→</span>
           <input type="date" style={S.input} value={dateTo} onChange={e => setDateTo(e.target.value)} />
@@ -243,7 +280,7 @@ export default function TahsilatlarPage() {
         {/* Search & payment type */}
         <input
           style={{ ...S.input, flex: '1 1 160px', minWidth: 140 }}
-          placeholder="Öğrenci ara..." value={q}
+          placeholder="Öğrenci veya okul ara..." value={q}
           onChange={e => setQ(e.target.value)} />
         <select
           style={{ ...S.input, minWidth: 150 }}
@@ -255,11 +292,12 @@ export default function TahsilatlarPage() {
       </div>
 
       {/* ── Table ── */}
-      <div style={S.panel}>
-        <div style={{ overflowX: 'auto' }}>
+      <div className="ak-panel" style={S.panel}>
+        <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
             <thead>
               <tr>
+                {isAdminPanelMode && <th style={S.th}>🏫 Okul</th>}
                 <th style={S.th}>Tarih</th>
                 <th style={S.th}>Öğrenci</th>
                 <th style={S.th}>Sınıf</th>
@@ -274,7 +312,7 @@ export default function TahsilatlarPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
+                  <td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
                     {collections.length === 0
                       ? 'Henüz hiç tahsilat kaydı yok.'
@@ -291,6 +329,20 @@ export default function TahsilatlarPage() {
                     onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     style={{ transition: 'background 0.12s' }}>
+                    {isAdminPanelMode && (
+                      <td style={S.td}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 8px', borderRadius: 6,
+                          fontSize: 11, fontWeight: 700,
+                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                          border: '1px solid rgba(99,102,241,0.2)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          🏫 {s?._schoolName || c._schoolName || '—'}
+                        </span>
+                      </td>
+                    )}
                     <td style={{ ...S.td, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
                       {trDate(c.date)}
                     </td>

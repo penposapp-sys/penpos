@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   accessibleBranchIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Branch', default: [] },
   accessibleTenantIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'Tenant', default: [] },
   regionSystemType: { type: String, enum: ['anaokulu'], default: null },
+  creatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   systemType: { type: String, enum: ['kermes', 'kantin', 'anaokulu'], default: null },
   name: { type: String, required: true },
   username: {

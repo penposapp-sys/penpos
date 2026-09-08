@@ -59,14 +59,15 @@ function reducer(state, action) {
 export function AnaokuluDataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const debounceRef = useRef(null)
-  const { regionCurrentTenantId, isRegionAdmin, user, loading } = useAuth()
+  const { regionCurrentTenantId, isRegionAdmin, isAdminPanelMode, accessibleTenants, user, loading } = useAuth()
   const isManager = Boolean(isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin')
 
-  const buildReqConfig = (extra = {}) => {
+  const buildReqConfig = (extra = {}, tenantId) => {
     const cfg = { portalOverride: 'anaokulu', ...extra }
-    if (isManager && regionCurrentTenantId) {
-      cfg.headers = { ...(cfg.headers || {}), 'X-Tenant-Id': String(regionCurrentTenantId) }
-      cfg.params = { ...(cfg.params || {}), tenantId: String(regionCurrentTenantId) }
+    const effectiveTenantId = tenantId || regionCurrentTenantId
+    if (isManager && effectiveTenantId) {
+      cfg.headers = { ...(cfg.headers || {}), 'X-Tenant-Id': String(effectiveTenantId) }
+      cfg.params = { ...(cfg.params || {}), tenantId: String(effectiveTenantId) }
     }
     return cfg
   }
@@ -74,6 +75,7 @@ export function AnaokuluDataProvider({ children }) {
   const saveToBackend = async (nextState = state) => {
     if (loading) return
     if (isRegionAdmin && !regionCurrentTenantId) return
+    if (isAdminPanelMode) return
     try {
       dispatch({ type: 'SET_SAVING', payload: true })
       const body = {
@@ -103,7 +105,111 @@ export function AnaokuluDataProvider({ children }) {
 
   const loadFromBackend = async () => {
     if (loading) return
-    if (isRegionAdmin && !regionCurrentTenantId) return
+    if (isRegionAdmin && !regionCurrentTenantId && !isAdminPanelMode) return
+
+    if (isAdminPanelMode) {
+      try {
+        const tenantList = Array.isArray(accessibleTenants) && accessibleTenants.length > 0
+          ? accessibleTenants
+          : []
+
+        if (tenantList.length === 0) {
+          dispatch({
+            type: 'LOAD',
+            payload: {
+              settings: { ...initialState.settings },
+              students: [],
+              collections: [],
+              invoices: [],
+              checks: []
+            }
+          })
+          return
+        }
+
+        const results = await Promise.all(
+          tenantList.map(async (t) => {
+            try {
+              const res = await api('/api/anaokulu/', buildReqConfig({ silent: true, suppressAuthRedirect: true }, t.id))
+              return { tenant: t, data: res?.ok !== false ? res : null }
+            } catch {
+              return { tenant: t, data: null }
+            }
+          })
+        )
+
+        const allStudents = []
+        const allCollections = []
+        const allInvoices = []
+        const allChecks = []
+        let firstSettings = { ...initialState.settings }
+
+        results.forEach(({ tenant, data }, idx) => {
+          if (!data) return
+          if (idx === 0) {
+            firstSettings = {
+              ...initialState.settings,
+              ...(data.settings || {}),
+              feeCategories: Array.isArray(data.settings?.feeCategories) ? data.settings.feeCategories : [],
+              discounts: Array.isArray(data.settings?.discounts) ? data.settings.discounts : [],
+              luca: {
+                tckn: '',
+                customerNo: '',
+                username: '',
+                password: '',
+                url: 'https://turmobefatura.luca.com.tr',
+                autoSync: true,
+                ...(data.settings?.luca || {})
+              }
+            }
+          }
+          const schoolId = String(tenant.id || tenant._id)
+          const schoolName = tenant.name || 'İsimsiz Okul'
+          ;(data.students || []).forEach(s => {
+            allStudents.push({
+              ...s,
+              _schoolId: schoolId,
+              _schoolName: schoolName
+            })
+          })
+          ;(data.collections || []).forEach(c => {
+            allCollections.push({
+              ...c,
+              _schoolId: schoolId,
+              _schoolName: schoolName
+            })
+          })
+          ;(data.invoices || []).forEach(i => {
+            allInvoices.push({
+              ...i,
+              _schoolId: schoolId,
+              _schoolName: schoolName
+            })
+          })
+          ;(data.checks || []).forEach(ch => {
+            allChecks.push({
+              ...ch,
+              _schoolId: schoolId,
+              _schoolName: schoolName
+            })
+          })
+        })
+
+        dispatch({
+          type: 'LOAD',
+          payload: {
+            settings: firstSettings,
+            students: allStudents,
+            collections: allCollections,
+            invoices: allInvoices,
+            checks: allChecks
+          }
+        })
+      } catch {
+      }
+      return
+    }
+
     try {
       const res = await api('/api/anaokulu/', buildReqConfig({ silent: true, suppressAuthRedirect: true }))
       if (res?.ok !== false && res) {
@@ -140,17 +246,18 @@ export function AnaokuluDataProvider({ children }) {
     if (!loading) {
       loadFromBackend()
     }
-  }, [loading, regionCurrentTenantId, isRegionAdmin])
+  }, [loading, regionCurrentTenantId, isRegionAdmin, isAdminPanelMode, accessibleTenants])
 
   useEffect(() => {
     if (!state.loaded) return
+    if (isAdminPanelMode) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       saveToBackend(state)
     }, 500)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.settings, state.students, state.collections, state.invoices, state.checks])
+  }, [state.settings, state.students, state.collections, state.invoices, state.checks, isAdminPanelMode])
 
   const actions = {
     updateSettings: (patch) => dispatch({ type: 'SETTINGS_UPDATE', payload: patch }),
@@ -163,12 +270,12 @@ export function AnaokuluDataProvider({ children }) {
     addInvoice: (i) => dispatch({ type: 'INVOICE_ADD', payload: { uuid: i.uuid || `inv_${Date.now()}`, ...i } }),
     deleteInvoice: (uuid) => dispatch({ type: 'INVOICE_DELETE', payload: uuid }),
     replaceAll: (data) => dispatch({ type: 'REPLACE_ALL', payload: data }),
-    forceSave: () => saveToBackend(state),
+    forceSave: () => !isAdminPanelMode && saveToBackend(state),
     reload: () => loadFromBackend()
   }
 
   return (
-    <AnaokuluDataContext.Provider value={{ state, actions, save: () => saveToBackend(state) }}>
+    <AnaokuluDataContext.Provider value={{ state, actions, save: () => !isAdminPanelMode && saveToBackend(state), isAdminPanelMode }}>
       {children}
     </AnaokuluDataContext.Provider>
   )

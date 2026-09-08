@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { hasAuthToken } from '../../lib/authStorage.js'
 import { isMobileRuntime, MOBILE_WIDTH_QUERY, subscribeToMediaQuery } from '../../utils/device.js'
+import './anaokulu.css'
 
 const BASE_NAV = [
   { to: '/anaokulu/genel-bakis', label: 'Genel Bakış', icon: '🏠' },
@@ -14,7 +15,7 @@ const BASE_NAV = [
 ]
 
 export default function AnaokuluLayout() {
-  const { user, loading, logout, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin, tenantCtx } = useAuth()
+  const { user, loading, logout, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin, isAdminPanelMode, tenantCtx } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false)
@@ -66,24 +67,36 @@ export default function AnaokuluLayout() {
   if (loading || !user) return null
 
   const isManager = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
+  const isStaff = user?.role === 'staff'
+  const isTenantAdmin = user?.role === 'tenant_admin'
 
   const NAV = [...BASE_NAV]
-  if (!isManager) {
+  if (isTenantAdmin) {
     NAV.push({
       to: '/anaokulu/ayarlar',
       label: 'Ayarlar',
       icon: '⚙️',
       subItems: [{ to: '/anaokulu/ayarlar/uyeler', label: 'Üyeler', icon: '👤' }]
     })
-  } else {
-    NAV.push({ to: '/anaokulu/ayarlar', label: 'Ayarlar', icon: '⚙️' })
+  } else if (isManager) {
+    NAV.push({
+      to: '/anaokulu/ayarlar',
+      label: 'Ayarlar',
+      icon: '⚙️',
+      subItems: [{ to: '/anaokulu/ayarlar/uyeler', label: 'Üyeler', icon: '👤' }]
+    })
     NAV.push({ to: '/anaokulu/okullarim', label: 'Okullarım', icon: '🏫', regionOnly: true })
+  } else if (isStaff) {
+    NAV.push({ to: '/anaokulu/ayarlar', label: 'Ayarlar', icon: '⚙️' })
   }
 
   const currentTenantForTitle = isManager
     ? (accessibleTenants.find((t) => String(t.id) === String(regionCurrentTenantId)))
     : (tenantCtx?.tenant || user?.tenant)
-  const currentSchoolName = currentTenantForTitle?.name || (isManager && accessibleTenants.length === 0 ? 'Okul Seçiniz / Ekleyiniz' : 'Anaokulu Yönetimi')
+  const currentSchoolName = (() => {
+    if (isAdminPanelMode) return 'Süper Admin Paneli'
+    return currentTenantForTitle?.name || (isManager && accessibleTenants.length === 0 ? 'Okul Seçiniz / Ekleyiniz' : 'Anaokulu Yönetimi')
+  })()
   const headerHeight = isMobile ? 70 : 62
 
   return (
@@ -137,6 +150,25 @@ export default function AnaokuluLayout() {
               <span style={{ display: 'inline-block' }}>ANAOKULU</span>
             </div>
 
+            {/* Back to Admin Panel Button (only when a specific school is selected) */}
+            {isManager && !isAdminPanelMode && (
+              <button
+                type="button"
+                onClick={() => setRegionCurrentTenantId(null)}
+                title="Süper Admin Paneline Dön"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px',
+                  borderRadius: 10, background: 'rgba(16,185,129,0.15)',
+                  border: '1px solid rgba(16,185,129,0.35)',
+                  color: '#065f46', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                ← Ana Panel
+              </button>
+            )}
+
             {/* School Switcher for Admins / Managers */}
             {isManager ? (
               <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
@@ -145,9 +177,11 @@ export default function AnaokuluLayout() {
                   onClick={() => setSchoolDropdownOpen((v) => !v)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-                    borderRadius: 10, background: 'rgba(99,102,241,0.2)',
-                    border: '1px solid rgba(99,102,241,0.4)',
-                    color: '#c7d2fe', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    borderRadius: 10,
+                    background: isAdminPanelMode ? 'rgba(16,185,129,0.18)' : 'rgba(99,102,241,0.2)',
+                    border: isAdminPanelMode ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(99,102,241,0.4)',
+                    color: isAdminPanelMode ? '#065f46' : '#c7d2fe',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 700,
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -162,6 +196,26 @@ export default function AnaokuluLayout() {
                     background: '#fff', borderRadius: 14, boxShadow: '0 18px 50px rgba(15,23,42,0.25)',
                     border: '1px solid #e2e8f0', padding: 6, zIndex: 1001
                   }}>
+                    {/* Admin Panel Mode Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegionCurrentTenantId(null)
+                        setSchoolDropdownOpen(false)
+                      }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                        fontWeight: isAdminPanelMode ? 800 : 600, fontSize: 13,
+                        background: isAdminPanelMode ? 'rgba(16,185,129,0.10)' : 'transparent',
+                        color: isAdminPanelMode ? '#059669' : '#0f172a',
+                        marginBottom: 4
+                      }}
+                    >
+                      🏢 Admin Paneli (Tüm Okullar)
+                      {isAdminPanelMode && <span style={{ marginLeft: 8, color: '#10b981' }}>●</span>}
+                    </button>
+                    <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0', padding: 0 }}></div>
                     {accessibleTenants.length === 0 && (
                       <div style={{ padding: 12, color: '#94a3b8', fontSize: 13 }}>Erişilebilir anaokulu yok</div>
                     )}
@@ -313,7 +367,37 @@ export default function AnaokuluLayout() {
             </div>
             {isManager && (
               <div style={{ marginBottom: 12 }}>
-                <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6 }}>Aktif okul</div>
+                <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6 }}>
+                  {isAdminPanelMode ? 'Mod' : 'Aktif okul'}
+                </div>
+                {/* Back to Admin Panel Button in Mobile */}
+                {!isAdminPanelMode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegionCurrentTenantId(null)
+                      setSchoolDropdownOpen(false)
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      padding: '10px 12px',
+                      marginBottom: 8,
+                      borderRadius: 12,
+                      background: 'rgba(16,185,129,0.18)',
+                      border: '1px solid rgba(16,185,129,0.35)',
+                      color: '#065f46',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 800
+                    }}
+                  >
+                    ← Ana Panel'e Dön
+                  </button>
+                )}
                 <div ref={dropdownRef} style={{ position: 'relative' }}>
                   <button
                     type="button"
@@ -326,9 +410,9 @@ export default function AnaokuluLayout() {
                       gap: 8,
                       padding: '10px 12px',
                       borderRadius: 12,
-                      background: 'rgba(99,102,241,0.16)',
-                      border: '1px solid rgba(99,102,241,0.36)',
-                      color: '#e0e7ff',
+                      background: isAdminPanelMode ? 'rgba(16,185,129,0.18)' : 'rgba(99,102,241,0.16)',
+                      border: isAdminPanelMode ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(99,102,241,0.36)',
+                      color: isAdminPanelMode ? '#065f46' : '#e0e7ff',
                       cursor: 'pointer',
                       fontSize: 13,
                       fontWeight: 700
@@ -350,6 +434,32 @@ export default function AnaokuluLayout() {
                       padding: 6,
                       zIndex: 1001
                     }}>
+                      {/* Admin Panel Mode Option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRegionCurrentTenantId(null)
+                          setSchoolDropdownOpen(false)
+                        }}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '9px 12px',
+                          borderRadius: 8,
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: isAdminPanelMode ? 800 : 600,
+                          fontSize: 13,
+                          background: isAdminPanelMode ? 'rgba(16,185,129,0.10)' : 'transparent',
+                          color: isAdminPanelMode ? '#059669' : '#0f172a',
+                          marginBottom: 4
+                        }}
+                      >
+                        🏢 Admin Paneli (Tüm Okullar)
+                        {isAdminPanelMode && <span style={{ marginLeft: 8, color: '#10b981' }}>●</span>}
+                      </button>
+                      <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0', padding: 0 }}></div>
                       {accessibleTenants.length === 0 && (
                         <div style={{ padding: 12, color: '#94a3b8', fontSize: 13 }}>Erişilebilir anaokulu yok</div>
                       )}
