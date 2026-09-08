@@ -1056,7 +1056,7 @@ export default function UcretPlaniPage() {
     <div style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
       
       {/* Page Title */}
-      <div style={{ marginBottom: 14 }}>
+      <div className="ak-page-header" style={{ marginBottom: 14 }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: 22, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>💳</span> Ücret &amp; Taksit Yönetimi
         </h2>
@@ -1273,7 +1273,7 @@ export default function UcretPlaniPage() {
               </div>
 
               {/* Summary 4-Box Cards */}
-              <div style={{
+              <div className="ak-stats-grid" style={{
                 display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10
               }}>
                 {[
@@ -1317,7 +1317,7 @@ export default function UcretPlaniPage() {
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
                   <table style={{ ...tbl, minWidth: 620 }}>
                     <thead>
                       <tr>
@@ -1478,7 +1478,7 @@ export default function UcretPlaniPage() {
                     </div>
                   </div>
 
-                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                  <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
                     <table style={{ ...tbl, minWidth: 680 }}>
                       <thead>
                         <tr>

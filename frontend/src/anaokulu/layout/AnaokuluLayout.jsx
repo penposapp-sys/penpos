@@ -97,7 +97,7 @@ export default function AnaokuluLayout() {
     if (isAdminPanelMode) return 'Süper Admin Paneli'
     return currentTenantForTitle?.name || (isManager && accessibleTenants.length === 0 ? 'Okul Seçiniz / Ekleyiniz' : 'Anaokulu Yönetimi')
   })()
-  const headerHeight = isMobile ? 70 : 62
+  const headerHeight = isMobile ? 48 : 62
 
   return (
     <div className={`anaokulu-layout-shell${isMobile ? ' anaokulu-layout-shell--mobile' : ''}`} style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fafc' }}>
@@ -112,12 +112,12 @@ export default function AnaokuluLayout() {
         borderBottom: '1px solid rgba(255,255,255,0.08)'
       }}>
         <div style={{
-          padding: isMobile ? '0 12px' : '0 16px', height: headerHeight,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12
+          padding: isMobile ? '0 10px' : '0 16px', height: headerHeight,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10
         }}>
           
           {/* Brand Logo & School Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flexShrink: 0, minWidth: 0 }}>
             {isMobile && (
               <button
                 type="button"
@@ -128,14 +128,14 @@ export default function AnaokuluLayout() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
                   border: '1px solid rgba(255,255,255,0.16)',
                   background: 'rgba(255,255,255,0.08)',
                   color: '#fff',
                   cursor: 'pointer',
-                  fontSize: 18,
+                  fontSize: 16,
                   flexShrink: 0
                 }}
               >
@@ -143,10 +143,10 @@ export default function AnaokuluLayout() {
               </button>
             )}
             <div style={{
-              fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: 0.5,
-              display: 'flex', alignItems: 'center', gap: 6
+              fontSize: isMobile ? 13 : 16, fontWeight: 900, color: '#fff', letterSpacing: 0.5,
+              display: 'flex', alignItems: 'center', gap: 5
             }}>
-              <span style={{ fontSize: 20 }}>🏫</span>
+              <span style={{ fontSize: isMobile ? 15 : 20 }}>🏫</span>
               <span style={{ display: 'inline-block' }}>ANAOKULU</span>
             </div>
 
@@ -157,15 +157,15 @@ export default function AnaokuluLayout() {
                 onClick={() => setRegionCurrentTenantId(null)}
                 title="Süper Admin Paneline Dön"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-                  borderRadius: 10, background: 'rgba(16,185,129,0.15)',
+                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: isMobile ? '3px 8px' : '5px 12px',
+                  borderRadius: 8, background: 'rgba(16,185,129,0.15)',
                   border: '1px solid rgba(16,185,129,0.35)',
-                  color: '#065f46', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                  color: '#065f46', cursor: 'pointer', fontSize: isMobile ? 10 : 12, fontWeight: 800,
                   transition: 'all 0.15s ease',
                   whiteSpace: 'nowrap'
                 }}
               >
-                ← Ana Panel
+                ← {isMobile ? 'Panel' : 'Ana Panel'}
               </button>
             )}
 
@@ -176,16 +176,16 @@ export default function AnaokuluLayout() {
                   type="button"
                   onClick={() => setSchoolDropdownOpen((v) => !v)}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-                    borderRadius: 10,
+                    display: 'inline-flex', alignItems: 'center', gap: 4, padding: isMobile ? '3px 8px' : '5px 12px',
+                    borderRadius: 8,
                     background: isAdminPanelMode ? 'rgba(16,185,129,0.18)' : 'rgba(99,102,241,0.2)',
                     border: isAdminPanelMode ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(99,102,241,0.4)',
                     color: isAdminPanelMode ? '#065f46' : '#c7d2fe',
-                    cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    cursor: 'pointer', fontSize: isMobile ? 11 : 13, fontWeight: 700,
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ maxWidth: isMobile ? 110 : 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {currentSchoolName}
                   </span>
                   <span style={{ opacity: 0.8, fontSize: 10 }}>▾</span>
@@ -321,8 +321,8 @@ export default function AnaokuluLayout() {
             <button
               onClick={logout}
               style={{
-                padding: isMobile ? '8px 12px' : '6px 12px', borderRadius: 8, background: '#ef4444', color: '#fff',
-                border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+                padding: isMobile ? '4px 8px' : '6px 12px', borderRadius: 6, background: '#ef4444', color: '#fff',
+                border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: isMobile ? 11 : 12,
                 boxShadow: '0 2px 6px rgba(239,68,68,0.3)'
               }}
             >
@@ -554,7 +554,7 @@ export default function AnaokuluLayout() {
       {/* Main content page area (Full width, responsive) */}
       <main className="anaokulu-layout-main" style={{
         flex: 1,
-        padding: isMobile ? '12px 10px 16px' : '16px 20px',
+        padding: isMobile ? '8px 8px 20px' : '16px 20px',
         maxWidth: '100%',
         boxSizing: 'border-box',
         overflowX: 'hidden'

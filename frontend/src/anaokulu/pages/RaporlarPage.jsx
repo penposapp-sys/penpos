@@ -163,14 +163,14 @@ export default function RaporlarPage() {
         <TopluAlacakRaporu />
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📊 Raporlar</h2>
-              <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
-                Günlük / haftalık / aylık / yıllık tahsilat, KDV ve fatura raporları
-              </p>
-            </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📈 Finansal Raporlar</h2>
+          <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
+            Günlük / haftalık / aylık / yıllık tahsilat, KDV ve fatura raporları
+          </p>
+        </div>
+        <div className="ak-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => {
             const n = exportCSV(state, periodType, rdate)
             toast(`CSV indirildi (${n} kayıt).`)
@@ -184,7 +184,7 @@ export default function RaporlarPage() {
         </div>
       </div>
 
-      <div style={{
+      <div className="ak-panel ak-filter-bar" style={{
         ...panel, marginBottom: 16, padding: '14px 16px',
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center'
       }}>
@@ -220,7 +220,7 @@ export default function RaporlarPage() {
         padding: '12px 18px', background: '#fff', borderRadius: 14,
         border: '1px solid #e6ebf3', marginBottom: 16
       }}>
-        <div style={{
+        <div className="ak-stats-grid" style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12
         }}>
           <div style={miniBox}>
@@ -245,7 +245,7 @@ export default function RaporlarPage() {
       <div style={panel}>
         <div style={{ padding: '18px 20px', overflow: 'auto' }}>
           <h3 style={sect}>Ödeme türüne göre</h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
             <table style={tbl}>
               <thead>
                 <tr>
@@ -271,7 +271,7 @@ export default function RaporlarPage() {
           </div>
 
           <h3 style={sect}>Seçili dönem fatura durumu</h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
             <table style={tbl}>
               <thead>
                 <tr>
@@ -317,7 +317,7 @@ export default function RaporlarPage() {
           </div>
 
           <h3 style={sect}>Öğrenci bazlı özet (en yüksek bakiye önce)</h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
             <table style={tbl}>
               <thead>
                 <tr>

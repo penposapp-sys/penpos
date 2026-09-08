@@ -1,6 +1,6 @@
 /* =========================================================
    ANAOKULU GLOBAL RESPONSIVE STYLES
-   Mobil (<=768px) ve küçük tablet (<=1024px) uyumlu düzenler
+   Mobil ve tablet ekranlar için optimize edilmiş düzen
    ========================================================= */
 
 /* ─── Reset & Base ─────────────────────────────────────── */
@@ -12,6 +12,7 @@
 .anaokulu-layout-main {
   overflow-x: hidden;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Tüm anaokulu içerik kutularının taşmasını engelle */
@@ -19,245 +20,261 @@
   min-width: 0;
 }
 
-/* ─── Tables – Mobilde yatay kaydırma ─────────────────── */
+/* ─── Tables – Yatay kaydırma sarmalayıcısı ────────────── */
 .ak-table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
   border-radius: 12px;
+  max-width: 100%;
 }
 
-/* ─── Mobile Global ≤ 768px ───────────────────────────── */
+/* =========================================================
+   MOBİL DÜZEN: ≤ 768px
+   Rahat okunabilir ve parmakla kolayca seçilebilir boyutlar
+   ========================================================= */
 @media (max-width: 768px) {
 
-  /* Header */
-  .anaokulu-layout-header {
-    padding: 0 !important;
+  /* ── Ana Konteyner ── */
+  .anaokulu-layout-main {
+    padding: 10px 10px 32px !important;
+    font-size: 13px !important;
   }
 
-  /* Summary stat boxes → stacked grid */
-  .ak-stats-grid {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 8px !important;
+  /* ── Başlıklar (Dengeli ve Okunabilir) ── */
+  .anaokulu-layout-main h1,
+  .anaokulu-layout-shell--mobile h1 {
+    font-size: 19px !important;
+    line-height: 1.3 !important;
+    margin: 0 0 4px 0 !important;
   }
 
-  .ak-stats-grid > * {
-    min-width: 0 !important;
-  }
-
-  /* Filter bar → stacked */
-  .ak-filter-bar {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-  }
-
-  .ak-filter-bar select,
-  .ak-filter-bar input {
-    width: 100% !important;
-    font-size: 14px !important;
-  }
-
-  /* Top header row → stacked */
-  .ak-page-header {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 10px !important;
-  }
-
+  .anaokulu-layout-main h2,
+  .anaokulu-layout-shell--mobile h2,
   .ak-page-header h2 {
     font-size: 18px !important;
     line-height: 1.3 !important;
+    margin: 0 0 4px 0 !important;
     word-break: break-word !important;
   }
 
-  .ak-page-header p {
-    font-size: 12px !important;
-    line-height: 1.5 !important;
-  }
-
-  /* Action buttons group → wrap */
-  .ak-actions {
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-    width: 100% !important;
-  }
-
-  .ak-actions > * {
-    flex: 1 1 auto !important;
-    min-width: 120px !important;
-    justify-content: center !important;
-    text-align: center !important;
-    font-size: 12px !important;
-  }
-
-  /* Tables */
-  .ak-table-wrap {
-    overflow-x: auto;
-    margin: 0 -4px;
-    padding: 0 4px;
-  }
-
-  .ak-table-wrap table {
-    min-width: 600px;
-    font-size: 12px !important;
-  }
-
-  .ak-table-wrap th,
-  .ak-table-wrap td {
-    padding: 8px 8px !important;
-    font-size: 12px !important;
-    white-space: normal !important;
-  }
-
-  /* Student / collection cards */
-  .ak-student-card {
-    padding: 10px 12px !important;
-    font-size: 13px !important;
-  }
-
-  /* Period picker row → wrap */
-  .ak-period-row {
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-  }
-
-  .ak-period-row select {
-    font-size: 13px !important;
-    max-width: 100% !important;
-  }
-
-  /* Modals */
-  .ak-modal-box {
-    width: 100% !important;
-    max-width: calc(100vw - 24px) !important;
-    margin: 0 !important;
-    border-radius: 16px !important;
-  }
-
-  /* Panel boxes → reduce padding */
-  .ak-panel {
-    border-radius: 10px !important;
-  }
-
-  /* Summary mini boxes */
-  .ak-mini-box {
-    padding: 8px 10px !important;
-    font-size: 11px !important;
-  }
-
-  .ak-mini-box .ak-mini-value {
+  .anaokulu-layout-main h3,
+  .anaokulu-layout-shell--mobile h3 {
     font-size: 15px !important;
+    line-height: 1.35 !important;
+    margin: 8px 0 4px 0 !important;
   }
 
-  /* School filter buttons → wrap */
-  .ak-school-filter {
+  .anaokulu-layout-main h4,
+  .anaokulu-layout-shell--mobile h4 {
+    font-size: 13px !important;
+    margin: 6px 0 3px 0 !important;
+  }
+
+  /* ── Paragraflar ve Açıklamalar ── */
+  .anaokulu-layout-main p,
+  .anaokulu-layout-shell--mobile p,
+  .ak-page-header p,
+  .ak-page-desc {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    color: #64748b !important;
+  }
+
+  /* ── Sayfa Üst Başlık Bloğu ── */
+  .ak-page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* ── Butonlar ve Aksiyonlar (Kolay Dokunulabilir: min 36px) ── */
+  .ak-actions,
+  .anaokulu-layout-main .ak-actions {
+    display: flex !important;
     flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .anaokulu-layout-main button,
+  .ak-actions button,
+  .ak-page-header button {
+    font-size: 12px !important;
+    padding: 7px 12px !important;
+    min-height: 36px !important;
+    border-radius: 8px !important;
     gap: 6px !important;
   }
 
-  .ak-school-filter button {
+  /* ── İstatistik Kartları: 2'li Izgara ── */
+  .ak-stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .ak-stats-grid > div,
+  .ak-mini-box {
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    min-width: 0 !important;
+  }
+
+  /* Rakamlar: Ne devasa ne de okunaksız, net ve belirgin */
+  .ak-stats-grid [style*="font-size: 28"],
+  .ak-stats-grid [style*="font-size:28"],
+  .ak-stats-grid [style*="fontSize: 28"],
+  .ak-stats-grid [style*="font-size: 26"],
+  .ak-stats-grid [style*="font-size: 24"],
+  .ak-stats-grid [style*="fontSize: 24"],
+  .ak-stats-grid [style*="font-size: 22"],
+  .ak-stats-grid [style*="fontSize: 22"],
+  .ak-stats-grid [style*="font-size: 20"],
+  .ak-stats-grid [style*="fontSize: 20"],
+  .ak-mini-value,
+  .anaokulu-layout-main div[style*="font-size: 28"],
+  .anaokulu-layout-main div[style*="font-size: 26"],
+  .anaokulu-layout-main div[style*="font-size: 24"],
+  .anaokulu-layout-main div[style*="font-size: 22"],
+  .anaokulu-layout-main div[style*="font-size: 20"] {
+    font-size: 18px !important;
+    line-height: 1.25 !important;
+    font-weight: 800 !important;
+  }
+
+  .ak-stats-grid [style*="font-size: 11"],
+  .ak-stats-grid [style*="font-size: 12"],
+  .ak-mini-box [style*="font-size: 11"],
+  .ak-mini-box [style*="font-size: 12"],
+  .anaokulu-layout-main div[style*="font-size: 11"],
+  .anaokulu-layout-main div[style*="font-size: 12"] {
     font-size: 11px !important;
-    padding: 5px 10px !important;
+    line-height: 1.3 !important;
   }
 
-  /* Page subtitle / description */
-  .ak-page-desc {
+  /* ── Filtre Çubuğu ── */
+  .ak-filter-bar {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Form elemanları: input, select (parmakla kolay tıklama) */
+  .anaokulu-layout-main input,
+  .anaokulu-layout-main select,
+  .anaokulu-layout-main textarea,
+  .ak-filter-bar input,
+  .ak-filter-bar select {
+    font-size: 13px !important;
+    padding: 7px 10px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    border-radius: 8px !important;
+  }
+
+  /* ── Tablolar: Rahat okunabilir, yatay kaydırılabilir ── */
+  .ak-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+  }
+
+  .anaokulu-layout-main table {
     font-size: 12px !important;
-    line-height: 1.5 !important;
   }
 
-  /* Diff warning badge */
+  .anaokulu-layout-main th,
+  .ak-table-wrap th {
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    white-space: nowrap !important;
+  }
+
+  .anaokulu-layout-main td,
+  .ak-table-wrap td {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Rozetler */
+  .anaokulu-layout-main span[style*="border-radius: 99"],
+  .anaokulu-layout-main span[style*="border-radius:99"],
+  .anaokulu-layout-main span[style*="borderRadius: 99"],
+  .anaokulu-layout-main span[style*="borderRadius: 999"],
+  .anaokulu-layout-main span[style*="border-radius: 999"],
   .ak-diff-badge {
     font-size: 10px !important;
-    padding: 2px 6px !important;
+    padding: 3px 7px !important;
   }
 
-  /* Overview / Genel Bakış cards */
-  .ak-overview-grid {
-    grid-template-columns: 1fr 1fr !important;
+  /* Paneller ve Kartlar */
+  .ak-panel {
+    border-radius: 12px !important;
+  }
+
+  /* Dashboard satırları */
+  .ak-dashboard-row {
+    grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
 
-  /* Rapor tab bar */
+  /* Sekmeler (Tabs) */
   .ak-tab-bar {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-    gap: 4px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
     flex-wrap: nowrap !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
   }
 
   .ak-tab-bar button {
-    white-space: nowrap;
     font-size: 12px !important;
-    padding: 6px 10px !important;
+    padding: 7px 12px !important;
+    white-space: nowrap !important;
     flex-shrink: 0 !important;
   }
 
-  /* Compact info boxes */
-  .ak-info-box {
-    padding: 10px 12px !important;
-    font-size: 12px !important;
+  /* Modallar: Rahat okunur ve ekrana tam oturur */
+  div[style*="position: fixed"] > div[style*="background: #fff"],
+  div[style*="position: fixed"] > div[style*="background: rgb(255, 255, 255)"],
+  div[style*="position: fixed"] > div[style*="background:#fff"],
+  .ak-modal-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    border-radius: 16px !important;
+    padding: 14px 16px !important;
   }
 
-  /* Scope selector */
-  .ak-scope-bar {
-    flex-wrap: wrap !important;
-    gap: 6px !important;
-  }
-
-  .ak-scope-bar button {
+  div[style*="position: fixed"] label {
     font-size: 11px !important;
-    padding: 5px 10px !important;
+    margin-bottom: 4px !important;
   }
 
-  /* Hide non-essential columns on mobile via class */
-  .ak-col-hide-mobile {
-    display: none !important;
-  }
-}
-
-/* ─── Small Mobile ≤ 420px ────────────────────────────── */
-@media (max-width: 420px) {
-
-  .ak-stats-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .ak-overview-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .ak-page-header h2 {
-    font-size: 16px !important;
-  }
-
-  .ak-mini-box .ak-mini-value {
+  div[style*="position: fixed"] input,
+  div[style*="position: fixed"] select {
     font-size: 13px !important;
-  }
-
-  .ak-actions > * {
-    font-size: 11px !important;
-    padding: 7px 10px !important;
-  }
-
-  .ak-table-wrap table {
-    min-width: 480px;
+    height: 38px !important;
   }
 }
 
-/* ─── Tablet ≤ 1024px ─────────────────────────────────── */
+/* =========================================================
+   TABLET: 769px - 1024px
+   ========================================================= */
 @media (max-width: 1024px) and (min-width: 769px) {
-
   .ak-table-wrap table {
     font-size: 13px;
   }
 
   .ak-table-wrap th,
   .ak-table-wrap td {
-    padding: 9px 10px;
-    font-size: 13px;
+    padding: 8px 10px;
+    font-size: 12px;
   }
 
   .ak-stats-grid {

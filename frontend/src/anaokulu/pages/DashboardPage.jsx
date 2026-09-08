@@ -67,7 +67,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div className="ak-page-header" style={{ marginBottom: 16 }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>🏠 Genel Bakış</h2>
         <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
           {isAdminPanelMode
@@ -96,7 +96,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div style={cardWrap}>
+      <div className="ak-stats-grid" style={cardWrap}>
         <div style={kpi()}>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6, fontWeight: 500 }}>Aktif Öğrenci</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: '#0f172a' }}>{stats.activeCount}</div>
@@ -117,7 +117,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ ...cardWrap, gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+      <div className="ak-dashboard-row" style={{ ...cardWrap, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         <div style={panel}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
@@ -137,7 +137,7 @@ export default function DashboardPage() {
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Son Tahsilatlar</h3>
             <span style={{ fontSize: 12, color: '#64748b' }}>son 6 kayıt</span>
           </div>
-          <div style={{ maxHeight: 260, overflow: 'auto' }}>
+          <div className="ak-table-wrap" style={{ maxHeight: 260, overflow: 'auto' }}>
             <table style={table}>
               <thead>
                 <tr>
@@ -175,7 +175,7 @@ export default function DashboardPage() {
         <h3 style={{ margin: '0 0 14px 0', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
           📋 {stats.currentPeriodName} Fatura Durumu
         </h3>
-        <div style={cardWrap}>
+        <div className="ak-stats-grid" style={{ ...cardWrap, gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
           <div style={{
             padding: '16px 18px', borderRadius: 12,
             background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
@@ -224,7 +224,7 @@ export default function DashboardPage() {
           <h3 style={{ margin: '0 0 14px 0', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
             🏫 Okul Bazlı Dağılım
           </h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
             <table style={table}>
               <thead>
                 <tr>
