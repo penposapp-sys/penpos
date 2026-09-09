@@ -1,4 +1,8 @@
 import { AnaokuluSchool } from '../models/AnaokuluSchool.js'
+import crypto from 'crypto'
+
+// In-memory job store (process restart’ta sıfırlanır — kısa süreli işler için yeterli)
+const lucaJobs = new Map()
 
 export const getAnaokuluSchool = async (req, res) => {
   try {
@@ -136,10 +140,9 @@ export const delAnaokuluInvoice = async (req, res) => {
     res.status(500).json({ error: err?.message || 'Sunucu hatası' })
   }
 }
-
-// ───────────────────────────────────────────────
-// LUCA E-FATURA ENTEGRASYONU - BOT ile Kontrol
-// ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// LUCA E-FATURA ENTEGRASYONU - Async Job mimarisi
+// ─────────────────────────────────────────────────────────────
 export const checkLucaInvoices = async (req, res) => {
   try {
     const tenantId = req.tenant?._id || req.tenant?.id
@@ -161,172 +164,139 @@ export const checkLucaInvoices = async (req, res) => {
       return res.status(400).json({ error: 'Dönem (period) bilgisi gönderilmedi.' })
     }
 
-    // period: "2026-04" → minDate: "2026-04-01", maxDate: "2026-04-30"
+    // Job oluştur ve hemen dön
+    const jobId = crypto.randomUUID()
+    lucaJobs.set(jobId, { status: 'running', startedAt: Date.now() })
+
+    // Arka planda çalıştır (await YOK)
+    _runLucaJob(jobId, tenantId, school, tckn, password, period)
+
+    return res.json({ ok: true, jobId, status: 'running' })
+  } catch (err) {
+    console.error('[checkLucaInvoices] Hata:', err)
+    res.status(500).json({ error: err?.message || 'Luca entegrasyon hatası' })
+  }
+}
+
+// Job durum sorgusu
+export const checkLucaJobStatus = async (req, res) => {
+  const { jobId } = req.params
+  const job = lucaJobs.get(jobId)
+  if (!job) return res.status(404).json({ error: 'Job bulunamadı veya süresi doldu.' })
+  return res.json(job)
+}
+
+// ─── İç yardımcı: arka planda çalışan Luca job'u ───
+async function _runLucaJob(jobId, tenantId, school, tckn, password, period) {
+  try {
     const [year, month] = period.split('-').map(Number)
     const lastDay = new Date(year, month, 0).getDate()
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
     const endDate   = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-    // Bot'u lazily import et (Puppeteer ağır, sadece gerektiğinde yükle)
     const { lucaScraperService } = await import('../services/lucaScraperService.js')
     const lucaInvoices = await lucaScraperService.getInvoices(tckn, password, startDate, endDate)
 
-    // Öğrencilerle eşleştir: TC/VKN ya da isim üzerinden
     const students = school.students || []
-    const matchBy = school.settings?.matchBy || 'tax'
 
-    const matched = []
-    let matchedCount = 0
-
-    // Yardımcı: Türkçe karakter normalizasyonu
     const normalizeTurkish = (str) => {
       if (!str) return ''
       return String(str)
-        .replace(/İ/g, 'i')
-        .replace(/I/g, 'i')
-        .replace(/ı/g, 'i')
+        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
         .toLowerCase()
-        .replace(/ş/g, 's')
-        .replace(/ç/g, 'c')
-        .replace(/ğ/g, 'g')
-        .replace(/ü/g, 'u')
-        .replace(/ö/g, 'o')
-        .replace(/[^a-z0-9]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+        .replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u').replace(/ö/g, 'o')
+        .replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim()
     }
 
     const matchInvoiceToStudent = (alici, studentList) => {
       const normAlici = normalizeTurkish(alici)
-      if (!normAlici || !studentList || studentList.length === 0) return null
-
-      // 1. ÖĞRENCİ ADIYLA TAM EŞLEŞME
+      if (!normAlici || !studentList?.length) return null
       let found = studentList.find(s => normalizeTurkish(s.name) === normAlici)
       if (found) return found
-
-      // 2. ÖĞRENCİ ADIYLA İLK AD + SOYAD EŞLEŞMESİ (Örn: MELİH CIVAK <-> MELİH EMRE CIVAK)
       const aliciWords = normAlici.split(' ').filter(w => w.length > 1)
       if (aliciWords.length >= 2) {
-        const firstA = aliciWords[0]
-        const lastA = aliciWords[aliciWords.length - 1]
-
+        const firstA = aliciWords[0]; const lastA = aliciWords[aliciWords.length - 1]
         found = studentList.find(s => {
           const sWords = normalizeTurkish(s.name).split(' ').filter(w => w.length > 1)
-          if (sWords.length >= 2) {
-            return firstA === sWords[0] && lastA === sWords[sWords.length - 1]
-          }
-          return false
+          return sWords.length >= 2 && firstA === sWords[0] && lastA === sWords[sWords.length - 1]
         })
         if (found) return found
       }
-
-      // 3. ÖĞRENCİ ADI İÇERME (INCLUDES) EŞLEŞMESİ
       found = studentList.find(s => {
         const sNorm = normalizeTurkish(s.name)
         if (!sNorm || sNorm.length < 4) return false
         return normAlici.includes(sNorm) || sNorm.includes(normAlici)
       })
       if (found) return found
-
-      // 4. VELİ ADIYLA TAM EŞLEŞME
       found = studentList.find(s => normalizeTurkish(s.parent) === normAlici)
       if (found) return found
-
-      // 5. VELİ ADIYLA İLK AD + SOYAD EŞLEŞMESİ
       if (aliciWords.length >= 2) {
-        const firstA = aliciWords[0]
-        const lastA = aliciWords[aliciWords.length - 1]
-
+        const firstA = aliciWords[0]; const lastA = aliciWords[aliciWords.length - 1]
         found = studentList.find(s => {
           const pWords = normalizeTurkish(s.parent).split(' ').filter(w => w.length > 1)
-          if (pWords.length >= 2) {
-            return firstA === pWords[0] && lastA === pWords[pWords.length - 1]
-          }
-          return false
+          return pWords.length >= 2 && firstA === pWords[0] && lastA === pWords[pWords.length - 1]
         })
         if (found) return found
       }
-
-      // 6. VELİ ADI İÇERME (INCLUDES) EŞLEŞMESİ
       found = studentList.find(s => {
         const pNorm = normalizeTurkish(s.parent)
         if (!pNorm || pNorm.length < 4) return false
         return normAlici.includes(pNorm) || pNorm.includes(normAlici)
       })
-      if (found) return found
-
-      return null
+      return found || null
     }
 
-    for (const li of lucaInvoices) {
-      // Luca'da faturalar öğrenciye kesildiği için önce öğrenci adıyla eşleştir
-      const student = matchInvoiceToStudent(li.alici, students)
+    const matched = []
+    let matchedCount = 0
+    const vatRate = Number(school.settings?.vat || 10)
 
-      const vatRate = Number(school.settings?.vat || 10)
+    for (const li of lucaInvoices) {
+      const student = matchInvoiceToStudent(li.alici, students)
       const base = li.total ? Math.round((li.total / (1 + vatRate / 100)) * 100) / 100 : 0
       const vat  = li.total ? Math.round((li.total - base) * 100) / 100 : 0
-
       const invPeriod = (li.isoDate && li.isoDate.length >= 7) ? li.isoDate.slice(0, 7) : period
-
       matched.push({
         uuid: `luca_${li.faturaNo || Date.now()}`,
-        no: li.faturaNo,
-        date: li.isoDate,
-        period: invPeriod, // Faturanın gerçek kesim tarihinden türetilen dönem (örn: 2026-05-30 -> 2026-05)
-        taxId: student?.tax || '',
-        buyer: li.alici,
-        base,
-        vat,
-        total: li.total,
-        type: 'e-Arşiv',
-        status: 'Kesildi',
+        no: li.faturaNo, date: li.isoDate, period: invPeriod,
+        taxId: student?.tax || '', buyer: li.alici,
+        base, vat, total: li.total, type: 'e-Arşiv', status: 'Kesildi',
         studentId: student ? (student.id || student._id) : null,
         matchBy: 'luca-scraper'
       })
       if (student && invPeriod === period) matchedCount++
     }
 
-    // Mevcut faturalara ekle (aynı fatura numarası varsa güncelle)
     const updated = await AnaokuluSchool.findOne({ tenant: tenantId })
-    if (!updated) return res.status(404).json({ error: 'Okul kaydı bulunamadı.' })
+    if (!updated) throw new Error('Okul kaydı bulunamadı')
 
     for (const inv of matched) {
       const idx = updated.invoices.findIndex(i => i.no === inv.no)
-      if (idx >= 0) {
-        updated.invoices[idx] = inv
-      } else {
-        updated.invoices.push(inv)
-      }
+      idx >= 0 ? (updated.invoices[idx] = inv) : updated.invoices.push(inv)
     }
-
-    // Tüm faturaların dönemlerini fatura tarihlerine göre garantiye al
     for (const inv of updated.invoices) {
-      if (inv.date && inv.date.length >= 7) {
-        inv.period = inv.date.slice(0, 7)
-      }
+      if (inv.date && inv.date.length >= 7) inv.period = inv.date.slice(0, 7)
     }
-
-    // Check kaydı ekle
     updated.checks = updated.checks || []
-    updated.checks.push({
-      period,
-      at: Date.now(),
-      found: lucaInvoices.length,
-      matched: matchedCount
-    })
-
+    updated.checks.push({ period, at: Date.now(), found: lucaInvoices.length, matched: matchedCount })
     updated.markModified('invoices')
     await updated.save()
 
-    const { settings, students: sts, collections, invoices, checks } = updated
-    res.json({
+    const { settings, students: sts, collections, invoices, checks } = updated.toObject()
+    lucaJobs.set(jobId, {
+      status: 'done',
       ok: true,
       found: lucaInvoices.length,
       matched: matchedCount,
-      settings, students: sts, collections, invoices, checks
+      settings, students: sts, collections, invoices, checks,
+      finishedAt: Date.now()
     })
+
+    // 10 dakika sonra belleği temizle
+    setTimeout(() => lucaJobs.delete(jobId), 10 * 60 * 1000)
   } catch (err) {
-    console.error('[checkLucaInvoices] Hata:', err)
-    res.status(500).json({ error: err?.message || 'Luca entegrasyon hatası' })
+    console.error('[_runLucaJob] Hata:', err)
+    lucaJobs.set(jobId, { status: 'error', error: err?.message || 'Luca entegrasyon hatası', finishedAt: Date.now() })
+    setTimeout(() => lucaJobs.delete(jobId), 5 * 60 * 1000)
   }
 }

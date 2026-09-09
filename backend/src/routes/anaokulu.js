@@ -8,7 +8,8 @@ import {
   delAnaokuluStudent,
   delAnaokuluCollection,
   delAnaokuluInvoice,
-  checkLucaInvoices
+  checkLucaInvoices,
+  checkLucaJobStatus
 } from '../controllers/anaokuluController.js'
 
 const router = Router()
@@ -25,7 +26,8 @@ router.delete('/students/:id', delAnaokuluStudent)
 router.delete('/collections/:id', delAnaokuluCollection)
 router.delete('/invoices/:uuid', delAnaokuluInvoice)
 
-// LUCA e-Fatura entegrasyon endpoint'i
+// LUCA e-Fatura entegrasyon endpoint'leri
 router.post('/check-luca', checkLucaInvoices)
+router.get('/check-luca/:jobId', checkLucaJobStatus)
 
 export default router

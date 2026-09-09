@@ -39,7 +39,7 @@ export default function FaturalarPage() {
   const [lucaModalOpen, setLucaModalOpen] = useState(false)
   const [lucaRunning, setLucaRunning] = useState(false)
   const [detailInv, setDetailInv] = useState(null)
-  const [toastMsg, setToastMsg] = useState('')
+  const [toastMsg, setToastMsg] = useState(null) // { msg, sticky }
 
   // Luca giriş ayarları formu
   const [lucaForm, setLucaForm] = useState({
@@ -47,7 +47,13 @@ export default function FaturalarPage() {
     password: lucaSettings.password || ''
   })
 
-  const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3200) }
+  const toast = (m) => {
+    setToastMsg({ msg: m, sticky: false })
+    setTimeout(() => setToastMsg(null), 3200)
+  }
+  const toastSticky = (m) => {
+    setToastMsg({ msg: m, sticky: true })
+  }
 
   // O ayın (veya tüm dönemlerin) faturalı taksitleri
   const rawRows = useMemo(() => {
@@ -101,7 +107,7 @@ export default function FaturalarPage() {
     }
   }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId])
 
-  // TÜRMOB Luca sorgulaması — Bot üzerinden gerçek API çağrısı
+  // TÜRMOB Luca sorgulaması — Async job + polling (504 Timeout'u önler)
   const runCheckInvoices = async () => {
     const hasCredentials = Boolean(lucaSettings.tckn || lucaSettings.username || lucaSettings.customerNo) && Boolean(lucaSettings.password)
     if (!hasCredentials) {
@@ -119,31 +125,80 @@ export default function FaturalarPage() {
     toast('🤖 TÜRMOB Luca sistemine bağlanılıyor, lütfen bekleyin...')
 
     try {
-      const res = await api('/api/anaokulu/check-luca', {
+      // 1. Adım: Job başlat (anında döner, 504 olmaz)
+      const startRes = await api('/api/anaokulu/check-luca', {
         method: 'POST',
         data: { period },
         portalOverride: 'anaokulu'
       })
 
-      if (res?.error) {
-        toast(`❌ Hata: ${res.error}`)
+      if (startRes?.error) {
+        toastSticky(`❌ Hata: ${startRes.error}`)
         return
       }
 
-      // Backend'den güncel tüm veriyi al ve store'u güncelle
-      if (res?.ok) {
-        actions.replaceAll({
-          settings: res.settings || state.settings,
-          students: res.students || state.students,
-          collections: res.collections || state.collections,
-          invoices: res.invoices || state.invoices,
-          checks: res.checks || state.checks
-        })
-        toast(`✅ TÜRMOB Luca kontrolü tamamlandı! ${res.found || 0} fatura bulundu, ${res.matched || 0} öğrenci ile eşleştirildi.`)
+      const jobId = startRes?.jobId
+      if (!jobId) {
+        toastSticky('❌ Job başlatılamadı.')
+        return
       }
+
+      // 2. Adım: Her 3 saniyede polling yap
+      let attempts = 0
+      const maxAttempts = 60 // 3 dakika (60 × 3sn)
+
+      const poll = async () => {
+        attempts++
+        if (attempts > maxAttempts) {
+          toastSticky('⚠️ Luca kontrolü zaman aşımına uğradı. Lütfen kısa süre sonra tekrar deneyin.')
+          setLucaRunning(false)
+          return
+        }
+
+        try {
+          const statusRes = await api(`/api/anaokulu/check-luca/${jobId}`, {
+            portalOverride: 'anaokulu'
+          })
+
+          if (statusRes?.status === 'running') {
+            // Hala çalışıyor, 3 saniye sonra tekrar dene
+            setTimeout(poll, 3000)
+            return
+          }
+
+          if (statusRes?.status === 'error') {
+            toastSticky(`❌ Hata: ${statusRes.error || 'Luca entegrasyon hatası'}`)
+            setLucaRunning(false)
+            return
+          }
+
+          if (statusRes?.status === 'done' && statusRes?.ok) {
+            actions.replaceAll({
+              settings: statusRes.settings || state.settings,
+              students: statusRes.students || state.students,
+              collections: statusRes.collections || state.collections,
+              invoices: statusRes.invoices || state.invoices,
+              checks: statusRes.checks || state.checks
+            })
+            toastSticky(`✅ TÜRMOB Luca kontrolü tamamlandı! ${statusRes.found || 0} fatura bulundu, ${statusRes.matched || 0} öğrenci ile eşleştirildi.`)
+            setLucaRunning(false)
+            return
+          }
+
+          // Beklenmedik durum
+          toastSticky('⚠️ Beklenmedik sonuç. Lütfen tekrar deneyin.')
+          setLucaRunning(false)
+        } catch (pollErr) {
+          toastSticky(`❌ Sorgulama hatası: ${pollErr?.message || 'Bilinmeyen hata'}`)
+          setLucaRunning(false)
+        }
+      }
+
+      // İlk polling'i 3 saniye sonra başlat
+      setTimeout(poll, 3000)
+
     } catch (err) {
-      toast(`❌ Bağlantı hatası: ${err?.message || 'Bilinmeyen hata'}`)
-    } finally {
+      toastSticky(`❌ Bağlantı hatası: ${err?.message || 'Bilinmeyen hata'}`)
       setLucaRunning(false)
     }
   }
@@ -878,10 +933,25 @@ export default function FaturalarPage() {
       {toastMsg && (
         <div style={{
           position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
-          background: '#0f172a', color: '#fff', padding: '12px 22px', borderRadius: 14,
+          background: '#0f172a', color: '#fff', padding: '12px 22px 12px 18px', borderRadius: 14,
           fontWeight: 600, fontSize: 13, zIndex: 99999,
-          boxShadow: '0 8px 24px rgba(15,23,42,0.3)'
-        }}>{toastMsg}</div>
+          boxShadow: '0 8px 24px rgba(15,23,42,0.3)',
+          display: 'flex', alignItems: 'center', gap: 14,
+          maxWidth: '90vw'
+        }}>
+          <span style={{ flex: 1 }}>{toastMsg.msg}</span>
+          {toastMsg.sticky && (
+            <button
+              onClick={() => setToastMsg(null)}
+              style={{
+                background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+                borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 15,
+                lineHeight: 1, padding: '3px 8px', flexShrink: 0
+              }}
+              title="Kapat"
+            >✕</button>
+          )}
+        </div>
       )}
     </div>
   )
