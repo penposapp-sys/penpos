@@ -102,7 +102,6 @@ class LucaScraperService {
       '--disable-blink-features=AutomationControlled',
       '--no-first-run',
       '--no-zygote',
-      '--single-process',
     ]
 
     const executablePath = detectChromiumPath()
