@@ -83,18 +83,42 @@ class LucaScraperService {
       await page.setViewport({ width: 1400, height: 900 });
 
       // 1. Giriş yap
-      await page.goto(this.loginUrl, { waitUntil: 'networkidle2' });
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.type('#validation-email', tckn);
       await page.type('#validation-password', password);
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle2' }),
+        page.waitForNavigation({
+          waitUntil: 'domcontentloaded',
+          timeout: 10000
+        }).catch(() => null),
         page.click('#loginBtn'),
       ]);
+
+      await new Promise(r => setTimeout(r, 3000));
+      const currentUrl = page.url();
+      console.log(`[LucaScraper] Giriş sonrası URL: ${currentUrl}`);
+
+      if (currentUrl && currentUrl.toLowerCase().includes('/account/login')) {
+        const errorText = await page.evaluate(() => {
+          const errEl = document.querySelector('.validation-summary-errors, .alert-danger, .field-validation-error, .text-danger');
+          return errEl ? errEl.innerText.trim() : '';
+        }).catch(() => '');
+
+        if (errorText) {
+          throw new Error(`Luca giriş başarısız: ${errorText}`);
+        } else {
+          throw new Error('Luca girişi yapılamadı, kullanıcı adı veya şifre hatalı olabilir.');
+        }
+      }
+
       console.log('[LucaScraper] Giriş başarılı.');
 
       // 2. E-Arşiv Faturalar sayfasına git
       const targetUrl = `${this.archiveInvoicesUrl}?minDate=${startDate}&maxDate=${endDate}`;
-      await page.goto(targetUrl, { waitUntil: 'networkidle2' });
+      await page.goto(targetUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
       await new Promise(r => setTimeout(r, 2000));
 
       // Eğer sayfada "Ara" butonu varsa tıkla (filtreleri uygulamak için)
