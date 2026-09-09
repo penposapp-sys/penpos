@@ -25,6 +25,62 @@ class LucaScraperService {
     this.archiveInvoicesUrl = 'https://turmobefatura.luca.com.tr/OutgoingInvoice/OutgoingArchiveList';
   }
 
+  async navigateWithRetry(page, url, stepName, expectedPath = '') {
+    const timeout = 20000
+    let lastError
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`[LucaScraper] ${stepName} açılıyor (deneme ${attempt}/2): ${url}`)
+        const response = await page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout,
+        })
+
+        if (!response) {
+          throw new Error('Luca sunucusundan HTTP yanıtı alınamadı.')
+        }
+        if (!response.ok()) {
+          throw new Error(`Luca HTTP ${response.status()} yanıtı döndürdü.`)
+        }
+
+        return response
+      } catch (error) {
+        lastError = error
+        const landedUrl = page.url()
+
+        // Luca e-Arşiv ekranı bazen URL değiştikten sonra DOMContentLoaded
+        // olayını geciktiriyor. Sayfaya ulaşıldıysa bu timeout'u hata sayma.
+        if (
+          error?.name === 'TimeoutError' &&
+          expectedPath &&
+          landedUrl.toLowerCase().includes(expectedPath.toLowerCase())
+        ) {
+          console.warn(
+            `[LucaScraper] ${stepName} DOM yüklenmesini geciktirdi; ` +
+            `sayfa URL'si doğrulandı, işleme devam ediliyor: ${landedUrl}`
+          )
+          return null
+        }
+
+        console.warn(
+          `[LucaScraper] ${stepName} deneme ${attempt}/2 başarısız. ` +
+          `URL: ${landedUrl} | Hata: ${error.message}`
+        )
+
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        }
+      }
+    }
+
+    throw new Error(
+      `${stepName} açılamadı. Luca bağlantısı 2 denemede tamamlanamadı. ` +
+      `Sunucunun Türkiye çıkış IP'si ve OpenVPN/tun0 rotası doğrulanmalı. ` +
+      `Son hata: ${lastError?.message || 'Bilinmeyen hata'}`
+    )
+  }
+
   async getInvoices(tckn, password, startDate, endDate) {
     if (!tckn || !password) {
       throw new Error('TCKN ve Şifre bilgileri eksik.');
@@ -83,7 +139,7 @@ class LucaScraperService {
       await page.setViewport({ width: 1400, height: 900 });
 
       // 1. Giriş yap
-      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.navigateWithRetry(page, this.loginUrl, 'Luca giriş sayfası');
       await page.type('#validation-email', tckn);
       await page.type('#validation-password', password);
       await Promise.all([
@@ -115,10 +171,12 @@ class LucaScraperService {
 
       // 2. E-Arşiv Faturalar sayfasına git
       const targetUrl = `${this.archiveInvoicesUrl}?minDate=${startDate}&maxDate=${endDate}`;
-      await page.goto(targetUrl, {
-        waitUntil: 'domcontentloaded',
-        timeout: 30000
-      });
+      await this.navigateWithRetry(
+        page,
+        targetUrl,
+        'Luca e-Arşiv fatura sayfası',
+        '/OutgoingInvoice/OutgoingArchiveList'
+      );
       await new Promise(r => setTimeout(r, 2000));
 
       // Eğer sayfada "Ara" butonu varsa tıkla (filtreleri uygulamak için)
