@@ -38,6 +38,7 @@ export default function FaturalarPage() {
   const [collectionFilter, setCollectionFilter] = useState('')
   const [lucaModalOpen, setLucaModalOpen] = useState(false)
   const [lucaRunning, setLucaRunning] = useState(false)
+  const [lucaStep, setLucaStep] = useState('')
   const [detailInv, setDetailInv] = useState(null)
   const [toastMsg, setToastMsg] = useState(null) // { msg, sticky }
 
@@ -122,6 +123,7 @@ export default function FaturalarPage() {
 
     if (lucaRunning) return
     setLucaRunning(true)
+    setLucaStep('Luca kontrolü başlatılıyor…')
     toast('🤖 TÜRMOB Luca sistemine bağlanılıyor, lütfen bekleyin...')
 
     try {
@@ -134,12 +136,16 @@ export default function FaturalarPage() {
 
       if (startRes?.error) {
         toastSticky(`❌ Hata: ${startRes.error}`)
+        setLucaRunning(false)
+        setLucaStep('')
         return
       }
 
       const jobId = startRes?.jobId
       if (!jobId) {
         toastSticky('❌ Job başlatılamadı.')
+        setLucaRunning(false)
+        setLucaStep('')
         return
       }
 
@@ -152,6 +158,7 @@ export default function FaturalarPage() {
         if (attempts > maxAttempts) {
           toastSticky('⚠️ Luca kontrolü zaman aşımına uğradı. Lütfen kısa süre sonra tekrar deneyin.')
           setLucaRunning(false)
+          setLucaStep('')
           return
         }
 
@@ -161,6 +168,7 @@ export default function FaturalarPage() {
           })
 
           if (statusRes?.status === 'running') {
+            setLucaStep(statusRes.step || 'Luca kontrolü devam ediyor…')
             // Hala çalışıyor, 3 saniye sonra tekrar dene
             setTimeout(poll, 3000)
             return
@@ -169,6 +177,7 @@ export default function FaturalarPage() {
           if (statusRes?.status === 'error') {
             toastSticky(`❌ Hata: ${statusRes.error || 'Luca entegrasyon hatası'}`)
             setLucaRunning(false)
+            setLucaStep('')
             return
           }
 
@@ -182,15 +191,18 @@ export default function FaturalarPage() {
             })
             toastSticky(`✅ TÜRMOB Luca kontrolü tamamlandı! ${statusRes.found || 0} fatura bulundu, ${statusRes.matched || 0} öğrenci ile eşleştirildi.`)
             setLucaRunning(false)
+            setLucaStep('')
             return
           }
 
           // Beklenmedik durum
           toastSticky('⚠️ Beklenmedik sonuç. Lütfen tekrar deneyin.')
           setLucaRunning(false)
+          setLucaStep('')
         } catch (pollErr) {
           toastSticky(`❌ Sorgulama hatası: ${pollErr?.message || 'Bilinmeyen hata'}`)
           setLucaRunning(false)
+          setLucaStep('')
         }
       }
 
@@ -200,6 +212,7 @@ export default function FaturalarPage() {
     } catch (err) {
       toastSticky(`❌ Bağlantı hatası: ${err?.message || 'Bilinmeyen hata'}`)
       setLucaRunning(false)
+      setLucaStep('')
     }
   }
 
@@ -299,7 +312,7 @@ export default function FaturalarPage() {
               cursor: lucaRunning ? 'not-allowed' : 'pointer'
             }}
           >
-            {lucaRunning ? '🤖 Luca\'ya Bağlanıyor...' : '↻ Faturaları Kontrol Et'}
+            {lucaRunning ? `🤖 ${lucaStep || 'Luca kontrolü devam ediyor…'}` : '↻ Faturaları Kontrol Et'}
           </button>
         </div>
       </div>

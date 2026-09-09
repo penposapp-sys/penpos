@@ -166,7 +166,11 @@ export const checkLucaInvoices = async (req, res) => {
 
     // Job oluştur ve hemen dön
     const jobId = crypto.randomUUID()
-    lucaJobs.set(jobId, { status: 'running', startedAt: Date.now() })
+    lucaJobs.set(jobId, {
+      status: 'running',
+      step: 'Luca kontrolü başlatılıyor…',
+      startedAt: Date.now()
+    })
 
     // Arka planda çalıştır (await YOK)
     _runLucaJob(jobId, tenantId, school, tckn, password, period)
@@ -189,13 +193,21 @@ export const checkLucaJobStatus = async (req, res) => {
 // ─── İç yardımcı: arka planda çalışan Luca job'u ───
 async function _runLucaJob(jobId, tenantId, school, tckn, password, period) {
   try {
+    const updateStep = (step) => {
+      const currentJob = lucaJobs.get(jobId)
+      if (currentJob?.status === 'running') {
+        lucaJobs.set(jobId, { ...currentJob, step, updatedAt: Date.now() })
+      }
+    }
+
     const [year, month] = period.split('-').map(Number)
     const lastDay = new Date(year, month, 0).getDate()
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
     const endDate   = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
     const { lucaScraperService } = await import('../services/lucaScraperService.js')
-    const lucaInvoices = await lucaScraperService.getInvoices(tckn, password, startDate, endDate)
+    const lucaInvoices = await lucaScraperService.getInvoices(tckn, password, startDate, endDate, updateStep)
+    updateStep('Faturalar öğrencilerle eşleştiriliyor…')
 
     const students = school.students || []
 
@@ -270,6 +282,7 @@ async function _runLucaJob(jobId, tenantId, school, tckn, password, period) {
     const updated = await AnaokuluSchool.findOne({ tenant: tenantId })
     if (!updated) throw new Error('Okul kaydı bulunamadı')
 
+    updateStep('Sonuçlar kaydediliyor…')
     for (const inv of matched) {
       const idx = updated.invoices.findIndex(i => i.no === inv.no)
       idx >= 0 ? (updated.invoices[idx] = inv) : updated.invoices.push(inv)

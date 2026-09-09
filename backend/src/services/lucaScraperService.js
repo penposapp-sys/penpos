@@ -81,12 +81,13 @@ class LucaScraperService {
     )
   }
 
-  async getInvoices(tckn, password, startDate, endDate) {
+  async getInvoices(tckn, password, startDate, endDate, onProgress) {
     if (!tckn || !password) {
       throw new Error('TCKN ve Şifre bilgileri eksik.');
     }
 
     console.log(`[LucaScraper] ${tckn} için giriş yapılıyor... (Dönem: ${startDate} - ${endDate})`);
+    const reportProgress = (step) => onProgress?.(step)
 
     // Linux üretim sunucuları için gerekli tüm argümanlar
     const launchArgs = [
@@ -139,7 +140,9 @@ class LucaScraperService {
       await page.setViewport({ width: 1400, height: 900 });
 
       // 1. Giriş yap
+      reportProgress('Luca giriş sayfası açılıyor…')
       await this.navigateWithRetry(page, this.loginUrl, 'Luca giriş sayfası');
+      reportProgress('Luca hesabına giriş yapılıyor…')
       await page.type('#validation-email', tckn);
       await page.type('#validation-password', password);
       await Promise.all([
@@ -170,6 +173,7 @@ class LucaScraperService {
       console.log('[LucaScraper] Giriş başarılı.');
 
       // 2. E-Arşiv Faturalar sayfasına git
+      reportProgress('E-Arşiv fatura listesi açılıyor…')
       const targetUrl = `${this.archiveInvoicesUrl}?minDate=${startDate}&maxDate=${endDate}`;
       await this.navigateWithRetry(
         page,
@@ -233,6 +237,7 @@ class LucaScraperService {
 
       while (hasNextPage) {
         console.log(`[LucaScraper] Sayfa ${pageNum} taranıyor...`);
+        reportProgress(`Faturalar okunuyor (sayfa ${pageNum})…`)
         await new Promise(r => setTimeout(r, 1200));
 
         // Bilgi satırını oku (örn: "35 kayıttan 1 - 25 arası gösteriliyor")
@@ -376,6 +381,7 @@ class LucaScraperService {
       }
 
       // 5. Tutarları ve tarihleri düzenle
+      reportProgress('Faturalar işleniyor…')
       const rawInvoices = Array.from(invoiceMap.values());
       const invoices = rawInvoices.map(inv => {
         let cleanTutar = (inv.tutarStr || '').replace(/[^\d.,]/g, '').trim();
