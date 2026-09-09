@@ -46,37 +46,56 @@ export default function AyarlarPage() {
   const ys = getYearStart(state)
 
   const [form, setForm] = useState({
-    school: s.school || s.okulAdi || '',
-    vat: Number(s.vat ?? s.vergiOrani ?? 10),
-    yearStart: s.yearStart || s.donem || ys || DEFAULT_YEAR_START,
-    matchBy: s.matchBy || 'tax'
+    school: '',
+    vat: 10,
+    yearStart: DEFAULT_YEAR_START,
+    matchBy: 'tax'
   })
+  // Kullanıcı formu aktif düzenliyorsa backend güncellemesi override etmesin
+  const [formUserEdited, setFormUserEdited] = useState(false)
 
   // Ücret kalemleri state
-  const [feeCategories, setFeeCategories] = useState(
-    Array.isArray(s.feeCategories) ? s.feeCategories : []
-  )
+  const [feeCategories, setFeeCategories] = useState([])
   const [newFee, setNewFee] = useState({ name: '', defaultPrice: 0, invoiced: true })
 
   // Luca e-Fatura Ayarları state — backend yüklenince useEffect ile senkronize edilir
   const [lucaSettings, setLucaSettings] = useState({ tckn: '', password: '' })
   const [lucaUserEdited, setLucaUserEdited] = useState(false)
 
-  // Backend'den veri geldiğinde (state.loaded olduğunda) formu güncelle
+  // İndirimler state
+  const [discounts, setDiscounts] = useState([])
+  const [newDiscount, setNewDiscount] = useState({ name: '', type: 'percent', value: 0 })
+
+  // Backend'den veri geldiğinde tüm form alanlarını senkronize et
   useEffect(() => {
-    if (lucaUserEdited) return // Kullanıcı form ile uğraşıyorsa override etme
-    const tckn = s?.luca?.tckn || s?.luca?.username || s?.luca?.customerNo || ''
-    const password = s?.luca?.password || ''
-    if (tckn || password) {
+    if (!state.loaded) return
+    const settings = state?.settings || {}
+    const currentYs = getYearStart(state)
+
+    // Form alanlarını — kullanıcı aktif düzenliyorsa override etme
+    if (!formUserEdited) {
+      setForm({
+        school: settings.school || settings.okulAdi || '',
+        vat: Number(settings.vat ?? settings.vergiOrani ?? 10),
+        yearStart: settings.yearStart || settings.donem || currentYs || DEFAULT_YEAR_START,
+        matchBy: settings.matchBy || 'tax'
+      })
+    }
+
+    // Ücret kalemleri
+    setFeeCategories(Array.isArray(settings.feeCategories) ? settings.feeCategories : [])
+
+    // İndirimler
+    setDiscounts(Array.isArray(settings.discounts) ? settings.discounts : [])
+
+    // Luca ayarları
+    if (!lucaUserEdited) {
+      const tckn = settings?.luca?.tckn || settings?.luca?.username || settings?.luca?.customerNo || ''
+      const password = settings?.luca?.password || ''
       setLucaSettings({ tckn, password })
     }
-  }, [s?.luca?.tckn, s?.luca?.username, s?.luca?.customerNo, s?.luca?.password])
-
-  // İndirimler state
-  const [discounts, setDiscounts] = useState(
-    Array.isArray(s.discounts) ? s.discounts : []
-  )
-  const [newDiscount, setNewDiscount] = useState({ name: '', type: 'percent', value: 0 })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.loaded, state.settings])
 
   const [activeTab, setActiveTab] = useState((isStaff || isAdminPanelMode) ? 'hesap' : 'genel')
   const [toastMsg, setToastMsg] = useState('')
@@ -97,7 +116,7 @@ export default function AyarlarPage() {
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3000) }
 
-  const upd = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+  const upd = (k, v) => { setFormUserEdited(true); setForm(prev => ({ ...prev, [k]: v })) }
 
   const saveAll = () => {
     const next = {
@@ -113,6 +132,7 @@ export default function AyarlarPage() {
       luca: { tckn: lucaSettings.tckn, password: lucaSettings.password }
     }
     actions.updateSettings(next)
+    setFormUserEdited(false) // Kaydettikten sonra flag'i sıfırla — bir sonraki backend yüklenmesi güncel veriyi göstersin
     toast('Ayarlar kaydedildi.')
   }
 
