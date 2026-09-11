@@ -87,7 +87,7 @@ export function AnaokuluDataProvider({ children }) {
         ...(isManager && regionCurrentTenantId ? { tenantId: String(regionCurrentTenantId) } : {})
       }
       const res = await api('/api/anaokulu/', {
-        method: 'POST',
+        method: 'PUT',
         data: body,
         ...buildReqConfig({ silent: true })
       })
@@ -96,8 +96,11 @@ export function AnaokuluDataProvider({ children }) {
       } else {
         dispatch({ type: 'SET_ERROR', payload: null })
       }
+      return res
     } catch (e) {
-      dispatch({ type: 'SET_ERROR', payload: String(e?.message || e) })
+      const message = String(e?.message || e)
+      dispatch({ type: 'SET_ERROR', payload: message })
+      return { ok: false, message }
     } finally {
       dispatch({ type: 'SET_SAVING', payload: false })
     }
@@ -261,12 +264,50 @@ export function AnaokuluDataProvider({ children }) {
 
   const actions = {
     updateSettings: (patch) => dispatch({ type: 'SETTINGS_UPDATE', payload: patch }),
+    updateSettingsAndSave: async (settings) => {
+      const nextState = { ...state, settings }
+      dispatch({ type: 'SETTINGS_UPDATE', payload: settings })
+      if (isAdminPanelMode) return { ok: false, message: 'Admin panelinde ayar kaydı kapalı.' }
+      return saveToBackend(nextState)
+    },
     addStudent: (s) => dispatch({ type: 'STUDENT_ADD', payload: { id: s.id || Date.now(), ...s } }),
     updateStudent: (s) => dispatch({ type: 'STUDENT_UPDATE', payload: s }),
+    updateStudentAndSave: async (student) => {
+      const nextState = {
+        ...state,
+        students: state.students.map(existing =>
+          String(existing.id || existing._id) === String(student.id)
+            ? { ...existing, ...student }
+            : existing
+        )
+      }
+      dispatch({ type: 'STUDENT_UPDATE', payload: student })
+      if (isAdminPanelMode) return
+      const res = await api(`/api/anaokulu/students/${encodeURIComponent(student.id)}`, {
+        method: 'PUT',
+        data: { items: student.items },
+        ...buildReqConfig({ silent: true })
+      })
+      if (res?.ok === false) {
+        dispatch({ type: 'SET_ERROR', payload: res?.message || 'Öğrenci planı kaydedilemedi' })
+      } else {
+        dispatch({ type: 'SET_ERROR', payload: null })
+      }
+    },
     deleteStudent: (id) => dispatch({ type: 'STUDENT_DELETE', payload: id }),
     addCollection: (c) => dispatch({ type: 'COLLECTION_ADD', payload: { id: c.id || Date.now(), ...c } }),
     updateCollection: (c) => dispatch({ type: 'COLLECTION_UPDATE', payload: c }),
-    deleteCollection: (id) => dispatch({ type: 'COLLECTION_DELETE', payload: id }),
+    deleteCollection: (id) => {
+      dispatch({ type: 'COLLECTION_DELETE', payload: id })
+      if (!isAdminPanelMode && id != null) {
+        api(`/api/anaokulu/collections/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          ...buildReqConfig({ silent: true })
+        }).catch(error => {
+          dispatch({ type: 'SET_ERROR', payload: String(error?.message || error) })
+        })
+      }
+    },
     addInvoice: (i) => dispatch({ type: 'INVOICE_ADD', payload: { uuid: i.uuid || `inv_${Date.now()}`, ...i } }),
     deleteInvoice: (uuid) => dispatch({ type: 'INVOICE_DELETE', payload: uuid }),
     replaceAll: (data) => dispatch({ type: 'REPLACE_ALL', payload: data }),

@@ -619,7 +619,7 @@ export default function OgrencilerPage() {
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
           padding: 20
-        }} onClick={() => { setModal(null); setForm(null) }}>
+        }}>
           <div style={{
             background: '#fff', borderRadius: 18, width: modal === 'file' ? 'min(920px, 100%)' : 'min(640px, 100%)',
             maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',

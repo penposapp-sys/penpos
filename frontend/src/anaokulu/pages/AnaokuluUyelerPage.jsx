@@ -664,7 +664,7 @@ function ModalWrap({ title, children, onClose }) {
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20
-    }} onClick={onClose}>
+    }}>
       <div style={{
         background: '#fff', borderRadius: 18, width: 'min(540px, 100%)', maxHeight: '90vh',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',

@@ -102,6 +102,7 @@ export default function UcretPlaniPage() {
     dueDate: '',
     dueAmount: 0,
     amount: 0,
+    collections: [],
     date: new Date().toISOString().slice(0, 10),
     payment: 'Nakit',
     note: ''
@@ -114,6 +115,7 @@ export default function UcretPlaniPage() {
     installmentNo: 1,
     planName: '',
     dueDate: '',
+    collections: [],
     date: '',
     amount: 0,
     payment: 'Nakit',
@@ -140,6 +142,7 @@ export default function UcretPlaniPage() {
     categoryId: '',
     name: '',
     basePrice: 0,
+    downPayment: 0,
     discountIds: [],
     installments: 10,
     start: defaultFullDate
@@ -309,6 +312,7 @@ export default function UcretPlaniPage() {
       categoryId: firstCat ? String(firstCat.id) : '',
       name: firstCat ? firstCat.name : '',
       basePrice: base,
+      downPayment: 0,
       discountIds: [],
       installments: 10,
       start: defaultFullDate
@@ -332,6 +336,7 @@ export default function UcretPlaniPage() {
       categoryId: catMatch ? String(catMatch.id) : '',
       name: it.name || '',
       basePrice: res.basePrice,
+      downPayment: Math.max(0, Number(it.downPayment) || 0),
       discountIds: res.discountIds,
       installments: Number(it.installments) || 10,
       start: resolvedStart
@@ -349,6 +354,10 @@ export default function UcretPlaniPage() {
     if (!itemForm.name.trim()) { toast('Kalem adı boş olamaz.'); return }
     if (Number(currentModalCalc.finalPrice) <= 0) { toast('Tutar sıfırdan büyük olmalı.'); return }
     if (!itemForm.start) { toast('Vade başlangıç tarihi seçiniz.'); return }
+    const downPayment = round2(Number(itemForm.downPayment) || 0)
+    if (downPayment < 0 || downPayment >= Number(currentModalCalc.finalPrice)) {
+      toast('Peşinat, net tutardan küçük olmalıdır.'); return
+    }
 
     const applied = currentModalCalc.applied
     const names = applied.map(a => a.name).join(' + ')
@@ -358,6 +367,7 @@ export default function UcretPlaniPage() {
       name: itemForm.name.trim(),
       total: Number(currentModalCalc.finalPrice) || 0,
       basePrice: Number(itemForm.basePrice) || Number(currentModalCalc.finalPrice) || 0,
+      downPayment,
       discountId: applied[0]?.id || '',
       discountName: names,
       discountLabel: labels,
@@ -379,7 +389,7 @@ export default function UcretPlaniPage() {
       items.push(newItem)
     }
 
-    actions.updateStudent({ id: selStudent.id, items })
+    actions.updateStudentAndSave({ id: selStudent.id, items })
     setModalOpen(false)
     toast(editItemIdx !== null ? 'Ücret planı güncellendi.' : 'Ücret planı eklendi.')
   }
@@ -403,6 +413,7 @@ export default function UcretPlaniPage() {
     if (!selStudent || !activePlan) return []
     const count = Math.max(1, Number(activePlan.installments) || 1)
     const total = Number(activePlan.total) || 0
+    const downPayment = round2(Math.max(0, Number(activePlan.downPayment) || 0))
     const perInstallment = round2(total / count)
     const startDate = activePlan.start
       ? (activePlan.start.length === 7 ? `${activePlan.start}-15` : activePlan.start)
@@ -427,7 +438,7 @@ export default function UcretPlaniPage() {
 
     planCols.forEach(c => {
       const instNo = Number(c.installmentNo)
-      if (instNo && instNo >= 1 && instNo <= count) {
+      if (Number.isInteger(instNo) && instNo <= count && (instNo > 0 || (downPayment > 0 && instNo === 0))) {
         if (!explicitCols[instNo]) explicitCols[instNo] = []
         explicitCols[instNo].push(c)
       } else {
@@ -437,6 +448,8 @@ export default function UcretPlaniPage() {
 
     // Unassigned pool for legacy collections that had NO installmentNo
     let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+    const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+    const downPaymentCredit = round2(downPaymentPaid / count)
 
     const list = []
     for (let i = 0; i < count; i++) {
@@ -480,7 +493,7 @@ export default function UcretPlaniPage() {
         // Kısmi (Yarım Ay / Gün bazlı) devamsızlık: kalan tutar veli tarafından ödenir!
         const effectiveAmount = round2(Math.max(0, perInstallment - deductedAmount))
         const directMatches = explicitCols[installmentNo] || []
-        let paid = 0
+        let paid = downPaymentCredit
         let collectionDate = ''
         let paymentMethod = ''
         let matchedCollections = []
@@ -488,7 +501,7 @@ export default function UcretPlaniPage() {
         if (directMatches.length > 0) {
           paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
           collectionDate = directMatches[0].date || ''
-          paymentMethod = directMatches[0].payment || 'Nakit'
+          paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
           matchedCollections = directMatches
         } else if (unassignedPool > 0) {
           if (unassignedPool >= effectiveAmount) {
@@ -499,7 +512,7 @@ export default function UcretPlaniPage() {
             unassignedPool = 0
           }
           collectionDate = unassignedCols[0]?.date || ''
-          paymentMethod = unassignedCols[0]?.payment || 'Nakit'
+          paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
           matchedCollections = unassignedCols
         }
 
@@ -544,7 +557,7 @@ export default function UcretPlaniPage() {
       }
 
       const directMatches = explicitCols[installmentNo] || []
-      let paid = 0
+      let paid = downPaymentCredit
       let collectionDate = ''
       let paymentMethod = ''
       let matchedCollections = []
@@ -553,7 +566,7 @@ export default function UcretPlaniPage() {
       if (directMatches.length > 0) {
         paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
         collectionDate = directMatches[0].date || ''
-        paymentMethod = directMatches[0].payment || 'Nakit'
+        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
         matchedCollections = directMatches
       }
       // 2. Only unassigned legacy collections can fill unassigned slots (NO double-counting!)
@@ -566,7 +579,7 @@ export default function UcretPlaniPage() {
           unassignedPool = 0
         }
         collectionDate = unassignedCols[0]?.date || ''
-        paymentMethod = unassignedCols[0]?.payment || 'Nakit'
+        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
         matchedCollections = unassignedCols
       }
 
@@ -603,6 +616,24 @@ export default function UcretPlaniPage() {
     return list
   }, [selStudent, activePlan, collections, defaultFullDate])
 
+  const downPaymentInfo = useMemo(() => {
+    if (!selStudent || !activePlan) return null
+    const amount = round2(Math.max(0, Number(activePlan.downPayment) || 0))
+    if (amount <= 0) return null
+    const paymentCollections = collections.filter(c =>
+      String(c.studentId) === String(selStudent.id) &&
+      (!c.item || c.item.trim().toLowerCase() === activePlan.name.trim().toLowerCase()) &&
+      Number(c.installmentNo) === 0
+    )
+    const paid = round2(paymentCollections.reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+    return {
+      amount,
+      paid: Math.min(amount, paid),
+      remaining: round2(Math.max(0, amount - paid)),
+      collections: paymentCollections
+    }
+  }, [selStudent, activePlan, collections])
+
   // =========================================================================
   // ALL OVERDUE INSTALLMENTS ACROSS ALL STUDENTS AND PLANS
   // =========================================================================
@@ -615,6 +646,7 @@ export default function UcretPlaniPage() {
       items.forEach(plan => {
         const count = Math.max(1, Number(plan.installments) || 1)
         const total = Number(plan.total) || 0
+        const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
         const perInstallment = round2(total / count)
         const startDate = plan.start
           ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
@@ -630,7 +662,7 @@ export default function UcretPlaniPage() {
         const unassignedCols = []
         planCols.forEach(c => {
           const instNo = Number(c.installmentNo)
-          if (instNo && instNo >= 1 && instNo <= count) {
+          if (Number.isInteger(instNo) && instNo <= count && (instNo > 0 || (downPayment > 0 && instNo === 0))) {
             if (!explicitCols[instNo]) explicitCols[instNo] = []
             explicitCols[instNo].push(c)
           } else {
@@ -638,13 +670,15 @@ export default function UcretPlaniPage() {
           }
         })
         let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+        const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+        const downPaymentCredit = round2(downPaymentPaid / count)
 
         for (let i = 0; i < count; i++) {
           const installmentNo = i + 1
           const dueDate = addMonthsToDate(startDate, i)
 
           const directMatches = explicitCols[installmentNo] || []
-          let paid = 0
+          let paid = downPaymentCredit
           if (directMatches.length > 0) {
             paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
           } else if (unassignedPool > 0) {
@@ -674,6 +708,7 @@ export default function UcretPlaniPage() {
               amount: perInstallment,
               paid,
               remaining,
+              collections: directMatches,
               daysOverdue
             })
           }
@@ -699,9 +734,37 @@ export default function UcretPlaniPage() {
       dueDate: inst.dueDate,
       dueAmount: inst.amount,
       amount: inst.remaining > 0 ? inst.remaining : inst.amount,
+      collections: inst.collections || [],
       date: new Date().toISOString().slice(0, 10),
       payment: 'Nakit',
       note: `${activePlan.name} ${inst.installmentNo}. Taksit Tahsilatı`
+    })
+    setCollectModalOpen(true)
+  }
+
+  const openDownPaymentModal = () => {
+    if (!selStudent || !activePlan || !downPaymentInfo) return
+    if (downPaymentInfo.remaining <= 0 && downPaymentInfo.collections.length > 0) {
+      openEditCollectionModal({
+        installmentNo: 0,
+        dueDateFormatted: 'Peşin İşlem',
+        amount: downPaymentInfo.amount,
+        collections: downPaymentInfo.collections
+      })
+      return
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    setCollectForm({
+      studentId: selStudent.id,
+      planName: activePlan.name,
+      installmentNo: 0,
+      dueDate: today,
+      dueAmount: downPaymentInfo.amount,
+      amount: downPaymentInfo.remaining,
+      collections: downPaymentInfo.collections,
+      date: today,
+      payment: 'Nakit',
+      note: `${activePlan.name} Peşin İşlem Tahsilatı`
     })
     setCollectModalOpen(true)
   }
@@ -732,6 +795,7 @@ export default function UcretPlaniPage() {
         dueDate: row.dueDate,
         dueAmount: row.amount,
         amount: row.remaining > 0 ? row.remaining : row.amount,
+        collections: row.collections || [],
         date: new Date().toISOString().slice(0, 10),
         payment: 'Nakit',
         note: `${plan.name} ${row.installmentNo}. Taksit Tahsilatı`
@@ -747,6 +811,15 @@ export default function UcretPlaniPage() {
     if (amt <= 0) { toast('Geçerli bir tahsilat tutarı giriniz.'); return }
     if (!collectForm.date) { toast('Tahsilat tarihi seçiniz.'); return }
 
+    const currentInstallment = installmentList.find(i => Number(i.installmentNo) === Number(collectForm.installmentNo))
+    const maxCollectable = Number(collectForm.installmentNo) === 0
+      ? Number(downPaymentInfo?.remaining || 0)
+      : (Number(currentInstallment?.remaining ?? collectForm.dueAmount) || 0)
+    if (amt > maxCollectable + 0.01) {
+      toast(`Fazla tahsilat yapılamaz. En fazla ${money(maxCollectable)} alabilirsiniz.`)
+      return
+    }
+
     const vatEligible = isCollectionInvoiced(state, { item: collectForm.planName }, selStudent)
     const vatRate = vatEligible ? Number(state?.settings?.vat || 0) : 0
     const vat = vatEligible ? round2(amt * (vatRate / (100 + vatRate))) : 0
@@ -761,29 +834,56 @@ export default function UcretPlaniPage() {
       vat,
       payment: collectForm.payment || 'Nakit',
       installmentNo: collectForm.installmentNo,
-      note: collectForm.note || `${collectForm.planName} ${collectForm.installmentNo}. Taksit Tahsilatı`
+      note: collectForm.note || (Number(collectForm.installmentNo) === 0
+        ? `${collectForm.planName} Peşin İşlem Tahsilatı`
+        : `${collectForm.planName} ${collectForm.installmentNo}. Taksit Tahsilatı`)
     }
 
     actions.addCollection(newCol)
     setCollectModalOpen(false)
-    toast(`🎉 ${collectForm.installmentNo}. Taksit tahsilatı başarıyla kaydedildi.`)
+    toast(Number(collectForm.installmentNo) === 0
+      ? '🎉 Peşin işlem tahsilatı başarıyla kaydedildi.'
+      : `🎉 ${collectForm.installmentNo}. Taksit tahsilatı başarıyla kaydedildi.`)
   }
 
   // Open edit / delete modal for an existing collected installment
-  const openEditCollectionModal = (inst) => {
-    const col = inst.collections?.[0]
+  const openEditCollectionModal = (inst, selectedCollection = null) => {
+    const collectionsForInstallment = Array.isArray(inst.collections) ? inst.collections : []
+    const col = selectedCollection || collectionsForInstallment[0]
     if (!col) return
     setEditCollectionForm({
       id: col.id || col._id,
       installmentNo: inst.installmentNo,
       planName: activePlan.name,
       dueDate: inst.dueDateFormatted,
+      collections: collectionsForInstallment,
       date: col.date || new Date().toISOString().slice(0, 10),
       amount: Number(col.amount) || inst.amount,
       payment: col.payment || 'Nakit',
       note: col.note || ''
     })
     setEditCollectionModalOpen(true)
+  }
+
+  const openPreviousCollectionForEdit = (collection) => {
+    setCollectModalOpen(false)
+    openEditCollectionModal({
+      installmentNo: collectForm.installmentNo,
+      dueDateFormatted: formatTrFullDate(collectForm.dueDate),
+      amount: collectForm.dueAmount,
+      collections: collectForm.collections
+    }, collection)
+  }
+
+  const selectCollectionForEdit = (collection) => {
+    setEditCollectionForm(prev => ({
+      ...prev,
+      id: collection.id || collection._id,
+      date: collection.date || new Date().toISOString().slice(0, 10),
+      amount: Number(collection.amount) || 0,
+      payment: collection.payment || 'Nakit',
+      note: collection.note || ''
+    }))
   }
 
   // Save edited collection details (e.g. change Nakit to Havale/EFT or fix date)
@@ -1344,7 +1444,7 @@ export default function UcretPlaniPage() {
                         </tr>
                       ) : (selStudent.items || []).map((it, idx) => {
                         const itemCalc = resolveItemDiscounts(it)
-                        const perMonth = round2(it.total / Math.max(1, it.installments))
+                        const perMonth = round2(Number(it.total) / Math.max(1, it.installments))
                         const isSelectedPlan = selectedPlanIdx === idx
 
                         return (
@@ -1477,6 +1577,34 @@ export default function UcretPlaniPage() {
                       </div>
                     </div>
                   </div>
+
+                  {downPaymentInfo && (
+                    <div style={{
+                      margin: '12px 20px 0', padding: '10px 12px', borderRadius: 10,
+                      border: '1px solid #fde68a', background: '#fffbeb',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      gap: 12, flexWrap: 'wrap'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e' }}>💰 Peşin İşlem</div>
+                        <div style={{ fontSize: 11, color: '#78350f', marginTop: 2 }}>
+                          Tutar: {money(downPaymentInfo.amount)} · Tahsil Edilen: {money(downPaymentInfo.paid)} · Kalan: {money(downPaymentInfo.remaining)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={openDownPaymentModal}
+                        style={{
+                          ...Btn, padding: '6px 10px', fontSize: 11,
+                          background: downPaymentInfo.remaining > 0 ? '#f59e0b' : '#fef3c7',
+                          color: downPaymentInfo.remaining > 0 ? '#fff' : '#92400e',
+                          border: '1px solid #fcd34d'
+                        }}
+                      >
+                        {downPaymentInfo.remaining > 0 ? '💰 Peşin Tahsil Et' : '🔍 Peşin İşlem Detayı'}
+                      </button>
+                    </div>
+                  )}
 
                   <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
                     <table style={{ ...tbl, minWidth: 680 }}>
@@ -1713,9 +1841,9 @@ export default function UcretPlaniPage() {
                                           💰 Tahsil Et
                                         </button>
                                       )}
-                                      {inst.isPaid && inst.collections && inst.collections.length > 0 && (
+                                      {inst.collections && inst.collections.length > 0 && (
                                         <button
-                                          onClick={() => openEditCollectionModal(inst.collections[0], inst)}
+                                          onClick={() => openEditCollectionModal(inst)}
                                           style={{
                                             ...Btn,
                                             background: '#f8fafc',
@@ -1728,7 +1856,7 @@ export default function UcretPlaniPage() {
                                           }}
                                           title="Tahsilat detayını gör / sil / düzenle"
                                         >
-                                          🔍 Detay
+                                          🔍 Detay / Düzenle
                                         </button>
                                       )}
                                       <button
@@ -1801,6 +1929,24 @@ export default function UcretPlaniPage() {
                                     >
                                       🚫 Atla
                                     </button>
+                                    {inst.collections && inst.collections.length > 0 && (
+                                      <button
+                                        onClick={() => openEditCollectionModal(inst)}
+                                        style={{
+                                          ...Btn,
+                                          background: '#eff6ff',
+                                          color: '#1d4ed8',
+                                          border: '1px solid #bfdbfe',
+                                          padding: '5px 9px',
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          borderRadius: 7
+                                        }}
+                                        title="Yapılan tahsilatları gör, düzenle veya sil"
+                                      >
+                                        🔍 Detay / Düzenle
+                                      </button>
+                                    )}
                                   </>
                                 ) : (
                                   <button
@@ -1919,7 +2065,7 @@ export default function UcretPlaniPage() {
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16
-        }} onClick={() => setModalOpen(false)}>
+        }}>
           <div style={{
             background: '#fff', borderRadius: 20, width: 'min(640px, 100%)',
             maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
@@ -2142,6 +2288,24 @@ export default function UcretPlaniPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                {/* Peşinat */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 5 }}>
+                    Peşinat (₺)
+                  </label>
+                  <input
+                    style={InputCls}
+                    type="number"
+                    min="0"
+                    max={Math.max(0, Number(currentModalCalc.finalPrice) - 0.01)}
+                    step="0.01"
+                    value={itemForm.downPayment}
+                    onChange={e => setItemForm(prev => ({ ...prev, downPayment: e.target.value }))}
+                  />
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>
+                    Kayıt tarihi vadesiyle ayrı bir peşinat satırı oluşturur.
+                  </div>
+                </div>
                 {/* Taksit Sayısı */}
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 5 }}>
@@ -2269,7 +2433,7 @@ export default function UcretPlaniPage() {
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16
-        }} onClick={() => setCollectModalOpen(false)}>
+        }}>
           <div style={{
             background: '#fff', borderRadius: 20, width: 'min(480px, 100%)',
             boxShadow: '0 24px 60px rgba(15,23,42,0.3)', overflow: 'hidden'
@@ -2285,7 +2449,7 @@ export default function UcretPlaniPage() {
                   💰 Taksit Tahsilatı Yap
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: 12, opacity: 0.9 }}>
-                  {collectForm.planName} · <strong>{collectForm.installmentNo}. Taksit</strong>
+                  {collectForm.planName} · <strong>{Number(collectForm.installmentNo) === 0 ? 'Peşin İşlem' : `${collectForm.installmentNo}. Taksit`}</strong>
                 </p>
               </div>
               <button
@@ -2305,7 +2469,7 @@ export default function UcretPlaniPage() {
               {/* Info banner */}
               <div style={{
                 background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
-                padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12
               }}>
                 <div>
                   <div style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>Taksit Vadesi</div>
@@ -2314,12 +2478,59 @@ export default function UcretPlaniPage() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>Ödenecek Tutar</div>
+                  <div style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>Bu Taksit Tutarı</div>
                   <div style={{ fontSize: 16, fontWeight: 900, color: '#15803d' }}>
                     {money(collectForm.dueAmount)}
                   </div>
                 </div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #bbf7d0', paddingTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: '#166534', fontWeight: 700 }}>
+                    Daha önce tahsil edilen: {money(Number(collectForm.installmentNo) === 0
+                      ? Number(downPaymentInfo?.paid || 0)
+                      : Math.max(0, Number(collectForm.dueAmount) - (Number(installmentList.find(i => Number(i.installmentNo) === Number(collectForm.installmentNo))?.remaining) || 0)))}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#b45309', fontWeight: 800 }}>
+                    Kalan: {money(Number(collectForm.installmentNo) === 0
+                      ? Number(downPaymentInfo?.remaining || 0)
+                      : installmentList.find(i => Number(i.installmentNo) === Number(collectForm.installmentNo))?.remaining || 0)}
+                  </span>
+                </div>
               </div>
+
+              {collectForm.collections.length > 0 && (
+                <div style={{
+                  border: '1px solid #dbeafe', borderRadius: 10, background: '#f8fbff', padding: '9px 11px'
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#1e40af', marginBottom: 6 }}>
+                    Önceki Tahsilatlar
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {collectForm.collections.map((collection, index) => (
+                      <button
+                        key={collection.id || collection._id || index}
+                        type="button"
+                        onClick={() => openPreviousCollectionForEdit(collection)}
+                        title="Bu tahsilatı düzenle"
+                        style={{
+                          width: '100%', textAlign: 'left', cursor: 'pointer',
+                        display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8,
+                        alignItems: 'center', padding: '6px 7px', background: '#fff',
+                        border: '1px solid #e0e7ff', borderRadius: 6
+                      }}>
+                        <span style={{ fontSize: 10, color: '#475569' }}>
+                          {index + 1}. {formatTrFullDate(collection.date)}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8' }}>
+                          {money(collection.amount)}
+                        </span>
+                        <span style={{ fontSize: 10, color: '#64748b' }}>
+                          {collection.payment || '—'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Tahsilat Tarihi */}
               <div>
@@ -2419,7 +2630,7 @@ export default function UcretPlaniPage() {
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16
-        }} onClick={() => setEditCollectionModalOpen(false)}>
+        }}>
           <div style={{
             background: '#fff', borderRadius: 20, width: 'min(500px, 100%)',
             boxShadow: '0 24px 60px rgba(15,23,42,0.3)', overflow: 'hidden'
@@ -2435,7 +2646,7 @@ export default function UcretPlaniPage() {
                   🔍 Tahsilat Detayı &amp; Düzenle
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: 12, opacity: 0.9 }}>
-                  {editCollectionForm.planName} · <strong>{editCollectionForm.installmentNo}. Taksit</strong>
+                  {editCollectionForm.planName} · <strong>{Number(editCollectionForm.installmentNo) === 0 ? 'Peşin İşlem' : `${editCollectionForm.installmentNo}. Taksit`}</strong>
                 </p>
               </div>
               <button
@@ -2470,6 +2681,48 @@ export default function UcretPlaniPage() {
                   }}>
                     ✓ Tahsil Edilmiş
                   </span>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#334155', marginBottom: 7 }}>
+                  Yapılan Tahsilatlar ({editCollectionForm.collections.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {editCollectionForm.collections.map((collection, index) => {
+                    const collectionId = collection.id || collection._id
+                    const isSelected = String(editCollectionForm.id) === String(collectionId)
+                    return (
+                      <button
+                        key={collectionId || index}
+                        type="button"
+                        onClick={() => selectCollectionForEdit(collection)}
+                        style={{
+                          width: '100%', textAlign: 'left', cursor: 'pointer',
+                          padding: '9px 11px', borderRadius: 8,
+                          border: `1px solid ${isSelected ? '#60a5fa' : '#dbeafe'}`,
+                          background: isSelected ? '#eff6ff' : '#fff',
+                          display: 'grid', gridTemplateColumns: '1fr auto', gap: 4,
+                          color: '#334155'
+                        }}
+                      >
+                        <span style={{ fontSize: 11, fontWeight: 700 }}>
+                          {index + 1}. {formatTrFullDate(collection.date)}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 900, color: '#2563eb' }}>
+                          {money(collection.amount)}
+                        </span>
+                        <span style={{ fontSize: 10, color: '#64748b' }}>
+                          {collection.payment || 'Ödeme türü belirtilmedi'}
+                        </span>
+                        {collection.note && (
+                          <span style={{ fontSize: 10, color: '#64748b', textAlign: 'right' }}>
+                            {collection.note}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -2588,7 +2841,6 @@ export default function UcretPlaniPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 9999, padding: 16
           }}
-          onClick={() => setSkipModalOpen(false)}
         >
           <div
             style={{
@@ -2966,7 +3218,6 @@ export default function UcretPlaniPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 9999, padding: 16
           }}
-          onClick={() => setOverdueModalOpen(false)}
         >
           <div
             style={{

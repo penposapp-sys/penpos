@@ -243,7 +243,7 @@ export const api = async (path, options = {}) => {
 
       if (!res.ok) {
         const code = data.code || data.error || 'error'
-        const message = data.message || 'Islem basarisiz'
+        const message = data.message || data.error || data.detail || 'Islem basarisiz'
 
         if (res.status === 401 && !suppressAuthRedirect) {
           try {

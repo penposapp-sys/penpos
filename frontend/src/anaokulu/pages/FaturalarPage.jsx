@@ -37,6 +37,9 @@ export default function FaturalarPage() {
   const [invoiceFilter, setInvoiceFilter] = useState('')
   const [collectionFilter, setCollectionFilter] = useState('')
   const [lucaModalOpen, setLucaModalOpen] = useState(false)
+  const [lucaStatusOpen, setLucaStatusOpen] = useState(false)
+  const [lucaStatusLoading, setLucaStatusLoading] = useState(false)
+  const [lucaStatus, setLucaStatus] = useState(null)
   const [lucaRunning, setLucaRunning] = useState(false)
   const [lucaStep, setLucaStep] = useState('')
   const [detailInv, setDetailInv] = useState(null)
@@ -108,8 +111,17 @@ export default function FaturalarPage() {
     }
   }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId])
 
-  // TÜRMOB Luca sorgulaması — Async job + polling (504 Timeout'u önler)
-  const runCheckInvoices = async () => {
+  const formatDeviceLastSeen = (value) => {
+    if (!value) return 'Az önce'
+    const timestamp = Date.parse(value)
+    if (!Number.isFinite(timestamp)) return 'Az önce'
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
+    if (seconds < 10) return 'Az önce'
+    if (seconds < 60) return `${seconds} sn önce`
+    return `${Math.floor(seconds / 60)} dk önce`
+  }
+
+  const startLucaCheck = async () => {
     const hasCredentials = Boolean(lucaSettings.tckn || lucaSettings.username || lucaSettings.customerNo) && Boolean(lucaSettings.password)
     if (!hasCredentials) {
       setLucaForm({
@@ -148,6 +160,25 @@ export default function FaturalarPage() {
         setLucaStep('')
         return
       }
+
+      const extensionToken = startRes?.extensionToken
+
+      if (!extensionToken) {
+        toastSticky('Chrome Extension görev anahtarı alınamadı.')
+        setLucaRunning(false)
+        setLucaStep('')
+        return
+      }
+
+      window.postMessage(
+        {
+          source: 'penpos-luca-bridge',
+          type: 'PENPOS_LUCA_START',
+          jobId,
+          extensionToken
+        },
+        window.location.origin
+      )
 
       // 2. Adım: Her 3 saniyede polling yap
       let attempts = 0
@@ -213,6 +244,34 @@ export default function FaturalarPage() {
       toastSticky(`❌ Bağlantı hatası: ${err?.message || 'Bilinmeyen hata'}`)
       setLucaRunning(false)
       setLucaStep('')
+    }
+  }
+
+  const runCheckInvoices = async () => {
+    setLucaStatusOpen(true)
+    setLucaStatusLoading(true)
+    setLucaStatus(null)
+    try {
+      const statusRes = await api('/api/anaokulu/luca-device/status', {
+        portalOverride: 'anaokulu',
+        cacheMode: 'no-cache',
+        cacheTtlMs: 0
+      })
+      if (statusRes?.ok === false) {
+        setLucaStatus({ active: false, devices: [], error: statusRes.error || statusRes.message || 'Luca Veri durumu alınamadı.' })
+      } else {
+        const activeThresholdMs = Math.max(1000, Number(statusRes?.activeThresholdSeconds || 15) * 1000)
+        const devices = Array.isArray(statusRes?.devices) ? statusRes.devices.map(device => {
+          const timestamp = Date.parse(device?.lastSeen || '')
+          const online = Number.isFinite(timestamp) && (Date.now() - timestamp) <= activeThresholdMs
+          return { ...device, status: online ? 'online' : 'offline' }
+        }) : []
+        setLucaStatus({ ...statusRes, devices, active: devices.some(device => device.status === 'online') })
+      }
+    } catch (error) {
+      setLucaStatus({ active: false, devices: [], error: error?.message || 'Luca Veri durumu alınamadı.' })
+    } finally {
+      setLucaStatusLoading(false)
     }
   }
 
@@ -756,6 +815,111 @@ export default function FaturalarPage() {
         </div>
       </div>
 
+      {/* PenPOS Luca Veri cihaz durumu */}
+      {lucaStatusOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.62)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 16
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 18, width: 'min(460px, 100%)',
+            boxShadow: '0 20px 50px rgba(15,23,42,0.28)', overflow: 'hidden'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{
+              padding: '16px 20px', background: '#0f172a', color: '#fff',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>🔌 Luca Veri Durumu</h3>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>PenPOS Luca Veri cihaz bağlantısı</p>
+              </div>
+              <button type="button" onClick={() => setLucaStatusOpen(false)} style={{
+                background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+                padding: '4px 9px', borderRadius: 7, cursor: 'pointer', fontWeight: 800
+              }}>✕</button>
+            </div>
+
+            <div style={{ padding: 20 }}>
+              {lucaStatusLoading ? (
+                <div style={{ padding: '28px 10px', textAlign: 'center', color: '#64748b' }}>
+                  Luca Veri cihazı kontrol ediliyor...
+                </div>
+              ) : (
+                <>
+                  <div style={{
+                    padding: '13px 14px', borderRadius: 11,
+                    background: lucaStatus?.active ? '#ecfdf5' : '#fef2f2',
+                    border: `1px solid ${lucaStatus?.active ? '#a7f3d0' : '#fecaca'}`,
+                    color: lucaStatus?.active ? '#047857' : '#b91c1c',
+                    fontWeight: 800, fontSize: 14
+                  }}>
+                    {lucaStatus?.active ? '🟢 AKTİF' : '🔴 PASİF'}
+                  </div>
+
+                  {lucaStatus?.error && (
+                    <div style={{ marginTop: 12, color: '#b91c1c', fontSize: 12 }}>{lucaStatus.error}</div>
+                  )}
+
+                  {lucaStatus?.active && (
+                    <div style={{ marginTop: 12, color: '#475569', fontSize: 12 }}>
+                      Chrome açık olmalı ve PenPOS Luca Veri extension’ı bağlı kalmalıdır.
+                    </div>
+                  )}
+
+                  {!lucaStatus?.active && !lucaStatus?.error && (
+                    <div style={{ marginTop: 12, color: '#475569', fontSize: 12, lineHeight: 1.6 }}>
+                      Bağlı aktif bir Luca Veri cihazı bulunamadı.<br />
+                      Fatura kontrolü için extension bağlı olmalı ve Chrome açık olmalıdır.
+                    </div>
+                  )}
+
+                  {Array.isArray(lucaStatus?.devices) && lucaStatus.devices.length > 0 && (
+                    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {lucaStatus.devices.map((device, index) => (
+                        <div key={`${device.deviceName}-${index}`} style={{
+                          display: 'flex', justifyContent: 'space-between', gap: 10,
+                          padding: '9px 10px', borderRadius: 8, background: '#f8fafc',
+                          border: '1px solid #e2e8f0', fontSize: 11
+                        }}>
+                          <strong style={{ color: '#334155' }}>{device.deviceName}</strong>
+                          <span style={{ color: device.status === 'online' ? '#047857' : '#64748b' }}>
+                            {device.status === 'online' ? '● Online' : `● Offline · ${formatDeviceLastSeen(device.lastSeen)}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div style={{
+              padding: '13px 20px', borderTop: '1px solid #e6ebf3', background: '#f8fafc',
+              display: 'flex', justifyContent: 'flex-end', gap: 8
+            }}>
+              <button type="button" onClick={() => setLucaStatusOpen(false)} style={{
+                ...Btn, background: '#fff', color: '#475569', border: '1px solid #cbd5e1'
+              }}>Kapat</button>
+              <button
+                type="button"
+                disabled={lucaStatusLoading || !lucaStatus?.active || lucaRunning}
+                onClick={() => { setLucaStatusOpen(false); startLucaCheck() }}
+                style={{
+                  ...Btn,
+                  background: lucaStatus?.active ? 'linear-gradient(135deg,#0284c7,#0369a1)' : '#cbd5e1',
+                  color: lucaStatus?.active ? '#fff' : '#64748b',
+                  cursor: lucaStatus?.active ? 'pointer' : 'not-allowed',
+                  opacity: lucaStatus?.active ? 1 : 0.8
+                }}
+              >
+                {lucaStatus?.active ? '↻ Faturaları Kontrol Et' : 'Pasif'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TÜRMOB Luca Bağlantı / Ayarlar Modalı */}
       {lucaModalOpen && (
         <div
@@ -764,7 +928,6 @@ export default function FaturalarPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 9999, padding: 16
           }}
-          onClick={() => setLucaModalOpen(false)}
         >
           <div
             style={{
@@ -871,7 +1034,6 @@ export default function FaturalarPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               zIndex: 9999, padding: 16
             }}
-            onClick={() => setDetailInv(null)}
           >
             <div
               style={{

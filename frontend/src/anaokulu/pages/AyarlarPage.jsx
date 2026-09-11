@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { api } from '../../lib/apiClient.js'
+import { resolveApiOrigin } from '../../lib/runtimeApi.js'
 import { exportDataJSON, getYearStart, periodsOfYear, periodName, DEFAULT_YEAR_START, DEFAULT_PERIODS } from '../utils/calculations.js'
 
 const Btn = {
@@ -24,6 +25,8 @@ const LabelCls = {
 
 const FieldCls = { marginBottom: 14 }
 
+const LUCA_SETUP_DOWNLOAD_PATH = '/public/downloads/PenPOS%20Luca%20Veri%20Setup.exe'
+
 const genId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
 export default function AyarlarPage() {
@@ -43,6 +46,7 @@ export default function AyarlarPage() {
 
   const { state, actions } = useAnaokuluData()
   const s = state?.settings || {}
+  const lucaSetupDownloadUrl = `${resolveApiOrigin()}${LUCA_SETUP_DOWNLOAD_PATH}`
   const ys = getYearStart(state)
 
   const [form, setForm] = useState({
@@ -118,7 +122,7 @@ export default function AyarlarPage() {
 
   const upd = (k, v) => { setFormUserEdited(true); setForm(prev => ({ ...prev, [k]: v })) }
 
-  const saveAll = () => {
+  const saveAll = async () => {
     const next = {
       school: String(form.school || '').trim() || 'Anaokulu',
       okulAdi: String(form.school || '').trim() || 'Anaokulu',
@@ -131,8 +135,12 @@ export default function AyarlarPage() {
       discounts,
       luca: { tckn: lucaSettings.tckn, password: lucaSettings.password }
     }
-    actions.updateSettings(next)
-    setFormUserEdited(false) // Kaydettikten sonra flag'i sıfırla — bir sonraki backend yüklenmesi güncel veriyi göstersin
+    const result = await actions.updateSettingsAndSave(next)
+    if (result?.ok === false) {
+      toast(`Ayarlar kaydedilemedi: ${result.message || 'Sunucu hatası'}`)
+      return
+    }
+    setFormUserEdited(false)
     toast('Ayarlar kaydedildi.')
   }
 
@@ -644,6 +652,32 @@ export default function AyarlarPage() {
               <strong>Luca e-Fatura Portalı:</strong> <code>https://turmobefatura.luca.com.tr</code><br/>
               Giriş bilgilerinizi tanımlayarak Faturalar sayfasından faturalarınızı doğrudan kontrol edebilir ve otomatik tahsilat eşleştirmesi yapabilirsiniz.
             </div>
+          </div>
+
+          <div style={{
+            background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 12,
+            padding: '16px 18px', marginBottom: 20, display: 'flex',
+            justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap'
+          }}>
+            <div>
+              <div style={{ color: '#0f2343', fontSize: 15, fontWeight: 800, marginBottom: 4 }}>
+                PenPOS Luca Veri
+              </div>
+              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.5, maxWidth: 620 }}>
+                Luca faturalarının PenPOS'a aktarılması için Chrome üzerinde PenPOS Luca Veri eklentisinin kurulu ve aktif olması gerekir.
+              </div>
+            </div>
+            <a
+              href={lucaSetupDownloadUrl}
+              download="PenPOS Luca Veri Setup.exe"
+              style={{
+                ...Btn, background: 'linear-gradient(135deg,#173b78,#0f2343)', color: '#fff',
+                textDecoration: 'none', whiteSpace: 'nowrap',
+                boxShadow: '0 4px 12px rgba(15,35,67,0.22)'
+              }}
+            >
+              ⬇ PenPOS Luca Veri'yi İndir
+            </a>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>

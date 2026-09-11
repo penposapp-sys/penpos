@@ -45,6 +45,7 @@ export const createServer = () => {
   const __dirname = path.dirname(__filename)
   const isProd = process.env.NODE_ENV === 'production'
   const corsOrigin = isProd ? process.env.CORS_ORIGIN : undefined
+  const lucaExtensionOrigin = 'chrome-extension://gmoinhialbehjedebjmbfkfoaipgbbbn'
   if (!isProd) {
     app.set('etag', false)
   }
@@ -63,7 +64,10 @@ export const createServer = () => {
   if (isProd) {
     const opts = corsOrigin
       ? {
-          origin: corsOrigin,
+          origin: (origin, cb) => {
+            if (!origin || origin === corsOrigin || origin === lucaExtensionOrigin) return cb(null, true)
+            return cb(null, false)
+          },
           credentials: true,
           methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
           allowedHeaders: corsAllowedHeaders,
@@ -81,7 +85,8 @@ export const createServer = () => {
     const allowlist = new Set([
       'http://localhost:5173',
       'http://127.0.0.1:5173',
-      'http://192.168.1.233:5173'
+      'http://192.168.1.233:5173',
+      lucaExtensionOrigin
     ])
     const privateLanRegexes = [
       /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:5173$/,

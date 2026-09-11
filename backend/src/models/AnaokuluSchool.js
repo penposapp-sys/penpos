@@ -85,6 +85,7 @@ const anaokuluStudentSchema = new mongoose.Schema(
               default: []
             },
             installments: { type: Number, default: 1 },
+            downPayment: { type: Number, default: 0 },
             start: { type: String, default: '' },
             skippedInstallments: { type: Array, default: [] }
           },

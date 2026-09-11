@@ -1,0 +1,261 @@
+warning: in the working copy of 'backend/src/controllers/anaokuluController.js', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/src/controllers/anaokuluController.js b/backend/src/controllers/anaokuluController.js[m
+[1mindex 016cf2f..5d7a399 100644[m
+[1m--- a/backend/src/controllers/anaokuluController.js[m
+[1m+++ b/backend/src/controllers/anaokuluController.js[m
+[36m@@ -1,7 +1,7 @@[m
+[31m-import { AnaokuluSchool } from '../models/AnaokuluSchool.js'[m
+[32m+[m[32m﻿import { AnaokuluSchool } from '../models/AnaokuluSchool.js'[m
+ import crypto from 'crypto'[m
+ [m
+[31m-// In-memory job store (process restart’ta sıfırlanır — kısa süreli işler için yeterli)[m
+[32m+[m[32m// In-memory job store (process restartâ€™ta sÄ±fÄ±rlanÄ±r â€” kÄ±sa sÃ¼reli iÅŸler iÃ§in yeterli)[m
+ const lucaJobs = new Map()[m
+ [m
+ export const getAnaokuluSchool = async (req, res) => {[m
+[36m@@ -27,7 +27,7 @@[m [mexport const getAnaokuluSchool = async (req, res) => {[m
+       })[m
+     }[m
+     const { settings, students, collections, invoices, checks } = school[m
+[31m-    // Faturaların dönemlerinin fatura tarihine uygun olduğundan emin ol (örn: 2026-06-30 -> 2026-06)[m
+[32m+[m[32m    // FaturalarÄ±n dÃ¶nemlerinin fatura tarihine uygun olduÄŸundan emin ol (Ã¶rn: 2026-06-30 -> 2026-06)[m
+     const normalizedInvoices = (invoices || []).map(inv => {[m
+       if (inv.date && inv.date.length >= 7) {[m
+         const truePeriod = inv.date.slice(0, 7)[m
+[36m@@ -39,7 +39,7 @@[m [mexport const getAnaokuluSchool = async (req, res) => {[m
+     })[m
+     res.json({ settings, students, collections, invoices: normalizedInvoices, checks })[m
+   } catch (err) {[m
+[31m-    res.status(500).json({ error: err?.message || 'Sunucu hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Sunucu hatasÄ±' })[m
+   }[m
+ }[m
+ [m
+[36m@@ -47,7 +47,7 @@[m [mexport const saveAnaokuluSchool = async (req, res) => {[m
+   try {[m
+     const tenantId = req.tenant?._id || req.tenant?.id[m
+     if (!tenantId) {[m
+[31m-      return res.status(400).json({ error: 'Lütfen işlem yapacağınız bir anaokulu seçiniz.' })[m
+[32m+[m[32m      return res.status(400).json({ error: 'LÃ¼tfen iÅŸlem yapacaÄŸÄ±nÄ±z bir anaokulu seÃ§iniz.' })[m
+     }[m
+     const body = req.body || {}[m
+     const reqSettings = body.settings[m
+[36m@@ -84,11 +84,11 @@[m [mexport const saveAnaokuluSchool = async (req, res) => {[m
+     const { settings, students, collections, invoices, checks } = school[m
+     res.json({ settings, students, collections, invoices, checks })[m
+   } catch (err) {[m
+[31m-    res.status(500).json({ error: err?.message || 'Sunucu hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Sunucu hatasÄ±' })[m
+   }[m
+ }[m
+ [m
+[31m-// Alt endpointler — tek öğrencinin dökümünü getir/sil[m
+[32m+[m[32m// Alt endpointler â€” tek Ã¶ÄŸrencinin dÃ¶kÃ¼mÃ¼nÃ¼ getir/sil[m
+ export const getAnaokuluStudent = async (req, res) => {[m
+   try {[m
+     const school = await AnaokuluSchool.findOne({ tenant: req.tenant?._id }).lean()[m
+[36m@@ -96,7 +96,7 @@[m [mexport const getAnaokuluStudent = async (req, res) => {[m
+     const s = school.students.find(st => st.id === Number(req.params.id))[m
+     res.json(s || null)[m
+   } catch (err) {[m
+[31m-    res.status(500).json({ error: err?.message || 'Sunucu hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Sunucu hatasÄ±' })[m
+   }[m
+ }[m
+ [m
+[36m@@ -104,14 +104,14 @@[m [mexport const delAnaokuluStudent = async (req, res) => {[m
+   try {[m
+     const sid = Number(req.params.id)[m
+     const school = await AnaokuluSchool.findOne({ tenant: req.tenant?._id })[m
+[31m-    if (!school) return res.status(404).json({ error: 'Okul kaydı bulunamadı' })[m
+[32m+[m[32m    if (!school) return res.status(404).json({ error: 'Okul kaydÄ± bulunamadÄ±' })[m
+     school.students = school.students.filter(st => st.id !== sid)[m
+     school.collections = school.collections.filter(c => c.studentId !== sid)[m
+     school.invoices = school.invoices.filter(i => i.studentId !== sid)[m
+     await school.save()[m
+     res.json({ ok: true })[m
+   } catch (err) {[m
+[31m-    res.status(500).json({ error: err?.message || 'Sunucu hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Sunucu hatasÄ±' })[m
+   }[m
+ }[m
+ [m
+[36m@@ -119,12 +119,12 @@[m [mexport const delAnaokuluCollection = async (req, res) => {[m
+   try {[m
+     const cid = Number(req.params.id)[m
+     const school = await AnaokuluSchool.findOne({ tenant: req.tenant?._id })[m
+[31m-    if (!school) return res.status(404).json({ error: 'Okul kaydı bulunamadı' })[m
+[32m+[m[32m    if (!school) return res.status(404).json({ error: 'Okul kaydÄ± bulunamadÄ±' })[m
+     school.collections = school.collections.filter(c => c.id !== cid)[m
+     await school.save()[m
+     res.json({ ok: true })[m
+   } catch (err) {[m
+[31m-    res.status(500).json({ error: err?.message || 'Sunucu hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Sunucu hatasÄ±' })[m
+   }[m
+ }[m
+ [m
+[36m@@ -132,53 +132,53 @@[m [mexport const delAnaokuluInvoice = async (req, res) => {[m
+   try {[m
+     const uuid = req.params.uuid[m
+     const school = await AnaokuluSchool.findOne({ tenant: req.tenant?._id })[m
+[31m-    if (!school) return res.status(404).json({ error: 'Okul kaydı bulunamadı' })[m
+[32m+[m[32m    if (!school) return res.status(404).json({ error: 'Okul kaydÄ± bulunamadÄ±' })[m
+     school.invoices = school.invoices.filter(i => i.uuid !== uuid)[m
+     await school.save()[m
+     res.json({ ok: true })[m
+   } catch (err) {[m
+[31m-    res.status(500).json({ error: err?.message || 'Sunucu hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Sunucu hatasÄ±' })[m
+   }[m
+ }[m
+[31m-// ─────────────────────────────────────────────────────────────[m
+[32m+[m[32m// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€[m
+ // LUCA E-FATURA ENTEGRASYONU - Async Job mimarisi[m
+[31m-// ─────────────────────────────────────────────────────────────[m
+[32m+[m[32m// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€[m
+ export const checkLucaInvoices = async (req, res) => {[m
+   try {[m
+     const tenantId = req.tenant?._id || req.tenant?.id[m
+[31m-    if (!tenantId) return res.status(400).json({ error: 'Tenant bulunamadı.' })[m
+[32m+[m[32m    if (!tenantId) return res.status(400).json({ error: 'Tenant bulunamadÄ±.' })[m
+ [m
+     const school = await AnaokuluSchool.findOne({ tenant: tenantId }).lean()[m
+[31m-    if (!school) return res.status(404).json({ error: 'Okul kaydı bulunamadı.' })[m
+[32m+[m[32m    if (!school) return res.status(404).json({ error: 'Okul kaydÄ± bulunamadÄ±.' })[m
+ [m
+     const luca = school?.settings?.luca || {}[m
+     const tckn = luca.tckn || luca.username || luca.customerNo[m
+     const password = luca.password[m
+ [m
+     if (!tckn || !password) {[m
+[31m-      return res.status(400).json({ error: 'Luca TCKN ve şifre ayarları eksik. Lütfen Ayarlar sayfasından tanımlayın.' })[m
+[32m+[m[32m      return res.status(400).json({ error: 'Luca TCKN ve ÅŸifre ayarlarÄ± eksik. LÃ¼tfen Ayarlar sayfasÄ±ndan tanÄ±mlayÄ±n.' })[m
+     }[m
+ [m
+     const { period } = req.body || {}[m
+     if (!period) {[m
+[31m-      return res.status(400).json({ error: 'Dönem (period) bilgisi gönderilmedi.' })[m
+[32m+[m[32m      return res.status(400).json({ error: 'DÃ¶nem (period) bilgisi gÃ¶nderilmedi.' })[m
+     }[m
+ [m
+[31m-    // Job oluştur ve hemen dön[m
+[32m+[m[32m    // Job oluÅŸtur ve hemen dÃ¶n[m
+     const jobId = crypto.randomUUID()[m
+     lucaJobs.set(jobId, {[m
+       status: 'running',[m
+[31m-      step: 'Luca kontrolü başlatılıyor…',[m
+[32m+[m[32m      phase: 'waiting_extension',[m
+[32m+[m[32m      step: 'Luca kontrolÃ¼ baÅŸlatÄ±lÄ±yorâ€¦',[m
+       startedAt: Date.now()[m
+     })[m
+ [m
+[31m-    // Arka planda çalıştır (await YOK)[m
+[31m-    _runLucaJob(jobId, tenantId, school, tckn, password, period)[m
+[31m-[m
+[32m+[m[32m    // Arka planda Ã§alÄ±ÅŸtÄ±r (await YOK)[m
+[32m+[m[32m    // Luca verisi Chrome Extension tarafından getirilecek.[m
+     return res.json({ ok: true, jobId, status: 'running' })[m
+   } catch (err) {[m
+     console.error('[checkLucaInvoices] Hata:', err)[m
+[31m-    res.status(500).json({ error: err?.message || 'Luca entegrasyon hatası' })[m
+[32m+[m[32m    res.status(500).json({ error: err?.message || 'Luca entegrasyon hatasÄ±' })[m
+   }[m
+ }[m
+ [m
+[36m@@ -186,11 +186,11 @@[m [mexport const checkLucaInvoices = async (req, res) => {[m
+ export const checkLucaJobStatus = async (req, res) => {[m
+   const { jobId } = req.params[m
+   const job = lucaJobs.get(jobId)[m
+[31m-  if (!job) return res.status(404).json({ error: 'Job bulunamadı veya süresi doldu.' })[m
+[32m+[m[32m  if (!job) return res.status(404).json({ error: 'Job bulunamadÄ± veya sÃ¼resi doldu.' })[m
+   return res.json(job)[m
+ }[m
+ [m
+[31m-// ─── İç yardımcı: arka planda çalışan Luca job'u ───[m
+[32m+[m[32m// â”€â”€â”€ Ä°Ã§ yardÄ±mcÄ±: arka planda Ã§alÄ±ÅŸan Luca job'u â”€â”€â”€[m
+ async function _runLucaJob(jobId, tenantId, school, tckn, password, period) {[m
+   try {[m
+     const updateStep = (step) => {[m
+[36m@@ -207,17 +207,17 @@[m [masync function _runLucaJob(jobId, tenantId, school, tckn, password, period) {[m
+ [m
+     const { lucaScraperService } = await import('../services/lucaScraperService.js')[m
+     const lucaInvoices = await lucaScraperService.getInvoices(tckn, password, startDate, endDate, updateStep)[m
+[31m-    updateStep('Faturalar öğrencilerle eşleştiriliyor…')[m
+[32m+[m[32m    updateStep('Faturalar Ã¶ÄŸrencilerle eÅŸleÅŸtiriliyorâ€¦')[m
+ [m
+     const students = school.students || [][m
+ [m
+     const normalizeTurkish = (str) => {[m
+       if (!str) return ''[m
+       return String(str)[m
+[31m-        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')[m
+[32m+[m[32m        .replace(/Ä°/g, 'i').replace(/I/g, 'i').replace(/Ä±/g, 'i')[m
+         .toLowerCase()[m
+[31m-        .replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g')[m
+[31m-        .replace(/ü/g, 'u').replace(/ö/g, 'o')[m
+[32m+[m[32m        .replace(/ÅŸ/g, 's').replace(/Ã§/g, 'c').replace(/ÄŸ/g, 'g')[m
+[32m+[m[32m        .replace(/Ã¼/g, 'u').replace(/Ã¶/g, 'o')[m
+         .replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim()[m
+     }[m
+ [m
+[36m@@ -272,7 +272,7 @@[m [masync function _runLucaJob(jobId, tenantId, school, tckn, password, period) {[m
+         uuid: `luca_${li.faturaNo || Date.now()}`,[m
+         no: li.faturaNo, date: li.isoDate, period: invPeriod,[m
+         taxId: student?.tax || '', buyer: li.alici,[m
+[31m-        base, vat, total: li.total, type: 'e-Arşiv', status: 'Kesildi',[m
+[32m+[m[32m        base, vat, total: li.total, type: 'e-ArÅŸiv', status: 'Kesildi',[m
+         studentId: student ? (student.id || student._id) : null,[m
+         matchBy: 'luca-scraper'[m
+       })[m
+[36m@@ -280,9 +280,9 @@[m [masync function _runLucaJob(jobId, tenantId, school, tckn, password, period) {[m
+     }[m
+ [m
+     const updated = await AnaokuluSchool.findOne({ tenant: tenantId })[m
+[31m-    if (!updated) throw new Error('Okul kaydı bulunamadı')[m
+[32m+[m[32m    if (!updated) throw new Error('Okul kaydÄ± bulunamadÄ±')[m
+ [m
+[31m-    updateStep('Sonuçlar kaydediliyor…')[m
+[32m+[m[32m    updateStep('SonuÃ§lar kaydediliyorâ€¦')[m
+     for (const inv of matched) {[m
+       const idx = updated.invoices.findIndex(i => i.no === inv.no)[m
+       idx >= 0 ? (updated.invoices[idx] = inv) : updated.invoices.push(inv)[m
+[36m@@ -305,11 +305,36 @@[m [masync function _runLucaJob(jobId, tenantId, school, tckn, password, period) {[m
+       finishedAt: Date.now()[m
+     })[m
+ [m
+[31m-    // 10 dakika sonra belleği temizle[m
+[32m+[m[32m    // 10 dakika sonra belleÄŸi temizle[m
+     setTimeout(() => lucaJobs.delete(jobId), 10 * 60 * 1000)[m
+   } catch (err) {[m
+     console.error('[_runLucaJob] Hata:', err)[m
+[31m-    lucaJobs.set(jobId, { status: 'error', error: err?.message || 'Luca entegrasyon hatası', finishedAt: Date.now() })[m
+[32m+[m[32m    lucaJobs.set(jobId, { status: 'error', error: err?.message || 'Luca entegrasyon hatasÄ±', finishedAt: Date.now() })[m
+     setTimeout(() => lucaJobs.delete(jobId), 5 * 60 * 1000)[m
+   }[m
+ }[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32mexport const checkLucaExtensionTask = async (req, res) => {[m
+[32m+[m[32m  const { jobId } = req.params[m
+[32m+[m[32m  const job = lucaJobs.get(jobId)[m
+[32m+[m
+[32m+[m[32m  if (!job) {[m
+[32m+[m[32m    return res.status(404).json({[m
+[32m+[m[32m      error: 'Job bulunamadı veya süresi doldu.'[m
+[32m+[m[32m    })[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return res.json({[m
+[32m+[m[32m    ok: true,[m
+[32m+[m[32m    jobId,[m
+[32m+[m[32m    status: job.status,[m
+[32m+[m[32m    phase: job.phase || null,[m
+[32m+[m[32m    step: job.step || null,[m
+[32m+[m[32m    startedAt: job.startedAt || null[m
+[32m+[m[32m  })[m
+[32m+[m[32m}[m
+[41m+[m

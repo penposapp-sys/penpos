@@ -111,7 +111,9 @@ export function expectedFor(state, sid, period) {
   let t = 0
   ;(s.items || []).forEach(it => {
     itemMonths(it, ys).forEach(m => {
-      if (m === period) t += it.total / it.installments
+      if (m === period) {
+        t += Number(it.total || 0) / Math.max(1, Number(it.installments) || 1)
+      }
     })
   })
   return round2(t)
@@ -270,6 +272,7 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
 
       const count = Math.max(1, Number(plan.installments) || 1)
       const total = Number(plan.total) || 0
+      const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
       const perInstallment = round2(total / count)
       const startDate = plan.start
         ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
@@ -294,11 +297,16 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
         if (instNo && instNo >= 1 && instNo <= count) {
           if (!explicitCols[instNo]) explicitCols[instNo] = []
           explicitCols[instNo].push(c)
-        } else {
+        } else if (instNo === 0) {
+          if (!explicitCols[0]) explicitCols[0] = []
+          explicitCols[0].push(c)
+        } else if (instNo !== 0) {
           unassignedCols.push(c)
         }
       })
       let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+      const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+      const downPaymentCredit = round2(downPaymentPaid / count)
 
       for (let i = 0; i < count; i++) {
         const installmentNo = i + 1
@@ -334,14 +342,14 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
 
         // Tahsilat eşleştirme
         const directMatches = explicitCols[installmentNo] || []
-        let paid = 0
+        let paid = downPaymentCredit
         let collectionDates = []
         let paymentMethods = []
 
         if (directMatches.length > 0) {
           paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
           collectionDates = directMatches.map(c => c.date).filter(Boolean)
-          paymentMethods = directMatches.map(c => c.payment).filter(Boolean)
+          paymentMethods = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', ...directMatches.map(c => c.payment).filter(Boolean)].filter(Boolean)
         } else if (unassignedPool > 0) {
           if (unassignedPool >= installmentAmount) {
             paid = installmentAmount
@@ -612,6 +620,7 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
       items.forEach(plan => {
         const count = Math.max(1, Number(plan.installments) || 1)
         const total = Number(plan.total) || 0
+        const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
         const perInstallment = round2(total / count)
         const startDate = plan.start
           ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
@@ -665,7 +674,10 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
           const key = `${itName}_${instNo}`
           if (!explicitCols[key]) explicitCols[key] = 0
           explicitCols[key] = round2(explicitCols[key] + (Number(c.amount) || 0))
-        } else {
+        } else if (instNo === 0) {
+          const key = `${itName}_0`
+          explicitCols[key] = round2((explicitCols[key] || 0) + (Number(c.amount) || 0))
+        } else if (instNo !== 0) {
           unassignedCols.push(Number(c.amount) || 0)
         }
       })
@@ -674,7 +686,8 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
 
       const installmentDebts = allInstallments.map(inst => {
         const key = `${(inst.planName || '').trim().toLowerCase()}_${inst.installmentNo}`
-        let paid = explicitCols[key] || 0
+        const downPaymentCredit = round2((explicitCols[`${(inst.planName || '').trim().toLowerCase()}_0`] || 0) / Math.max(1, Number(items.find(item => item.name === inst.planName)?.installments) || 1))
+        let paid = round2((explicitCols[key] || 0) + downPaymentCredit)
         let debt = round2(Math.max(0, inst.amount - paid))
 
         if (debt > 0 && unassignedPool > 0) {

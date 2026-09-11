@@ -1,0 +1,22 @@
+* { box-sizing: border-box; }
+body { margin: 0; width: 330px; min-height: 360px; background: #f4f7fb; color: #10213b; font: 13px Segoe UI, Arial, sans-serif; }
+.popup { padding: 20px; }
+.brand { display: flex; align-items: center; gap: 11px; margin-bottom: 18px; }
+.mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: #0d1b35; color: #fff; font-weight: 900; font-size: 20px; }
+h1 { margin: 0; font-size: 17px; letter-spacing: .1px; }
+.brand p { margin: 3px 0 0; color: #66758c; font-size: 11px; }
+.panel { padding: 15px; border: 1px solid #d8e1ee; border-radius: 14px; background: #fff; box-shadow: 0 10px 26px rgba(16,33,59,.08); }
+label { display: block; margin: 10px 0 5px; color: #52627a; font-size: 11px; font-weight: 700; }
+input { width: 100%; padding: 9px 10px; border: 1px solid #cbd7e6; border-radius: 8px; outline: none; color: #10213b; background: #fbfdff; }
+input:focus { border-color: #2f6fed; box-shadow: 0 0 0 3px rgba(47,111,237,.12); }
+button { width: 100%; margin-top: 15px; padding: 10px; border: 0; border-radius: 9px; cursor: pointer; font-weight: 800; }
+.primary { color: #fff; background: #173b78; }
+.primary:hover { background: #0d2c60; }
+.secondary { color: #173b78; background: #e8eef8; }
+.status { display: flex; align-items: center; gap: 8px; color: #087443; margin-bottom: 16px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #15a765; box-shadow: 0 0 0 4px #d8f5e7; }
+.info { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #edf1f6; color: #6a7890; }
+.info strong { color: #1c3153; text-align: right; }
+.task { margin-top: 13px; padding: 10px; border-radius: 8px; color: #174a91; background: #eaf2ff; font-weight: 700; }
+.message { min-height: 17px; margin: 12px 2px 0; color: #bd362f; font-size: 11px; line-height: 1.4; }
+.hidden { display: none; }

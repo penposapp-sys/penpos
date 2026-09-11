@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PenPOS Luca Veri</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="popup">
+    <header class="brand">
+      <div class="mark">P</div>
+      <div>
+        <h1>PenPOS Luca Veri</h1>
+        <p>Remote Luca cihazı</p>
+      </div>
+    </header>
+
+    <section id="loginView" class="panel">
+      <label for="email">E-posta / Kullanıcı Adı</label>
+      <input id="email" autocomplete="username">
+      <label for="password">Şifre</label>
+      <input id="password" type="password" autocomplete="current-password">
+      <label for="deviceName">Cihaz adı</label>
+      <input id="deviceName" value="Ofis PC" maxlength="80">
+      <button id="loginButton" class="primary">Giriş Yap ve Bağla</button>
+    </section>
+
+    <section id="connectedView" class="panel hidden">
+      <div class="status"><span class="dot"></span><strong id="statusText">Bağlı</strong></div>
+      <div class="info"><span>Cihaz</span><strong id="connectedDevice">-</strong></div>
+      <div class="info"><span>Luca bağlantısı</span><strong>Hazır</strong></div>
+      <div class="info"><span>Son bağlantı</span><strong id="lastSeen">-</strong></div>
+      <div id="taskInfo" class="task hidden">Luca görevi çalışıyor...</div>
+      <button id="logoutButton" class="secondary">Bağlantıyı Kes</button>
+    </section>
+
+    <p id="message" class="message"></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
