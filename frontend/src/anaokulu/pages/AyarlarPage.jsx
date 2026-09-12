@@ -72,6 +72,78 @@ export default function AyarlarPage() {
   const [discounts, setDiscounts] = useState([])
   const [newDiscount, setNewDiscount] = useState({ name: '', type: 'percent', value: 0 })
 
+  // Ödeme türleri state
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true)
+  const [paymentMethodsError, setPaymentMethodsError] = useState('')
+  const [newPaymentMethod, setNewPaymentMethod] = useState({ type: 'cash', name: '' })
+
+  const PAYMENT_TYPE_OPTIONS = [
+    { value: 'cash', label: 'Nakit' },
+    { value: 'bank', label: 'Havale / EFT' },
+    { value: 'card', label: 'Kredi Kartı' },
+    { value: 'custom', label: 'Özel' },
+  ]
+
+  const paymentTypeLabel = (type = 'custom') => {
+    const map = { cash: 'Nakit', bank: 'Havale / EFT', card: 'Kredi Kartı', custom: 'Özel', account: 'Veresiye', credit: 'Veresiye' }
+    return map[String(type || 'custom')] || 'Özel'
+  }
+
+  const paymentMethodDisplay = (method = {}) => {
+    const base = paymentTypeLabel(method?.type || 'custom')
+    const name = String(method?.name || '').trim()
+    return name ? `${base} - ${name}` : base
+  }
+
+  const loadPaymentMethods = async () => {
+    setPaymentMethodsLoading(true)
+    setPaymentMethodsError('')
+    try {
+      const result = await api('/api/settings/payment-methods', { silent: true, cacheMode: 'no-store' })
+      const methods = Array.isArray(result?.paymentMethods)
+        ? result.paymentMethods
+        : Array.isArray(result?.methods)
+          ? result.methods
+          : []
+      setPaymentMethods(methods.filter((method) => method && method.isDeleted !== true))
+    } catch (err) {
+      setPaymentMethods([])
+      setPaymentMethodsError(err?.message || 'Ödeme türleri yüklenemedi.')
+    } finally {
+      setPaymentMethodsLoading(false)
+    }
+  }
+
+  useEffect(() => { loadPaymentMethods() }, [])
+
+  const savePaymentMethods = async (nextMethods = paymentMethods) => {
+    const normalized = (Array.isArray(nextMethods) ? nextMethods : []).map((method, index) => ({
+      id: method?.id || genId(),
+      name: String(method?.name || '').trim(),
+      type: String(method?.type || 'custom'),
+      enabled: method?.enabled !== false,
+      isDefault: !!method?.isDefault,
+      isSystem: !!method?.isSystem,
+      isDeleted: !!method?.isDeleted,
+      sortOrder: Number.isFinite(Number(method?.sortOrder)) ? Number(method.sortOrder) : index + 1,
+    }))
+
+    const result = await api('/api/settings/payment-methods', {
+      method: 'PUT',
+      data: { paymentMethods: normalized },
+      silent: true
+    })
+
+    if (result?.ok === false || result?.success === false) {
+      throw new Error(result?.message || 'Ödeme türleri kaydedilemedi.')
+    }
+
+    const saved = Array.isArray(result?.paymentMethods) ? result.paymentMethods : Array.isArray(result?.methods) ? result.methods : normalized
+    setPaymentMethods(saved.filter((method) => method && method.isDeleted !== true))
+    return saved
+  }
+
   // Backend'den veri geldiğinde tüm form alanlarını senkronize et
   useEffect(() => {
     if (!state.loaded) return
@@ -196,6 +268,65 @@ export default function AyarlarPage() {
     toast('✓ TÜRMOB Luca e-Fatura ayarları kaydedildi.')
   }
 
+  const addPaymentMethod = async () => {
+    const safeName = String(newPaymentMethod.name || '').trim()
+    if (!safeName) {
+      toast('Ödeme alt adı boş olamaz.')
+      return
+    }
+
+    const next = [
+      ...paymentMethods,
+      {
+        id: genId(),
+        name: safeName,
+        type: String(newPaymentMethod.type || 'custom'),
+        enabled: true,
+        isDefault: false,
+        isSystem: false,
+        isDeleted: false,
+        sortOrder: paymentMethods.length + 1,
+      },
+    ]
+
+    try {
+      await savePaymentMethods(next)
+      setNewPaymentMethod({ type: 'cash', name: '' })
+      toast('Ödeme türü eklendi.')
+    } catch (err) {
+      toast(err?.message || 'Ödeme türü eklenemedi.')
+    }
+  }
+
+  const updatePaymentMethod = (id, patch) => {
+    setPaymentMethods((current) => current.map((method) => String(method?.id) === String(id) ? { ...method, ...patch } : method))
+  }
+
+  const deletePaymentMethod = async (method) => {
+    if (!method) return
+    const confirmed = window.confirm('Bu ödeme türü pasif hale getirilecek; eski kayıtlar etkilenmez.')
+    if (!confirmed) return
+
+    try {
+      const list = paymentMethods.map((item) => String(item?.id) === String(method.id)
+        ? { ...item, enabled: false, isDeleted: true }
+        : item)
+      await savePaymentMethods(list)
+      toast('Ödeme türü pasifleştirildi.')
+    } catch (err) {
+      toast(err?.message || 'Ödeme türü pasifleştirilemedi.')
+    }
+  }
+
+  const savePaymentMethodList = async () => {
+    try {
+      await savePaymentMethods(paymentMethods)
+      toast('Ödeme türleri kaydedildi.')
+    } catch (err) {
+      toast(err?.message || 'Ödeme türleri kaydedilemedi.')
+    }
+  }
+
   const addDiscount = () => {
     if (!newDiscount.name.trim()) { toast('İndirim adı boş olamaz.'); return }
     const updated = [...discounts, { id: genId(), name: newDiscount.name.trim(), type: newDiscount.type, value: Number(newDiscount.value) || 0 }]
@@ -314,6 +445,7 @@ export default function AyarlarPage() {
 
   const allTabs = [
     { key: 'genel', label: '🏫 Genel', staffHide: true, adminPanelHide: true },
+    { key: 'odeme', label: '💳 Ödeme Türleri', staffHide: true, adminPanelHide: true },
     { key: 'ucretler', label: '💰 Ücret Kalemleri', staffHide: true, adminPanelHide: true },
     { key: 'indirimler', label: '🏷️ İndirimler', staffHide: true, adminPanelHide: true },
     { key: 'luca', label: '🧾 TÜRMOB Luca e-Fatura', staffHide: true, adminPanelHide: true },
@@ -423,6 +555,84 @@ export default function AyarlarPage() {
               ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
               boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
             }}>💾 Ayarları Kaydet</button>
+          </div>
+        </div>
+      )}
+
+      {/* Ödeme Türleri */}
+      {!isStaff && !isAdminPanelMode && activeTab === 'odeme' && (
+        <div style={panel}>
+          <h3 style={h3}>💳 Ödeme Türleri</h3>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px 0' }}>
+            Tahsilatlarda görünecek ödeme yöntemlerini yönetin. Ana tür ile alt açıklama birlikte kullanılır; örn. <strong>Havale / EFT - Ziraat Bankası</strong>.
+          </p>
+
+          {paymentMethodsError && (
+            <div style={{ marginBottom: 12, color: '#b91c1c', fontSize: 13 }}>{paymentMethodsError}</div>
+          )}
+
+          <div style={{ display: 'grid', gap: 12, marginBottom: 18 }}>
+            {(paymentMethods || []).map((method) => (
+              <div key={method.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) minmax(220px, 1fr) auto auto', gap: 10, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+                <select
+                  className="input"
+                  value={method.type || 'custom'}
+                  onChange={(event) => updatePaymentMethod(method.id, { type: event.target.value })}
+                  style={{ ...InputCls, width: '100%' }}
+                >
+                  {PAYMENT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <input
+                  className="input"
+                  value={method.name || ''}
+                  onChange={(event) => updatePaymentMethod(method.id, { name: event.target.value })}
+                  placeholder="Ziraat Bankası / Garanti POS / Senet / Çek"
+                  style={{ ...InputCls, width: '100%' }}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
+                  <input
+                    type="checkbox"
+                    checked={method.enabled !== false}
+                    onChange={() => updatePaymentMethod(method.id, { enabled: !(method.enabled !== false) })}
+                  />
+                  Aktif
+                </label>
+                <button type="button" onClick={() => deletePaymentMethod(method)} style={{ ...Btn, background: '#fee2e2', color: '#991b1b', padding: '7px 10px' }}>Sil</button>
+              </div>
+            ))}
+
+            {paymentMethods.length === 0 && !paymentMethodsLoading && (
+              <div style={{ color: '#64748b', fontSize: 13, padding: '12px 4px' }}>Henüz ödeme türü eklenmemiş.</div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) minmax(220px, 1fr) auto', gap: 10, alignItems: 'end', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+            <select
+              className="input"
+              value={newPaymentMethod.type}
+              onChange={(event) => setNewPaymentMethod((current) => ({ ...current, type: event.target.value }))}
+              style={{ ...InputCls, width: '100%' }}
+            >
+              {PAYMENT_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <input
+              className="input"
+              value={newPaymentMethod.name}
+              onChange={(event) => setNewPaymentMethod((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Ziraat Bankası / Garanti POS / Senet / Çek"
+              style={{ ...InputCls, width: '100%' }}
+            />
+            <button type="button" onClick={addPaymentMethod} style={{ ...Btn, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', padding: '9px 14px' }}>+ Ekle</button>
+          </div>
+
+          <div style={{ marginTop: 18, textAlign: 'right' }}>
+            <button type="button" onClick={savePaymentMethodList} disabled={paymentMethodsLoading} style={{ ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: '0 4px 12px rgba(99,102,241,0.25)' }}>
+              💾 Değişiklikleri Kaydet
+            </button>
           </div>
         </div>
       )}

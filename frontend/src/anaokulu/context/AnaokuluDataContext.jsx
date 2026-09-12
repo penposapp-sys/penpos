@@ -60,8 +60,34 @@ function reducer(state, action) {
 export function AnaokuluDataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const debounceRef = useRef(null)
+  const lastPersistedSnapshotRef = useRef('')
+  const saveInFlightRef = useRef(false)
+  const suppressAutoSaveRef = useRef(false)
   const { regionCurrentTenantId, isRegionAdmin, isAdminPanelMode, accessibleTenants, user, loading } = useAuth()
   const isManager = Boolean(isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin')
+
+  const snapshotSchoolState = (source = state) => JSON.stringify({
+    settings: source.settings,
+    students: source.students,
+    collections: source.collections,
+    invoices: source.invoices,
+    checks: source.checks
+  })
+
+  const hasDuplicateCollection = (collections = [], candidate = {}) => {
+    if (!candidate || !candidate.studentId || !candidate.item) return false
+
+    const candidateStudentId = String(candidate.studentId)
+    const candidateItem = String(candidate.item || '').trim().toLowerCase()
+    const candidateInstallment = Number(candidate.installmentNo)
+
+    return collections.some((collection) => {
+      const sameStudent = String(collection.studentId) === candidateStudentId
+      const sameItem = String(collection.item || '').trim().toLowerCase() === candidateItem
+      const sameInstallment = Number(collection.installmentNo) === candidateInstallment
+      return sameStudent && sameItem && sameInstallment
+    })
+  }
 
   const buildReqConfig = (extra = {}, tenantId) => {
     const cfg = { portalOverride: 'anaokulu', ...extra }
@@ -77,6 +103,16 @@ export function AnaokuluDataProvider({ children }) {
     if (loading) return
     if (isRegionAdmin && !regionCurrentTenantId) return
     if (isAdminPanelMode) return
+    if (saveInFlightRef.current) {
+      return { ok: true, skipped: true }
+    }
+
+    const snapshot = snapshotSchoolState(nextState)
+    if (snapshot === lastPersistedSnapshotRef.current) {
+      return { ok: true, skipped: true }
+    }
+
+    saveInFlightRef.current = true
     try {
       dispatch({ type: 'SET_SAVING', payload: true })
       const body = {
@@ -95,6 +131,7 @@ export function AnaokuluDataProvider({ children }) {
       if (res?.ok === false) {
         dispatch({ type: 'SET_ERROR', payload: res?.message || 'Kaydedilemedi' })
       } else {
+        lastPersistedSnapshotRef.current = snapshot
         dispatch({ type: 'SET_ERROR', payload: null })
       }
       return res
@@ -103,6 +140,7 @@ export function AnaokuluDataProvider({ children }) {
       dispatch({ type: 'SET_ERROR', payload: message })
       return { ok: false, message }
     } finally {
+      saveInFlightRef.current = false
       dispatch({ type: 'SET_SAVING', payload: false })
     }
   }
@@ -217,29 +255,33 @@ export function AnaokuluDataProvider({ children }) {
     try {
       const res = await api('/api/anaokulu/', buildReqConfig({ silent: true, suppressAuthRedirect: true }))
       if (res?.ok !== false && res) {
+        const loadedState = {
+          settings: {
+            ...initialState.settings,
+            ...(res.settings || {}),
+            feeCategories: Array.isArray(res.settings?.feeCategories) ? res.settings.feeCategories : [],
+            discounts: Array.isArray(res.settings?.discounts) ? res.settings.discounts : [],
+            luca: {
+              tckn: '',
+              customerNo: '',
+              username: '',
+              password: '',
+              url: 'https://turmobefatura.luca.com.tr',
+              autoSync: true,
+              ...(res.settings?.luca || {})
+            }
+          },
+          students: res.students || [],
+          collections: res.collections || [],
+          invoices: res.invoices || [],
+          checks: res.checks || []
+        }
+
+        lastPersistedSnapshotRef.current = snapshotSchoolState(loadedState)
+
         dispatch({
           type: 'LOAD',
-          payload: {
-            settings: {
-              ...initialState.settings,
-              ...(res.settings || {}),
-              feeCategories: Array.isArray(res.settings?.feeCategories) ? res.settings.feeCategories : [],
-              discounts: Array.isArray(res.settings?.discounts) ? res.settings.discounts : [],
-              luca: {
-                tckn: '',
-                customerNo: '',
-                username: '',
-                password: '',
-                url: 'https://turmobefatura.luca.com.tr',
-                autoSync: true,
-                ...(res.settings?.luca || {})
-              }
-            },
-            students: res.students || [],
-            collections: res.collections || [],
-            invoices: res.invoices || [],
-            checks: res.checks || []
-          }
+          payload: loadedState
         })
       }
     } catch {
@@ -255,13 +297,20 @@ export function AnaokuluDataProvider({ children }) {
   useEffect(() => {
     if (!state.loaded) return
     if (isAdminPanelMode) return
+    if (suppressAutoSaveRef.current) return
+    if (state.saving || saveInFlightRef.current) return
+    const currentSnapshot = snapshotSchoolState(state)
+    if (currentSnapshot === lastPersistedSnapshotRef.current) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
+      const latest = snapshotSchoolState(state)
+      if (suppressAutoSaveRef.current) return
+      if (latest === lastPersistedSnapshotRef.current || state.saving || saveInFlightRef.current) return
       saveToBackend(state)
     }, 500)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.settings, state.students, state.collections, state.invoices, state.checks, isAdminPanelMode])
+  }, [state.settings, state.students, state.collections, state.invoices, state.checks, isAdminPanelMode, state.saving])
 
   const actions = {
     updateSettings: (patch) => dispatch({ type: 'SETTINGS_UPDATE', payload: patch }),
@@ -296,8 +345,55 @@ export function AnaokuluDataProvider({ children }) {
       }
     },
     deleteStudent: (id) => dispatch({ type: 'STUDENT_DELETE', payload: id }),
-    addCollection: (c) => dispatch({ type: 'COLLECTION_ADD', payload: { id: c.id || Date.now(), ...c } }),
-    updateCollection: (c) => dispatch({ type: 'COLLECTION_UPDATE', payload: c }),
+    addCollection: async (c) => {
+      const payload = { id: c.id || Date.now(), ...c }
+      if (isAdminPanelMode) {
+        dispatch({ type: 'COLLECTION_ADD', payload })
+        return { ok: true }
+      }
+
+      if (hasDuplicateCollection(state.collections, payload)) {
+        return { ok: true, skipped: true, message: 'Aynı taksit zaten kayıtlı.' }
+      }
+
+      const nextState = { ...state, collections: [...state.collections, payload] }
+      suppressAutoSaveRef.current = true
+      const res = await saveToBackend(nextState)
+      suppressAutoSaveRef.current = false
+
+      if (res?.ok === false) {
+        dispatch({ type: 'SET_ERROR', payload: res?.message || 'Tahsilat kaydedilemedi.' })
+        throw new Error(res?.message || 'Tahsilat kaydedilemedi.')
+      }
+
+      dispatch({ type: 'COLLECTION_ADD', payload })
+      dispatch({ type: 'SET_ERROR', payload: null })
+      return res
+    },
+    updateCollection: async (c) => {
+      if (isAdminPanelMode) {
+        dispatch({ type: 'COLLECTION_UPDATE', payload: c })
+        return { ok: true }
+      }
+
+      const nextState = {
+        ...state,
+        collections: state.collections.map(collection =>
+          String(collection.id || collection._id) === String(c.id || c._id)
+            ? { ...collection, ...c }
+            : collection
+        )
+      }
+      const res = await saveToBackend(nextState)
+      if (res?.ok === false) {
+        dispatch({ type: 'SET_ERROR', payload: res?.message || 'Tahsilat güncellenemedi.' })
+        throw new Error(res?.message || 'Tahsilat güncellenemedi.')
+      }
+
+      dispatch({ type: 'COLLECTION_UPDATE', payload: c })
+      dispatch({ type: 'SET_ERROR', payload: null })
+      return res
+    },
     deleteCollection: (id) => {
       dispatch({ type: 'COLLECTION_DELETE', payload: id })
       if (!isAdminPanelMode && id != null) {

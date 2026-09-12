@@ -177,6 +177,7 @@ export default function FaturalarPage() {
     const totalPlanned = rawRows.reduce((s, r) => s + r.amount, 0)
     const totalPaid = rawRows.reduce((s, r) => s + r.paid, 0)
     const totalRemaining = rawRows.reduce((s, r) => s + r.remaining, 0)
+    const totalVat = rawRows.reduce((s, r) => s + (Number(r.vatAmount) || 0), 0)
 
     const billedItems = rawRows.filter(r => r.invoiceStatus === 'billed')
     const unbilledItems = rawRows.filter(r => r.invoiceStatus === 'unbilled')
@@ -193,6 +194,7 @@ export default function FaturalarPage() {
       totalPlanned,
       totalPaid,
       totalRemaining,
+      totalVat,
       billedCount: billedItems.length,
       billedAmount,
       unbilledCount: unbilledItems.length,
@@ -567,28 +569,20 @@ export default function FaturalarPage() {
         <div className="ak-stats-grid" style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12
         }}>
-          {/* Toplam Taksit */}
+          {/* Bu ay fatura kesilecek toplam tutar */}
           <div style={miniBox}>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Dönem Taksit Tutarı</div>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Bu Ay Fatura Kesilecek Tutar</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
               <b style={{ fontSize: 18, color: '#0f172a' }}>{processedData.totalCount} Adet</b>
               <span style={{ fontSize: 13, color: '#0f172a', fontWeight: 800 }}>{money(processedData.totalPlanned)}</span>
             </div>
           </div>
 
-          {/* Tahsil Edilen */}
-          <div style={{ ...miniBox, background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-            <div style={{ fontSize: 11, color: '#166534', fontWeight: 700 }}>🟢 Tahsil Edilen Tutar</div>
+          {/* Toplam KDV */}
+          <div style={{ ...miniBox, background: '#f8fafc', borderColor: '#cbd5e1' }}>
+            <div style={{ fontSize: 11, color: '#475569', fontWeight: 700 }}>Toplam KDV Tutarı</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#166534' }}>{money(processedData.totalPaid)}</b>
-            </div>
-          </div>
-
-          {/* Tahsil Edilmeyen */}
-          <div style={{ ...miniBox, background: '#fef2f2', borderColor: '#fecaca' }}>
-            <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 700 }}>🔴 Tahsil Edilmeyen Tutar</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#991b1b' }}>{money(processedData.totalRemaining)}</b>
+              <b style={{ fontSize: 18, color: '#1e293b' }}>{money(processedData.totalVat)}</b>
             </div>
           </div>
 
@@ -601,12 +595,28 @@ export default function FaturalarPage() {
             </div>
           </div>
 
-          {/* Fatura Kesilmemiş */}
+          {/* Kesilmesi Beklenen */}
           <div style={{ ...miniBox, background: 'linear-gradient(135deg,#fff1f2,#ffe4e6)', borderColor: '#fecdd3' }}>
-            <div style={{ fontSize: 11, color: '#9f1239', fontWeight: 700 }}>🔴 Fatura Kesilmemiş (Bekleyen)</div>
+            <div style={{ fontSize: 11, color: '#9f1239', fontWeight: 700 }}>🔴 Kesilmesi Beklenen</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
               <b style={{ fontSize: 18, color: '#9f1239' }}>{processedData.unbilledCount} Adet</b>
               <span style={{ fontSize: 12, color: '#be123c', fontWeight: 700 }}>{money(processedData.unbilledAmount)}</span>
+            </div>
+          </div>
+
+          {/* Tahsil Edilen */}
+          <div style={{ ...miniBox, background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+            <div style={{ fontSize: 11, color: '#166534', fontWeight: 700 }}>🟢 Toplam Tahsil Edilen</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <b style={{ fontSize: 18, color: '#166534' }}>{money(processedData.totalPaid)}</b>
+            </div>
+          </div>
+
+          {/* Tahsil Edilmeyi Bekleyen */}
+          <div style={{ ...miniBox, background: '#fef2f2', borderColor: '#fecaca' }}>
+            <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 700 }}>🔴 Tahsil Edilmeyi Bekleyen</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <b style={{ fontSize: 18, color: '#991b1b' }}>{money(processedData.totalRemaining)}</b>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { api } from '../../lib/apiClient.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
@@ -95,6 +96,46 @@ export default function UcretPlaniPage() {
     perInst: 0,
     deduction: 0
   })
+
+  const buildPaymentOptionLabel = (method = {}) => {
+    const typeMap = {
+      cash: 'Nakit',
+      bank: 'Havale / EFT',
+      card: 'Kredi Kartı',
+      credit: 'Veresiye',
+      account: 'Veresiye',
+      custom: 'Özel',
+      other: 'Diğer',
+    }
+    const base = typeMap[String(method?.type || 'custom')] || 'Özel'
+    const name = String(method?.name || method?.label || '').trim()
+    return name ? `${base} - ${name}` : base
+  }
+
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState([])
+
+  useEffect(() => {
+    let active = true
+    const loadPaymentMethods = async () => {
+      try {
+        const result = await api('/api/settings/payment-methods', { silent: true, cacheMode: 'no-store' })
+        const methods = Array.isArray(result?.paymentMethods)
+          ? result.paymentMethods
+          : Array.isArray(result?.methods)
+            ? result.methods
+            : []
+        const next = methods
+          .filter((method) => method && method.isDeleted !== true && method.enabled !== false)
+          .map((method) => buildPaymentOptionLabel(method))
+          .filter(Boolean)
+        if (active) setPaymentMethodOptions(Array.from(new Set(next)))
+      } catch {
+        if (active) setPaymentMethodOptions([])
+      }
+    }
+    loadPaymentMethods()
+    return () => { active = false }
+  }, [])
 
   // New collection modal state
   const [collectModalOpen, setCollectModalOpen] = useState(false)
@@ -797,6 +838,7 @@ export default function UcretPlaniPage() {
   // Open the collection modal to collect an unpaid installment
   const openCollectModal = (inst) => {
     if (!selStudent || !activePlan) return
+    const preferredPayment = paymentMethodOptions.find((option) => /nakit/i.test(option)) || paymentMethodOptions[0] || ''
     setCollectForm({
       studentId: selStudent.id,
       planName: activePlan.name,
@@ -806,7 +848,7 @@ export default function UcretPlaniPage() {
       amount: inst.remaining > 0 ? inst.remaining : inst.amount,
       collections: inst.collections || [],
       date: new Date().toISOString().slice(0, 10),
-      payment: 'Nakit',
+      payment: preferredPayment,
       note: `${activePlan.name} ${inst.installmentNo}. Taksit Tahsilatı`
     })
     setCollectModalOpen(true)
@@ -824,6 +866,7 @@ export default function UcretPlaniPage() {
       return
     }
     const today = new Date().toISOString().slice(0, 10)
+    const preferredPayment = paymentMethodOptions.find((option) => /nakit/i.test(option)) || paymentMethodOptions[0] || ''
     setCollectForm({
       studentId: selStudent.id,
       planName: activePlan.name,
@@ -833,7 +876,7 @@ export default function UcretPlaniPage() {
       amount: downPaymentInfo.remaining,
       collections: downPaymentInfo.collections,
       date: today,
-      payment: 'Nakit',
+      payment: preferredPayment,
       note: `${activePlan.name} Peşin İşlem Tahsilatı`
     })
     setCollectModalOpen(true)
@@ -858,6 +901,7 @@ export default function UcretPlaniPage() {
     setTimeout(() => {
       const plan = (student.items || [])[resolvedPlanIdx]
       if (!plan) return
+      const preferredPayment = paymentMethodOptions.find((option) => /nakit/i.test(option)) || paymentMethodOptions[0] || ''
       setCollectForm({
         studentId: student.id,
         planName: plan.name,
@@ -867,7 +911,7 @@ export default function UcretPlaniPage() {
         amount: row.remaining > 0 ? row.remaining : row.amount,
         collections: row.collections || [],
         date: new Date().toISOString().slice(0, 10),
-        payment: 'Nakit',
+        payment: preferredPayment,
         note: `${plan.name} ${row.installmentNo}. Taksit Tahsilatı`
       })
       setCollectModalOpen(true)
@@ -876,7 +920,7 @@ export default function UcretPlaniPage() {
 
 
   // Save new installment collection
-  const saveInstallmentCollection = () => {
+  const saveInstallmentCollection = async () => {
     const amt = Number(collectForm.amount) || 0
     if (amt <= 0) { toast('Geçerli bir tahsilat tutarı giriniz.'); return }
     if (!collectForm.date) { toast('Tahsilat tarihi seçiniz.'); return }
@@ -909,11 +953,15 @@ export default function UcretPlaniPage() {
         : `${collectForm.planName} ${collectForm.installmentNo}. Taksit Tahsilatı`)
     }
 
-    actions.addCollection(newCol)
-    setCollectModalOpen(false)
-    toast(Number(collectForm.installmentNo) === 0
-      ? '🎉 Peşin işlem tahsilatı başarıyla kaydedildi.'
-      : `🎉 ${collectForm.installmentNo}. Taksit tahsilatı başarıyla kaydedildi.`)
+    try {
+      await actions.addCollection(newCol)
+      setCollectModalOpen(false)
+      toast(Number(collectForm.installmentNo) === 0
+        ? '🎉 Peşin işlem tahsilatı başarıyla kaydedildi.'
+        : `🎉 ${collectForm.installmentNo}. Taksit tahsilatı başarıyla kaydedildi.`)
+    } catch (error) {
+      toast(error?.message || 'Tahsilat kaydedilemedi.')
+    }
   }
 
   // Open edit / delete modal for an existing collected installment
@@ -957,7 +1005,7 @@ export default function UcretPlaniPage() {
   }
 
   // Save edited collection details (e.g. change Nakit to Havale/EFT or fix date)
-  const saveEditedCollection = () => {
+  const saveEditedCollection = async () => {
     if (!editCollectionForm.id) return
     const amt = Number(editCollectionForm.amount) || 0
     if (amt <= 0) { toast('Tutar sıfırdan büyük olmalıdır.'); return }
@@ -967,17 +1015,21 @@ export default function UcretPlaniPage() {
     const vatRate = vatEligible ? Number(state?.settings?.vat || 0) : 0
     const vat = vatEligible ? round2(amt * (vatRate / (100 + vatRate))) : 0
 
-    actions.updateCollection({
-      id: editCollectionForm.id,
-      date: editCollectionForm.date,
-      amount: amt,
-      payment: editCollectionForm.payment,
-      note: editCollectionForm.note,
-      vatRate,
-      vat
-    })
-    setEditCollectionModalOpen(false)
-    toast('✓ Tahsilat bilgileri başarıyla güncellendi.')
+    try {
+      await actions.updateCollection({
+        id: editCollectionForm.id,
+        date: editCollectionForm.date,
+        amount: amt,
+        payment: editCollectionForm.payment,
+        note: editCollectionForm.note,
+        vatRate,
+        vat
+      })
+      setEditCollectionModalOpen(false)
+      toast('✓ Tahsilat bilgileri başarıyla güncellendi.')
+    } catch (error) {
+      toast(error?.message || 'Tahsilat bilgileri güncellenemedi.')
+    }
   }
 
   // Delete an existing collection (undo / delete payment)
@@ -2677,13 +2729,12 @@ export default function UcretPlaniPage() {
                 </label>
                 <select
                   style={InputCls}
-                  value={collectForm.payment}
+                  value={collectForm.payment || paymentMethodOptions[0] || ''}
                   onChange={e => setCollectForm(prev => ({ ...prev, payment: e.target.value }))}
                 >
-                  <option value="Nakit">Nakit</option>
-                  <option value="Havale/EFT">Havale / EFT</option>
-                  <option value="Kredi Kartı">Kredi Kartı</option>
-                  <option value="Diğer">Diğer</option>
+                  {paymentMethodOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
                 </select>
               </div>
 
@@ -2872,13 +2923,12 @@ export default function UcretPlaniPage() {
                 </label>
                 <select
                   style={{ ...InputCls, fontWeight: 700, borderColor: '#3b82f6', background: '#f8faff' }}
-                  value={editCollectionForm.payment}
+                  value={editCollectionForm.payment || paymentMethodOptions[0] || ''}
                   onChange={e => setEditCollectionForm(prev => ({ ...prev, payment: e.target.value }))}
                 >
-                  <option value="Nakit">Nakit</option>
-                  <option value="Havale/EFT">Havale / EFT (Banka)</option>
-                  <option value="Kredi Kartı">Kredi Kartı</option>
-                  <option value="Diğer">Diğer</option>
+                  {paymentMethodOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
                 </select>
               </div>
 

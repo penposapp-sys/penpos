@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { api } from '../../lib/apiClient.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { money, trDate, getStudent, round2, isCollectionInvoiced } from '../utils/calculations.js'
@@ -6,7 +7,34 @@ import { money, trDate, getStudent, round2, isCollectionInvoiced } from '../util
 /* ─── Helpers ─────────────────────────────────────────────── */
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
-const PAYMENT_TYPES = ['Nakit', 'Havale/EFT', 'Kredi Kartı', 'Diğer']
+const normalizePaymentName = (value) => String(value ?? '').trim()
+const normalizePaymentKey = (value) => normalizePaymentName(value).toLocaleLowerCase('tr-TR')
+
+const paymentTypeBaseLabel = (type = 'custom') => {
+  const map = {
+    cash: 'Nakit',
+    card: 'Kredi Kartı',
+    bank: 'Havale / EFT',
+    credit: 'Veresiye',
+    account: 'Veresiye',
+    custom: 'Özel',
+    other: 'Özel',
+  }
+  return map[String(type || 'custom')] || 'Özel'
+}
+
+const buildConfiguredPaymentLabel = (method = {}) => {
+  const base = paymentTypeBaseLabel(method?.type || 'custom')
+  const name = normalizePaymentName(method?.name || method?.label)
+  return name ? `${base} - ${name}` : base
+}
+
+const getConfiguredPaymentTypeOptions = (configured = []) => {
+  const names = (Array.isArray(configured) ? configured : [])
+    .map((value) => normalizePaymentName(value))
+    .filter(Boolean)
+  return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, 'tr'))
+}
 
 /* ─── Style tokens ────────────────────────────────────────── */
 const S = {
@@ -131,6 +159,30 @@ export default function TahsilatlarPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [sortKey, setSortKey] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
+  const [paymentOptions, setPaymentOptions] = useState([])
+
+  useEffect(() => {
+    let active = true
+    const loadPaymentMethods = async () => {
+      try {
+        const result = await api('/api/settings/payment-methods', { silent: true, cacheMode: 'no-store' })
+        const methods = Array.isArray(result?.paymentMethods)
+          ? result.paymentMethods
+          : Array.isArray(result?.methods)
+            ? result.methods
+            : []
+        const names = methods
+          .filter((method) => method && method.isDeleted !== true && method.enabled !== false)
+          .map((method) => buildConfiguredPaymentLabel(method))
+          .filter(Boolean)
+        if (active) setPaymentOptions(names)
+      } catch {
+        if (active) setPaymentOptions([])
+      }
+    }
+    loadPaymentMethods()
+    return () => { active = false }
+  }, [])
 
   const compareLocalized = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'tr')
 
@@ -177,10 +229,14 @@ export default function TahsilatlarPage() {
     setSortDir('asc')
   }
 
+  const paymentTypeOptions = useMemo(() => getConfiguredPaymentTypeOptions(paymentOptions), [paymentOptions])
+
   const filtered = useMemo(() => {
     const needle = q.toLowerCase().trim()
     const rows = collections.filter(c => {
       const s = getStudent(state, c.studentId)
+      const paymentValue = normalizePaymentName(c.payment)
+      const filterValue = normalizePaymentKey(typeFilter)
       const hitSchool = !selectedSchoolId || (s?._schoolId === selectedSchoolId) || (c._schoolId === selectedSchoolId)
       const hitSearch = !needle || [
         s?.name || '',
@@ -193,7 +249,15 @@ export default function TahsilatlarPage() {
         c.note || '',
         c.date || ''
       ].join(' ').toLowerCase().includes(needle)
-      const hitType = !typeFilter || c.payment === typeFilter
+      const typeHint = paymentValue.includes('Havale') || paymentValue.includes('EFT') || paymentValue.includes('Banka')
+        ? 'Havale / EFT'
+        : paymentValue.includes('Kart') || paymentValue.includes('Kredi') || paymentValue.includes('POS') || paymentValue.includes('Pos')
+          ? 'Kredi Kartı'
+          : paymentValue.includes('Nakit')
+            ? 'Nakit'
+            : paymentValue
+
+      const hitType = !filterValue || normalizePaymentKey(paymentValue) === filterValue || normalizePaymentKey(typeHint) === filterValue || normalizePaymentKey(paymentValue).includes(filterValue) || normalizePaymentKey(typeHint).includes(filterValue)
       const hitFrom = !dateFrom || (c.date || '') >= dateFrom
       const hitTo = !dateTo || (c.date || '') <= dateTo
       return hitSchool && hitSearch && hitType && hitFrom && hitTo
@@ -225,8 +289,20 @@ export default function TahsilatlarPage() {
   }, [filtered, state])
 
   const payBadge = (type) => {
-    const map = { 'Nakit': ['#dcfce7', '#15803d'], 'Havale/EFT': ['#dbeafe', '#1d4ed8'], 'Kredi Kartı': ['#ede9fe', '#6d28d9'], 'Diğer': ['#f1f5f9', '#475569'] }
-    const [bg, color] = map[type] || ['#f1f5f9', '#475569']
+    const normalized = normalizePaymentKey(type)
+    const baseKey = normalized.includes('nakit') ? 'cash'
+      : (normalized.includes('havale') || normalized.includes('eft') || normalized.includes('banka')) ? 'bank'
+      : (normalized.includes('kart') || normalized.includes('kredi') || normalized.includes('pos')) ? 'card'
+      : (normalized.includes('veresiye') || normalized.includes('cari')) ? 'credit'
+      : 'custom'
+    const map = {
+      cash: ['#dcfce7', '#15803d'],
+      bank: ['#dbeafe', '#1d4ed8'],
+      card: ['#ede9fe', '#6d28d9'],
+      credit: ['#fef3c7', '#b45309'],
+      custom: ['#f1f5f9', '#475569']
+    }
+    const [bg, color] = map[baseKey] || ['#f1f5f9', '#475569']
     return { display: 'inline-block', padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: bg, color }
   }
 
@@ -358,7 +434,9 @@ export default function TahsilatlarPage() {
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}>
           <option value="">Tüm Ödeme Türleri</option>
-          {PAYMENT_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
+          {paymentTypeOptions.map((payment) => (
+            <option key={payment} value={payment}>{payment}</option>
+          ))}
         </select>
       </div>
 
