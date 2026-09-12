@@ -1,4 +1,7 @@
 ﻿(() => {
+  let startedJobId = ""
+  let startTaskPromise = null
+
   console.log(
     "[PenPOS Luca Bridge] Content script aktif:",
     location.href
@@ -699,6 +702,18 @@
     if (!task) {
       return
     }
+
+    const jobId = String(task.jobId || "").trim()
+    if (!jobId || startedJobId === jobId) {
+      return startTaskPromise
+    }
+
+    startedJobId = jobId
+    startTaskPromise = runTask(task)
+    return startTaskPromise
+  }
+
+  async function runTask(task) {
 
     console.log(
       "[PenPOS Luca Bridge] Luca görevi başladı."

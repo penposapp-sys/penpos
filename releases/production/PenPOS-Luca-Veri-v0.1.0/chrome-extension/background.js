@@ -4,6 +4,7 @@ const DEFAULT_API_BASE = "https://penpos.cloud";
 const PENDING_KEY = "penposLucaPendingTask";
 const DEVICE_KEY = "penposLucaDevice";
 const activeTaskSecrets = new Map();
+const claimInFlight = new Map();
 let devicePollingStarted = false;
 
 async function getApiBase() {
@@ -70,6 +71,33 @@ async function claimTask(jobId, extensionToken) {
   }
 
   return data;
+}
+
+async function claimTaskOnce(task) {
+  const jobId = String(task?.jobId || "").trim();
+  if (!jobId) throw new Error("Luca jobId bulunamadı.");
+  const existing = claimInFlight.get(jobId);
+  if (existing) return existing;
+  const claimPromise = (async () => {
+    const claimed = await claimTask(jobId, task.extensionToken);
+    const lucaTask = {
+      jobId: claimed.jobId,
+      period: claimed.period,
+      resultToken: claimed.resultToken,
+      tckn: claimed.tckn,
+      deviceBound: true
+    };
+    const secret = { tckn: claimed.tckn, password: claimed.password };
+    activeTaskSecrets.set(jobId, secret);
+    await setPendingTask({ ...task, stage: "claimed", lucaTask, claimedAt: Date.now() });
+    return { ...lucaTask, ...secret };
+  })();
+  claimInFlight.set(jobId, claimPromise);
+  try {
+    return await claimPromise;
+  } finally {
+    if (claimInFlight.get(jobId) === claimPromise) claimInFlight.delete(jobId);
+  }
 }
 
 async function submitInvoices(jobId, resultToken, invoices) {
@@ -504,8 +532,14 @@ chrome.runtime.onMessage.addListener(
             );
           }
 
-          // Önce eski görev varsa temizle.
-          await clearPendingTask();
+          const existingTask = await getPendingTask();
+          if (existingTask?.jobId === jobId) {
+            sendResponse({ ok: true, type: "PENPOS_LUCA_STARTED", tabId: existingTask.tabId });
+            return;
+          }
+          if (existingTask) {
+            throw new Error("Başka bir Luca görevi halen çalışıyor.");
+          }
 
           // Luca'yı AKTİF sekme yapmadan aç.
           const tab =
@@ -596,11 +630,7 @@ chrome.runtime.onMessage.addListener(
 
           // Aynı görev daha önce claim edildiyse
           // tekrar claim yapma.
-          if (
-            task.stage ===
-              "claimed" &&
-            task.lucaTask
-          ) {
+          if (task.stage === "claimed" && task.lucaTask) {
             const secret = activeTaskSecrets.get(task.jobId);
             if (!secret) {
               throw new Error("Luca görev bilgileri artık bellekte değil. Luca görevini yeniden başlatın.");
@@ -616,50 +646,13 @@ chrome.runtime.onMessage.addListener(
             return;
           }
 
-          const claimed =
-            await claimTask(
-              task.jobId,
-              task.extensionToken
-            );
-
-          const lucaTask = {
-            jobId:
-              claimed.jobId,
-
-            period:
-              claimed.period,
-
-            resultToken:
-              claimed.resultToken,
-
-            tckn:
-              claimed.tckn,
-
-            deviceBound: true
-          };
-
-          activeTaskSecrets.set(task.jobId, {
-            tckn: claimed.tckn,
-            password: claimed.password
-          });
-
-          await setPendingTask({
-            ...task,
-
-            stage:
-              "claimed",
-
-            lucaTask,
-
-            claimedAt:
-              Date.now()
-          });
+          const claimed = await claimTaskOnce(task);
 
           sendResponse({
             ok: true,
             type:
               "PENPOS_LUCA_TASK",
-            ...lucaTask
+            ...claimed
           });
 
         } catch (err) {
@@ -797,9 +790,7 @@ chrome.runtime.onMessage.addListener(
         const task =
           await getPendingTask();
 
-        const tabId =
-          sender?.tab?.id ||
-          task?.tabId;
+        const tabId = sender?.tab?.id;
 
         try {
           if (!task) {
@@ -927,9 +918,9 @@ chrome.runtime.onMessage.addListener(
 
         await clearPendingTask();
 
-        await closeLucaTab(
-          tabId
-        );
+        if (task?.tabId && task.tabId === tabId) {
+          await closeLucaTab(tabId);
+        }
 
         sendResponse({
           ok: true,
