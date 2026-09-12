@@ -64,11 +64,85 @@ export default function FaturalarPage() {
     return getMonthlyInvoicableInstallments(state, period)
   }, [state, period])
 
+  const rowsWithInvoiceOnlyFallbacks = useMemo(() => {
+    const rows = [...rawRows]
+    const students = state?.students || []
+    const invoices = state?.invoices || []
+    const representedInvoiceKeys = new Set()
+
+    const addInvoiceKeys = (invoice) => {
+      if (!invoice) return
+      if (invoice.uuid) representedInvoiceKeys.add(`uuid:${String(invoice.uuid)}`)
+      if (invoice.no) representedInvoiceKeys.add(`no:${String(invoice.no)}`)
+    }
+
+    rawRows.forEach(row => addInvoiceKeys(row.invoice))
+
+    invoices.forEach(invoice => {
+      if (invoice?.period !== period) return
+
+      const student = students.find(candidate => (
+        String(candidate.id || candidate._id) === String(invoice.studentId)
+      ))
+      if (!student) return
+
+      const invoiceKeys = [
+        invoice.uuid ? `uuid:${String(invoice.uuid)}` : '',
+        invoice.no ? `no:${String(invoice.no)}` : ''
+      ].filter(Boolean)
+      if (invoiceKeys.some(key => representedInvoiceKeys.has(key))) return
+      invoiceKeys.forEach(key => representedInvoiceKeys.add(key))
+
+      const total = round2(invoice.total)
+      const baseAmount = round2(invoice.base ?? total)
+      const vatAmount = round2(invoice.vat ?? Math.max(0, total - baseAmount))
+      const vatRate = baseAmount > 0 ? round2((vatAmount / baseAmount) * 100) : 0
+
+      rows.push({
+        id: `invoice-only-${invoice.uuid || invoice.no}`,
+        invoiceDerived: true,
+        student,
+        studentId: student.id || student._id,
+        schoolName: student._schoolName || '',
+        schoolId: student._schoolId || '',
+        studentName: student.name || '—',
+        parent: invoice.buyer || student.parent || '—',
+        tax: invoice.taxId || student.tax || '—',
+        plan: null,
+        planName: invoice.planName || 'Luca faturası',
+        installmentNo: invoice.installmentNo || null,
+        dueDate: invoice.date || `${period}-01`,
+        dueDateFormatted: trDate(invoice.date || `${period}-01`),
+        amount: total,
+        paid: 0,
+        remaining: 0,
+        collectionStatus: 'unpaid',
+        collectionDate: '',
+        paymentMethod: '',
+        matchedCollections: [],
+        invoiceStatus: 'billed',
+        invoice,
+        invoiceNo: invoice.no || '',
+        invoiceDate: invoice.date || '',
+        invoiceTotal: total,
+        diff: 0,
+        hasDiff: false,
+        isUnderInvoiced: false,
+        isOverInvoiced: false,
+        vatRate,
+        baseAmount,
+        vatAmount
+      })
+    })
+
+    return rows
+  }, [rawRows, state, period])
+
   // Arama ve Durum filtreleri
   const processedData = useMemo(() => {
     const needle = q.toLowerCase().trim()
 
-    const filtered = rawRows.filter(r => {
+    const filtered = rowsWithInvoiceOnlyFallbacks.filter(r => {
       const hitSchool = !selectedSchoolId || String(r.schoolId) === String(selectedSchoolId)
       const searchTarget = `${r.schoolName} ${r.studentName} ${r.parent} ${r.tax} ${r.planName} ${r.invoiceNo}`.toLowerCase()
       const hitSearch = !needle || searchTarget.includes(needle)
@@ -82,13 +156,13 @@ export default function FaturalarPage() {
       return hitSchool && hitSearch && hitInv && hitCol
     })
 
-    const totalPlanned = rawRows.reduce((s, r) => s + r.amount, 0)
-    const totalPaid = rawRows.reduce((s, r) => s + r.paid, 0)
-    const totalRemaining = rawRows.reduce((s, r) => s + r.remaining, 0)
+    const totalPlanned = rowsWithInvoiceOnlyFallbacks.reduce((s, r) => s + r.amount, 0)
+    const totalPaid = rowsWithInvoiceOnlyFallbacks.reduce((s, r) => s + r.paid, 0)
+    const totalRemaining = rowsWithInvoiceOnlyFallbacks.reduce((s, r) => s + r.remaining, 0)
 
-    const billedItems = rawRows.filter(r => r.invoiceStatus === 'billed')
-    const unbilledItems = rawRows.filter(r => r.invoiceStatus === 'unbilled')
-    const diffItems = rawRows.filter(r => r.hasDiff)
+    const billedItems = rowsWithInvoiceOnlyFallbacks.filter(r => r.invoiceStatus === 'billed')
+    const unbilledItems = rowsWithInvoiceOnlyFallbacks.filter(r => r.invoiceStatus === 'unbilled')
+    const diffItems = rowsWithInvoiceOnlyFallbacks.filter(r => r.hasDiff)
 
     const billedAmount = billedItems.reduce((s, r) => s + (r.invoiceTotal || r.amount), 0)
     const unbilledAmount = unbilledItems.reduce((s, r) => s + r.amount, 0)
@@ -96,7 +170,7 @@ export default function FaturalarPage() {
 
     return {
       list: filtered,
-      totalCount: rawRows.length,
+      totalCount: rowsWithInvoiceOnlyFallbacks.length,
       filteredCount: filtered.length,
       totalPlanned,
       totalPaid,
@@ -109,7 +183,7 @@ export default function FaturalarPage() {
       diffItems,
       totalDiffAmount
     }
-  }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId])
+  }, [rowsWithInvoiceOnlyFallbacks, q, invoiceFilter, collectionFilter, selectedSchoolId])
 
   const formatDeviceLastSeen = (value) => {
     if (!value) return 'Az önce'
@@ -731,7 +805,7 @@ export default function FaturalarPage() {
                           {row.planName}
                         </span>
                         <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
-                          {row.installmentNo}. Taksit
+                          {row.invoiceDerived ? 'Luca faturası' : `${row.installmentNo}. Taksit`}
                         </span>
                       </div>
                     </td>
