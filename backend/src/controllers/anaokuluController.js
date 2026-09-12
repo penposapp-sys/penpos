@@ -1,10 +1,42 @@
 import { AnaokuluSchool } from '../models/AnaokuluSchool.js'
 import LucaExtensionDevice from '../models/LucaExtensionDevice.js'
+import LucaJob from '../models/LucaJob.js'
 import { findLucaDeviceByToken, getLucaDeviceToken, hashLucaDeviceToken } from '../middlewares/requireLucaDevice.js'
 import crypto from 'crypto'
 
 // In-memory job store (process restart’ta sıfırlanır — kısa süreli işler için yeterli)
 const lucaJobs = new Map()
+
+const getLucaJob = async (jobId, { fresh = false } = {}) => {
+  const cached = lucaJobs.get(jobId)
+  if (cached && !fresh) return cached
+  const stored = await LucaJob.findOne({ jobId }).lean()
+  if (!stored) return null
+  lucaJobs.set(jobId, stored.data)
+  return stored.data
+}
+
+const setLucaJob = async (jobId, data) => {
+  lucaJobs.set(jobId, data)
+  const expiresAt = new Date(Date.now() + (data.status === 'running' ? 10 : 5) * 60 * 1000)
+  await LucaJob.findOneAndUpdate(
+    { jobId },
+    { $set: { jobId, data, expiresAt } },
+    { upsert: true, setDefaultsOnInsert: true }
+  )
+  return data
+}
+
+const deleteLucaJob = async (jobId) => {
+  lucaJobs.delete(jobId)
+  await LucaJob.deleteOne({ jobId })
+}
+
+const listLucaJobs = async () => {
+  const stored = await LucaJob.find({ 'data.status': 'running' }).lean()
+  for (const item of stored) lucaJobs.set(item.jobId, item.data)
+  return stored.map(item => [item.jobId, item.data])
+}
 
 const createLucaDeviceToken = () => crypto.randomBytes(32).toString('hex')
 
@@ -413,7 +445,7 @@ export const checkLucaInvoices = async (req, res) => {
       .update(extensionToken)
       .digest('hex')
 
-    lucaJobs.set(jobId, {
+    await setLucaJob(jobId, {
       status: 'running',
       phase: 'waiting_extension',
       period,
@@ -444,7 +476,7 @@ export const checkLucaInvoices = async (req, res) => {
 export const checkLucaJobStatus = async (req, res) => {
   const { jobId } = req.params
 
-  const job = lucaJobs.get(jobId)
+  const job = await getLucaJob(jobId)
 
   if (!job) {
     return res.status(404).json({
@@ -480,7 +512,7 @@ export const claimLucaExtensionTask = async (req, res) => {
       })
     }
 
-    const job = lucaJobs.get(jobId)
+    const job = await getLucaJob(jobId, { fresh: true })
 
     if (!job) {
       return res.status(404).json({
@@ -574,7 +606,7 @@ export const claimLucaExtensionTask = async (req, res) => {
       .update(resultToken)
       .digest('hex')
 
-    lucaJobs.set(jobId, {
+    await setLucaJob(jobId, {
       ...job,
       phase: 'extension_claimed',
       step: 'Chrome Extension görevi devraldı…',
@@ -645,7 +677,7 @@ console.log(
       })
     }
 
-    const job = lucaJobs.get(jobId)
+    const job = await getLucaJob(jobId)
 
     if (!job) {
       return res.status(404).json({
@@ -714,7 +746,7 @@ console.log(
     }
 
     // Sonuç tokenını tek kullanımlık hale getir.
-    lucaJobs.set(jobId, {
+    await setLucaJob(jobId, {
       ...job,
       phase: 'processing_invoices',
       step:
@@ -771,11 +803,11 @@ async function _runLucaJob(
   extensionInvoices = null
 ) {
   try {
-    const updateStep = (step) => {
-      const currentJob = lucaJobs.get(jobId)
+    const updateStep = async (step) => {
+      const currentJob = await getLucaJob(jobId)
 
       if (currentJob?.status === 'running') {
-        lucaJobs.set(jobId, {
+        await setLucaJob(jobId, {
           ...currentJob,
           step,
           updatedAt: Date.now()
@@ -811,7 +843,7 @@ async function _runLucaJob(
       )
     }
 
-    updateStep(
+    await updateStep(
       lucaInvoices.length
         ? 'Faturalar öğrencilerle eşleştiriliyor…'
         : 'Luca bu dönem için fatura bulamadı. Sonuç kaydediliyor…'
@@ -1079,7 +1111,7 @@ async function _runLucaJob(
       )
     }
 
-    updateStep(
+    await updateStep(
       'Sonuçlar kaydediliyor…'
     )
 
@@ -1132,7 +1164,7 @@ async function _runLucaJob(
       checks
     } = updated.toObject()
 
-    lucaJobs.set(jobId, {
+    await setLucaJob(jobId, {
       status: 'done',
       ok: true,
       found:
@@ -1150,7 +1182,7 @@ async function _runLucaJob(
 
     // 10 dakika sonra belleği temizle
     setTimeout(
-      () => lucaJobs.delete(jobId),
+      () => { void deleteLucaJob(jobId) },
       10 * 60 * 1000
     )
   } catch (err) {
@@ -1159,7 +1191,7 @@ async function _runLucaJob(
       err
     )
 
-    lucaJobs.set(jobId, {
+    await setLucaJob(jobId, {
       status: 'error',
       error:
         err?.message ||
@@ -1169,7 +1201,7 @@ async function _runLucaJob(
     })
 
     setTimeout(
-      () => lucaJobs.delete(jobId),
+      () => { void deleteLucaJob(jobId) },
       5 * 60 * 1000
     )
   }
@@ -1279,21 +1311,37 @@ export const listLucaDeviceTasks = async (req, res) => {
   const device = req.lucaDevice
   if (!device) return res.status(401).json({ error: 'Luca cihazı yetkisiz.' })
 
-  for (const [jobId, job] of lucaJobs.entries()) {
+  for (const [jobId, job] of await listLucaJobs()) {
     if (job.status !== 'running' || job.phase !== 'waiting_extension') continue
     if (job.assignedDeviceId) continue
     if (String(job.tenantId) !== String(device.tenant)) continue
     if (job.startedAt && Date.now() - job.startedAt > 5 * 60 * 1000) continue
 
-    lucaJobs.set(jobId, {
-      ...job,
-      assignedDeviceId: String(device._id),
-      assignedAt: Date.now(),
-      step: `${device.deviceName || 'Luca cihazı'} görevi aldı, Luca bağlantısı bekleniyor…`
-    })
+    const assignedAt = Date.now()
+    const claimed = await LucaJob.findOneAndUpdate(
+      {
+        jobId,
+        'data.status': 'running',
+        'data.phase': 'waiting_extension',
+        'data.tenantId': String(device.tenant),
+        'data.assignedDeviceId': { $exists: false }
+      },
+      {
+        $set: {
+          'data.assignedDeviceId': String(device._id),
+          'data.assignedAt': assignedAt,
+          'data.step': `${device.deviceName || 'Luca cihazı'} görevi aldı, Luca bağlantısı bekleniyor…`
+        }
+      },
+      { new: true }
+    ).lean()
+
+    if (!claimed) continue
+
+    lucaJobs.set(jobId, claimed.data)
     return res.json({
       ok: true,
-      task: { jobId, extensionToken: job.extensionToken, period: job.period }
+      task: { jobId: claimed.jobId, extensionToken: claimed.data.extensionToken, period: claimed.data.period }
     })
   }
 
