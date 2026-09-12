@@ -65,6 +65,8 @@ export default function AyarlarPage() {
   // Luca e-Fatura Ayarları state — backend yüklenince useEffect ile senkronize edilir
   const [lucaSettings, setLucaSettings] = useState({ tckn: '', password: '' })
   const [lucaUserEdited, setLucaUserEdited] = useState(false)
+  const [invoiceSettings, setInvoiceSettings] = useState({})
+  const [invoiceSettingsEdited, setInvoiceSettingsEdited] = useState(false)
 
   // İndirimler state
   const [discounts, setDiscounts] = useState([])
@@ -98,8 +100,12 @@ export default function AyarlarPage() {
       const password = settings?.luca?.password || ''
       setLucaSettings({ tckn, password })
     }
+
+    if (!invoiceSettingsEdited) {
+      setInvoiceSettings(settings.invoiceSettings || {})
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.loaded, state.settings])
+  }, [state.loaded, state.settings, invoiceSettingsEdited])
 
   const [activeTab, setActiveTab] = useState((isStaff || isAdminPanelMode) ? 'hesap' : 'genel')
   const [toastMsg, setToastMsg] = useState('')
@@ -133,7 +139,8 @@ export default function AyarlarPage() {
       matchBy: form.matchBy || 'tax',
       feeCategories,
       discounts,
-      luca: { tckn: lucaSettings.tckn, password: lucaSettings.password }
+      luca: { tckn: lucaSettings.tckn, password: lucaSettings.password },
+      invoiceSettings
     }
     const result = await actions.updateSettingsAndSave(next)
     if (result?.ok === false) {
@@ -310,6 +317,7 @@ export default function AyarlarPage() {
     { key: 'ucretler', label: '💰 Ücret Kalemleri', staffHide: true, adminPanelHide: true },
     { key: 'indirimler', label: '🏷️ İndirimler', staffHide: true, adminPanelHide: true },
     { key: 'luca', label: '🧾 TÜRMOB Luca e-Fatura', staffHide: true, adminPanelHide: true },
+    { key: 'fatura', label: '📄 Fatura Ayarları', staffHide: true, adminPanelHide: true },
     { key: 'veri', label: '💾 Veri', staffHide: true, adminPanelHide: true },
     { key: 'hesap', label: '👤 Hesap Ayarları' }
   ]
@@ -730,6 +738,61 @@ export default function AyarlarPage() {
               }}
             >
               💾 Luca Ayarlarını Kaydet
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isStaff && !isAdminPanelMode && activeTab === 'fatura' && (
+        <div style={panel}>
+          <h3 style={h3}>📄 Fatura Ayarları</h3>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 18px 0' }}>
+            PDF fatura görünümünde düzenleyen şirket bilgileri olarak kullanılacak alanları yönetin.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+            {[
+              ['companyName', 'Firma / Şirket Ünvanı', 'Anaokulu ayarındaki okul adı fallback olarak kullanılır.'],
+              ['taxOffice', 'Vergi Dairesi', ''],
+              ['taxNumber', 'VKN', ''],
+              ['identityNumber', 'TCKN', ''],
+              ['address', 'Adres', ''],
+              ['city', 'İl', ''],
+              ['district', 'İlçe', ''],
+              ['postalCode', 'Posta Kodu', ''],
+              ['phone', 'Telefon', 'Tenant telefon bilgisi fallback olarak kullanılabilir.'],
+              ['email', 'E-posta', ''],
+              ['website', 'Web Sitesi', ''],
+              ['logoUrl', 'Logo URL', 'Mevcut tenant logo adresi varsa PDF fallback olarak kullanılır.']
+            ].map(([key, label, hint]) => (
+              <div style={FieldCls} key={key}>
+                <label style={LabelCls}>{label}</label>
+                <input
+                  style={InputCls}
+                  value={invoiceSettings[key] || ''}
+                  onChange={e => {
+                    setInvoiceSettingsEdited(true)
+                    setInvoiceSettings(prev => ({ ...prev, [key]: e.target.value }))
+                  }}
+                />
+                {hint && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{hint}</div>}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, textAlign: 'right' }}>
+            <button
+              type="button"
+              onClick={async () => {
+                const result = await actions.updateSettingsAndSave({ ...(state.settings || {}), invoiceSettings })
+                if (result?.ok === false) {
+                  toast(`Fatura ayarları kaydedilemedi: ${result.message || 'Sunucu hatası'}`)
+                  return
+                }
+                setInvoiceSettingsEdited(false)
+                toast('Fatura ayarları kaydedildi.')
+              }}
+              style={{ ...Btn, background: 'linear-gradient(135deg,#173b78,#0f2343)', color: '#fff' }}
+            >
+              💾 Fatura Ayarlarını Kaydet
             </button>
           </div>
         </div>

@@ -40,7 +40,21 @@ const anaokuluSettingSchema = new mongoose.Schema(
     matchBy: { type: String, default: 'tax' },
     feeCategories: { type: [anaokuluFeeCategorySchema], default: [] },
     discounts: { type: [anaokuluDiscountSchema], default: [] },
-    luca: { type: anaokuluLucaSchema, default: () => ({}) }
+    luca: { type: anaokuluLucaSchema, default: () => ({}) },
+    invoiceSettings: {
+      companyName: { type: String, default: '' },
+      taxOffice: { type: String, default: '' },
+      taxNumber: { type: String, default: '' },
+      identityNumber: { type: String, default: '' },
+      address: { type: String, default: '' },
+      city: { type: String, default: '' },
+      district: { type: String, default: '' },
+      postalCode: { type: String, default: '' },
+      phone: { type: String, default: '' },
+      email: { type: String, default: '' },
+      website: { type: String, default: '' },
+      logoUrl: { type: String, default: '' }
+    }
   },
   { _id: false, strict: false }
 )
@@ -125,6 +139,7 @@ const anaokuluInvoiceSchema = new mongoose.Schema(
     buyer: { type: String, default: '' },
     base: { type: Number, default: 0 },
     vat: { type: Number, default: 0 },
+    vatRate: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     type: { type: String, default: 'e-Arşiv' },
     status: { type: String, default: 'Kesildi' },
@@ -134,7 +149,59 @@ const anaokuluInvoiceSchema = new mongoose.Schema(
     installmentNo: { type: Number },
     planName: { type: String, default: '' },
     diff: { type: Boolean, default: false },
-    matchBy: { type: String, default: '' }
+    matchBy: { type: String, default: '' },
+    invoiceType: { type: String, default: '' },
+    customizationNo: { type: String, default: '' },
+    invoiceTime: { type: String, default: '' },
+    ettn: { type: String, default: '' },
+    sendingMethod: { type: String, default: '' },
+    taxOffice: { type: String, default: '' },
+    address: { type: String, default: '' },
+    note: { type: String, default: '' },
+    goodsServicesTotal: { type: Number, default: 0 },
+    subtotal: { type: Number, default: 0 },
+    discountTotal: { type: Number, default: 0 },
+    vatBase: { type: Number, default: 0 },
+    vatTotal: { type: Number, default: 0 },
+    grandTotal: { type: Number, default: 0 },
+    payableTotal: { type: Number, default: 0 },
+    buyerDetails: {
+      name: { type: String, default: '' },
+      taxNumber: { type: String, default: '' },
+      identityNumber: { type: String, default: '' },
+      taxOffice: { type: String, default: '' },
+      address: { type: String, default: '' },
+      city: { type: String, default: '' },
+      district: { type: String, default: '' }
+    },
+    lineItems: {
+      type: [{
+        description: { type: String, default: '' },
+        quantity: { type: Number, default: 0 },
+        unit: { type: String, default: '' },
+        unitPrice: { type: Number, default: 0 },
+        discountRate: { type: Number, default: 0 },
+        discountAmount: { type: Number, default: 0 },
+        vatRate: { type: Number, default: 0 },
+        vatAmount: { type: Number, default: 0 },
+        lineTotal: { type: Number, default: 0 }
+      }],
+      default: []
+    },
+    issuerSnapshot: {
+      companyName: { type: String, default: '' },
+      taxOffice: { type: String, default: '' },
+      taxNumber: { type: String, default: '' },
+      identityNumber: { type: String, default: '' },
+      address: { type: String, default: '' },
+      city: { type: String, default: '' },
+      district: { type: String, default: '' },
+      postalCode: { type: String, default: '' },
+      phone: { type: String, default: '' },
+      email: { type: String, default: '' },
+      website: { type: String, default: '' },
+      logoUrl: { type: String, default: '' }
+    }
   },
   { _id: false, id: false, strict: false }
 )

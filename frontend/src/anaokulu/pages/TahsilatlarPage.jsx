@@ -129,19 +129,90 @@ export default function TahsilatlarPage() {
   const [dateTo, setDateTo] = useState(todayStr())
   const [q, setQ] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
+  const [sortKey, setSortKey] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
+
+  const compareLocalized = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'tr')
+
+  const sortValue = (c, key, s) => {
+    switch (key) {
+      case 'date':
+        return new Date(c.date || '1970-01-01').getTime()
+      case 'student':
+        return (s?.name || '').toLocaleLowerCase('tr')
+      case 'class':
+        return (s?.class || '').toLocaleLowerCase('tr')
+      case 'school':
+        return ((s?._schoolName || c._schoolName || '')).toLocaleLowerCase('tr')
+      case 'item':
+        return (c.item || '').toLocaleLowerCase('tr')
+      case 'payment':
+        return (c.payment || '').toLocaleLowerCase('tr')
+      case 'amount':
+        return Number(c.amount || 0)
+      case 'vat':
+        return Number(c.vat || 0)
+      case 'invoiceNo':
+        return (c.invoiceNo || '').toLocaleLowerCase('tr')
+      case 'note':
+        return (c.note || '').toLocaleLowerCase('tr')
+      default:
+        return new Date(c.date || '1970-01-01').getTime()
+    }
+  }
+
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') {
+        setSortDir('desc')
+        return
+      }
+      if (sortDir === 'desc') {
+        setSortKey('date')
+        setSortDir('desc')
+        return
+      }
+    }
+    setSortKey(key)
+    setSortDir('asc')
+  }
 
   const filtered = useMemo(() => {
-    const needle = q.toLowerCase()
-    return collections.filter(c => {
+    const needle = q.toLowerCase().trim()
+    const rows = collections.filter(c => {
       const s = getStudent(state, c.studentId)
       const hitSchool = !selectedSchoolId || (s?._schoolId === selectedSchoolId) || (c._schoolId === selectedSchoolId)
-      const hitSearch = ((s?.name || '') + ' ' + (s?._schoolName || '') + ' ' + (c._schoolName || '')).toLowerCase().includes(needle)
+      const hitSearch = !needle || [
+        s?.name || '',
+        s?.class || '',
+        s?._schoolName || '',
+        c._schoolName || '',
+        c.item || '',
+        c.payment || '',
+        c.invoiceNo || '',
+        c.note || '',
+        c.date || ''
+      ].join(' ').toLowerCase().includes(needle)
       const hitType = !typeFilter || c.payment === typeFilter
       const hitFrom = !dateFrom || (c.date || '') >= dateFrom
       const hitTo = !dateTo || (c.date || '') <= dateTo
       return hitSchool && hitSearch && hitType && hitFrom && hitTo
-    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  }, [collections, q, typeFilter, dateFrom, dateTo, selectedSchoolId, state]) // eslint-disable-line
+    })
+
+    return [...rows].sort((a, b) => {
+      const sA = getStudent(state, a.studentId)
+      const sB = getStudent(state, b.studentId)
+      const aValue = sortValue(a, sortKey, sA)
+      const bValue = sortValue(b, sortKey, sB)
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDir === 'asc' ? aValue - bValue : bValue - aValue
+      }
+
+      const comparison = compareLocalized(aValue, bValue)
+      return sortDir === 'asc' ? comparison : -comparison
+    })
+  }, [collections, q, typeFilter, dateFrom, dateTo, selectedSchoolId, sortKey, sortDir, state])
 
   const totals = useMemo(() => {
     const total = filtered.reduce((a, c) => a + (c.amount || 0), 0)
@@ -297,16 +368,58 @@ export default function TahsilatlarPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
             <thead>
               <tr>
-                {isAdminPanelMode && <th style={S.th}>🏫 Okul</th>}
-                <th style={S.th}>Tarih</th>
-                <th style={S.th}>Öğrenci</th>
-                <th style={S.th}>Sınıf</th>
-                <th style={S.th}>Kalem</th>
-                <th style={S.th}>Ödeme</th>
-                <th style={{ ...S.th, textAlign: 'right' }}>Tutar</th>
-                <th style={{ ...S.th, textAlign: 'right' }}>KDV</th>
-                <th style={S.th}>Fatura No</th>
-                <th style={S.th}>Açıklama</th>
+                {isAdminPanelMode && (
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                )}
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('date')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Tarih {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('student')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Öğrenci {sortKey === 'student' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('class')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Sınıf {sortKey === 'class' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('item')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Kalem {sortKey === 'item' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('payment')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Ödeme {sortKey === 'payment' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...S.th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('amount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Tutar {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...S.th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('vat')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    KDV {sortKey === 'vat' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={S.th}>
+                  <button type="button" onClick={() => toggleSort('note')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Açıklama {sortKey === 'note' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>

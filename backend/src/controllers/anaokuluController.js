@@ -2,6 +2,7 @@ import { AnaokuluSchool } from '../models/AnaokuluSchool.js'
 import LucaExtensionDevice from '../models/LucaExtensionDevice.js'
 import LucaJob from '../models/LucaJob.js'
 import { findLucaDeviceByToken, getLucaDeviceToken, hashLucaDeviceToken } from '../middlewares/requireLucaDevice.js'
+import { renderAnaokuluInvoicePdf } from '../services/anaokuluInvoicePdfService.js'
 import crypto from 'crypto'
 
 // In-memory job store (process restart’ta sıfırlanır — kısa süreli işler için yeterli)
@@ -1011,33 +1012,119 @@ async function _runLucaJob(
 
     let matchedCount = 0
 
-    const vatRate =
+    const defaultVatRate =
       Number(
         school.settings?.vat || 10
       )
 
+    const asNumber = (value, fallback = 0) => {
+      const n = Number(value)
+      return Number.isFinite(n) ? n : fallback
+    }
+
+    const normalizeLucaLineItem = (item) => {
+      if (!item || typeof item !== 'object') return null
+
+      const description = String(item.description || item.name || item.productName || item.malHizmet || item.aciklama || '').trim()
+      const rawUnitText = String(item.unit || item.birim || '').trim()
+      const rawQuantity = item.quantity ?? item.qty ?? item.miktar ?? 1
+      const parsedQty = typeof rawQuantity === 'string' ? Number(String(rawQuantity).replace(',', '.').match(/\d+(?:[.,]\d+)?/)?.[0] || 0) : asNumber(rawQuantity, 0)
+      const quantity = parsedQty || asNumber(item.quantity ?? item.qty ?? item.miktar ?? 1, 0)
+      const unit = rawUnitText || (() => {
+        if (typeof item.quantity === 'string' && item.quantity.includes(' ')) {
+          return item.quantity.split(' ').slice(1).join(' ').trim()
+        }
+        if (typeof item.miktar === 'string' && item.miktar.includes(' ')) {
+          return item.miktar.split(' ').slice(1).join(' ').trim()
+        }
+        return ''
+      })()
+      const unitPrice = asNumber(item.unitPrice ?? item.birimFiyat ?? item.price ?? item.fiyat ?? 0, 0)
+      const vatRate = asNumber(item.vatRate ?? item.kdvOrani ?? item.taxRate ?? item.vat ?? 0, 0)
+      const vatAmount = asNumber(item.vatAmount ?? item.kdvTutari ?? item.taxAmount ?? 0, 0)
+      const discountRate = asNumber(item.discountRate ?? item.indirimOrani ?? item.discountRateValue ?? 0, 0)
+      const discountAmount = asNumber(item.discountAmount ?? item.indirimTutari ?? 0, 0)
+      const lineTotal = asNumber(item.lineTotal ?? item.toplam ?? item.total ?? (quantity * unitPrice), 0)
+
+      if (!description && !unitPrice && !lineTotal && !quantity) {
+        return null
+      }
+
+      return {
+        description,
+        quantity,
+        unit,
+        unitPrice,
+        discountRate,
+        discountAmount,
+        vatRate,
+        vatAmount,
+        lineTotal
+      }
+    }
+
+    const normalizeLucaInvoice = (li) => {
+      const rawLineItems = Array.isArray(li?.items)
+        ? li.items
+        : Array.isArray(li?.lineItems)
+          ? li.lineItems
+          : []
+
+      const lineItems = rawLineItems
+        .map(normalizeLucaLineItem)
+        .filter(Boolean)
+
+      const invoiceVatRate = asNumber(
+        li.vatRate ?? li.kdvOrani ?? li.taxRate ?? li.vat ?? defaultVatRate,
+        defaultVatRate
+      )
+
+      const note = String(
+        li.note || li.notes || li.aciklama || li.description || li.remarks || ''
+      ).trim()
+
+      return {
+        ...li,
+        buyerDetails: li.buyerDetails || li.buyer || {},
+        customizationNo: li.customizationNo || li.ozellestirmeNo || li.customization || '',
+        invoiceTime: li.invoiceTime || li.dateTime || li.time || li.düzenlemeZamani || li.editTime || '',
+        ettn: li.ettn || li.ettnNo || li.ETTN || '',
+        sendingMethod: li.sendingMethod || li.gonderimSekli || li.sendMethod || '',
+        taxOffice: li.taxOffice || li.vergiDairesi || li.taxOfficeName || '',
+        note,
+        lineItems,
+        vatRate: invoiceVatRate
+      }
+    }
+
     for (const li of lucaInvoices) {
+      const normalizedLi = normalizeLucaInvoice(li)
       const student =
         matchInvoiceToStudent(
-          li.alici,
+          normalizedLi.alici,
           students
         )
 
+      const effectiveVatRate = asNumber(
+        normalizedLi.vatRate || defaultVatRate,
+        defaultVatRate
+      )
+
       const base =
-        li.total
+        normalizedLi.total
           ? Math.round(
               (
-                li.total /
-                (1 + vatRate / 100)
+                normalizedLi.total /
+                (1 + effectiveVatRate / 100)
               ) * 100
             ) / 100
           : 0
 
       const vat =
-        li.total
+        normalizedLi.total
           ? Math.round(
               (
-                li.total -
+                normalizedLi.total -
                 base
               ) * 100
             ) / 100
@@ -1045,21 +1132,21 @@ async function _runLucaJob(
 
       const invPeriod =
         (
-          li.isoDate &&
-          li.isoDate.length >= 7
+          normalizedLi.isoDate &&
+          normalizedLi.isoDate.length >= 7
         )
-          ? li.isoDate.slice(0, 7)
+          ? normalizedLi.isoDate.slice(0, 7)
           : period
 
       matched.push({
         uuid:
-          `luca_${li.faturaNo || Date.now()}`,
+          `luca_${normalizedLi.faturaNo || Date.now()}`,
 
         no:
-          li.faturaNo,
+          normalizedLi.faturaNo,
 
         date:
-          li.isoDate,
+          normalizedLi.isoDate,
 
         period:
           invPeriod,
@@ -1068,14 +1155,68 @@ async function _runLucaJob(
           student?.tax || '',
 
         buyer:
-          li.alici,
+          normalizedLi.alici,
+
+        buyerDetails:
+          normalizedLi.buyerDetails || {},
+
+        invoiceType:
+          normalizedLi.invoiceType || normalizedLi.faturaType || '',
+
+        customizationNo:
+          normalizedLi.customizationNo,
+
+        invoiceTime:
+          normalizedLi.invoiceTime,
+
+        ettn:
+          normalizedLi.ettn,
+
+        sendingMethod:
+          normalizedLi.sendingMethod,
+
+        taxOffice:
+          normalizedLi.taxOffice,
+
+        address:
+          normalizedLi.address || '',
+
+        lineItems:
+          normalizedLi.lineItems,
+
+        note:
+          normalizedLi.note,
+
+        goodsServicesTotal:
+          normalizedLi.goodsServicesTotal ?? normalizedLi.subtotal ?? undefined,
+
+        discountTotal:
+          normalizedLi.discountTotal ?? undefined,
+
+        vatBase:
+          normalizedLi.vatBase ?? undefined,
+
+        vatTotal:
+          normalizedLi.vatTotal ?? normalizedLi.vat ?? undefined,
+
+        grandTotal:
+          normalizedLi.grandTotal ?? normalizedLi.total ?? undefined,
+
+        payableTotal:
+          normalizedLi.payableTotal ?? normalizedLi.grandTotal ?? normalizedLi.total ?? 0,
+
+        issuerSnapshot:
+          school.settings?.invoiceSettings || {},
 
         base,
 
         vat,
 
         total:
-          li.total,
+          normalizedLi.total,
+
+        vatRate:
+          effectiveVatRate,
 
         type:
           'e-Arşiv',
@@ -1356,4 +1497,41 @@ export const revokeLucaDevice = async (req, res) => {
     { $set: { status: 'revoked', revokedAt: new Date() } }
   )
   return res.json({ ok: true })
+}
+
+export const getAnaokuluInvoicePdf = async (req, res) => {
+  try {
+    const tenantId = req.tenant?._id || req.tenant?.id
+    if (!tenantId) return res.status(400).json({ error: 'Tenant bulunamadı.' })
+
+    const school = await AnaokuluSchool.findOne({ tenant: tenantId }).lean()
+    if (!school) return res.status(404).json({ error: 'Okul kaydı bulunamadı.' })
+
+    const invoice = (school.invoices || []).find(item => String(item.uuid) === String(req.params.uuid))
+    if (!invoice) return res.status(404).json({ error: 'Fatura bulunamadı.' })
+
+    const configured = school.settings?.invoiceSettings || {}
+    const snapshot = invoice.issuerSnapshot || {}
+    const tenant = req.tenant || {}
+    const nonEmptySnapshot = Object.fromEntries(
+      Object.entries(snapshot).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '')
+    )
+    const issuer = {
+      ...configured,
+      ...nonEmptySnapshot,
+      companyName: nonEmptySnapshot.companyName || configured.companyName || school.settings?.school || tenant.name || '',
+      phone: nonEmptySnapshot.phone || configured.phone || tenant.phone || '',
+      logoUrl: nonEmptySnapshot.logoUrl || configured.logoUrl || tenant.logoUrl || ''
+    }
+
+    const pdf = await renderAnaokuluInvoicePdf({ invoice, issuer, tenant })
+    const filename = `${String(invoice.no || invoice.uuid || 'fatura').replace(/[^a-zA-Z0-9._-]/g, '_')}.pdf`
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
+    res.setHeader('Content-Length', pdf.length)
+    return res.send(pdf)
+  } catch (err) {
+    console.error('[getAnaokuluInvoicePdf] Hata:', err)
+    return res.status(500).json({ error: 'Fatura PDF oluşturulamadı.' })
+  }
 }

@@ -264,7 +264,8 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
     if (student.active === false || student.invoiced === false) return
 
     const items = student.items || []
-    items.forEach(plan => {
+    items.forEach((plan, planIdx) => {
+      const planKey = plan?.id || plan?._id || `${(plan?.name || 'plan').replace(/\s+/g, '-').toLowerCase()}-${planIdx}`
       // 2. Ücret kalemi kontrolü: Plan ve genel kategori faturalı olmalı
       if (plan.invoiced === false) return
       const feeCat = feeCategories.find(fc => (fc.name || '').trim().toLowerCase() === (plan.name || '').trim().toLowerCase())
@@ -388,7 +389,7 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
         const isOverInvoiced = Boolean(inv && diff > 0.01)
 
         result.push({
-          id: `${student.id || student._id}-${plan.name}-${installmentNo}-${installmentPeriod}`,
+          id: `${student.id || student._id}-${planKey}-${installmentNo}-${installmentPeriod}`,
           student,
           studentId: student.id || student._id,
           schoolName: student._schoolName || '',

@@ -70,6 +70,9 @@ export default function UcretPlaniPage() {
   const [selStudentId, setSelStudentId] = useState(null)
   const [selectedPlanIdx, setSelectedPlanIdx] = useState(0)
   const [studentSearch, setStudentSearch] = useState('')
+  const [planSearch, setPlanSearch] = useState('')
+  const [planSortKey, setPlanSortKey] = useState('name')
+  const [planSortDir, setPlanSortDir] = useState('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [editItemIdx, setEditItemIdx] = useState(null)
   const [toastMsg, setToastMsg] = useState('')
@@ -148,12 +151,22 @@ export default function UcretPlaniPage() {
     start: defaultFullDate
   })
 
+  const orderedStudents = useMemo(() => {
+    return [...students].sort((a, b) => {
+      const nameDiff = String(a?.name || '').localeCompare(String(b?.name || ''), 'tr')
+      if (nameDiff !== 0) return nameDiff
+      const classDiff = String(a?.class || '').localeCompare(String(b?.class || ''), 'tr')
+      if (classDiff !== 0) return classDiff
+      return String(a?._schoolName || '').localeCompare(String(b?._schoolName || ''), 'tr')
+    })
+  }, [students])
+
   // Auto-select first student if none selected
   useEffect(() => {
-    if (!selStudentId && students.length > 0) {
-      setSelStudentId(String(students[0].id))
+    if (!selStudentId && orderedStudents.length > 0) {
+      setSelStudentId(String(orderedStudents[0].id))
     }
-  }, [students, selStudentId])
+  }, [orderedStudents, selStudentId])
 
   // Reset selected plan to first item when switching student
   useEffect(() => {
@@ -161,8 +174,8 @@ export default function UcretPlaniPage() {
   }, [selStudentId])
 
   const selStudent = useMemo(() =>
-    students.find(s => String(s.id) === String(selStudentId)) || null,
-    [students, selStudentId]
+    orderedStudents.find(s => String(s.id) === String(selStudentId)) || null,
+    [orderedStudents, selStudentId]
   )
 
   const activePlan = useMemo(() => {
@@ -171,7 +184,7 @@ export default function UcretPlaniPage() {
   }, [selStudent, selectedPlanIdx])
 
   const filteredStudents = useMemo(() => {
-    let list = students
+    let list = orderedStudents
     if (selectedSchoolId) {
       list = list.filter(s => String(s._schoolId) === String(selectedSchoolId))
     }
@@ -181,9 +194,66 @@ export default function UcretPlaniPage() {
       (s.name || '').toLowerCase().includes(q) ||
       (s.class || '').toLowerCase().includes(q) ||
       (s.parent || '').toLowerCase().includes(q) ||
-      (s._schoolName || '').toLowerCase().includes(q)
+      (s._schoolName || '').toLowerCase().includes(q) ||
+      (s.phone || '').toLowerCase().includes(q) ||
+      (s.tax || '').toLowerCase().includes(q)
     )
-  }, [students, studentSearch, selectedSchoolId])
+  }, [orderedStudents, studentSearch, selectedSchoolId])
+
+  const togglePlanSort = (key) => {
+    if (planSortKey === key) {
+      if (planSortDir === 'asc') {
+        setPlanSortDir('desc'); return
+      }
+      if (planSortDir === 'desc') {
+        setPlanSortKey('name'); setPlanSortDir('asc'); return
+      }
+    }
+    setPlanSortKey(key)
+    setPlanSortDir('asc')
+  }
+
+  const visiblePlans = useMemo(() => {
+    if (!selStudent || !Array.isArray(selStudent.items)) return []
+    const needle = planSearch.toLowerCase().trim()
+    const filtered = selStudent.items.filter((it) => {
+      if (!needle) return true
+      const text = [it.name, it.start, String(it.installments || ''), String(it.total || ''), String(it.basePrice || ''), (it.discounts || []).map(d => d?.name || d?.discountName || '').join(' ')].join(' ').toLowerCase()
+      return text.includes(needle)
+    })
+
+    return [...filtered].sort((a, b) => {
+      const aValue = (() => {
+        switch (planSortKey) {
+          case 'name': return String(a.name || '').toLocaleLowerCase('tr')
+          case 'basePrice': return Number(a.basePrice || 0)
+          case 'total': return Number(a.total || 0)
+          case 'installments': return Number(a.installments || 0)
+          case 'month': return Number((Number(a.total || 0) / Math.max(1, Number(a.installments || 1))) || 0)
+          case 'start': return new Date(a.start || '1970-01-01').getTime()
+          default: return String(a.name || '').toLocaleLowerCase('tr')
+        }
+      })()
+      const bValue = (() => {
+        switch (planSortKey) {
+          case 'name': return String(b.name || '').toLocaleLowerCase('tr')
+          case 'basePrice': return Number(b.basePrice || 0)
+          case 'total': return Number(b.total || 0)
+          case 'installments': return Number(b.installments || 0)
+          case 'month': return Number((Number(b.total || 0) / Math.max(1, Number(b.installments || 1))) || 0)
+          case 'start': return new Date(b.start || '1970-01-01').getTime()
+          default: return String(b.name || '').toLocaleLowerCase('tr')
+        }
+      })()
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return planSortDir === 'asc' ? aValue - bValue : bValue - aValue
+      }
+
+      const comparison = String(aValue).localeCompare(String(bValue), 'tr')
+      return planSortDir === 'asc' ? comparison : -comparison
+    })
+  }, [selStudent, planSearch, planSortKey, planSortDir])
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 2800) }
 
@@ -1204,7 +1274,7 @@ export default function UcretPlaniPage() {
               value={selStudentId || ''}
               onChange={e => setSelStudentId(e.target.value)}
             >
-              {students.map(s => (
+              {orderedStudents.map(s => (
                 <option key={s.id} value={String(s.id)}>
                   {s.name} {s.class ? `(${s.class})` : ''}
                 </option>
@@ -1402,7 +1472,7 @@ export default function UcretPlaniPage() {
                 <div style={{
                   padding: '12px 18px', borderBottom: '1px solid #e6ebf3',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)'
+                  background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', gap: 12, flexWrap: 'wrap'
                 }}>
                   <div>
                     <span style={{ fontSize: 13, fontWeight: 800, color: '#334155' }}>
@@ -1417,17 +1487,51 @@ export default function UcretPlaniPage() {
                   </div>
                 </div>
 
+                <div style={{ padding: '12px 18px 0', display: 'flex', justifyContent: 'flex-end' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Plan ara: ad, başlangıç, tutar, taksit..."
+                    value={planSearch}
+                    onChange={e => setPlanSearch(e.target.value)}
+                    style={{ ...InputCls, maxWidth: 300, background: '#fff' }}
+                  />
+                </div>
+
                 <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
                   <table style={{ ...tbl, minWidth: 620 }}>
                     <thead>
                       <tr>
-                        <th style={th}>Plan Adı</th>
-                        <th style={{ ...th, textAlign: 'right' }}>Baz Fiyat</th>
+                        <th style={th}>
+                          <button type="button" onClick={() => togglePlanSort('name')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                            Plan Adı {planSortKey === 'name' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                          </button>
+                        </th>
+                        <th style={{ ...th, textAlign: 'right' }}>
+                          <button type="button" onClick={() => togglePlanSort('basePrice')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                            Baz Fiyat {planSortKey === 'basePrice' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                          </button>
+                        </th>
                         <th style={th}>İndirim Durumu</th>
-                        <th style={{ ...th, textAlign: 'right' }}>Net Tutar</th>
-                        <th style={{ ...th, textAlign: 'center' }}>Taksit</th>
-                        <th style={{ ...th, textAlign: 'right' }}>Aylık Tutar</th>
-                        <th style={th}>Başlangıç</th>
+                        <th style={{ ...th, textAlign: 'right' }}>
+                          <button type="button" onClick={() => togglePlanSort('total')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                            Net Tutar {planSortKey === 'total' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                          </button>
+                        </th>
+                        <th style={{ ...th, textAlign: 'center' }}>
+                          <button type="button" onClick={() => togglePlanSort('installments')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                            Taksit {planSortKey === 'installments' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                          </button>
+                        </th>
+                        <th style={{ ...th, textAlign: 'right' }}>
+                          <button type="button" onClick={() => togglePlanSort('month')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                            Aylık Tutar {planSortKey === 'month' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                          </button>
+                        </th>
+                        <th style={th}>
+                          <button type="button" onClick={() => togglePlanSort('start')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                            Başlangıç {planSortKey === 'start' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                          </button>
+                        </th>
                         <th style={{ ...th, textAlign: 'center', width: 130 }}>İşlem</th>
                       </tr>
                     </thead>
@@ -1442,7 +1546,14 @@ export default function UcretPlaniPage() {
                             </div>
                           </td>
                         </tr>
-                      ) : (selStudent.items || []).map((it, idx) => {
+                      ) : visiblePlans.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '32px 12px' }}>
+                            Plan ara sonuçlarına uygun kayıt bulunamadı.
+                          </td>
+                        </tr>
+                      ) : visiblePlans.map((it) => {
+                        const idx = selStudent.items.findIndex(p => p === it)
                         const itemCalc = resolveItemDiscounts(it)
                         const perMonth = round2(Number(it.total) / Math.max(1, it.installments))
                         const isSelectedPlan = selectedPlanIdx === idx

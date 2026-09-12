@@ -29,6 +29,8 @@ export default function OgrencilerPage() {
   const [q, setQ] = useState('')
   const [classFilter, setClassFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
 
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(null)
@@ -36,15 +38,67 @@ export default function OgrencilerPage() {
 
   const classes = useMemo(() => [...new Set(students.map(s => s.class).filter(Boolean))], [students])
 
+  const sortValue = (s, key) => {
+    switch (key) {
+      case 'name': return (s.name || '').toString().toLocaleLowerCase('tr')
+      case 'class': return (s.class || '').toString().toLocaleLowerCase('tr')
+      case 'parent': return (s.parent || '').toString().toLocaleLowerCase('tr')
+      case 'phone': return (s.phone || '').toString().toLocaleLowerCase('tr')
+      case 'tax': return (s.tax || '').toString().toLocaleLowerCase('tr')
+      case 'planned': return Number(expectedTotalFor(state, s.id) || 0)
+      case 'remaining': return Number(balanceFor(state, s.id) || 0)
+      case 'status': return Number(s.active !== false)
+      case 'school': return (s._schoolName || '').toString().toLocaleLowerCase('tr')
+      default: return (s.name || '').toString().toLocaleLowerCase('tr')
+    }
+  }
+
   const list = useMemo(() => {
-    const needle = q.toLowerCase()
-    return students.filter(s => {
-      const hitSearch = ((s.name || '') + ' ' + (s.parent || '')).toLowerCase().includes(needle)
+    const needle = q.toLowerCase().trim()
+    const filtered = students.filter(s => {
+      const hitSearch = !needle || [
+        s.name || '',
+        s.parent || '',
+        s.class || '',
+        s.phone || '',
+        s.tax || '',
+        s._schoolName || '',
+        s.address || '',
+        s.note || ''
+      ].join(' ').toLowerCase().includes(needle)
       const hitClass = !classFilter || s.class === classFilter
       const hitStatus = statusFilter === '' || String(Number(s.active)) === statusFilter
       return hitSearch && hitClass && hitStatus
     })
-  }, [students, q, classFilter, statusFilter])
+
+    return [...filtered].sort((a, b) => {
+      const aValue = sortValue(a, sortKey)
+      const bValue = sortValue(b, sortKey)
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDir === 'asc' ? aValue - bValue : bValue - aValue
+      }
+
+      const comparison = String(aValue).localeCompare(String(bValue), 'tr')
+      return sortDir === 'asc' ? comparison : -comparison
+    })
+  }, [students, q, classFilter, statusFilter, sortKey, sortDir, state])
+
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') {
+        setSortDir('desc')
+        return
+      }
+      if (sortDir === 'desc') {
+        setSortKey('name')
+        setSortDir('asc')
+        return
+      }
+    }
+    setSortKey(key)
+    setSortDir('asc')
+  }
 
   const toast = (m) => {
     setToastMsg(m)
@@ -501,7 +555,7 @@ export default function OgrencilerPage() {
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center'
       }}>
         <input style={{ ...InputCls, flex: '1 1 240px', minWidth: 200 }}
-          placeholder="Öğrenci / veli ara..." value={q} onChange={e => setQ(e.target.value)} />
+          placeholder="Öğrenci / veli / sınıf / telefon / TC ara..." value={q} onChange={e => setQ(e.target.value)} />
         <select style={{ ...InputCls, minWidth: 150 }} value={classFilter} onChange={e => setClassFilter(e.target.value)}>
           <option value="">Tüm Sınıflar</option>
           {classes.map(c => <option key={c} value={c}>{c}</option>)}
@@ -518,15 +572,53 @@ export default function OgrencilerPage() {
           <table style={table}>
             <thead>
               <tr>
-                {isAdminPanelMode && <th style={th}>🏫 Okul</th>}
-                <th style={th}>Öğrenci</th>
-                <th style={th}>Sınıf</th>
-                <th style={th}>Veli</th>
-                <th style={th}>Telefon</th>
-                <th style={th}>TC/VKN</th>
-                <th style={{ ...th, textAlign: 'right' }}>Planlanan</th>
-                <th style={{ ...th, textAlign: 'right' }}>Kalan</th>
-                <th style={th}>Durum</th>
+                {isAdminPanelMode && (
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                )}
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('name')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Öğrenci {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('class')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Sınıf {sortKey === 'class' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('parent')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Veli {sortKey === 'parent' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('phone')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Telefon {sortKey === 'phone' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('tax')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    TC/VKN {sortKey === 'tax' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('planned')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Planlanan {sortKey === 'planned' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('remaining')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Kalan {sortKey === 'remaining' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('status')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Durum {sortKey === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
                 <th style={{ ...th, minWidth: isAdminPanelMode ? 120 : 240 }}>İşlemler</th>
               </tr>
             </thead>

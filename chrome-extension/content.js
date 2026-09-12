@@ -64,6 +64,216 @@
     return Number.isFinite(number) ? number : 0
   }
 
+  function parseDecimal(value, fallback = 0) {
+    if (value === null || value === undefined || value === "") {
+      return fallback
+    }
+
+    const text = String(value)
+      .replace(/\s/g, "")
+      .replace(/%/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .replace(/[^0-9.-]/g, "")
+
+    if (!text) {
+      return fallback
+    }
+
+    const number = Number.parseFloat(text)
+    return Number.isFinite(number) ? number : fallback
+  }
+
+  function getRowMetaValue(row, names) {
+    const candidates = names.flatMap(name => [
+      row?.dataset?.[name],
+      row?.dataset?.[name.replace(/[-_]+/g, "")],
+      row?.getAttribute?.(`data-${name}`),
+      row?.getAttribute?.(`data-${name.replace(/([A-Z])/g, "-$1").toLowerCase()}`)
+    ])
+
+    for (const value of candidates) {
+      if (value !== null && value !== undefined && String(value).trim()) {
+        return String(value).trim()
+      }
+    }
+
+    return ""
+  }
+
+  function parseLucaMoney(value) {
+    return parseTotal(value)
+  }
+
+  function parseQuantityAndUnit(value) {
+    const text = String(value || "").trim()
+    if (!text) {
+      return { quantity: 0, unit: "" }
+    }
+
+    const match = text.match(/^([0-9]+(?:[.,][0-9]+)?)\s*(.*)$/)
+    if (!match) {
+      return { quantity: 0, unit: text }
+    }
+
+    const quantity = Number(match[1].replace(",", ".")) || 0
+    const unit = String(match[2] || "").trim()
+
+    return { quantity, unit }
+  }
+
+  function extractDetailPageInvoice() {
+    const pageText = String(document.body?.innerText || "")
+    const rowPattern = (pattern) => {
+      const match = pageText.match(pattern)
+      return match ? match[1].trim() : ""
+    }
+
+    const no = rowPattern(/Fatura No\s*[:\-]\s*([A-Z0-9-]+)/i)
+      || rowPattern(/Fatura No\s*[:\-]\s*([A-Z0-9-]+)\s*$/im)
+    const invoiceType = rowPattern(/Fatura Tipi\s*[:\-]\s*([A-ZÇĞİÖŞÜ]+)/i)
+    const sendingMethod = rowPattern(/Gönderim Şekli\s*[:\-]\s*([A-ZÇĞİÖŞÜ]+)/i)
+    const date = rowPattern(/Düzenleme Tarihi\s*[:\-]\s*(\d{2}-\d{2}-\d{4})/i)
+    const invoiceTime = rowPattern(/Düzenleme Zamanı\s*[:\-]\s*(\d{2}:\d{2}:\d{2})/i)
+    const ettn = rowPattern(/ETTN\s*[:\-]\s*([0-9A-Fa-f-]+)/i)
+    const note = rowPattern(/Not\s*[:\-]\s*([\s\S]*?)(?:\n|$)/i)
+    const vatRate = (() => {
+      const match = pageText.match(/Hesaplanan KDV\((?:%\s*)?([0-9]+(?:[.,][0-9]+)?)\)/i)
+      if (match) return parseDecimal(match[1], 0)
+      const itemMatch = pageText.match(/KDV Oranı\s*[:\-]\s*(?:%\s*)?([0-9]+(?:[.,][0-9]+)?)/i)
+      return itemMatch ? parseDecimal(itemMatch[1], 0) : 0
+    })()
+
+    const vatBase = (() => {
+      const match = pageText.match(/KDV Matrahı\s*[:\-]?\s*([0-9\.\s,]+(?:TL|₺)?)/i)
+      return match ? parseTotal(match[1]) : 0
+    })()
+    const vatAmount = (() => {
+      const match = pageText.match(/Hesaplanan KDV\([^\n]*?\)\s*[:\-]?\s*([0-9\.\s,]+(?:TL|₺)?)/i)
+      return match ? parseTotal(match[1]) : 0
+    })()
+    const payable = (() => {
+      const match = pageText.match(/Ödenecek Tutar\s*[:\-]?\s*([0-9\.\s,]+(?:TL|₺)?)/i)
+      return match ? parseTotal(match[1]) : 0
+    })()
+    const total = (() => {
+      const match = pageText.match(/Vergiler Dahil Toplam Tutar\s*[:\-]?\s*([0-9\.\s,]+(?:TL|₺)?)/i)
+      return match ? parseTotal(match[1]) : payable || 0
+    })()
+
+    const lineRows = Array.from(document.querySelectorAll('table tr')).filter(tr => {
+      const cells = Array.from(tr.querySelectorAll('td'))
+      const text = (tr.textContent || '').replace(/\s+/g, ' ').trim()
+      return cells.length >= 11 && /Miktar|KDV Oranı|Mal Hizmet Tutarı/i.test(text)
+    })
+
+    const lineItems = lineRows
+      .map(tr => {
+        const cells = Array.from(tr.querySelectorAll('td'))
+        if (cells.length < 11) return null
+
+        const firstText = (cells[0]?.textContent || '').trim()
+        if (!/\d+/.test(firstText) && !/EĞİTİM|HEM|BİTİR|AÇIKLAMA/i.test((cells[1]?.textContent || '').trim())) {
+          return null
+        }
+
+        const description = (cells[1]?.textContent || '').trim() || (cells[2]?.textContent || '').trim()
+        const quantityAndUnit = parseQuantityAndUnit(cells[3]?.textContent || '')
+        const quantity = quantityAndUnit.quantity || Number((cells[3]?.textContent || '').match(/\d+/)?.[0] || 0)
+        const unit = quantityAndUnit.unit || (cells[3]?.textContent || '').replace(/\d+|[.,]/g, '').trim()
+        const unitPrice = parseLucaMoney(cells[4]?.textContent || 0)
+        const vatRateRow = parseDecimal((cells[7]?.textContent || '').replace(/%/g, '').replace(/\./g, '').replace(',', '.'), 0)
+        const vatAmountRow = parseLucaMoney(cells[8]?.textContent || 0)
+        const lineTotalValue = parseLucaMoney(cells[10]?.textContent || 0)
+
+        if (!description && !quantity && !unitPrice && !lineTotalValue) {
+          return null
+        }
+
+        return {
+          description,
+          quantity,
+          unit,
+          unitPrice,
+          vatRate: vatRateRow,
+          vatAmount: vatAmountRow,
+          lineTotal: lineTotalValue
+        }
+      })
+      .filter(Boolean)
+
+    return {
+      faturaNo: no || "",
+      alici: (String(document.body?.innerText || '').match(/SAYIN\s+([^\n]+)/i)?.[1] || '').trim() || "",
+      isoDate: date ? `${date.split('-').reverse().join('-')}` : "",
+      total,
+      period: date ? date.slice(6, 10) + '-' + date.slice(3, 5) : "",
+      ettn,
+      invoiceType,
+      sendingMethod,
+      invoiceTime,
+      vatRate,
+      note,
+      lineItems,
+      vatBase,
+      vatTotal: vatAmount,
+      payableTotal: payable,
+      grandTotal: total,
+      goodsServicesTotal: total - vatAmount || 0
+    }
+  }
+
+  function normalizeLineItems(raw) {
+    if (!raw) return []
+
+    const parse = value => {
+      if (Array.isArray(value)) {
+        return value.map(item => normalizeLineItems(item)).flat()
+      }
+
+      if (typeof value === "string") {
+        try {
+          return normalizeLineItems(JSON.parse(value))
+        } catch {
+          return []
+        }
+      }
+
+      if (!value || typeof value !== "object") {
+        return []
+      }
+
+      const description = value.description || value.name || value.productName || value.malHizmet || value.aciklama || ""
+      const quantity = value.quantity ?? value.qty ?? value.miktar ?? 1
+      const unit = value.unit || value.birim || ""
+      const unitPrice = value.unitPrice ?? value.birimFiyat ?? value.price ?? value.fiyat ?? 0
+      const vatRate = value.vatRate ?? value.kdvOrani ?? value.taxRate ?? value.vat ?? 0
+      const vatAmount = value.vatAmount ?? value.kdvTutari ?? value.taxAmount ?? 0
+      const lineTotal = value.lineTotal ?? value.toplam ?? value.total ?? (Number(quantity) * Number(unitPrice || 0))
+      const discountRate = value.discountRate ?? value.indirimOrani ?? value.discount ?? 0
+      const discountAmount = value.discountAmount ?? value.indirimTutari ?? 0
+
+      if (!description && !unitPrice && !lineTotal && !quantity) {
+        return []
+      }
+
+      return [{
+        description: String(description || "").trim(),
+        quantity: Number(quantity) || 0,
+        unit: String(unit || "").trim(),
+        unitPrice: Number(unitPrice) || 0,
+        discountRate: Number(discountRate) || 0,
+        discountAmount: Number(discountAmount) || 0,
+        vatRate: Number(vatRate) || 0,
+        vatAmount: Number(vatAmount) || 0,
+        lineTotal: Number(lineTotal) || 0
+      }]
+    }
+
+    const parsed = parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  }
+
   function normalizeInvoice(row) {
     if (!row) {
       return null
@@ -124,13 +334,43 @@
       }
     }
 
-    return {
+    const rowText = String(row.textContent || "")
+    const ettn = getRowMetaValue(row, ["ettn", "ettnNo"]) || (rowText.match(/ETTN\s*[:=]\s*([A-Z0-9]+)/i)?.[1] || "")
+    const invoiceTime = getRowMetaValue(row, ["invoiceTime", "editTime", "dateTime", "duzenlemeZamani", "zaman"]) || (rowText.match(/(?:Düzenleme\s+Zamanı|Invoice\s+Time|Zaman)\s*[:=]\s*([^\n|]+?)(?:\s*(?:ETTN|KDV|Not|\|)|$)/i)?.[1] || "")
+    const vatRateMatch = rowText.match(/(?:KDV|VAT|Vergi)\s*(?:Oranı|Rate)?\s*[:=]\s*(?:%\s*)?([0-9]+(?:[.,][0-9]+)?)/i)
+    const vatRate = vatRateMatch ? parseDecimal(vatRateMatch[1], 0) : parseDecimal(getRowMetaValue(row, ["vatRate", "kdvOrani", "taxRate"]), 0)
+    const note = getRowMetaValue(row, ["note", "notes", "aciklama", "description"]) || (rowText.match(/(?:Not|Note|Açıklama)\s*[:=]\s*([^\n|]+?)(?:\s*(?:ETTN|KDV|Düzenleme|\|)|$)/i)?.[1] || "")
+    const lineItems = normalizeLineItems(
+      getRowMetaValue(row, ["lineItems", "items", "malHizmetler", "lineitems"]) ||
+      row.querySelector('script[type="application/json"]')?.textContent ||
+      row.querySelector('[data-line-items]')?.dataset?.lineItems ||
+      ""
+    )
+
+    const invoice = {
       alici,
       faturaNo,
       isoDate,
       total: parseTotal(rawTotal),
-      period: isoDate ? isoDate.slice(0, 7) : ""
+      period: isoDate ? isoDate.slice(0, 7) : "",
+      ettn,
+      invoiceTime,
+      vatRate,
+      note,
+      lineItems
     }
+
+    const hidden = row.querySelectorAll('[data-ettn], [data-vat-rate], [data-kdv-orani], [data-line-items], [data-note], [data-invoice-time]')
+    for (const el of hidden) {
+      const elText = String(el.dataset?.ettn || el.dataset?.invoiceTime || el.dataset?.vatRate || el.dataset?.kdvOrani || el.dataset?.note || "")
+      if (elText && !invoice.ettn && el.dataset?.ettn) invoice.ettn = el.dataset.ettn
+      if (elText && !invoice.invoiceTime && (el.dataset?.invoiceTime || el.dataset?.dateTime || el.dataset?.duzenlemeZamani)) invoice.invoiceTime = el.dataset.invoiceTime || el.dataset.dateTime || el.dataset.duzenlemeZamani
+      if (elText && !invoice.vatRate && (el.dataset?.vatRate || el.dataset?.kdvOrani || el.dataset?.taxRate)) invoice.vatRate = parseDecimal(el.dataset.vatRate || el.dataset.kdvOrani || el.dataset.taxRate, 0)
+      if (elText && !invoice.note && (el.dataset?.note || el.dataset?.notes || el.dataset?.aciklama)) invoice.note = el.dataset.note || el.dataset.notes || el.dataset.aciklama
+      if (!invoice.lineItems.length && (el.dataset?.lineItems || el.dataset?.items)) invoice.lineItems = normalizeLineItems(el.dataset.lineItems || el.dataset.items)
+    }
+
+    return invoice
   }
 
   function getPageInvoices() {
@@ -720,6 +960,22 @@
     )
 
     try {
+      if (
+        location.pathname
+          .toLowerCase()
+          .includes("/invoice/detail")
+      ) {
+        const detailInvoice = extractDetailPageInvoice()
+        if (detailInvoice?.faturaNo) {
+          console.log(
+            "[PenPOS Luca Bridge] Luca detay sayfası doğrudan okunuyor:",
+            detailInvoice.faturaNo
+          )
+          await sendInvoicesToBackground(task, [detailInvoice])
+          return
+        }
+      }
+
       if (
         location.pathname
           .toLowerCase()

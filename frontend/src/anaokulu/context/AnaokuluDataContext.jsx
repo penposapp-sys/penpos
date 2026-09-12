@@ -14,6 +14,7 @@ const initialState = {
     donem: '',
     yearStart: '',
     matchBy: 'tax',
+    invoiceSettings: {},
     feeCategories: [],
     discounts: []
   },

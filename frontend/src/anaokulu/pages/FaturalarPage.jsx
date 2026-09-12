@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { api } from '../../lib/apiClient.js'
+import { getAuthToken } from '../../lib/authStorage.js'
+import { resolveApiOrigin } from '../../lib/runtimeApi.js'
 import {
   money, trDate, periodsOfYear, getYearStart, periodName, round2,
   getMonthlyInvoicableInstallments
@@ -36,6 +38,8 @@ export default function FaturalarPage() {
   const [q, setQ] = useState('')
   const [invoiceFilter, setInvoiceFilter] = useState('')
   const [collectionFilter, setCollectionFilter] = useState('')
+  const [sortKey, setSortKey] = useState('dueDate')
+  const [sortDir, setSortDir] = useState('asc')
   const [lucaModalOpen, setLucaModalOpen] = useState(false)
   const [lucaStatusOpen, setLucaStatusOpen] = useState(false)
   const [lucaStatusLoading, setLucaStatusLoading] = useState(false)
@@ -43,6 +47,7 @@ export default function FaturalarPage() {
   const [lucaRunning, setLucaRunning] = useState(false)
   const [lucaStep, setLucaStep] = useState('')
   const [detailInv, setDetailInv] = useState(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [toastMsg, setToastMsg] = useState(null) // { msg, sticky }
 
   // Luca giriş ayarları formu
@@ -59,10 +64,87 @@ export default function FaturalarPage() {
     setToastMsg({ msg: m, sticky: true })
   }
 
+  const openInvoicePdf = async (invoice) => {
+    const uuid = String(invoice?.uuid || '').trim()
+    if (!uuid) {
+      toastSticky('❌ Bu faturanın PDF kimliği bulunamadı.')
+      return
+    }
+
+    setPdfLoading(true)
+    try {
+      const token = getAuthToken('token_anaokulu')
+      const response = await fetch(
+        `${resolveApiOrigin()}/api/anaokulu/invoices/${encodeURIComponent(uuid)}/pdf`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      )
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.message || error?.error || `PDF oluşturulamadı (${response.status})`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (error) {
+      toastSticky(`❌ ${error?.message || 'Fatura PDF oluşturulamadı.'}`)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   // O ayın (veya tüm dönemlerin) faturalı taksitleri
   const rawRows = useMemo(() => {
     return getMonthlyInvoicableInstallments(state, period)
   }, [state, period])
+
+  const compareLocalized = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'tr')
+
+  const sortValue = (row, key) => {
+    switch (key) {
+      case 'school':
+        return (row.schoolName || row.student?._schoolName || '').toLocaleLowerCase('tr')
+      case 'invoiceStatus':
+        return row.invoiceStatus === 'billed' ? 2 : row.invoiceStatus === 'unbilled' ? 1 : 0
+      case 'collectionStatus':
+        return row.collectionStatus === 'paid' ? 2 : row.collectionStatus === 'partial' ? 1 : 0
+      case 'student':
+        return (row.studentName || '').toLocaleLowerCase('tr')
+      case 'parent':
+        return (row.parent || '').toLocaleLowerCase('tr')
+      case 'tax':
+        return (row.tax || '').toLocaleLowerCase('tr')
+      case 'plan':
+        return (row.planName || '').toLocaleLowerCase('tr')
+      case 'dueDate':
+        return new Date(row.dueDate || '1970-01-01').getTime()
+      case 'amount':
+        return Number(row.amount || 0)
+      case 'paid':
+        return Number(row.paid || 0)
+      case 'baseAmount':
+        return Number(row.baseAmount || 0)
+      case 'vatAmount':
+        return Number(row.vatAmount || 0)
+      case 'invoiceNo':
+        return (row.invoiceNo || '').toLocaleLowerCase('tr')
+      default:
+        return new Date(row.dueDate || '1970-01-01').getTime()
+    }
+  }
+
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') {
+        setSortDir('desc'); return
+      }
+      if (sortDir === 'desc') {
+        setSortKey('dueDate'); setSortDir('asc'); return
+      }
+    }
+    setSortKey(key)
+    setSortDir('asc')
+  }
 
   // Arama ve Durum filtreleri
   const processedData = useMemo(() => {
@@ -70,9 +152,9 @@ export default function FaturalarPage() {
 
     const filtered = rawRows.filter(r => {
       const hitSchool = !selectedSchoolId || String(r.schoolId) === String(selectedSchoolId)
-      const searchTarget = `${r.schoolName} ${r.studentName} ${r.parent} ${r.tax} ${r.planName} ${r.invoiceNo}`.toLowerCase()
+      const searchTarget = `${r.schoolName} ${r.studentName} ${r.parent} ${r.tax} ${r.planName} ${r.invoiceNo} ${r.student?.class || ''} ${r.student?.phone || ''}`.toLowerCase()
       const hitSearch = !needle || searchTarget.includes(needle)
-      
+
       let hitInv = true
       if (invoiceFilter === 'billed') hitInv = r.invoiceStatus === 'billed'
       else if (invoiceFilter === 'unbilled') hitInv = r.invoiceStatus === 'unbilled'
@@ -80,6 +162,16 @@ export default function FaturalarPage() {
 
       const hitCol = !collectionFilter || r.collectionStatus === collectionFilter
       return hitSchool && hitSearch && hitInv && hitCol
+    }).sort((a, b) => {
+      const aValue = sortValue(a, sortKey)
+      const bValue = sortValue(b, sortKey)
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDir === 'asc' ? aValue - bValue : bValue - aValue
+      }
+
+      const comparison = compareLocalized(aValue, bValue)
+      return sortDir === 'asc' ? comparison : -comparison
     })
 
     const totalPlanned = rawRows.reduce((s, r) => s + r.amount, 0)
@@ -109,7 +201,7 @@ export default function FaturalarPage() {
       diffItems,
       totalDiffAmount
     }
-  }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId])
+  }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId, sortKey, sortDir])
 
   const formatDeviceLastSeen = (value) => {
     if (!value) return 'Az önce'
@@ -584,19 +676,73 @@ export default function FaturalarPage() {
           <table style={{ ...tbl, minWidth: 1200 }}>
             <thead>
               <tr>
-                {isAdminPanelMode && <th style={th}>🏫 Okul</th>}
-                <th style={{ ...th, width: 140 }}>Fatura Durumu</th>
-                <th style={{ ...th, width: 140 }}>Tahsilat Durumu</th>
-                <th style={th}>Öğrenci Adı</th>
-                <th style={th}>Veli / Alıcı</th>
-                <th style={th}>TCKN / VKN</th>
-                <th style={th}>Ücret Kalemi</th>
-                <th style={th}>Vade Tarihi</th>
-                <th style={{ ...th, textAlign: 'right' }}>Taksit Tutarı (₺)</th>
-                <th style={{ ...th, textAlign: 'right' }}>Tahsil Edilen (₺)</th>
-                <th style={{ ...th, textAlign: 'right' }}>Matrah</th>
-                <th style={{ ...th, textAlign: 'right' }}>KDV</th>
-                <th style={th}>Fatura No</th>
+                {isAdminPanelMode && (
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                )}
+                <th style={{ ...th, width: 140 }}>
+                  <button type="button" onClick={() => toggleSort('invoiceStatus')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Fatura Durumu {sortKey === 'invoiceStatus' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, width: 140 }}>
+                  <button type="button" onClick={() => toggleSort('collectionStatus')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Tahsilat Durumu {sortKey === 'collectionStatus' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('student')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Öğrenci Adı {sortKey === 'student' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('parent')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Veli / Alıcı {sortKey === 'parent' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('tax')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    TCKN / VKN {sortKey === 'tax' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('plan')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Ücret Kalemi {sortKey === 'plan' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('dueDate')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Vade Tarihi {sortKey === 'dueDate' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('amount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Taksit Tutarı (₺) {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('paid')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Tahsil Edilen (₺) {sortKey === 'paid' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('baseAmount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Matrah {sortKey === 'baseAmount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={{ ...th, textAlign: 'right' }}>
+                  <button type="button" onClick={() => toggleSort('vatAmount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    KDV {sortKey === 'vatAmount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
+                <th style={th}>
+                  <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                    Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </button>
+                </th>
                 <th style={{ ...th, textAlign: 'center', width: 130 }}>İşlem</th>
               </tr>
             </thead>
@@ -618,7 +764,7 @@ export default function FaturalarPage() {
                 const isPartial = row.collectionStatus === 'partial'
 
                 return (
-                  <tr key={row.id} style={{
+                  <tr key={row.id || `${row.studentId}-${row.planName}-${row.installmentNo}-${row.dueDate}`} style={{
                     background: row.hasDiff ? 'rgba(245,158,11,0.06)' : undefined,
                     transition: 'background 0.15s'
                   }}>
@@ -1083,9 +1229,25 @@ export default function FaturalarPage() {
                 <div><strong>Alıcı:</strong> {inv.buyer || '—'}</div>
                 <div><strong>TCKN/VKN:</strong> {inv.taxId || '—'}</div>
                 <div><strong>Kalem / Plan:</strong> {inv.planName || 'Genel'} {inv.installmentNo ? `(${inv.installmentNo}. Taksit)` : ''}</div>
+                <div><strong>ETTN:</strong> {inv.ettn || '—'}</div>
+                <div><strong>Düzenleme Zamanı:</strong> {inv.invoiceTime || '—'}</div>
+                <div><strong>Gönderim Şekli:</strong> {inv.sendingMethod || '—'}</div>
                 <div><strong>Matrah:</strong> {money(inv.base)}</div>
                 <div><strong>KDV:</strong> {money(inv.vat)} (%{inv.vatRate || 10})</div>
                 <div><strong>Genel Toplam:</strong> <strong style={{ color: '#0f172a' }}>{money(inv.total)}</strong></div>
+                {Array.isArray(inv.lineItems) && inv.lineItems.length > 0 && (
+                  <div>
+                    <strong>Satır Detayları:</strong>
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {inv.lineItems.slice(0, 3).map((item, idx) => (
+                        <div key={`${item.description || 'line'}-${idx}`} style={{ fontSize: 12, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 8px' }}>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.description || 'Kalem'}</div>
+                          <div>{Number(item.quantity || 0)} {item.unit || ''} · {money(item.unitPrice || 0)} · KDV %{item.vatRate || inv.vatRate || 10}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {inv.note && <div><strong>Not:</strong> {inv.note}</div>}
               </div>
               <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1095,9 +1257,19 @@ export default function FaturalarPage() {
                 >
                   🗑️ Faturayı Sil / İptal Et
                 </button>
-                <button onClick={() => setDetailInv(null)} style={{ ...Btn, background: '#f1f5f9', color: '#0f172a' }}>
-                  Kapat
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={pdfLoading}
+                    onClick={() => openInvoicePdf(inv)}
+                    style={{ ...Btn, background: '#173b78', color: '#fff', opacity: pdfLoading ? 0.7 : 1 }}
+                  >
+                    {pdfLoading ? '⏳ Hazırlanıyor...' : '🖨️ Fatura Yazdır'}
+                  </button>
+                  <button onClick={() => setDetailInv(null)} style={{ ...Btn, background: '#f1f5f9', color: '#0f172a' }}>
+                    Kapat
+                  </button>
+                </div>
               </div>
             </div>
           </div>

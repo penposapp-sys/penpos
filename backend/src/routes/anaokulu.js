@@ -8,6 +8,7 @@ import {
   delAnaokuluStudent,
   delAnaokuluCollection,
   delAnaokuluInvoice,
+  getAnaokuluInvoicePdf,
   checkLucaInvoices,
   checkLucaJobStatus,
   claimLucaExtensionTask,
@@ -107,6 +108,11 @@ router.delete(
 router.delete(
   '/invoices/:uuid',
   delAnaokuluInvoice
+)
+
+router.get(
+  '/invoices/:uuid/pdf',
+  getAnaokuluInvoicePdf
 )
 
 
