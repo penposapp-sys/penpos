@@ -24,7 +24,7 @@ SourceFiles=SourceFiles
 AppLaunched=powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1
 
 [SourceFiles]
-SourceFiles0=C:\Users\faruk\OneDrive\Belgeler\PenPos System\penpos dosyalar\PenPos\releases\PenPOS-Luca-Veri-v0.1.0
+SourceFiles0=C:\Users\faruk\OneDrive\Belgeler\PenPos System\penpos dosyalar\PenPos\releases\production\PenPOS-Luca-Veri-v0.1.0
 SourceFiles1=C:\Users\faruk\OneDrive\Belgeler\PenPos System\penpos dosyalar\PenPos\releases\installer
 
 [SourceFiles0]
