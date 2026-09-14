@@ -6,6 +6,7 @@ import {
   money, expectedTotalFor, collectedAll, getStudent,
   periodName, periodsOfYear, getYearStart, planTableFor, round2, isCollectionInvoiced
 } from '../utils/calculations.js'
+import { printCollectionReceipt } from '../utils/receiptGenerator.js'
 
 const Btn = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1056,6 +1057,37 @@ export default function UcretPlaniPage() {
       payment: collection.payment || 'Nakit',
       note: collection.note || ''
     }))
+  }
+
+  // Tahsilat makbuzunu yazdır / PDF olarak aç
+  const handlePrintCurrentReceipt = () => {
+    if (!selStudent || !editCollectionForm.id) return
+    const col = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id)) || {
+      id: editCollectionForm.id,
+      date: editCollectionForm.date,
+      amount: editCollectionForm.amount,
+      payment: editCollectionForm.payment,
+      note: editCollectionForm.note,
+      item: editCollectionForm.planName
+    }
+
+    const currentPlan = (selStudent.items || []).find(p => p.name === editCollectionForm.planName) || activePlan
+    const planTotal = Number(currentPlan?.total) || 0
+    const studentCollections = (state?.collections || []).filter(c => String(c.studentId) === String(selStudent.id) && c.item === editCollectionForm.planName)
+    const totalCollected = studentCollections.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+    const remaining = Math.max(0, planTotal - totalCollected)
+
+    printCollectionReceipt({
+      schoolName: state?.settings?.school || state?.settings?.okulAdi || 'Anaokulu',
+      student: selStudent,
+      collection: col,
+      planName: editCollectionForm.planName,
+      installmentNo: editCollectionForm.installmentNo,
+      dueDate: editCollectionForm.dueDate,
+      totalPlan: planTotal,
+      totalCollected,
+      remaining
+    })
   }
 
   // Save edited collection details (e.g. change Nakit to Havale/EFT or fix date)
@@ -3429,15 +3461,30 @@ export default function UcretPlaniPage() {
                   {editCollectionForm.planName} · <strong>{Number(editCollectionForm.installmentNo) === 0 ? 'Peşin İşlem' : `${editCollectionForm.installmentNo}. Taksit`}</strong>
                 </p>
               </div>
-              <button
-                onClick={() => setEditCollectionModalOpen(false)}
-                style={{
-                  background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
-                  padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontWeight: 800
-                }}
-              >
-                ✕
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handlePrintCurrentReceipt}
+                  style={{
+                    background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.4)',
+                    color: '#fff', padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                    fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5,
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                  }}
+                  title="Tahsilat makbuzunu yazdır veya PDF olarak kaydet"
+                >
+                  🖨️ Makbuz Yazdır
+                </button>
+                <button
+                  onClick={() => setEditCollectionModalOpen(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
+                    padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontWeight: 800
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Body */}
@@ -3594,32 +3641,50 @@ export default function UcretPlaniPage() {
             {/* Footer */}
             <div style={{
               padding: '12px 20px', borderTop: '1px solid #e6ebf3',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc'
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', flexWrap: 'wrap', gap: 8
             }}>
-              {/* Delete button (Silme) */}
-              {(() => {
-                const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
-                const originalCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
-                const isLocked = (originalCol?.date && lockedDates.includes(originalCol.date)) || (editCollectionForm.date && lockedDates.includes(editCollectionForm.date))
-                return (
-                  <button
-                    type="button"
-                    onClick={deleteExistingCollection}
-                    disabled={isLocked}
-                    style={{
-                      ...Btn,
-                      background: isLocked ? '#f1f5f9' : '#fee2e2',
-                      color: isLocked ? '#94a3b8' : '#991b1b',
-                      border: `1px solid ${isLocked ? '#cbd5e1' : '#fca5a5'}`,
-                      padding: '7px 12px', fontSize: 12,
-                      cursor: isLocked ? 'not-allowed' : 'pointer'
-                    }}
-                    title={isLocked ? 'Bu gün kilitli olduğu için silinemez' : ''}
-                  >
-                    {isLocked ? '🔒 Silme Kilitli' : '🗑️ Tahsilatı Sil'}
-                  </button>
-                )
-              })()}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handlePrintCurrentReceipt}
+                  style={{
+                    ...Btn,
+                    background: 'linear-gradient(135deg,#0284c7,#0369a1)',
+                    color: '#fff',
+                    boxShadow: '0 2px 8px rgba(2,132,199,0.25)',
+                    padding: '7px 14px',
+                    fontSize: 12
+                  }}
+                  title="Bu tahsilata ait resmi makbuzu yazdır"
+                >
+                  🧾 Tahsilat Makbuzu
+                </button>
+
+                {/* Delete button (Silme) */}
+                {(() => {
+                  const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+                  const originalCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
+                  const isLocked = (originalCol?.date && lockedDates.includes(originalCol.date)) || (editCollectionForm.date && lockedDates.includes(editCollectionForm.date))
+                  return (
+                    <button
+                      type="button"
+                      onClick={deleteExistingCollection}
+                      disabled={isLocked}
+                      style={{
+                        ...Btn,
+                        background: isLocked ? '#f1f5f9' : '#fee2e2',
+                        color: isLocked ? '#94a3b8' : '#991b1b',
+                        border: `1px solid ${isLocked ? '#cbd5e1' : '#fca5a5'}`,
+                        padding: '7px 12px', fontSize: 12,
+                        cursor: isLocked ? 'not-allowed' : 'pointer'
+                      }}
+                      title={isLocked ? 'Bu gün kilitli olduğu için silinemez' : ''}
+                    >
+                      {isLocked ? '🔒 Silme Kilitli' : '🗑️ Tahsilatı Sil'}
+                    </button>
+                  )
+                })()}
+              </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <button

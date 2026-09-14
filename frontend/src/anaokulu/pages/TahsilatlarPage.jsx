@@ -3,6 +3,7 @@ import { api } from '../../lib/apiClient.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { money, trDate, getStudent, round2, isCollectionInvoiced } from '../utils/calculations.js'
+import { printCollectionReceipt } from '../utils/receiptGenerator.js'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -191,6 +192,27 @@ export default function TahsilatlarPage() {
     loadPaymentMethods()
     return () => { active = false }
   }, [])
+
+  const handlePrintRowReceipt = (c) => {
+    const s = getStudent(state, c.studentId)
+    const plan = (s?.items || []).find(p => p.name === c.item)
+    const planTotal = Number(plan?.total) || 0
+    const studentCollections = (state?.collections || []).filter(col => String(col.studentId) === String(c.studentId) && col.item === c.item)
+    const totalCollected = studentCollections.reduce((sum, col) => sum + (Number(col.amount) || 0), 0)
+    const remaining = Math.max(0, planTotal - totalCollected)
+
+    printCollectionReceipt({
+      schoolName: s?._schoolName || c._schoolName || state?.settings?.school || state?.settings?.okulAdi || 'Anaokulu',
+      student: s || {},
+      collection: c,
+      planName: c.item,
+      installmentNo: c.installmentNo,
+      dueDate: c.dueDate || '',
+      totalPlan: planTotal,
+      totalCollected,
+      remaining
+    })
+  }
 
   const compareLocalized = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'tr')
 
@@ -543,15 +565,28 @@ export default function TahsilatlarPage() {
                       </span>
                     </div>
 
-                    {/* Satır 3: Ödeme Yöntemi ve Açıklama */}
+                    {/* Satır 3: Ödeme Yöntemi, Makbuz Butonu ve Açıklama */}
                     <div style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       gap: 8, paddingTop: 6, borderTop: '1px solid #f1f5f9', flexWrap: 'wrap'
                     }}>
-                      <span style={payBadge(c.payment)}>{c.payment || '—'}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={payBadge(c.payment)}>{c.payment || '—'}</span>
+                        <button
+                          type="button"
+                          onClick={() => handlePrintRowReceipt(c)}
+                          style={{
+                            ...S.btn, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                            padding: '3px 8px', fontSize: 11
+                          }}
+                          title="Tahsilat Makbuzunu Yazdır"
+                        >
+                          🧾 Makbuz
+                        </button>
+                      </div>
                       {c.note && (
                         <div style={{
-                          fontSize: 11, color: '#64748b', maxWidth: '60%',
+                          fontSize: 11, color: '#64748b', maxWidth: '50%',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                         }}>
                           💬 {c.note}
@@ -637,12 +672,13 @@ export default function TahsilatlarPage() {
                       Açıklama {sortKey === 'note' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                     </button>
                   </th>
+                  <th style={{ ...S.th, textAlign: 'center', width: 90 }}>Makbuz</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
+                    <td colSpan={isAdminPanelMode ? 11 : 10} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
                       <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
                       {collections.length === 0
                         ? 'Henüz hiç tahsilat kaydı yok.'
@@ -709,6 +745,23 @@ export default function TahsilatlarPage() {
                       }}>
                         {c.note || '—'}
                       </td>
+                      <td style={{ ...S.td, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => handlePrintRowReceipt(c)}
+                          style={{
+                            ...S.btn,
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            padding: '4px 8px',
+                            fontSize: 11
+                          }}
+                          title="Tahsilat Makbuzunu Yazdır / PDF Al"
+                        >
+                          🧾 Makbuz
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -725,7 +778,7 @@ export default function TahsilatlarPage() {
                     <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#f59e0b' }}>
                       {money(totals.vat)}
                     </td>
-                    <td colSpan={2} style={S.td} />
+                    <td colSpan={3} style={S.td} />
                   </tr>
                 </tfoot>
               )}
