@@ -1417,9 +1417,9 @@ export default function UcretPlaniPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap',
           boxShadow: '0 1px 3px rgba(15,23,42,0.04)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 240 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
-              👤 Seçili Öğrenci:
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, width: isMobile ? '100%' : 'auto' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              👤 Seçili:
             </span>
             <select
               style={{
@@ -1429,7 +1429,9 @@ export default function UcretPlaniPage() {
                 fontWeight: 700,
                 color: '#1e293b',
                 background: '#f8fafc',
-                flex: 1
+                flex: 1,
+                minWidth: 0,
+                width: '100%'
               }}
               value={selStudentId || ''}
               onChange={e => setSelStudentId(e.target.value)}
@@ -1447,6 +1449,8 @@ export default function UcretPlaniPage() {
             onClick={() => setShowStudentListMobile(v => !v)}
             style={{
               ...Btn,
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center',
               background: showStudentListMobile ? '#e0e7ff' : '#f1f5f9',
               color: showStudentListMobile ? '#4338ca' : '#475569',
               padding: '7px 12px', fontSize: 12, fontWeight: 700, border: '1px solid #cbd5e1'
@@ -1524,10 +1528,13 @@ export default function UcretPlaniPage() {
               <div style={{
                 background: '#fff', borderRadius: 16, border: '1px solid #e6ebf3',
                 boxShadow: '0 1px 4px rgba(15,23,42,0.04)',
-                padding: '16px 20px',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12
+                padding: isMobile ? '12px 14px' : '16px 20px',
+                display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center',
+                gap: 12,
+                overflow: 'hidden'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, width: '100%' }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: 12, flexShrink: 0,
                     background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
@@ -1536,9 +1543,9 @@ export default function UcretPlaniPage() {
                   }}>
                     {(selStudent.name || 'Ö')[0]?.toUpperCase()}
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a', wordBreak: 'break-word' }}>
                         {selStudent.name}
                       </h3>
                       {selStudent.class && (
@@ -1550,7 +1557,7 @@ export default function UcretPlaniPage() {
                         </span>
                       )}
                     </div>
-                    <div style={{ marginTop: 3, fontSize: 12, color: '#64748b', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ marginTop: 3, fontSize: 12, color: '#64748b', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
                       {selStudent.parent && <span>👤 Veli: <strong>{selStudent.parent}</strong></span>}
                       {selStudent.phone && <span>📞 Tel: <strong>{selStudent.phone}</strong></span>}
                       {selStudent.tax && <span>🆔 TC: <strong>{selStudent.tax}</strong></span>}
@@ -1559,22 +1566,29 @@ export default function UcretPlaniPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+                <div style={{
+                  display: 'flex', gap: 8, flexWrap: 'wrap',
+                  width: isMobile ? '100%' : 'auto',
+                  borderTop: isMobile ? '1px solid #f1f5f9' : 'none',
+                  paddingTop: isMobile ? 8 : 0
+                }}>
                   {allOverdueInstallments.length > 0 && (
                     <button
                       id="btn-vadesi-gecmis"
+                      type="button"
                       onClick={() => setOverdueModalOpen(true)}
                       style={{
                         ...Btn,
+                        flex: isMobile ? '1 1 120px' : '0 0 auto',
+                        justifyContent: 'center',
                         background: 'linear-gradient(135deg,#ef4444,#dc2626)',
                         color: '#fff',
-                        padding: '9px 16px',
-                        fontSize: 13,
-                        boxShadow: '0 4px 14px rgba(239,68,68,0.35)',
-                        position: 'relative'
+                        padding: '8px 12px',
+                        fontSize: 12,
+                        boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
                       }}
                     >
-                      <span style={{ fontSize: 15 }}>⚠️</span>
+                      <span style={{ fontSize: 14 }}>⚠️</span>
                       Vadesi Geçmiş
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -1587,17 +1601,20 @@ export default function UcretPlaniPage() {
                   )}
                   <button
                     id="btn-ucret-plani-ekle"
+                    type="button"
                     onClick={openAdd}
                     style={{
                       ...Btn,
+                      flex: isMobile ? '1 1 120px' : '0 0 auto',
+                      justifyContent: 'center',
                       background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
                       color: '#fff',
-                      padding: '9px 16px',
-                      fontSize: 13,
-                      boxShadow: '0 4px 14px rgba(99,102,241,0.3)'
+                      padding: '8px 14px',
+                      fontSize: 12,
+                      boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
                     }}
                   >
-                    <span style={{ fontSize: 15 }}>+</span> Ücret Planı Ekle
+                    <span style={{ fontSize: 14 }}>+</span> Ücret Planı Ekle
                   </button>
                 </div>
               </div>
@@ -1757,29 +1774,29 @@ export default function UcretPlaniPage() {
                           {/* Satır 2: 3'lü Finansal Kutu */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: '1fr 1fr 1fr',
-                            gap: 6,
+                            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                            gap: 4,
                             background: '#f8fafc',
                             padding: '8px 10px',
                             borderRadius: 10,
                             border: '1px solid #e2e8f0',
                             alignItems: 'center'
                           }}>
-                            <div>
-                              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Net Tutar</div>
-                              <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>
+                            <div style={{ minWidth: 0, textAlign: 'center' }}>
+                              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Net Tutar</div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {money(it.total)}
                               </div>
                             </div>
-                            <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
-                              <div style={{ fontSize: 10, color: '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Tahsil Edilen</div>
-                              <div style={{ fontSize: 13, fontWeight: 800, color: planSum.paid > 0 ? '#059669' : '#64748b', marginTop: 1 }}>
+                            <div style={{ minWidth: 0, textAlign: 'center', borderLeft: '1px solid #e2e8f0', paddingLeft: 4 }}>
+                              <div style={{ fontSize: 10, color: '#059669', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Tahsilat</div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: planSum.paid > 0 ? '#059669' : '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {money(planSum.paid)}
                               </div>
                             </div>
-                            <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
-                              <div style={{ fontSize: 10, color: planSum.remaining > 0 ? '#e11d48' : '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Kalan</div>
-                              <div style={{ fontSize: 13, fontWeight: 800, color: planSum.remaining > 0 ? '#e11d48' : '#059669', marginTop: 1 }}>
+                            <div style={{ minWidth: 0, textAlign: 'center', borderLeft: '1px solid #e2e8f0', paddingLeft: 4 }}>
+                              <div style={{ fontSize: 10, color: planSum.remaining > 0 ? '#e11d48' : '#059669', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Kalan</div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: planSum.remaining > 0 ? '#e11d48' : '#059669', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {money(planSum.remaining)}
                               </div>
                             </div>
@@ -3221,16 +3238,18 @@ export default function UcretPlaniPage() {
       {collectModalOpen && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16
-        }}>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 12
+        }} onClick={() => setCollectModalOpen(false)}>
           <div style={{
             background: '#fff', borderRadius: 20, width: 'min(480px, 100%)',
+            maxHeight: '92vh', display: 'flex', flexDirection: 'column',
             boxShadow: '0 24px 60px rgba(15,23,42,0.3)', overflow: 'hidden'
           }} onClick={e => e.stopPropagation()}>
             
             {/* Header */}
             <div style={{
-              padding: '16px 20px', background: 'linear-gradient(135deg,#10b981,#059669)',
+              flexShrink: 0,
+              padding: '14px 18px', background: 'linear-gradient(135deg,#10b981,#059669)',
               color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <div>
@@ -3242,6 +3261,7 @@ export default function UcretPlaniPage() {
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setCollectModalOpen(false)}
                 style={{
                   background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
@@ -3253,7 +3273,7 @@ export default function UcretPlaniPage() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', flex: 1 }}>
               
               {/* Info banner */}
               <div style={{
@@ -3397,6 +3417,7 @@ export default function UcretPlaniPage() {
 
             {/* Footer */}
             <div style={{
+              flexShrink: 0,
               padding: '12px 20px', borderTop: '1px solid #e6ebf3',
               display: 'flex', justifyContent: 'flex-end', gap: 8, background: '#f8fafc'
             }}>
@@ -3441,16 +3462,18 @@ export default function UcretPlaniPage() {
       {editCollectionModalOpen && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16
-        }}>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 12
+        }} onClick={() => setEditCollectionModalOpen(false)}>
           <div style={{
             background: '#fff', borderRadius: 20, width: 'min(500px, 100%)',
+            maxHeight: '92vh', display: 'flex', flexDirection: 'column',
             boxShadow: '0 24px 60px rgba(15,23,42,0.3)', overflow: 'hidden'
           }} onClick={e => e.stopPropagation()}>
             
             {/* Header */}
             <div style={{
-              padding: '16px 20px', background: 'linear-gradient(135deg,#3b82f6,#2563eb)',
+              flexShrink: 0,
+              padding: '14px 18px', background: 'linear-gradient(135deg,#3b82f6,#2563eb)',
               color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <div>
@@ -3464,18 +3487,6 @@ export default function UcretPlaniPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   type="button"
-                  onClick={handlePrintCurrentReceipt}
-                  style={{
-                    background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.4)',
-                    color: '#fff', padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
-                    fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5,
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                  }}
-                  title="Tahsilat makbuzunu yazdır veya PDF olarak kaydet"
-                >
-                  🖨️ Makbuz Yazdır
-                </button>
-                <button
                   onClick={() => setEditCollectionModalOpen(false)}
                   style={{
                     background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
@@ -3488,7 +3499,7 @@ export default function UcretPlaniPage() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', flex: 1 }}>
               
               <div style={{
                 background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10,
@@ -3640,27 +3651,28 @@ export default function UcretPlaniPage() {
 
             {/* Footer */}
             <div style={{
-              padding: '12px 20px', borderTop: '1px solid #e6ebf3',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', flexWrap: 'wrap', gap: 8
+              flexShrink: 0,
+              padding: '12px 16px', borderTop: '1px solid #e6ebf3',
+              display: 'flex', flexDirection: 'column', gap: 8, background: '#f8fafc'
             }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {/* Row 1: Makbuz + Sil */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={handlePrintCurrentReceipt}
                   style={{
-                    ...Btn,
+                    ...Btn, flex: '1 1 auto',
                     background: 'linear-gradient(135deg,#0284c7,#0369a1)',
                     color: '#fff',
                     boxShadow: '0 2px 8px rgba(2,132,199,0.25)',
-                    padding: '7px 14px',
-                    fontSize: 12
+                    padding: '9px 14px',
+                    fontSize: 13, justifyContent: 'center'
                   }}
                   title="Bu tahsilata ait resmi makbuzu yazdır"
                 >
                   🧾 Tahsilat Makbuzu
                 </button>
 
-                {/* Delete button (Silme) */}
                 {(() => {
                   const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
                   const originalCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
@@ -3671,11 +3683,11 @@ export default function UcretPlaniPage() {
                       onClick={deleteExistingCollection}
                       disabled={isLocked}
                       style={{
-                        ...Btn,
+                        ...Btn, flex: '1 1 auto',
                         background: isLocked ? '#f1f5f9' : '#fee2e2',
                         color: isLocked ? '#94a3b8' : '#991b1b',
                         border: `1px solid ${isLocked ? '#cbd5e1' : '#fca5a5'}`,
-                        padding: '7px 12px', fontSize: 12,
+                        padding: '9px 12px', fontSize: 13, justifyContent: 'center',
                         cursor: isLocked ? 'not-allowed' : 'pointer'
                       }}
                       title={isLocked ? 'Bu gün kilitli olduğu için silinemez' : ''}
@@ -3686,12 +3698,14 @@ export default function UcretPlaniPage() {
                 })()}
               </div>
 
-              <div style={{ display: 'flex', gap: 8 }}>
+              {/* Row 2: Vazgeç + Kaydet */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setEditCollectionModalOpen(false)}
                   style={{
-                    ...Btn, background: '#fff', color: '#475569', border: '1px solid #cbd5e1', padding: '7px 14px'
+                    ...Btn, flex: '1 1 auto', background: '#fff', color: '#475569',
+                    border: '1px solid #cbd5e1', padding: '9px 14px', justifyContent: 'center'
                   }}
                 >
                   Vazgeç
@@ -3706,11 +3720,11 @@ export default function UcretPlaniPage() {
                       onClick={saveEditedCollection}
                       disabled={isLocked}
                       style={{
-                        ...Btn,
+                        ...Btn, flex: '1 1 auto',
                         background: isLocked ? '#94a3b8' : 'linear-gradient(135deg,#3b82f6,#2563eb)',
                         color: '#fff',
                         boxShadow: isLocked ? 'none' : '0 4px 12px rgba(37,99,235,0.25)',
-                        padding: '7px 16px',
+                        padding: '9px 16px', justifyContent: 'center',
                         cursor: isLocked ? 'not-allowed' : 'pointer'
                       }}
                     >

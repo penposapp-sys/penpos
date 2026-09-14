@@ -571,60 +571,87 @@ export default function FaturalarPage() {
 
       {/* İstatistik ve Özet Kartları */}
       <div style={{
-        padding: '12px 18px', background: '#fff', borderRadius: 14,
+        padding: '12px 14px', background: '#fff', borderRadius: 14,
         border: '1px solid #e6ebf3', marginBottom: 16
       }}>
         <div className="ak-stats-grid" style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10
         }}>
           {/* Bu ay fatura kesilecek toplam tutar */}
           <div style={miniBox}>
             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Bu Ay Fatura Kesilecek Tutar</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#0f172a' }}>{processedData.totalCount} Adet</b>
-              <span style={{ fontSize: 13, color: '#0f172a', fontWeight: 800 }}>{money(processedData.totalPlanned)}</span>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 16, color: '#0f172a', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {money(processedData.totalPlanned)}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 700, marginTop: 2 }}>
+                {processedData.totalCount} Adet
+              </div>
             </div>
           </div>
 
           {/* Toplam KDV */}
           <div style={{ ...miniBox, background: '#f8fafc', borderColor: '#cbd5e1' }}>
             <div style={{ fontSize: 11, color: '#475569', fontWeight: 700 }}>Toplam KDV Tutarı</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#1e293b' }}>{money(processedData.totalVat)}</b>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 16, color: '#1e293b', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {money(processedData.totalVat)}
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
+                KDV Dahil
+              </div>
             </div>
           </div>
 
           {/* Faturası Kesilen */}
           <div style={{ ...miniBox, background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', borderColor: '#a7f3d0' }}>
             <div style={{ fontSize: 11, color: '#065f46', fontWeight: 700 }}>🟢 Faturası Kesilen</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#065f46' }}>{processedData.billedCount} Adet</b>
-              <span style={{ fontSize: 12, color: '#047857', fontWeight: 700 }}>{money(processedData.billedAmount)}</span>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 16, color: '#065f46', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {money(processedData.billedAmount)}
+              </div>
+              <div style={{ fontSize: 12, color: '#047857', fontWeight: 700, marginTop: 2 }}>
+                {processedData.billedCount} Adet
+              </div>
             </div>
           </div>
 
           {/* Kesilmesi Beklenen */}
           <div style={{ ...miniBox, background: 'linear-gradient(135deg,#fff1f2,#ffe4e6)', borderColor: '#fecdd3' }}>
             <div style={{ fontSize: 11, color: '#9f1239', fontWeight: 700 }}>🔴 Kesilmesi Beklenen</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#9f1239' }}>{processedData.unbilledCount} Adet</b>
-              <span style={{ fontSize: 12, color: '#be123c', fontWeight: 700 }}>{money(processedData.unbilledAmount)}</span>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 16, color: '#9f1239', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {money(processedData.unbilledAmount)}
+              </div>
+              <div style={{ fontSize: 12, color: '#be123c', fontWeight: 700, marginTop: 2 }}>
+                {processedData.unbilledCount} Adet
+              </div>
             </div>
           </div>
 
           {/* Tahsil Edilen */}
           <div style={{ ...miniBox, background: '#f0fdf4', borderColor: '#bbf7d0' }}>
             <div style={{ fontSize: 11, color: '#166534', fontWeight: 700 }}>🟢 Toplam Tahsil Edilen</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#166534' }}>{money(processedData.totalPaid)}</b>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 16, color: '#166534', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {money(processedData.totalPaid)}
+              </div>
+              <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600, marginTop: 2 }}>
+                Tahsil Edildi
+              </div>
             </div>
           </div>
 
           {/* Tahsil Edilmeyi Bekleyen */}
           <div style={{ ...miniBox, background: '#fef2f2', borderColor: '#fecaca' }}>
             <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 700 }}>🔴 Tahsil Edilmeyi Bekleyen</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <b style={{ fontSize: 18, color: '#991b1b' }}>{money(processedData.totalRemaining)}</b>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 16, color: '#991b1b', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {money(processedData.totalRemaining)}
+              </div>
+              <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 600, marginTop: 2 }}>
+                Kalan Tutar
+              </div>
             </div>
           </div>
         </div>
