@@ -2,12 +2,12 @@ import User from '../models/User.js'
 import { notDeletedFilter } from '../utils/softDelete.js'
 
 export const findAllByTenant = (tenantId) =>
-  User.find(notDeletedFilter({ tenantId, role: 'staff' })).sort({ createdAt: -1 })
+  User.find(notDeletedFilter({ tenantId, role: { $in: ['staff', 'tenant_admin'] } })).sort({ createdAt: -1 })
 
-export const createStaff = (data) => User.create({ ...data, role: 'staff', active: true, isActive: true, isDeleted: false, deletedAt: null, status: 'active' })
+export const createStaff = (data) => User.create({ ...data, role: data.role || 'staff', active: true, isActive: true, isDeleted: false, deletedAt: null, status: 'active' })
 
 export const findByIdAndTenant = (id, tenantId) =>
-  User.findOne({ _id: id, tenantId, role: 'staff' })
+  User.findOne({ _id: id, tenantId, role: { $in: ['staff', 'tenant_admin'] } })
 
 export const confirmEmailAvailable = async (tenantId, email, excludeUserId, systemType) => {
   const scopedSystemType = String(systemType || '').trim()

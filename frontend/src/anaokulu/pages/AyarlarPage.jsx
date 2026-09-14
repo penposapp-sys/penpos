@@ -29,6 +29,23 @@ const LUCA_SETUP_DOWNLOAD_PATH = '/public/downloads/PenPOS%20Luca%20Veri%20Setup
 
 const genId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
+const formatTrDate = (dateStr) => {
+  if (!dateStr) return '—'
+  try {
+    const [y, m, d] = dateStr.split('-')
+    if (!y || !m || !d) return dateStr
+    const date = new Date(Number(y), Number(m) - 1, Number(d))
+    return date.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      weekday: 'long'
+    })
+  } catch {
+    return dateStr
+  }
+}
+
 export default function AyarlarPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -58,6 +75,14 @@ export default function AyarlarPage() {
   // Kullanıcı formu aktif düzenliyorsa backend güncellemesi override etmesin
   const [formUserEdited, setFormUserEdited] = useState(false)
 
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
+
   // Ücret kalemleri state
   const [feeCategories, setFeeCategories] = useState([])
   const [newFee, setNewFee] = useState({ name: '', defaultPrice: 0, invoiced: true })
@@ -71,6 +96,12 @@ export default function AyarlarPage() {
   // İndirimler state
   const [discounts, setDiscounts] = useState([])
   const [newDiscount, setNewDiscount] = useState({ name: '', type: 'percent', value: 0 })
+
+  // Gün Kilidi state
+  const [lockedDates, setLockedDates] = useState([])
+  const [newLockDate, setNewLockDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [lockSaving, setLockSaving] = useState(false)
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false)
 
   // Ödeme türleri state
   const [paymentMethods, setPaymentMethods] = useState([])
@@ -166,6 +197,9 @@ export default function AyarlarPage() {
     // İndirimler
     setDiscounts(Array.isArray(settings.discounts) ? settings.discounts : [])
 
+    // Gün Kilidi
+    setLockedDates(Array.isArray(settings.lockedDates) ? settings.lockedDates : [])
+
     // Luca ayarları
     if (!lucaUserEdited) {
       const tckn = settings?.luca?.tckn || settings?.luca?.username || settings?.luca?.customerNo || ''
@@ -211,6 +245,7 @@ export default function AyarlarPage() {
       matchBy: form.matchBy || 'tax',
       feeCategories,
       discounts,
+      lockedDates,
       luca: { tckn: lucaSettings.tckn, password: lucaSettings.password },
       invoiceSettings
     }
@@ -221,6 +256,82 @@ export default function AyarlarPage() {
     }
     setFormUserEdited(false)
     toast('Ayarlar kaydedildi.')
+  }
+
+  // En son / sıradaki kilitlenecek günü hesapla
+  const getLatestLockCandidate = () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const sortedLocked = [...lockedDates].sort()
+
+    // 1) Sistemde henüz kilitlenmemiş tahsilat günleri var mı?
+    const unLockedColDates = (state?.collections || [])
+      .map(c => c.date)
+      .filter(Boolean)
+      .filter(d => !lockedDates.includes(d))
+      .sort()
+
+    if (unLockedColDates.length > 0) {
+      // Henüz kilitlenmemiş tahsilat günlerinden en güncel olanı
+      return unLockedColDates[unLockedColDates.length - 1]
+    }
+
+    // 2) Kilitli gün yoksa: bugünün tarihi
+    if (sortedLocked.length === 0) {
+      return today
+    }
+
+    // 3) Kilitli günler varsa: En son kilitli günün 1 gün sonrasını al
+    const lastLocked = sortedLocked[sortedLocked.length - 1]
+    if (lastLocked >= today) {
+      const [y, m, d] = lastLocked.split('-').map(Number)
+      const nextDate = new Date(y, m - 1, d + 1)
+      return nextDate.toISOString().slice(0, 10)
+    }
+
+    return today
+  }
+
+  const handleAddLockDate = async (dateToAdd) => {
+    const targetDate = dateToAdd || getLatestLockCandidate() || newLockDate
+    if (!targetDate) { toast('Lütfen bir tarih belirleyiniz.'); return }
+    if (lockedDates.includes(targetDate)) { toast('Bu tarih zaten kilitli.'); return }
+
+    const updated = [...lockedDates, targetDate].sort().reverse()
+    setLockedDates(updated)
+    setLockSaving(true)
+    try {
+      const nextSettings = { ...(state?.settings || {}), lockedDates: updated }
+      const res = await actions.updateSettingsAndSave(nextSettings)
+      if (res?.ok === false) {
+        toast(`Hata: ${res.message || 'Kaydedilemedi'}`)
+      } else {
+        toast(`🔒 ${targetDate} tarihi kilitlendi.`)
+      }
+    } catch (e) {
+      toast(e?.message || 'Gün kilitlenirken hata oluştu.')
+    } finally {
+      setLockSaving(false)
+    }
+  }
+
+  const handleRemoveLockDate = async (dateToRemove) => {
+    if (!window.confirm(`${dateToRemove} tarihinin kilidini açmak istediğinize emin misiniz?`)) return
+    const updated = lockedDates.filter(d => d !== dateToRemove)
+    setLockedDates(updated)
+    setLockSaving(true)
+    try {
+      const nextSettings = { ...(state?.settings || {}), lockedDates: updated }
+      const res = await actions.updateSettingsAndSave(nextSettings)
+      if (res?.ok === false) {
+        toast(`Hata: ${res.message || 'Kaydedilemedi'}`)
+      } else {
+        toast(`🔓 ${dateToRemove} tarihinin kilidi açıldı.`)
+      }
+    } catch (e) {
+      toast(e?.message || 'Kilit açılırken hata oluştu.')
+    } finally {
+      setLockSaving(false)
+    }
   }
 
   const addFeeCategory = () => {
@@ -448,6 +559,7 @@ export default function AyarlarPage() {
     { key: 'odeme', label: '💳 Ödeme Türleri', staffHide: true, adminPanelHide: true },
     { key: 'ucretler', label: '💰 Ücret Kalemleri', staffHide: true, adminPanelHide: true },
     { key: 'indirimler', label: '🏷️ İndirimler', staffHide: true, adminPanelHide: true },
+    { key: 'gunkilidi', label: '🔒 Gün Kilidi', staffHide: true, adminPanelHide: true },
     { key: 'luca', label: '🧾 TÜRMOB Luca e-Fatura', staffHide: true, adminPanelHide: true },
     { key: 'fatura', label: '📄 Fatura Ayarları', staffHide: true, adminPanelHide: true },
     { key: 'veri', label: '💾 Veri', staffHide: true, adminPanelHide: true },
@@ -573,33 +685,60 @@ export default function AyarlarPage() {
 
           <div style={{ display: 'grid', gap: 12, marginBottom: 18 }}>
             {(paymentMethods || []).map((method) => (
-              <div key={method.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) minmax(220px, 1fr) auto auto', gap: 10, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
-                <select
-                  className="input"
-                  value={method.type || 'custom'}
-                  onChange={(event) => updatePaymentMethod(method.id, { type: event.target.value })}
-                  style={{ ...InputCls, width: '100%' }}
-                >
-                  {PAYMENT_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-                <input
-                  className="input"
-                  value={method.name || ''}
-                  onChange={(event) => updatePaymentMethod(method.id, { name: event.target.value })}
-                  placeholder="Ziraat Bankası / Garanti POS / Senet / Çek"
-                  style={{ ...InputCls, width: '100%' }}
-                />
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
+              <div
+                key={method.id}
+                style={{
+                  display: isMobile ? 'flex' : 'grid',
+                  flexDirection: isMobile ? 'column' : undefined,
+                  gridTemplateColumns: isMobile ? undefined : 'minmax(180px, 220px) minmax(220px, 1fr) auto auto',
+                  gap: 10,
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: 12
+                }}
+              >
+                <div style={{
+                  display: isMobile ? 'flex' : 'contents',
+                  flexDirection: isMobile ? 'column' : undefined,
+                  gap: isMobile ? 8 : 0
+                }}>
+                  <select
+                    className="input"
+                    value={method.type || 'custom'}
+                    onChange={(event) => updatePaymentMethod(method.id, { type: event.target.value })}
+                    style={{ ...InputCls, width: '100%' }}
+                  >
+                    {PAYMENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
                   <input
-                    type="checkbox"
-                    checked={method.enabled !== false}
-                    onChange={() => updatePaymentMethod(method.id, { enabled: !(method.enabled !== false) })}
+                    className="input"
+                    value={method.name || ''}
+                    onChange={(event) => updatePaymentMethod(method.id, { name: event.target.value })}
+                    placeholder="Ziraat Bankası / Garanti POS / Senet / Çek"
+                    style={{ ...InputCls, width: '100%' }}
                   />
-                  Aktif
-                </label>
-                <button type="button" onClick={() => deletePaymentMethod(method)} style={{ ...Btn, background: '#fee2e2', color: '#991b1b', padding: '7px 10px' }}>Sil</button>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: isMobile ? 'space-between' : 'flex-start',
+                  gap: 10,
+                  paddingTop: isMobile ? 4 : 0
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={method.enabled !== false}
+                      onChange={() => updatePaymentMethod(method.id, { enabled: !(method.enabled !== false) })}
+                    />
+                    Aktif
+                  </label>
+                  <button type="button" onClick={() => deletePaymentMethod(method)} style={{ ...Btn, background: '#fee2e2', color: '#991b1b', padding: '7px 14px' }}>Sil</button>
+                </div>
               </div>
             ))}
 
@@ -608,7 +747,17 @@ export default function AyarlarPage() {
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) minmax(220px, 1fr) auto', gap: 10, alignItems: 'end', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+          <div style={{
+            display: isMobile ? 'flex' : 'grid',
+            flexDirection: isMobile ? 'column' : undefined,
+            gridTemplateColumns: isMobile ? undefined : 'minmax(180px, 220px) minmax(220px, 1fr) auto',
+            gap: 10,
+            alignItems: isMobile ? 'stretch' : 'end',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 12,
+            padding: 12
+          }}>
             <select
               className="input"
               value={newPaymentMethod.type}
@@ -626,11 +775,11 @@ export default function AyarlarPage() {
               placeholder="Ziraat Bankası / Garanti POS / Senet / Çek"
               style={{ ...InputCls, width: '100%' }}
             />
-            <button type="button" onClick={addPaymentMethod} style={{ ...Btn, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', padding: '9px 14px' }}>+ Ekle</button>
+            <button type="button" onClick={addPaymentMethod} style={{ ...Btn, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', padding: '9px 14px', justifyContent: 'center' }}>+ Ekle</button>
           </div>
 
           <div style={{ marginTop: 18, textAlign: 'right' }}>
-            <button type="button" onClick={savePaymentMethodList} disabled={paymentMethodsLoading} style={{ ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: '0 4px 12px rgba(99,102,241,0.25)' }}>
+            <button type="button" onClick={savePaymentMethodList} disabled={paymentMethodsLoading} style={{ ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: '0 4px 12px rgba(99,102,241,0.25)', width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}>
               💾 Değişiklikleri Kaydet
             </button>
           </div>
@@ -653,32 +802,30 @@ export default function AyarlarPage() {
           </div>
 
           {/* Mevcut Kalemler */}
-          <div style={{ marginBottom: 20, overflowX: 'auto' }}>
-            <table style={tbl}>
-              <thead>
-                <tr>
-                  <th style={th}>Kalem Adı</th>
-                  <th style={{ ...th, width: 180 }}>Varsayılan Fiyat (₺)</th>
-                  <th style={{ ...th, width: 200 }}>Fatura Durumu</th>
-                  <th style={{ ...th, width: 80, textAlign: 'center' }}>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {feeCategories.length === 0 ? (
-                  <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
-                    Henüz ücret kalemi eklenmedi.
-                  </td></tr>
-                ) : feeCategories.map(fc => (
-                  <tr key={fc.id}>
-                    <td style={td}>
-                      <input style={{ ...InputCls, width: '100%' }} value={fc.name}
-                        onChange={e => updateFeeCategory(fc.id, 'name', e.target.value)} />
-                    </td>
-                    <td style={td}>
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {feeCategories.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px 12px', fontSize: 13, background: '#f8fafc', borderRadius: 10 }}>
+                  Henüz ücret kalemi eklenmedi.
+                </div>
+              ) : feeCategories.map(fc => (
+                <div key={fc.id} style={{
+                  background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12,
+                  padding: 12, display: 'flex', flexDirection: 'column', gap: 10
+                }}>
+                  <div>
+                    <label style={LabelCls}>Kalem Adı</label>
+                    <input style={{ ...InputCls, width: '100%' }} value={fc.name}
+                      onChange={e => updateFeeCategory(fc.id, 'name', e.target.value)} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label style={LabelCls}>Varsayılan Fiyat (₺)</label>
                       <input style={{ ...InputCls, width: '100%' }} type="number" step="0.01" value={fc.defaultPrice}
                         onChange={e => updateFeeCategory(fc.id, 'defaultPrice', e.target.value)} />
-                    </td>
-                    <td style={td}>
+                    </div>
+                    <div>
+                      <label style={LabelCls}>Fatura Durumu</label>
                       <select
                         style={{ ...InputCls, width: '100%', fontWeight: 700 }}
                         value={fc.invoiced !== false ? '1' : '0'}
@@ -687,54 +834,104 @@ export default function AyarlarPage() {
                         <option value="1">🟢 Faturalı</option>
                         <option value="0">⚪ Faturasız</option>
                       </select>
-                    </td>
-                    <td style={{ ...td, textAlign: 'center' }}>
-                      <button onClick={() => removeFeeCategory(fc.id)} style={{
-                        ...Btn, background: '#fee2e2', color: '#991b1b', padding: '6px 10px'
-                      }}>🗑</button>
-                    </td>
+                    </div>
+                  </div>
+                  <button onClick={() => removeFeeCategory(fc.id)} style={{
+                    ...Btn, background: '#fee2e2', color: '#991b1b', padding: '7px 12px', justifyContent: 'center'
+                  }}>🗑 Kalemi Sil</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 20, overflowX: 'auto' }}>
+              <table style={tbl}>
+                <thead>
+                  <tr>
+                    <th style={th}>Kalem Adı</th>
+                    <th style={{ ...th, width: 180 }}>Varsayılan Fiyat (₺)</th>
+                    <th style={{ ...th, width: 200 }}>Fatura Durumu</th>
+                    <th style={{ ...th, width: 80, textAlign: 'center' }}>İşlem</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {feeCategories.length === 0 ? (
+                    <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
+                      Henüz ücret kalemi eklenmedi.
+                    </td></tr>
+                  ) : feeCategories.map(fc => (
+                    <tr key={fc.id}>
+                      <td style={td}>
+                        <input style={{ ...InputCls, width: '100%' }} value={fc.name}
+                          onChange={e => updateFeeCategory(fc.id, 'name', e.target.value)} />
+                      </td>
+                      <td style={td}>
+                        <input style={{ ...InputCls, width: '100%' }} type="number" step="0.01" value={fc.defaultPrice}
+                          onChange={e => updateFeeCategory(fc.id, 'defaultPrice', e.target.value)} />
+                      </td>
+                      <td style={td}>
+                        <select
+                          style={{ ...InputCls, width: '100%', fontWeight: 700 }}
+                          value={fc.invoiced !== false ? '1' : '0'}
+                          onChange={e => updateFeeCategory(fc.id, 'invoiced', e.target.value)}
+                        >
+                          <option value="1">🟢 Faturalı</option>
+                          <option value="0">⚪ Faturasız</option>
+                        </select>
+                      </td>
+                      <td style={{ ...td, textAlign: 'center' }}>
+                        <button onClick={() => removeFeeCategory(fc.id)} style={{
+                          ...Btn, background: '#fee2e2', color: '#991b1b', padding: '6px 10px'
+                        }}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Yeni Kalem Ekle */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 150px 180px auto', gap: 10,
-            alignItems: 'flex-end', padding: '14px', background: '#f8fafc', borderRadius: 10
+            display: isMobile ? 'flex' : 'grid',
+            flexDirection: isMobile ? 'column' : undefined,
+            gridTemplateColumns: isMobile ? undefined : '1fr 150px 180px auto',
+            gap: 10,
+            alignItems: isMobile ? 'stretch' : 'flex-end',
+            padding: '14px', background: '#f8fafc', borderRadius: 10
           }}>
             <div>
               <label style={LabelCls}>Kalem Adı *</label>
               <input style={InputCls} placeholder="Örn: Servis" value={newFee.name}
                 onChange={e => setNewFee({ ...newFee, name: e.target.value })} />
             </div>
-            <div>
-              <label style={LabelCls}>Varsayılan Fiyat (₺)</label>
-              <input style={InputCls} type="number" step="0.01" value={newFee.defaultPrice}
-                onChange={e => setNewFee({ ...newFee, defaultPrice: Number(e.target.value) || 0 })} />
-            </div>
-            <div>
-              <label style={LabelCls}>Fatura Durumu</label>
-              <select
-                style={{ ...InputCls, fontWeight: 700 }}
-                value={newFee.invoiced !== false ? '1' : '0'}
-                onChange={e => setNewFee({ ...newFee, invoiced: e.target.value === '1' })}
-              >
-                <option value="1">🟢 Faturalı</option>
-                <option value="0">⚪ Faturasız</option>
-              </select>
+            <div style={{ display: isMobile ? 'grid' : 'contents', gridTemplateColumns: isMobile ? '1fr 1fr' : undefined, gap: 8 }}>
+              <div>
+                <label style={LabelCls}>Varsayılan Fiyat (₺)</label>
+                <input style={InputCls} type="number" step="0.01" value={newFee.defaultPrice}
+                  onChange={e => setNewFee({ ...newFee, defaultPrice: Number(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <label style={LabelCls}>Fatura Durumu</label>
+                <select
+                  style={{ ...InputCls, fontWeight: 700 }}
+                  value={newFee.invoiced !== false ? '1' : '0'}
+                  onChange={e => setNewFee({ ...newFee, invoiced: e.target.value === '1' })}
+                >
+                  <option value="1">🟢 Faturalı</option>
+                  <option value="0">⚪ Faturasız</option>
+                </select>
+              </div>
             </div>
             <button onClick={addFeeCategory} style={{
               ...Btn, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff',
-              padding: '9px 14px', alignSelf: 'flex-end'
+              padding: '9px 14px', alignSelf: isMobile ? 'stretch' : 'flex-end', justifyContent: 'center'
             }}>+ Ekle</button>
           </div>
 
           <div style={{ marginTop: 16, textAlign: 'right' }}>
             <button onClick={saveFeeCategories} style={{
               ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
+              boxShadow: '0 4px 12px rgba(99,102,241,0.25)', width: isMobile ? '100%' : 'auto', justifyContent: 'center'
             }}>💾 Kalemleri Kaydet</button>
           </div>
         </div>
@@ -749,88 +946,398 @@ export default function AyarlarPage() {
             (Yüzde veya sabit tutar olarak belirleyebilirsiniz.)
           </p>
 
-          <div style={{ marginBottom: 20, overflowX: 'auto' }}>
-            <table style={tbl}>
-              <thead>
-                <tr>
-                  <th style={th}>İndirim Adı</th>
-                  <th style={th}>Tür</th>
-                  <th style={th}>Değer</th>
-                  <th style={{ ...th, width: 80 }}>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {discounts.length === 0 ? (
-                  <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
-                    Henüz indirim tanımlanmadı.
-                  </td></tr>
-                ) : discounts.map(d => (
-                  <tr key={d.id}>
-                    <td style={td}>
-                      <input style={{ ...InputCls, width: '100%' }} value={d.name}
-                        onChange={e => updateDiscount(d.id, 'name', e.target.value)} />
-                    </td>
-                    <td style={td}>
-                      <select style={{ ...InputCls, width: 130 }} value={d.type}
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {discounts.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px 12px', fontSize: 13, background: '#f8fafc', borderRadius: 10 }}>
+                  Henüz indirim tanımlanmadı.
+                </div>
+              ) : discounts.map(d => (
+                <div key={d.id} style={{
+                  background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12,
+                  padding: 12, display: 'flex', flexDirection: 'column', gap: 10
+                }}>
+                  <div>
+                    <label style={LabelCls}>İndirim Adı</label>
+                    <input style={{ ...InputCls, width: '100%' }} value={d.name}
+                      onChange={e => updateDiscount(d.id, 'name', e.target.value)} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label style={LabelCls}>Tür</label>
+                      <select style={{ ...InputCls, width: '100%' }} value={d.type}
                         onChange={e => updateDiscount(d.id, 'type', e.target.value)}>
                         <option value="percent">Yüzde (%)</option>
                         <option value="fixed">Sabit (₺)</option>
                       </select>
-                    </td>
-                    <td style={td}>
+                    </div>
+                    <div>
+                      <label style={LabelCls}>Değer</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input style={{ ...InputCls, width: 100 }} type="number" step="0.01" value={d.value}
+                        <input style={{ ...InputCls, width: '100%' }} type="number" step="0.01" value={d.value}
                           onChange={e => updateDiscount(d.id, 'value', e.target.value)} />
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 700 }}>
                           {d.type === 'percent' ? '%' : '₺'}
                         </span>
                       </div>
-                    </td>
-                    <td style={td}>
-                      <button onClick={() => removeDiscount(d.id)} style={{
-                        ...Btn, background: '#fee2e2', color: '#991b1b', padding: '6px 10px'
-                      }}>🗑</button>
-                    </td>
+                    </div>
+                  </div>
+                  <button onClick={() => removeDiscount(d.id)} style={{
+                    ...Btn, background: '#fee2e2', color: '#991b1b', padding: '7px 12px', justifyContent: 'center'
+                  }}>🗑 İndirimi Sil</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 20, overflowX: 'auto' }}>
+              <table style={tbl}>
+                <thead>
+                  <tr>
+                    <th style={th}>İndirim Adı</th>
+                    <th style={th}>Tür</th>
+                    <th style={th}>Değer</th>
+                    <th style={{ ...th, width: 80 }}>İşlem</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {discounts.length === 0 ? (
+                    <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
+                      Henüz indirim tanımlanmadı.
+                    </td></tr>
+                  ) : discounts.map(d => (
+                    <tr key={d.id}>
+                      <td style={td}>
+                        <input style={{ ...InputCls, width: '100%' }} value={d.name}
+                          onChange={e => updateDiscount(d.id, 'name', e.target.value)} />
+                      </td>
+                      <td style={td}>
+                        <select style={{ ...InputCls, width: 130 }} value={d.type}
+                          onChange={e => updateDiscount(d.id, 'type', e.target.value)}>
+                          <option value="percent">Yüzde (%)</option>
+                          <option value="fixed">Sabit (₺)</option>
+                        </select>
+                      </td>
+                      <td style={td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input style={{ ...InputCls, width: 100 }} type="number" step="0.01" value={d.value}
+                            onChange={e => updateDiscount(d.id, 'value', e.target.value)} />
+                          <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                            {d.type === 'percent' ? '%' : '₺'}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={td}>
+                        <button onClick={() => removeDiscount(d.id)} style={{
+                          ...Btn, background: '#fee2e2', color: '#991b1b', padding: '6px 10px'
+                        }}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Yeni İndirim Ekle */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 140px 140px auto', gap: 10,
-            alignItems: 'flex-end', padding: '14px', background: '#f8fafc', borderRadius: 10
+            display: isMobile ? 'flex' : 'grid',
+            flexDirection: isMobile ? 'column' : undefined,
+            gridTemplateColumns: isMobile ? undefined : '1fr 140px 140px auto',
+            gap: 10,
+            alignItems: isMobile ? 'stretch' : 'flex-end',
+            padding: '14px', background: '#f8fafc', borderRadius: 10
           }}>
             <div>
               <label style={LabelCls}>İndirim Adı *</label>
               <input style={InputCls} placeholder="Örn: Kardeş İndirimi" value={newDiscount.name}
                 onChange={e => setNewDiscount({ ...newDiscount, name: e.target.value })} />
             </div>
-            <div>
-              <label style={LabelCls}>Tür</label>
-              <select style={InputCls} value={newDiscount.type}
-                onChange={e => setNewDiscount({ ...newDiscount, type: e.target.value })}>
-                <option value="percent">Yüzde (%)</option>
-                <option value="fixed">Sabit (₺)</option>
-              </select>
-            </div>
-            <div>
-              <label style={LabelCls}>Değer</label>
-              <input style={InputCls} type="number" step="0.01" value={newDiscount.value}
-                onChange={e => setNewDiscount({ ...newDiscount, value: Number(e.target.value) || 0 })} />
+            <div style={{ display: isMobile ? 'grid' : 'contents', gridTemplateColumns: isMobile ? '1fr 1fr' : undefined, gap: 8 }}>
+              <div>
+                <label style={LabelCls}>Tür</label>
+                <select style={InputCls} value={newDiscount.type}
+                  onChange={e => setNewDiscount({ ...newDiscount, type: e.target.value })}>
+                  <option value="percent">Yüzde (%)</option>
+                  <option value="fixed">Sabit (₺)</option>
+                </select>
+              </div>
+              <div>
+                <label style={LabelCls}>Değer</label>
+                <input style={InputCls} type="number" step="0.01" value={newDiscount.value}
+                  onChange={e => setNewDiscount({ ...newDiscount, value: Number(e.target.value) || 0 })} />
+              </div>
             </div>
             <button onClick={addDiscount} style={{
               ...Btn, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff',
-              padding: '9px 14px', alignSelf: 'flex-end'
+              padding: '9px 14px', alignSelf: isMobile ? 'stretch' : 'flex-end', justifyContent: 'center'
             }}>+ Ekle</button>
           </div>
 
           <div style={{ marginTop: 16, textAlign: 'right' }}>
             <button onClick={saveDiscounts} style={{
               ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
+              boxShadow: '0 4px 12px rgba(99,102,241,0.25)', width: isMobile ? '100%' : 'auto', justifyContent: 'center'
             }}>💾 İndirimleri Kaydet</button>
+          </div>
+        </div>
+      )}
+
+      {/* 🔒 Gün Kilidi (Yalnızca Yönetici Görür) */}
+      {!isStaff && !isAdminPanelMode && activeTab === 'gunkilidi' && (
+        <div style={panel}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <div>
+              <h3 style={{ ...h3, margin: '0 0 4px 0' }}>🔒 Gün Kilidi Ayarları</h3>
+              <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+                Kilitlenen günlerde yapılmış tahsilatlar silinemez ve kilitli günlere yeni tahsilat girişi yapılamaz.
+              </p>
+            </div>
+            <div style={{
+              padding: '6px 12px', borderRadius: 20, background: '#fef3c7', border: '1px solid #fde68a',
+              color: '#92400e', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6
+            }}>
+              <span>🛡️ Yalnızca Yönetici Yetkisi</span>
+            </div>
+          </div>
+
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(245,158,11,0.06))',
+            border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12,
+            padding: '14px 16px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center'
+          }}>
+            <span style={{ fontSize: 26 }}>🔐</span>
+            <div style={{ fontSize: 13, color: '#991b1b', lineHeight: 1.5 }}>
+              <strong>Nasıl Çalışır?</strong> Gün kilidi uygulandığında, o gün içinde tahsil edilmiş hiçbir ücret (taksit/peşinat) okul personeli veya kullanıcılar tarafından silinemez ve güncellenemez. Ayrıca o kilitli tarihe geriye dönük tahsilat eklenmesi de sistem tarafından tamamen engellenir. Kilidi dilediğiniz zaman buradan tekrar açabilirsiniz.
+            </div>
+          </div>
+
+          {/* 🔒 EN SON GÜNÜ KİLİTLE KARTI (Tarih seçme zorunluluğu olmadan tek tıkla) */}
+          {(() => {
+            const candidate = getLatestLockCandidate()
+            const candidateCols = (state?.collections || []).filter(c => c.date === candidate)
+            const candidateTotal = candidateCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+            const latestLocked = lockedDates.length > 0 ? [...lockedDates].sort().reverse()[0] : null
+
+            return (
+              <div style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: 16, padding: '20px 24px', color: '#0f172a',
+                boxShadow: '0 4px 16px rgba(15,23,42,0.06)',
+                marginBottom: 22, border: '1px solid #e2e8f0',
+                borderLeft: '5px solid #ef4444'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 22 }}>🔒</span>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>En Son Günü Kilitle</span>
+                      <span style={{
+                        background: '#fee2e2', color: '#991b1b', fontSize: 10, fontWeight: 800,
+                        padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca', letterSpacing: '0.5px'
+                      }}>
+                        TEK TIKLA KİLİTLE
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 14, color: '#475569', marginTop: 4 }}>
+                      Kilitlenecek Hedef Gün: <strong style={{ color: '#0f172a', fontSize: 15 }}>{formatTrDate(candidate)}</strong>
+                      <span style={{ marginLeft: 8, fontFamily: 'monospace', color: '#64748b' }}>({candidate})</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: candidateCols.length > 0 ? '#0284c7' : '#64748b', marginTop: 4, fontWeight: 600 }}>
+                      {candidateCols.length > 0
+                        ? `📊 Bu güne ait ${candidateCols.length} tahsilat mevcut (Toplam: ${Number(candidateTotal).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺)`
+                        : 'ℹ️ Bu güne ait henüz tahsilat kaydı bulunmuyor'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleAddLockDate(candidate)}
+                      disabled={lockSaving}
+                      style={{
+                        ...Btn,
+                        background: 'linear-gradient(135deg,#ef4444,#dc2626)',
+                        color: '#fff',
+                        boxShadow: '0 4px 14px rgba(239,68,68,0.25)',
+                        padding: '12px 22px',
+                        fontSize: 14,
+                        fontWeight: 800,
+                        borderRadius: 12,
+                        cursor: lockSaving ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {lockSaving ? '⏳ Kilitleniyor...' : `🔒 En Son Günü Kilitle (${candidate})`}
+                    </button>
+
+                    {latestLocked && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLockDate(latestLocked)}
+                        disabled={lockSaving}
+                        style={{
+                          ...Btn,
+                          background: '#fff',
+                          color: '#475569',
+                          border: '1px solid #cbd5e1',
+                          padding: '12px 16px',
+                          fontSize: 13,
+                          borderRadius: 12,
+                          cursor: lockSaving ? 'not-allowed' : 'pointer'
+                        }}
+                        title="En son kilitlenmiş günü geri aç"
+                      >
+                        ↩️ Son Kilidi Geri Al ({latestLocked})
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* İsteğe bağlı özel tarih seçme alanı (Varsayılan olarak gizli) */}
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomDatePicker(!showCustomDatePicker)}
+                    style={{
+                      background: 'transparent', border: 'none', color: '#64748b',
+                      fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: 0, textDecoration: 'underline'
+                    }}
+                  >
+                    <span>{showCustomDatePicker ? '▲ Farklı tarih seçimini gizle' : '⚙️ Özel bir geçmiş tarih seçmek istiyorum...'}</span>
+                  </button>
+
+                  {showCustomDatePicker && (
+                    <div style={{
+                      marginTop: 10, padding: 12, background: '#f8fafc',
+                      borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap'
+                    }}>
+                      <input
+                        style={{ ...InputCls, maxWidth: 180, fontWeight: 700 }}
+                        type="date"
+                        value={newLockDate}
+                        onChange={e => setNewLockDate(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddLockDate(newLockDate)}
+                        disabled={lockSaving || !newLockDate}
+                        style={{
+                          ...Btn, background: '#ef4444', color: '#fff', fontSize: 12, padding: '7px 14px'
+                        }}
+                      >
+                        Bu Tarihi Kilitle
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Kilitli Günler Listesi */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                📋 Kilitli Tarihler Listesi ({lockedDates.length})
+              </div>
+              {lockedDates.length > 0 && (
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  Toplam <strong>{lockedDates.length}</strong> gün kilitli durumda
+                </div>
+              )}
+            </div>
+
+            {lockedDates.length === 0 ? (
+              <div style={{
+                padding: '36px 20px', textAlign: 'center', background: '#f8fafc',
+                borderRadius: 12, border: '1px dashed #cbd5e1'
+              }}>
+                <span style={{ fontSize: 36 }}>🔓</span>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#334155', marginTop: 8 }}>
+                  Şu anda kilitlenmiş bir gün bulunmuyor.
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  Geriye dönük tahsilat silinmesini veya eklenmesini engellemek istediğiniz tarihleri yukarıdan kilitleyebilirsiniz.
+                </div>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={tbl}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Kilitli Tarih</th>
+                      <th style={th}>Durum</th>
+                      <th style={th}>Kayıtlı Tahsilat Sayısı &amp; Tutarı</th>
+                      <th style={{ ...th, textAlign: 'right' }}>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lockedDates.map((dateStr) => {
+                      const cols = (state?.collections || []).filter(c => c.date === dateStr)
+                      const count = cols.length
+                      const totalAmt = cols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+
+                      return (
+                        <tr key={dateStr} style={{ transition: 'background 0.15s' }}>
+                          <td style={td}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 16 }}>🔒</span>
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
+                                  {formatTrDate(dateStr)}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
+                                  {dateStr}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={td}>
+                            <span style={{
+                              padding: '3px 9px', borderRadius: 8, fontSize: 11, fontWeight: 800,
+                              background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5'
+                            }}>
+                              🔴 KİLİTLİ
+                            </span>
+                          </td>
+                          <td style={td}>
+                            {count > 0 ? (
+                              <div style={{ fontSize: 12 }}>
+                                <strong style={{ color: '#0f172a' }}>{count} tahsilat</strong>
+                                <span style={{ color: '#64748b', marginLeft: 6 }}>
+                                  ({Number(totalAmt).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺)
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>Kayıtlı tahsilat yok</span>
+                            )}
+                          </td>
+                          <td style={{ ...td, textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLockDate(dateStr)}
+                              disabled={lockSaving}
+                              style={{
+                                ...Btn,
+                                background: '#fff',
+                                color: '#0284c7',
+                                border: '1px solid #bae6fd',
+                                padding: '6px 12px',
+                                fontSize: 12,
+                                cursor: lockSaving ? 'not-allowed' : 'pointer'
+                              }}
+                              title="Kilidi kaldırarak tahsilat ekleme/silmeyi tekrar serbest bırakır"
+                            >
+                              🔓 Kilidi Aç
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { api } from '../../lib/apiClient.js'
@@ -40,6 +40,14 @@ export default function FaturalarPage() {
   const [collectionFilter, setCollectionFilter] = useState('')
   const [sortKey, setSortKey] = useState('dueDate')
   const [sortDir, setSortDir] = useState('asc')
+
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
   const [lucaModalOpen, setLucaModalOpen] = useState(false)
   const [lucaStatusOpen, setLucaStatusOpen] = useState(false)
   const [lucaStatusLoading, setLucaStatusLoading] = useState(false)
@@ -681,294 +689,484 @@ export default function FaturalarPage() {
       )}
 
       {/* Taksitler ve Faturalar Tablosu */}
+      {/* Taksitler ve Faturalar: Mobilde Kart Düzeni, Masaüstünde Tablo */}
       <div style={panel}>
-        <div className="ak-table-wrap" style={{ overflow: 'auto', maxHeight: '64vh' }}>
-          <table style={{ ...tbl, minWidth: 1200 }}>
-            <thead>
-              <tr>
-                {isAdminPanelMode && (
-                  <th style={th}>
-                    <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                      🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </button>
-                  </th>
-                )}
-                <th style={{ ...th, width: 140 }}>
-                  <button type="button" onClick={() => toggleSort('invoiceStatus')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Fatura Durumu {sortKey === 'invoiceStatus' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, width: 140 }}>
-                  <button type="button" onClick={() => toggleSort('collectionStatus')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Tahsilat Durumu {sortKey === 'collectionStatus' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('student')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Öğrenci Adı {sortKey === 'student' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('parent')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Veli / Alıcı {sortKey === 'parent' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('tax')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    TCKN / VKN {sortKey === 'tax' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('plan')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Ücret Kalemi {sortKey === 'plan' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('dueDate')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Vade Tarihi {sortKey === 'dueDate' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('amount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Taksit Tutarı (₺) {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('paid')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Tahsil Edilen (₺) {sortKey === 'paid' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('baseAmount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Matrah {sortKey === 'baseAmount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('vatAmount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    KDV {sortKey === 'vatAmount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'center', width: 130 }}>İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {processedData.list.length === 0 ? (
-                <tr>
-                  <td colSpan={isAdminPanelMode ? 14 : 13} style={{
-                    ...td, textAlign: 'center', color: '#94a3b8', padding: '48px 12px'
-                  }}>
-                    Bu dönem için kayıtlı faturalı taksit bulunamadı.
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
-                      (Faturasız öğrenciler ve faturasız ücret kalemleri bu sayfaya dahil edilmez)
-                    </div>
-                  </td>
-                </tr>
-              ) : processedData.list.map(row => {
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+            {processedData.list.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '36px 12px', fontSize: 13 }}>
+                Bu dönem için kayıtlı faturalı taksit bulunamadı.
+              </div>
+            ) : (
+              processedData.list.map(row => {
                 const isBilled = row.invoiceStatus === 'billed'
                 const isPaid = row.collectionStatus === 'paid'
                 const isPartial = row.collectionStatus === 'partial'
 
                 return (
-                  <tr key={row.id || `${row.studentId}-${row.planName}-${row.installmentNo}-${row.dueDate}`} style={{
-                    background: row.hasDiff ? 'rgba(245,158,11,0.06)' : undefined,
-                    transition: 'background 0.15s'
-                  }}>
-                    {/* Okul */}
-                    {isAdminPanelMode && (
-                      <td style={td}>
+                  <div
+                    key={row.id || `${row.studentId}-${row.planName}-${row.installmentNo}-${row.dueDate}`}
+                    style={{
+                      background: row.hasDiff ? '#fffbf5' : '#fff',
+                      border: row.hasDiff ? '1.5px solid #fed7aa' : '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 9
+                    }}
+                  >
+                    {/* Satır 1: Öğrenci, Sınıf ve Vade / Taksit Bilgisi */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>
+                          {row.studentName}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                          {row.student?.class && (
+                            <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                              {row.student.class}
+                            </span>
+                          )}
+                          {isAdminPanelMode && (row.schoolName || row.student?._schoolName) && (
+                            <span style={{
+                              padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                              background: 'rgba(99,102,241,0.08)', color: '#4338ca'
+                            }}>
+                              🏫 {row.schoolName || row.student?._schoolName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <span style={{
                           display: 'inline-block',
-                          padding: '3px 8px', borderRadius: 6,
-                          fontSize: 11, fontWeight: 700,
-                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
-                          border: '1px solid rgba(99,102,241,0.2)',
-                          whiteSpace: 'nowrap'
+                          fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6,
+                          background: '#e0e7ff', color: '#3730a3'
                         }}>
-                          🏫 {row.schoolName || row.student?._schoolName || '—'}
+                          {row.installmentNo}. Taksit
                         </span>
-                      </td>
-                    )}
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                          📅 {row.dueDateFormatted}
+                        </div>
+                      </div>
+                    </div>
 
-                    {/* Fatura Durumu */}
-                    <td style={td}>
-                      {isBilled ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    {/* Satır 2: Durum Rozetleri ve Plan Adı */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {/* Fatura Durumu */}
+                        {isBilled ? (
                           <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800,
                             background: row.isUnderInvoiced ? '#fff7ed' : (row.isOverInvoiced ? '#eff6ff' : '#dcfce7'),
                             color: row.isUnderInvoiced ? '#c2410c' : (row.isOverInvoiced ? '#1d4ed8' : '#15803d'),
                             border: `1px solid ${row.isUnderInvoiced ? '#fed7aa' : (row.isOverInvoiced ? '#bfdbfe' : '#bbf7d0')}`
                           }}>
-                            {row.isUnderInvoiced ? '⚠️ Eksik Kesildi' : (row.isOverInvoiced ? 'ℹ️ Fazla Kesildi' : '🟢 Kesildi')}
+                            {row.isUnderInvoiced ? '⚠️ Eksik' : (row.isOverInvoiced ? 'ℹ️ Fazla' : '🟢 Kesildi')}
                           </span>
-                          {row.hasDiff && (
-                            <span style={{
-                              fontSize: 10, fontWeight: 800,
-                              color: row.isUnderInvoiced ? '#b91c1c' : '#1d4ed8',
-                              background: row.isUnderInvoiced ? '#fee2e2' : '#dbeafe',
-                              padding: '1px 6px', borderRadius: 6,
-                              border: `1px solid ${row.isUnderInvoiced ? '#fca5a5' : '#93c5fd'}`
-                            }}>
-                              {row.isUnderInvoiced ? `-${money(Math.abs(row.diff))} Fark` : `+${money(row.diff)} Fark`}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
-                          background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
-                        }}>
-                          🔴 Kesilmedi
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Tahsilat Durumu */}
-                    <td style={td}>
-                      {isPaid ? (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
-                          background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0'
-                        }}>
-                          🟢 Tahsil Edildi
-                        </span>
-                      ) : isPartial ? (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
-                          background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
-                        }}>
-                          🟡 Kısmi ({money(row.paid)})
-                        </span>
-                      ) : (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
-                          background: '#f8fafc', color: '#64748b', border: '1px solid #cbd5e1'
-                        }}>
-                          🔴 Tahsil Edilmedi
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Öğrenci */}
-                    <td style={td}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{row.studentName}</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>{row.student?.class ? `${row.student.class} Sınıfı` : ''}</div>
-                    </td>
-
-                    {/* Veli / Alıcı */}
-                    <td style={td}>
-                      <div style={{ color: '#334155' }}>{row.parent || '—'}</div>
-                    </td>
-
-                    {/* TCKN / VKN */}
-                    <td style={td}>
-                      <code style={{ fontSize: 12, background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, color: '#334155' }}>
-                        {row.tax || '—'}
-                      </code>
-                    </td>
-
-                    {/* Ücret Kalemi & Taksit No */}
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-                          background: '#e0e7ff', color: '#3730a3'
-                        }}>
-                          {row.planName}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
-                          {row.installmentNo}. Taksit
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Vade Tarihi */}
-                    <td style={td}>
-                      <div style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
-                        {row.dueDateFormatted}
-                      </div>
-                    </td>
-
-                    {/* Taksit Tutarı (Miktar) */}
-                    <td style={{ ...td, textAlign: 'right' }}>
-                      <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
-                        {money(row.amount)}
-                      </div>
-                      {row.hasDiff && (
-                        <div style={{ marginTop: 3 }}>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>
-                            Fatura: <strong style={{ color: row.isUnderInvoiced ? '#c2410c' : '#1d4ed8' }}>{money(row.invoiceTotal)}</strong>
-                          </div>
-                          <div style={{
-                            fontSize: 10, fontWeight: 800,
-                            color: row.isUnderInvoiced ? '#dc2626' : '#2563eb'
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+                            background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
                           }}>
-                            ({money(Math.abs(row.diff))} {row.isUnderInvoiced ? 'Eksik' : 'Fazla'})
-                          </div>
+                            🔴 Kesilmedi
+                          </span>
+                        )}
+
+                        {/* Tahsilat Durumu */}
+                        {isPaid ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+                            background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0'
+                          }}>
+                            🟢 Tahsil Edildi
+                          </span>
+                        ) : isPartial ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+                            background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
+                          }}>
+                            🟡 Kısmi ({money(row.paid)})
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+                            background: '#f8fafc', color: '#64748b', border: '1px solid #cbd5e1'
+                          }}>
+                            🔴 Tahsil Edilmedi
+                          </span>
+                        )}
+                      </div>
+
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>
+                        {row.planName}
+                      </span>
+                    </div>
+
+                    {/* Satır 3: 3'lü Finansal Kutu */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr 1fr',
+                      gap: 4,
+                      background: '#f8fafc',
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      border: '1px solid #e2e8f0',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Tutar</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>
+                          {money(row.amount)}
                         </div>
-                      )}
-                    </td>
+                      </div>
+                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 6 }}>
+                        <div style={{ fontSize: 9, color: '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Tahsilat</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: isPaid ? '#059669' : '#64748b', marginTop: 1 }}>
+                          {money(row.paid)}
+                        </div>
+                      </div>
+                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 6 }}>
+                        <div style={{ fontSize: 9, color: '#d97706', fontWeight: 700, textTransform: 'uppercase' }}>KDV (%{row.vatRate})</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#d97706', marginTop: 1 }}>
+                          {money(row.vatAmount)}
+                        </div>
+                      </div>
+                    </div>
 
-                    {/* Tahsil Edilen */}
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isPaid ? '#15803d' : '#64748b', fontSize: 13 }}>
-                      {money(row.paid)}
-                    </td>
+                    {/* Satır 4: Veli, Fatura Bilgisi ve İşlem Butonu */}
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      gap: 8, paddingTop: 6, borderTop: '1px solid #f1f5f9', flexWrap: 'wrap'
+                    }}>
+                      <div style={{ fontSize: 11, color: '#475569' }}>
+                        <span>👤 {row.parent || '—'}</span>
+                        {row.tax && <span style={{ color: '#94a3b8', marginLeft: 6 }}>({row.tax})</span>}
+                        {row.invoiceNo && (
+                          <span style={{ marginLeft: 6, color: '#2563eb', fontWeight: 700 }}>
+                            · Fatura: {row.invoiceNo}
+                          </span>
+                        )}
+                      </div>
 
-                    {/* Matrah (KDV Hariç) */}
-                    <td style={{ ...td, textAlign: 'right', color: '#475569', fontSize: 12 }}>
-                      {money(row.baseAmount)}
-                    </td>
-
-                    {/* KDV Tutarı */}
-                    <td style={{ ...td, textAlign: 'right', color: '#d97706', fontSize: 12, fontWeight: 700 }}>
-                      <div>{money(row.vatAmount)}</div>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>%{row.vatRate}</div>
-                    </td>
-
-                    {/* Fatura No */}
-                    <td style={td}>
-                      {row.invoiceNo ? (
-                        <span style={{ fontWeight: 700, color: '#2563eb' }}>{row.invoiceNo}</span>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
-                      )}
-                    </td>
-
-                    {/* İşlem */}
-                    <td style={{ ...td, textAlign: 'center' }}>
-                      {isBilled ? (
+                      {isBilled && (
                         <button
+                          type="button"
                           onClick={() => setDetailInv({ invoice: row.invoice, row })}
                           style={{
                             ...Btn,
                             background: row.hasDiff ? '#fff7ed' : '#f1f5f9',
                             color: row.hasDiff ? '#c2410c' : '#0f172a',
-                            border: row.hasDiff ? '1px solid #fed7aa' : 'none',
-                            padding: '4px 8px', fontSize: 11, fontWeight: 700
+                            border: row.hasDiff ? '1px solid #fed7aa' : '1px solid #cbd5e1',
+                            padding: '5px 10px', fontSize: 11, fontWeight: 700, borderRadius: 7
                           }}
                         >
                           🔍 Fatura Detay {row.hasDiff ? '⚠️' : ''}
                         </button>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
                       )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        ) : (
+          <div className="ak-table-wrap" style={{ overflow: 'auto', maxHeight: '64vh' }}>
+            <table style={{ ...tbl, minWidth: 1200 }}>
+              <thead>
+                <tr>
+                  {isAdminPanelMode && (
+                    <th style={th}>
+                      <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                        🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </button>
+                    </th>
+                  )}
+                  <th style={{ ...th, width: 140 }}>
+                    <button type="button" onClick={() => toggleSort('invoiceStatus')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Fatura Durumu {sortKey === 'invoiceStatus' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, width: 140 }}>
+                    <button type="button" onClick={() => toggleSort('collectionStatus')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Tahsilat Durumu {sortKey === 'collectionStatus' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('student')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Öğrenci Adı {sortKey === 'student' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('parent')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Veli / Alıcı {sortKey === 'parent' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('tax')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      TCKN / VKN {sortKey === 'tax' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('plan')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Ücret Kalemi {sortKey === 'plan' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('dueDate')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Vade Tarihi {sortKey === 'dueDate' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('amount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Taksit Tutarı (₺) {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('paid')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Tahsil Edilen (₺) {sortKey === 'paid' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('baseAmount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Matrah {sortKey === 'baseAmount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('vatAmount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      KDV {sortKey === 'vatAmount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'center', width: 130 }}>İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processedData.list.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdminPanelMode ? 14 : 13} style={{
+                      ...td, textAlign: 'center', color: '#94a3b8', padding: '48px 12px'
+                    }}>
+                      Bu dönem için kayıtlı faturalı taksit bulunamadı.
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+                        (Faturasız öğrenciler ve faturasız ücret kalemleri bu sayfaya dahil edilmez)
+                      </div>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                ) : processedData.list.map(row => {
+                  const isBilled = row.invoiceStatus === 'billed'
+                  const isPaid = row.collectionStatus === 'paid'
+                  const isPartial = row.collectionStatus === 'partial'
+
+                  return (
+                    <tr key={row.id || `${row.studentId}-${row.planName}-${row.installmentNo}-${row.dueDate}`} style={{
+                      background: row.hasDiff ? 'rgba(245,158,11,0.06)' : undefined,
+                      transition: 'background 0.15s'
+                    }}>
+                      {/* Okul */}
+                      {isAdminPanelMode && (
+                        <td style={td}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 8px', borderRadius: 6,
+                            fontSize: 11, fontWeight: 700,
+                            background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                            border: '1px solid rgba(99,102,241,0.2)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            🏫 {row.schoolName || row.student?._schoolName || '—'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Fatura Durumu */}
+                      <td style={td}>
+                        {isBilled ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                              background: row.isUnderInvoiced ? '#fff7ed' : (row.isOverInvoiced ? '#eff6ff' : '#dcfce7'),
+                              color: row.isUnderInvoiced ? '#c2410c' : (row.isOverInvoiced ? '#1d4ed8' : '#15803d'),
+                              border: `1px solid ${row.isUnderInvoiced ? '#fed7aa' : (row.isOverInvoiced ? '#bfdbfe' : '#bbf7d0')}`
+                            }}>
+                              {row.isUnderInvoiced ? '⚠️ Eksik Kesildi' : (row.isOverInvoiced ? 'ℹ️ Fazla Kesildi' : '🟢 Kesildi')}
+                            </span>
+                            {row.hasDiff && (
+                              <span style={{
+                                fontSize: 10, fontWeight: 800,
+                                color: row.isUnderInvoiced ? '#b91c1c' : '#1d4ed8',
+                                background: row.isUnderInvoiced ? '#fee2e2' : '#dbeafe',
+                                padding: '1px 6px', borderRadius: 6,
+                                border: `1px solid ${row.isUnderInvoiced ? '#fca5a5' : '#93c5fd'}`
+                              }}>
+                                {row.isUnderInvoiced ? `-${money(Math.abs(row.diff))} Fark` : `+${money(row.diff)} Fark`}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                            background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
+                          }}>
+                            🔴 Kesilmedi
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Tahsilat Durumu */}
+                      <td style={td}>
+                        {isPaid ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                            background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0'
+                          }}>
+                            🟢 Tahsil Edildi
+                          </span>
+                        ) : isPartial ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                            background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
+                          }}>
+                            🟡 Kısmi ({money(row.paid)})
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                            background: '#f8fafc', color: '#64748b', border: '1px solid #cbd5e1'
+                          }}>
+                            🔴 Tahsil Edilmedi
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Öğrenci */}
+                      <td style={td}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{row.studentName}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{row.student?.class ? `${row.student.class} Sınıfı` : ''}</div>
+                      </td>
+
+                      {/* Veli / Alıcı */}
+                      <td style={td}>
+                        <div style={{ color: '#334155' }}>{row.parent || '—'}</div>
+                      </td>
+
+                      {/* TCKN / VKN */}
+                      <td style={td}>
+                        <code style={{ fontSize: 12, background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, color: '#334155' }}>
+                          {row.tax || '—'}
+                        </code>
+                      </td>
+
+                      {/* Ücret Kalemi & Taksit No */}
+                      <td style={td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                            background: '#e0e7ff', color: '#3730a3'
+                          }}>
+                            {row.planName}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                            {row.installmentNo}. Taksit
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Vade Tarihi */}
+                      <td style={td}>
+                        <div style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
+                          {row.dueDateFormatted}
+                        </div>
+                      </td>
+
+                      {/* Taksit Tutarı (Miktar) */}
+                      <td style={{ ...td, textAlign: 'right' }}>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
+                          {money(row.amount)}
+                        </div>
+                        {row.hasDiff && (
+                          <div style={{ marginTop: 3 }}>
+                            <div style={{ fontSize: 11, color: '#64748b' }}>
+                              Fatura: <strong style={{ color: row.isUnderInvoiced ? '#c2410c' : '#1d4ed8' }}>{money(row.invoiceTotal)}</strong>
+                            </div>
+                            <div style={{
+                              fontSize: 10, fontWeight: 800,
+                              color: row.isUnderInvoiced ? '#dc2626' : '#2563eb'
+                            }}>
+                              ({money(Math.abs(row.diff))} {row.isUnderInvoiced ? 'Eksik' : 'Fazla'})
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Tahsil Edilen */}
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isPaid ? '#15803d' : '#64748b', fontSize: 13 }}>
+                        {money(row.paid)}
+                      </td>
+
+                      {/* Matrah (KDV Hariç) */}
+                      <td style={{ ...td, textAlign: 'right', color: '#475569', fontSize: 12 }}>
+                        {money(row.baseAmount)}
+                      </td>
+
+                      {/* KDV Tutarı */}
+                      <td style={{ ...td, textAlign: 'right', color: '#d97706', fontSize: 12, fontWeight: 700 }}>
+                        <div>{money(row.vatAmount)}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8' }}>%{row.vatRate}</div>
+                      </td>
+
+                      {/* Fatura No */}
+                      <td style={td}>
+                        {row.invoiceNo ? (
+                          <span style={{ fontWeight: 700, color: '#2563eb' }}>{row.invoiceNo}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+
+                      {/* İşlem */}
+                      <td style={{ ...td, textAlign: 'center' }}>
+                        {isBilled ? (
+                          <button
+                            onClick={() => setDetailInv({ invoice: row.invoice, row })}
+                            style={{
+                              ...Btn,
+                              background: row.hasDiff ? '#fff7ed' : '#f1f5f9',
+                              color: row.hasDiff ? '#c2410c' : '#0f172a',
+                              border: row.hasDiff ? '1px solid #fed7aa' : 'none',
+                              padding: '4px 8px', fontSize: 11, fontWeight: 700
+                            }}
+                          >
+                            🔍 Fatura Detay {row.hasDiff ? '⚠️' : ''}
+                          </button>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* PenPOS Luca Veri cihaz durumu */}

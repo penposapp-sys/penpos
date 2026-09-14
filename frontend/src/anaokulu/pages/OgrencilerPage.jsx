@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
@@ -31,6 +31,14 @@ export default function OgrencilerPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
+
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
 
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(null)
@@ -307,16 +315,106 @@ export default function OgrencilerPage() {
             ['Durum', s.active ? 'Aktif' : 'Pasif'],
             ['Fatura Durumu', s.invoiced !== false ? '🟢 Faturalı (Faturalar sayfasına yansır)' : '⚪ Faturasız (Faturalar sayfasına yansımaz)']
           ].map(([k, v]) => (
-            <div key={k} style={rowLine}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{k}</div>
-              <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 500 }}>{v}</div>
+            <div key={k} style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              justifyContent: isMobile ? 'flex-start' : 'space-between',
+              borderBottom: '1px solid #f1f5f9',
+              padding: '9px 0',
+              gap: isMobile ? 2 : 12
+            }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, minWidth: isMobile ? undefined : 140 }}>{k}</div>
+              <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600 }}>{v}</div>
             </div>
           ))}
         </div>
       )
     } else if (fileTab === 'plan') {
       const pt = planTableFor(state, s)
-      body = (
+      body = isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Kalemler Özeti */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 8, textTransform: 'uppercase' }}>
+              Ücret Kalemleri
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pt.rows.map((r, ri) => (
+                <div key={ri} style={{
+                  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+                  padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{r.item.name}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                      {r.item.installments} taksit · {money(r.perMonth)}/ay
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 900, fontSize: 14, color: '#4338ca' }}>
+                    {money(r.item.total)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Aylık Taksit Kartları */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginTop: 4 }}>
+            Aylık Taksit Dökümü
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pt.periods.map((p, pi) => {
+              const expMonth = pt.monthTotals[pi] || 0
+              const colMonth = pt.monthCollected[pi] || 0
+              const remMonth = pt.monthRemaining[pi] || 0
+              if (expMonth === 0 && colMonth === 0) return null
+              return (
+                <div key={p} style={{
+                  background: remMonth > 0 ? '#fffaf9' : '#fff',
+                  border: remMonth > 0 ? '1.5px solid #fecaca' : '1px solid #e2e8f0',
+                  borderRadius: 12, padding: '10px 14px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
+                      📅 {periodName(p)}
+                    </div>
+                    {remMonth > 0 ? (
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#fee2e2', color: '#dc2626' }}>
+                        {money(remMonth)} Kalan
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: '#dcfce7', color: '#166534' }}>
+                        ✓ Ödendi
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
+                    <span>Planlanan: <b style={{ color: '#0f172a' }}>{money(expMonth)}</b></span>
+                    <span>Tahsilat: <b style={{ color: '#16a34a' }}>{money(colMonth)}</b></span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Toplam Kartı */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#fff',
+            borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>Toplam Beklenen</div>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>{money(pt.totalExpected)}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>Kalan Bakiye</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: pt.totalRemaining > 0 ? '#fca5a5' : '#4ade80' }}>
+                {money(pt.totalRemaining)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div style={{ overflow: 'auto' }}>
           <table style={tbl}>
             <thead>
@@ -379,7 +477,50 @@ export default function OgrencilerPage() {
     } else if (fileTab === 'coll') {
       const rows = (state.collections || []).filter(c => String(c.studentId) === String(s.id))
         .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-      body = (
+      body = isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px 12px', fontSize: 13, background: '#f8fafc', borderRadius: 10 }}>
+              Henüz tahsilat yok.
+            </div>
+          ) : rows.map(c => (
+            <div key={c.id || c._id} style={{
+              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+              padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{c.item || 'Tahsilat'}</span>
+                  <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>📅 {trDate(c.date)}</span>
+                </div>
+                <div style={{ fontWeight: 900, fontSize: 14, color: '#16a34a' }}>
+                  {money(c.amount)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', fontSize: 11 }}>
+                {c.payment && (
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}>
+                    {c.payment}
+                  </span>
+                )}
+                {c.invoiceNo ? (
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: '#f0fdf4', color: '#166534', fontWeight: 600 }}>
+                    🧾 Fatura: {c.invoiceNo}
+                  </span>
+                ) : (
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: '#f1f5f9', color: '#64748b' }}>
+                    Faturasız
+                  </span>
+                )}
+                {c.note && (
+                  <span style={{ color: '#64748b', fontStyle: 'italic' }}>· {c.note}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
         <div style={{ overflow: 'auto' }}>
           <table style={tbl}>
             <thead>
@@ -411,7 +552,34 @@ export default function OgrencilerPage() {
       )
     } else if (fileTab === 'inv') {
       const ps = periodsOfYear(ys)
-      body = (
+      body = isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ps.map(p => {
+            const e = expectedFor(state, s.id, p)
+            const stt = invStatus(state, s.id, p)
+            const inv = invoiceFor(state, s.id, p)
+            const badge = stt === 'ok' ? <span style={statusOk}>🟢 Kesildi</span>
+              : stt === 'diff' ? <span style={statusWait}>🟡 Tutar farklı</span>
+                : stt === 'none' ? <span style={statusBad}>🔴 Kesilmedi</span>
+                  : <span style={{ color: '#94a3b8' }}>—</span>
+            return (
+              <div key={p} style={{
+                background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+                padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>📅 {periodName(p)}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    Beklenen: <b>{money(e)}</b>
+                    {inv && <span style={{ marginLeft: 6 }}>· Fatura: {inv.no} ({money(inv.total)})</span>}
+                  </div>
+                </div>
+                <div>{badge}</div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
         <div style={{ overflow: 'auto' }}>
           <table style={tbl}>
             <thead>
@@ -568,160 +736,275 @@ export default function OgrencilerPage() {
       </div>
 
       <div className="ak-panel" style={panel}>
-        <div className="ak-table-wrap" style={{ overflow: 'auto' }}>
-          <table style={table}>
-            <thead>
-              <tr>
-                {isAdminPanelMode && (
-                  <th style={th}>
-                    <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                      🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </button>
-                  </th>
-                )}
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('name')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Öğrenci {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('class')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Sınıf {sortKey === 'class' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('parent')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Veli {sortKey === 'parent' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('phone')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Telefon {sortKey === 'phone' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('tax')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    TC/VKN {sortKey === 'tax' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('planned')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Planlanan {sortKey === 'planned' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('remaining')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Kalan {sortKey === 'remaining' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={th}>
-                  <button type="button" onClick={() => toggleSort('status')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Durum {sortKey === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...th, minWidth: isAdminPanelMode ? 120 : 240 }}>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
-                <tr><td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '40px 12px' }}>
-                  Henüz öğrenci yok. {!isAdminPanelMode ? 'Sağ üstten "Yeni Öğrenci" ekleyin.' : ''}
-                </td></tr>
-              ) : list.map(s => {
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+            {list.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '36px 12px' }}>
+                Henüz öğrenci yok. {!isAdminPanelMode ? 'Sağ üstten "Yeni Öğrenci" ekleyin.' : ''}
+              </div>
+            ) : (
+              list.map(s => {
                 const bal = balanceFor(state, s.id)
+                const exp = expectedTotalFor(state, s.id)
+
                 return (
-                  <tr key={String(s.id || s._id)} style={{ transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    {isAdminPanelMode && (
-                      <td style={td}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '3px 10px', borderRadius: 20,
-                          fontSize: 11, fontWeight: 700,
-                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
-                          border: '1px solid rgba(99,102,241,0.18)'
-                        }}>
-                          🏫 {s._schoolName || '—'}
-                        </span>
-                      </td>
-                    )}
-                    <td style={td}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{s.name || '-'}</div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Kayıt: {trDate(s.regDate)}</div>
-                    </td>
-                    <td style={td}>{s.class || '-'}</td>
-                    <td style={td}>{s.parent || '-'}</td>
-                    <td style={td}>{s.phone || '-'}</td>
-                    <td style={td}>{s.tax || '-'}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(expectedTotalFor(state, s.id))}</td>
-                    <td style={{
-                      ...td, textAlign: 'right', fontWeight: 700,
-                      color: bal > 0 ? '#ef4444' : '#10b981'
-                    }}>{money(bal)}</td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                  <div
+                    key={String(s.id || s._id)}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8
+                    }}
+                  >
+                    {/* Satır 1: İsim, Sınıf ve Durumlar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{s.name || '-'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                          {s.class && (
+                            <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                              {s.class}
+                            </span>
+                          )}
+                          {isAdminPanelMode && s._schoolName && (
+                            <span style={{
+                              padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                              background: 'rgba(99,102,241,0.08)', color: '#4338ca'
+                            }}>
+                              🏫 {s._schoolName}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 10, color: '#94a3b8' }}>Kayıt: {trDate(s.regDate)}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {s.active
                           ? <span style={statusOk}>Aktif</span>
                           : <span style={statusBad}>Pasif</span>}
                         {s.invoiced !== false ? (
                           <span style={{
-                            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+                            fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
                             background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe'
                           }}>
                             🧾 Faturalı
                           </span>
                         ) : (
                           <span style={{
-                            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+                            fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
                             background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0'
                           }}>
                             ⚪ Faturasız
                           </span>
                         )}
                       </div>
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button onClick={() => { setFileTab('info'); openFile(s.id) }} style={{
-                          ...Btn, background: '#f1f5f9', color: '#0f172a'
-                        }}>Dosya</button>
-                        {!isAdminPanelMode && (
-                          <>
-                            <button onClick={() => openForm(s)} style={{
-                              ...Btn, background: '#eef2ff', color: '#4338ca'
-                            }}>Düzenle</button>
-                            <button onClick={() => handleDelete(s.id)} style={{
-                              ...Btn, background: '#fee2e2', color: '#991b1b'
-                            }}>Sil</button>
-                          </>
-                        )}
+                    </div>
+
+                    {/* Satır 2: Veli, Telefon ve TC */}
+                    <div style={{ fontSize: 11, color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <span>👤 {s.parent || '—'} {s.phone && `· 📞 ${s.phone}`}</span>
+                      {s.tax && <span style={{ color: '#64748b' }}>TC: {s.tax}</span>}
+                    </div>
+
+                    {/* Satır 3: Planlanan ve Kalan Bakiye */}
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+                      background: '#f8fafc', padding: '6px 10px', borderRadius: 8, border: '1px solid #e2e8f0'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700 }}>PLANLANAN</div>
+                        <div style={{ fontWeight: 800, color: '#0f172a', marginTop: 1, fontSize: 13 }}>{money(exp)}</div>
                       </div>
-                    </td>
-                  </tr>
+                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
+                        <div style={{ fontSize: 9, color: bal > 0 ? '#b91c1c' : '#047857', fontWeight: 700 }}>KALAN BAKİYE</div>
+                        <div style={{ fontWeight: 800, color: bal > 0 ? '#ef4444' : '#10b981', marginTop: 1, fontSize: 13 }}>{money(bal)}</div>
+                      </div>
+                    </div>
+
+                    {/* Satır 4: İşlem Butonları */}
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', paddingTop: 4, borderTop: '1px solid #f1f5f9' }}>
+                      <button onClick={() => { setFileTab('info'); openFile(s.id) }} style={{
+                        ...Btn, background: '#f1f5f9', color: '#0f172a', padding: '5px 12px', fontSize: 11
+                      }}>Dosya</button>
+                      {!isAdminPanelMode && (
+                        <>
+                          <button onClick={() => openForm(s)} style={{
+                            ...Btn, background: '#eef2ff', color: '#4338ca', padding: '5px 12px', fontSize: 11
+                          }}>Düzenle</button>
+                          <button onClick={() => handleDelete(s.id)} style={{
+                            ...Btn, background: '#fee2e2', color: '#991b1b', padding: '5px 12px', fontSize: 11
+                          }}>Sil</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 )
-              })}
-            </tbody>
-          </table>
-        </div>
+              })
+            )}
+          </div>
+        ) : (
+          <div className="ak-table-wrap" style={{ overflow: 'auto' }}>
+            <table style={table}>
+              <thead>
+                <tr>
+                  {isAdminPanelMode && (
+                    <th style={th}>
+                      <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                        🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </button>
+                    </th>
+                  )}
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('name')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Öğrenci {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('class')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Sınıf {sortKey === 'class' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('parent')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Veli {sortKey === 'parent' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('phone')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Telefon {sortKey === 'phone' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('tax')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      TC/VKN {sortKey === 'tax' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('planned')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Planlanan {sortKey === 'planned' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('remaining')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Kalan {sortKey === 'remaining' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={th}>
+                    <button type="button" onClick={() => toggleSort('status')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Durum {sortKey === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...th, minWidth: isAdminPanelMode ? 120 : 240 }}>İşlemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.length === 0 ? (
+                  <tr><td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '40px 12px' }}>
+                    Henüz öğrenci yok. {!isAdminPanelMode ? 'Sağ üstten "Yeni Öğrenci" ekleyin.' : ''}
+                  </td></tr>
+                ) : list.map(s => {
+                  const bal = balanceFor(state, s.id)
+                  return (
+                    <tr key={String(s.id || s._id)} style={{ transition: 'background 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      {isAdminPanelMode && (
+                        <td style={td}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 10px', borderRadius: 20,
+                            fontSize: 11, fontWeight: 700,
+                            background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                            border: '1px solid rgba(99,102,241,0.18)'
+                          }}>
+                            🏫 {s._schoolName || '—'}
+                          </span>
+                        </td>
+                      )}
+                      <td style={td}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{s.name || '-'}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Kayıt: {trDate(s.regDate)}</div>
+                      </td>
+                      <td style={td}>{s.class || '-'}</td>
+                      <td style={td}>{s.parent || '-'}</td>
+                      <td style={td}>{s.phone || '-'}</td>
+                      <td style={td}>{s.tax || '-'}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(expectedTotalFor(state, s.id))}</td>
+                      <td style={{
+                        ...td, textAlign: 'right', fontWeight: 700,
+                        color: bal > 0 ? '#ef4444' : '#10b981'
+                      }}>{money(bal)}</td>
+                      <td style={td}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                          {s.active
+                            ? <span style={statusOk}>Aktif</span>
+                            : <span style={statusBad}>Pasif</span>}
+                          {s.invoiced !== false ? (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+                              background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe'
+                            }}>
+                              🧾 Faturalı
+                            </span>
+                          ) : (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+                              background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0'
+                            }}>
+                              ⚪ Faturasız
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={td}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button onClick={() => { setFileTab('info'); openFile(s.id) }} style={{
+                            ...Btn, background: '#f1f5f9', color: '#0f172a'
+                          }}>Dosya</button>
+                          {!isAdminPanelMode && (
+                            <>
+                              <button onClick={() => openForm(s)} style={{
+                                ...Btn, background: '#eef2ff', color: '#4338ca'
+                              }}>Düzenle</button>
+                              <button onClick={() => handleDelete(s.id)} style={{
+                                ...Btn, background: '#fee2e2', color: '#991b1b'
+                              }}>Sil</button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {modal && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-          padding: 20
+          padding: isMobile ? 8 : 20
         }}>
           <div style={{
-            background: '#fff', borderRadius: 18, width: modal === 'file' ? 'min(920px, 100%)' : 'min(640px, 100%)',
-            maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            background: '#fff', borderRadius: 18,
+            width: isMobile ? '100%' : (modal === 'file' ? 'min(920px, 100%)' : 'min(640px, 100%)'),
+            maxHeight: isMobile ? '96vh' : '90vh',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(15,23,42,0.25)'
           }} onClick={e => e.stopPropagation()}>
             <div style={{
-              padding: '18px 22px', borderBottom: '1px solid #e6ebf3',
+              padding: isMobile ? '14px 16px' : '18px 22px', borderBottom: '1px solid #e6ebf3',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
+              <h3 style={{ margin: 0, fontSize: isMobile ? 15 : 17, fontWeight: 700, color: '#0f172a' }}>
                 {modal === 'form'
                   ? (form?.id ? 'Öğrenci Bilgilerini Düzenle' : 'Yeni Öğrenci Kaydet')
                   : `Öğrenci Dosyası: ${getStudent(state, form?.id)?.name || ''}`}
@@ -731,11 +1014,11 @@ export default function OgrencilerPage() {
                 cursor: 'pointer', fontSize: 14, color: '#475569', fontWeight: 700
               }}>✕</button>
             </div>
-            <div style={{ padding: 22, overflow: 'auto' }}>
+            <div style={{ padding: isMobile ? '14px 12px' : 22, overflow: 'auto' }}>
               {modal === 'form' ? renderForm() : renderFile()}
             </div>
             <div style={{
-              padding: '14px 22px', borderTop: '1px solid #e6ebf3',
+              padding: isMobile ? '12px 16px' : '14px 22px', borderTop: '1px solid #e6ebf3',
               display: 'flex', justifyContent: 'flex-end', gap: 10,
               background: '#f8fafc'
             }}>

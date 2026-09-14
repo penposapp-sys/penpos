@@ -209,6 +209,38 @@ export const saveAnaokuluSchool = async (req, res) => {
       }
     }
 
+    if (collectionsChanged && school) {
+      const lockedDates = Array.isArray(school.settings?.lockedDates) ? school.settings.lockedDates : []
+      if (lockedDates.length > 0) {
+        const oldCols = Array.isArray(school.collections) ? school.collections : []
+        const newCols = Array.isArray(reqCollections) ? reqCollections : []
+
+        // Kilitli güne yeni tahsilat eklenmiş mi?
+        const oldIds = new Set(oldCols.map(c => String(c.id || c._id)))
+        for (const nc of newCols) {
+          if (!oldIds.has(String(nc.id || nc._id))) {
+            if (nc.date && lockedDates.includes(nc.date)) {
+              return res.status(400).json({
+                error: `${nc.date} tarihi kilitlidir. Kilitli güne tahsilat eklenemez.`
+              })
+            }
+          }
+        }
+
+        // Kilitli günden tahsilat silinmiş mi?
+        const newIds = new Set(newCols.map(c => String(c.id || c._id)))
+        for (const oc of oldCols) {
+          if (!newIds.has(String(oc.id || oc._id))) {
+            if (oc.date && lockedDates.includes(oc.date)) {
+              return res.status(400).json({
+                error: `${oc.date} tarihi kilitlidir. Kilitli güne ait tahsilat silinemez.`
+              })
+            }
+          }
+        }
+      }
+    }
+
     if (!school) {
       school = await AnaokuluSchool.create({
         tenant: tenantId,
@@ -341,8 +373,16 @@ export const delAnaokuluCollection = async (req, res) => {
       })
     }
 
+    const col = (school.collections || []).find(c => Number(c.id) === cid || String(c._id) === String(req.params.id))
+    const lockedDates = Array.isArray(school.settings?.lockedDates) ? school.settings.lockedDates : []
+    if (col && col.date && lockedDates.includes(col.date)) {
+      return res.status(400).json({
+        error: `${col.date} tarihi kilitlidir. Kilitli güne ait tahsilat silinemez.`
+      })
+    }
+
     school.collections = school.collections.filter(
-      c => c.id !== cid
+      c => Number(c.id) !== cid && String(c._id) !== String(req.params.id)
     )
 
     await school.save()

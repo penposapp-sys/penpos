@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import TopluAlacakRaporu from './TopluAlacakRaporu.jsx'
@@ -25,6 +25,14 @@ export default function RaporlarPage() {
   const isManager = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
   const [reportTab, setReportTab] = useState('single')
   const [selectedSchoolId, setSelectedSchoolId] = useState('')
+
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
 
   const { state } = useAnaokuluData()
   const rawStudents = state?.students || []
@@ -245,140 +253,320 @@ export default function RaporlarPage() {
       <div style={panel}>
         <div style={{ padding: '18px 20px', overflow: 'auto' }}>
           <h3 style={sect}>Ödeme türüne göre</h3>
-          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-            <table style={tbl}>
-              <thead>
-                <tr>
-                  <th style={th}>Ödeme Türü</th>
-                  <th style={{ ...th, textAlign: 'right' }}>İşlem</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Brüt</th>
-                  <th style={{ ...th, textAlign: 'right' }}>KDV</th>
-                  <th style={{ ...th, textAlign: 'right' }}>KDV Hariç</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.types.length === 0 ? emptyRow(5) : data.types.map(t => (
-                  <tr key={t.type}>
-                    <td style={{ ...td, fontWeight: 600 }}>{t.type}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{t.n}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{money(t.amount)}</td>
-                    <td style={{ ...td, textAlign: 'right', color: '#b45309' }}>{money(t.vat)}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(t.amount - t.vat)}</td>
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.types.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 12px', fontSize: 12 }}>
+                  Bu dönem için kayıt bulunamadı.
+                </div>
+              ) : (
+                data.types.map(t => (
+                  <div
+                    key={t.type}
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{t.type}</span>
+                      <span style={{
+                        background: '#e0e7ff', color: '#3730a3', padding: '2px 8px',
+                        borderRadius: 6, fontSize: 11, fontWeight: 700
+                      }}>
+                        {t.n} İşlem
+                      </span>
+                    </div>
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4,
+                      background: '#fff', padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0',
+                      fontSize: 11
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700 }}>BRÜT</div>
+                        <div style={{ fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{money(t.amount)}</div>
+                      </div>
+                      <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: 6 }}>
+                        <div style={{ fontSize: 9, color: '#b45309', fontWeight: 700 }}>KDV</div>
+                        <div style={{ fontWeight: 800, color: '#b45309', marginTop: 1 }}>{money(t.vat)}</div>
+                      </div>
+                      <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: 6 }}>
+                        <div style={{ fontSize: 9, color: '#10b981', fontWeight: 700 }}>KDV HARİÇ</div>
+                        <div style={{ fontWeight: 800, color: '#10b981', marginTop: 1 }}>{money(t.amount - t.vat)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
+              <table style={tbl}>
+                <thead>
+                  <tr>
+                    <th style={th}>Ödeme Türü</th>
+                    <th style={{ ...th, textAlign: 'right' }}>İşlem</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Brüt</th>
+                    <th style={{ ...th, textAlign: 'right' }}>KDV</th>
+                    <th style={{ ...th, textAlign: 'right' }}>KDV Hariç</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.types.length === 0 ? emptyRow(5) : data.types.map(t => (
+                    <tr key={t.type}>
+                      <td style={{ ...td, fontWeight: 600 }}>{t.type}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{t.n}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{money(t.amount)}</td>
+                      <td style={{ ...td, textAlign: 'right', color: '#b45309' }}>{money(t.vat)}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(t.amount - t.vat)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <h3 style={sect}>Seçili dönem fatura durumu</h3>
-          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-            <table style={tbl}>
-              <thead>
-                <tr>
-                  <th style={th}>Durum</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Öğrenci Sayısı</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Beklenen</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Fatura Tutarı</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={td}>
-                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534' }}>
-                      🟢 Kesildi
-                    </span>
-                  </td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#166534' }}>{data.ok}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(data.invSum)}</td>
-                </tr>
-                <tr>
-                  <td style={td}>
-                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>
-                      🟡 Tutar farklı
-                    </span>
-                  </td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#92400e' }}>{data.diff}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>—</td>
-                </tr>
-                <tr>
-                  <td style={td}>
-                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#fee2e2', color: '#991b1b' }}>
-                      🔴 Kesilmedi
-                    </span>
-                  </td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#991b1b' }}>{data.none}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Kesildi */}
+              <div style={{
+                background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
+                padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: 99 }}>
+                    🟢 Kesildi
+                  </span>
+                  <span style={{ fontWeight: 800, color: '#166534', fontSize: 13 }}>{data.ok} Öğrenci</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#334155' }}>
+                  <span>Beklenen: <strong>{money(data.expSum)}</strong></span>
+                  <span>Fatura Tutarı: <strong style={{ color: '#166534' }}>{money(data.invSum)}</strong></span>
+                </div>
+              </div>
+
+              {/* Tutar Farklı */}
+              <div style={{
+                background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10,
+                padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 99 }}>
+                    🟡 Tutar farklı
+                  </span>
+                  <span style={{ fontWeight: 800, color: '#92400e', fontSize: 13 }}>{data.diff} Öğrenci</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#334155' }}>
+                  <span>Beklenen: <strong>{money(data.expSum)}</strong></span>
+                  <span>Fatura Tutarı: <strong>—</strong></span>
+                </div>
+              </div>
+
+              {/* Kesilmedi */}
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+                padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '2px 8px', borderRadius: 99 }}>
+                    🔴 Kesilmedi
+                  </span>
+                  <span style={{ fontWeight: 800, color: '#991b1b', fontSize: 13 }}>{data.none} Öğrenci</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#334155' }}>
+                  <span>Beklenen: <strong>{money(data.expSum)}</strong></span>
+                  <span>Fatura Tutarı: <strong>—</strong></span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
+              <table style={tbl}>
+                <thead>
+                  <tr>
+                    <th style={th}>Durum</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Öğrenci Sayısı</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Beklenen</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Fatura Tutarı</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={td}>
+                      <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534' }}>
+                        🟢 Kesildi
+                      </span>
+                    </td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#166534' }}>{data.ok}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(data.invSum)}</td>
+                  </tr>
+                  <tr>
+                    <td style={td}>
+                      <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>
+                        🟡 Tutar farklı
+                      </span>
+                    </td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#92400e' }}>{data.diff}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>—</td>
+                  </tr>
+                  <tr>
+                    <td style={td}>
+                      <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#fee2e2', color: '#991b1b' }}>
+                        🔴 Kesilmedi
+                      </span>
+                    </td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#991b1b' }}>{data.none}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <h3 style={sect}>Öğrenci bazlı özet (en yüksek bakiye önce)</h3>
-          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-            <table style={tbl}>
-              <thead>
-                <tr>
-                  {isAdminPanelMode && !selectedSchoolId && <th style={th}>🏫 Okul</th>}
-                  <th style={th}>Öğrenci</th>
-                  <th style={th}>Sınıf</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Planlanan</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Tahsil Edilen</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Kalan Bakiye</th>
-                  <th style={{ ...th, minWidth: 180 }}>Tamamlanma</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.stuRows.length === 0 ? emptyRow(isAdminPanelMode && !selectedSchoolId ? 7 : 6) : data.stuRows.map(({ s, exp, col, bal, pct }) => (
-                  <tr key={String(s.id)}>
-                    {isAdminPanelMode && !selectedSchoolId && (
-                      <td style={td}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '2px 8px', borderRadius: 6,
-                          fontSize: 11, fontWeight: 700,
-                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
-                          border: '1px solid rgba(99,102,241,0.2)'
-                        }}>
-                          🏫 {s._schoolName || '—'}
-                        </span>
-                      </td>
-                    )}
-                    <td style={{ ...td, fontWeight: 700 }}>{s.name}</td>
-                    <td style={td}>{s.class || '-'}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{money(exp)}</td>
-                    <td style={{ ...td, textAlign: 'right', color: '#047857' }}>{money(col)}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: bal > 0 ? '#b91c1c' : '#047857' }}>
-                      {money(bal)}
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#334155', minWidth: 40 }}>{pct}%</span>
-                        <div style={{
-                          flex: 1, height: 10, background: '#e2e8f0',
-                          borderRadius: 999, overflow: 'hidden'
-                        }}>
-                          <div style={{
-                            width: pct + '%', height: '100%',
-                            background: pct === 100
-                              ? 'linear-gradient(90deg,#10b981,#059669)'
-                              : pct >= 70
-                                ? 'linear-gradient(90deg,#6366f1,#8b5cf6)'
-                                : pct >= 30
-                                  ? 'linear-gradient(90deg,#f59e0b,#d97706)'
-                                  : 'linear-gradient(90deg,#ef4444,#dc2626)',
-                            borderRadius: 999, transition: 'width 0.3s'
-                          }} />
-                        </div>
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.stuRows.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 12px', fontSize: 12 }}>
+                  Bu dönem için kayıt bulunamadı.
+                </div>
+              ) : (
+                data.stuRows.map(({ s, exp, col, bal, pct }) => (
+                  <div
+                    key={String(s.id)}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ fontSize: 13, color: '#0f172a' }}>{s.name}</strong>
+                        {s.class && (
+                          <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>
+                            {s.class}
+                          </span>
+                        )}
                       </div>
-                    </td>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#334155' }}>%{pct}</span>
+                    </div>
+
+                    {/* Finansal 3'lü Kutu */}
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4,
+                      background: '#f8fafc', padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0',
+                      fontSize: 11
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700 }}>PLANLANAN</div>
+                        <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 1 }}>{money(exp)}</div>
+                      </div>
+                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 6 }}>
+                        <div style={{ fontSize: 9, color: '#047857', fontWeight: 700 }}>TAHSİLAT</div>
+                        <div style={{ fontWeight: 700, color: '#047857', marginTop: 1 }}>{money(col)}</div>
+                      </div>
+                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 6 }}>
+                        <div style={{ fontSize: 9, color: bal > 0 ? '#b91c1c' : '#047857', fontWeight: 700 }}>KALAN</div>
+                        <div style={{ fontWeight: 800, color: bal > 0 ? '#b91c1c' : '#047857', marginTop: 1 }}>{money(bal)}</div>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden' }}>
+                      <div style={{
+                        width: pct + '%', height: '100%',
+                        background: pct === 100
+                          ? '#10b981'
+                          : pct >= 70
+                            ? '#6366f1'
+                            : pct >= 30
+                              ? '#f59e0b'
+                              : '#ef4444',
+                        borderRadius: 999
+                      }} />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
+              <table style={tbl}>
+                <thead>
+                  <tr>
+                    {isAdminPanelMode && !selectedSchoolId && <th style={th}>🏫 Okul</th>}
+                    <th style={th}>Öğrenci</th>
+                    <th style={th}>Sınıf</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Planlanan</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Tahsil Edilen</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Kalan Bakiye</th>
+                    <th style={{ ...th, minWidth: 180 }}>Tamamlanma</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.stuRows.length === 0 ? emptyRow(isAdminPanelMode && !selectedSchoolId ? 7 : 6) : data.stuRows.map(({ s, exp, col, bal, pct }) => (
+                    <tr key={String(s.id)}>
+                      {isAdminPanelMode && !selectedSchoolId && (
+                        <td style={td}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '2px 8px', borderRadius: 6,
+                            fontSize: 11, fontWeight: 700,
+                            background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                            border: '1px solid rgba(99,102,241,0.2)'
+                          }}>
+                            🏫 {s._schoolName || '—'}
+                          </span>
+                        </td>
+                      )}
+                      <td style={{ ...td, fontWeight: 700 }}>{s.name}</td>
+                      <td style={td}>{s.class || '-'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{money(exp)}</td>
+                      <td style={{ ...td, textAlign: 'right', color: '#047857' }}>{money(col)}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: bal > 0 ? '#b91c1c' : '#047857' }}>
+                        {money(bal)}
+                      </td>
+                      <td style={td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#334155', minWidth: 40 }}>{pct}%</span>
+                          <div style={{
+                            flex: 1, height: 10, background: '#e2e8f0',
+                            borderRadius: 999, overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: pct + '%', height: '100%',
+                              background: pct === 100
+                                ? 'linear-gradient(90deg,#10b981,#059669)'
+                                : pct >= 70
+                                  ? 'linear-gradient(90deg,#6366f1,#8b5cf6)'
+                                  : pct >= 30
+                                    ? 'linear-gradient(90deg,#f59e0b,#d97706)'
+                                    : 'linear-gradient(90deg,#ef4444,#dc2626)',
+                              borderRadius: 999, transition: 'width 0.3s'
+                            }} />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
         </>

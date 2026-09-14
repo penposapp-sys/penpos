@@ -16,7 +16,8 @@ const initialState = {
     matchBy: 'tax',
     invoiceSettings: {},
     feeCategories: [],
-    discounts: []
+    discounts: [],
+    lockedDates: []
   },
   students: [],
   collections: [],
@@ -347,6 +348,13 @@ export function AnaokuluDataProvider({ children }) {
     deleteStudent: (id) => dispatch({ type: 'STUDENT_DELETE', payload: id }),
     addCollection: async (c) => {
       const payload = { id: c.id || Date.now(), ...c }
+      const lockedDates = Array.isArray(state.settings?.lockedDates) ? state.settings.lockedDates : []
+      if (payload.date && lockedDates.includes(payload.date)) {
+        const msg = `🔒 ${payload.date} tarihi kilitlidir. Bu güne tahsilat eklenemez.`
+        dispatch({ type: 'SET_ERROR', payload: msg })
+        throw new Error(msg)
+      }
+
       if (isAdminPanelMode) {
         dispatch({ type: 'COLLECTION_ADD', payload })
         return { ok: true }
@@ -371,6 +379,19 @@ export function AnaokuluDataProvider({ children }) {
       return res
     },
     updateCollection: async (c) => {
+      const lockedDates = Array.isArray(state.settings?.lockedDates) ? state.settings.lockedDates : []
+      const existing = state.collections.find(col => String(col.id || col._id) === String(c.id || c._id))
+      if (existing?.date && lockedDates.includes(existing.date)) {
+        const msg = `🔒 ${existing.date} tarihi kilitlidir. Kilitli güne ait tahsilat düzenlenemez.`
+        dispatch({ type: 'SET_ERROR', payload: msg })
+        throw new Error(msg)
+      }
+      if (c.date && lockedDates.includes(c.date)) {
+        const msg = `🔒 ${c.date} tarihi kilitlidir. Kilitli bir tarihe tahsilat taşınamaz.`
+        dispatch({ type: 'SET_ERROR', payload: msg })
+        throw new Error(msg)
+      }
+
       if (isAdminPanelMode) {
         dispatch({ type: 'COLLECTION_UPDATE', payload: c })
         return { ok: true }
@@ -395,6 +416,14 @@ export function AnaokuluDataProvider({ children }) {
       return res
     },
     deleteCollection: (id) => {
+      const existing = state.collections.find(col => String(col.id || col._id) === String(id))
+      const lockedDates = Array.isArray(state.settings?.lockedDates) ? state.settings.lockedDates : []
+      if (existing?.date && lockedDates.includes(existing.date)) {
+        const msg = `🔒 ${existing.date} tarihi kilitlidir. Kilitli güne ait tahsilat silinemez.`
+        dispatch({ type: 'SET_ERROR', payload: msg })
+        throw new Error(msg)
+      }
+
       dispatch({ type: 'COLLECTION_DELETE', payload: id })
       if (!isAdminPanelMode && id != null) {
         api(`/api/anaokulu/collections/${encodeURIComponent(id)}`, {

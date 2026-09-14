@@ -22,19 +22,43 @@ const LabelCls = {
 const FieldCls = { marginBottom: 14 }
 
 export default function AnaokuluUyelerPage() {
-  const { user, refresh, regionCurrentTenantId, isRegionAdmin, accessibleTenants } = useAuth()
+  const { user, refresh, regionCurrentTenantId, isRegionAdmin, accessibleTenants, isAdminPanelMode } = useAuth()
   const isManager = Boolean(isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin')
-  const [scope, setScope] = useState('account') // 'account' | string tenantId
+
+  // Başlangıç scope'u: Eğer bir okul seçiliyse o okulun ID'si, değilse ve yönetici admin panel modundaysa 'account'
+  const defaultScope = (!isAdminPanelMode && regionCurrentTenantId)
+    ? String(regionCurrentTenantId)
+    : (regionCurrentTenantId ? String(regionCurrentTenantId) : (isAdminPanelMode && isManager ? 'account' : 'school'))
+
+  const [scope, setScope] = useState(defaultScope)
+
+  useEffect(() => {
+    if (!isAdminPanelMode && regionCurrentTenantId) {
+      setScope(String(regionCurrentTenantId))
+    }
+  }, [isAdminPanelMode, regionCurrentTenantId])
+
+  const isAccountScope = Boolean(isAdminPanelMode && isManager && scope === 'account')
+
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [includeInactive, setIncludeInactive] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
+
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3000) }
 
   const withTenantHeaders = (opts = {}) => {
     const extra = { ...opts }
-    const effectiveTenantId = scope !== 'account' ? scope : regionCurrentTenantId
+    const effectiveTenantId = isAccountScope ? null : (scope !== 'account' && scope !== 'school' ? scope : regionCurrentTenantId)
     if (effectiveTenantId) {
       extra.headers = { ...(extra.headers || {}), 'x-tenant-id': String(effectiveTenantId) }
     }
@@ -61,7 +85,7 @@ export default function AnaokuluUyelerPage() {
     setLoading(true)
     setError('')
     try {
-      if (isManager && scope === 'account') {
+      if (isAccountScope) {
         const res = await api('/api/platform/region-admin/members', {
           portalOverride: 'anaokulu',
           silent: true
@@ -88,7 +112,7 @@ export default function AnaokuluUyelerPage() {
   const openCreate = () => {
     setCreateForm({
       name: '', email: '', username: '', phone: '', password: '',
-      role: scope === 'account' ? 'anaokulu_region_admin' : 'staff'
+      role: isAccountScope ? 'anaokulu_region_admin' : 'tenant_admin'
     })
     setFormError('')
     setCreateOpen(true)
@@ -103,7 +127,7 @@ export default function AnaokuluUyelerPage() {
       if (!createForm.email?.trim()) throw new Error('E-posta gerekli.')
       if (!createForm.password || createForm.password.length < 6) throw new Error('Şifre en az 6 karakter olmalı.')
 
-      if (isManager && scope === 'account') {
+      if (isAccountScope) {
         const payload = {
           name: createForm.name.trim(),
           email: createForm.email.trim(),
@@ -125,8 +149,9 @@ export default function AnaokuluUyelerPage() {
           name: createForm.name.trim(),
           email: createForm.email.trim(),
           username: createForm.username?.trim() || undefined,
+          phone: createForm.phone?.trim() || undefined,
           password: createForm.password,
-          role: createForm.role,
+          role: createForm.role === 'tenant_admin' ? 'tenant_admin' : 'staff',
           permissions: [],
           systemType: 'anaokulu'
         }
@@ -157,7 +182,7 @@ export default function AnaokuluUyelerPage() {
       email: u.email || '',
       username: u.username || '',
       phone: u.phone || '',
-      role: u.role || (scope === 'account' ? 'anaokulu_region_admin' : 'staff'),
+      role: u.role === 'tenant_admin' ? 'tenant_admin' : (isAccountScope ? 'anaokulu_region_admin' : 'staff'),
       isActive: u.isActive !== false && u.status !== 'inactive' && u.status !== 'deleted'
     })
     setFormError('')
@@ -173,7 +198,7 @@ export default function AnaokuluUyelerPage() {
       if (!editForm.name?.trim()) throw new Error('Ad soyad gerekli.')
       if (!editForm.email?.trim()) throw new Error('E-posta gerekli.')
 
-      if (isManager && scope === 'account') {
+      if (isAccountScope) {
         const payload = {
           name: editForm.name.trim(),
           email: editForm.email.trim(),
@@ -190,7 +215,8 @@ export default function AnaokuluUyelerPage() {
           name: editForm.name.trim(),
           email: editForm.email.trim(),
           username: editForm.username?.trim() || undefined,
-          role: editForm.role,
+          phone: editForm.phone?.trim() || '',
+          role: editForm.role === 'tenant_admin' ? 'tenant_admin' : 'staff',
           isActive: !!editForm.isActive,
           permissions: [],
           systemType: 'anaokulu'
@@ -225,7 +251,7 @@ export default function AnaokuluUyelerPage() {
       if (!selected) return
       if (!pwdForm.password || pwdForm.password.length < 6) throw new Error('Şifre en az 6 karakter olmalı.')
 
-      if (isManager && scope === 'account') {
+      if (isAccountScope) {
         const res = await api(`/api/platform/region-admin/members/${selected.id || selected._id}`, {
           method: 'PUT', data: { password: pwdForm.password }, silent: true, portalOverride: 'anaokulu'
         })
@@ -249,7 +275,7 @@ export default function AnaokuluUyelerPage() {
     if (!delOpen) return
     setFormLoading(true)
     try {
-      if (isManager && scope === 'account') {
+      if (isAccountScope) {
         const res = await api(`/api/platform/region-admin/members/${delOpen.id || delOpen._id}`, {
           method: 'DELETE', silent: true, portalOverride: 'anaokulu'
         })
@@ -281,10 +307,10 @@ export default function AnaokuluUyelerPage() {
   const roleBadge = (role) => {
     const common = { display: 'inline-block', padding: '3px 9px', borderRadius: 8, fontSize: 11, fontWeight: 700 }
     if (role === 'anaokulu_region_admin') return { ...common, background: 'rgba(99,102,241,0.12)', color: '#4338ca', text: 'Bölge Yöneticisi' }
-    if (role === 'tenant_admin') return { ...common, background: '#eef2ff', color: '#3730a3', text: 'Yönetici (Müdür)' }
+    if (role === 'tenant_admin') return { ...common, background: '#eef2ff', color: '#3730a3', text: '👑 Okul Yöneticisi' }
     if (role === 'superadmin') return { ...common, background: '#fff7ed', color: '#9a3412', text: 'Süper Admin' }
     if (role === 'platform_admin') return { ...common, background: '#fef3c7', color: '#92400e', text: 'Platform' }
-    return { ...common, background: '#f1f5f9', color: '#334155', text: 'Personel' }
+    return { ...common, background: '#f1f5f9', color: '#334155', text: '👩‍🏫 Personel' }
   }
 
   const panel = {
@@ -304,22 +330,22 @@ export default function AnaokuluUyelerPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>👤 Anaokulu Üyeleri</h2>
+          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>👤 {isAccountScope ? 'Yönetim Paneli Üyeleri' : 'Okul Üyeleri'}</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
-            {scope === 'account' 
+            {isAccountScope 
               ? 'Yönetim paneliniz için yardımcı yöneticileri buradan yönetin. Tüm bağlı okulların verilerine erişebilirler.'
-              : 'Seçili okula ait müdür ve öğretmen kadrosunu buradan yönetin.'}
+              : 'Seçili okula ait yönetici (müdür) ve personel (öğretmen) kadrosunu buradan yönetin.'}
           </p>
         </div>
         <button onClick={openCreate} style={{
           ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
           boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
         }}>
-          {scope === 'account' ? '➕ Yönetim Paneline Üye Ekle' : '➕ Yeni Personel Ekle'}
+          {isAccountScope ? '➕ Yönetim Paneline Üye Ekle' : '➕ Yeni Üye Ekle'}
         </button>
       </div>
 
-      {isManager && (
+      {isAdminPanelMode && isManager && (
         <div style={{
           ...panel, marginBottom: 16, padding: '12px 16px',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap'
@@ -365,7 +391,7 @@ export default function AnaokuluUyelerPage() {
         </div>
       )}
 
-      {isManager && scope === 'account' ? (
+      {isAdminPanelMode && isManager && scope === 'account' ? (
         <div style={{
           background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 12,
           padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#3730a3', display: 'flex', alignItems: 'center', gap: 10
@@ -375,14 +401,14 @@ export default function AnaokuluUyelerPage() {
             <b>Kendi Hesabınız (Yönetim Paneli Üyeleri):</b> Buraya eklenen kullanıcılar sizin adınıza tüm bağlı anaokullarının verilerini (ücretler, tahsilatlar, faturalar, raporlar) görüntüleyebilir ve yönetebilir.
           </div>
         </div>
-      ) : isManager ? (
+      ) : (isAdminPanelMode && isManager) ? (
         <div style={{
           background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12,
           padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#166534', display: 'flex', alignItems: 'center', gap: 10
         }}>
           <span style={{ fontSize: 20 }}>🏫</span>
           <div>
-            <b>{accessibleTenants?.find(t => String(t.id || t._id) === String(scope))?.name || 'Okul'} Personelleri:</b> Bu okula ait öğretmen ve yöneticileri listeliyorsunuz. Buradaki kullanıcılar yalnızca bu okulun verilerine erişebilir.
+            <b>{accessibleTenants?.find(t => String(t.id || t._id) === String(scope))?.name || 'Okul'} Üyeleri:</b> Bu okula ait yönetici ve personelleri listeliyorsunuz. Buradaki kullanıcılar yalnızca bu okulun verilerine erişebilir.
           </div>
         </div>
       ) : null}
@@ -410,71 +436,130 @@ export default function AnaokuluUyelerPage() {
       )}
 
       <div style={panel}>
-        <div style={{ overflow: 'auto', maxHeight: '70vh' }}>
-          <table style={tbl}>
-            <thead>
-              <tr>
-                <th style={th}>Ad Soyad</th>
-                <th style={th}>E-posta</th>
-                <th style={th}>Kullanıcı Adı / Tel</th>
-                <th style={th}>Rol</th>
-                <th style={th}>Durum</th>
-                <th style={{ ...th, minWidth: 220, textAlign: 'right' }}>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} style={{ ...td, textAlign: 'center', padding: '40px 12px', color: '#94a3b8' }}>Yükleniyor...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={6} style={{ ...td, textAlign: 'center', padding: '40px 12px', color: '#94a3b8' }}>
-                  {scope === 'account' 
-                    ? 'Yönetim panelinize henüz yardımcı üye eklenmemiş. Yukarıdaki butondan ekleyebilirsiniz.'
-                    : 'Bu okula ait henüz üye eklenmemiş. Yukarıdaki butondan ilk üyeyi ekleyin.'}
-                </td></tr>
-              ) : items.map(u => {
-                const sBdg = statusBadge(u)
-                const rBdg = roleBadge(u.role)
-                const isMe = String(user?.id || user?._id || '') === String(u.id || u._id || '')
-                return (
-                  <tr key={String(u.id || u._id || u.email)}
-                    onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ ...td, fontWeight: 700 }}>
-                      {u.name || '-'}
-                      {isMe && <span style={{ fontSize: 10, marginLeft: 6, padding: '2px 6px', background: '#eef2ff', color: '#3730a3', borderRadius: 999, fontWeight: 700 }}>SİZ</span>}
-                    </td>
-                    <td style={td}>{u.email || '-'}</td>
-                    <td style={{ ...td, color: '#334155' }}>
-                      <div>{u.username || '-'}</div>
-                      {u.phone && <div style={{ fontSize: 11, color: '#64748b' }}>📞 {u.phone}</div>}
-                    </td>
-                    <td style={td}><span style={rBdg}>{rBdg.text}</span></td>
-                    <td style={td}><span style={sBdg}>{sBdg.text}</span></td>
-                    <td style={{ ...td, textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button onClick={() => openEdit(u)} style={{
-                          ...Btn, background: '#f1f5f9', color: '#0f172a', padding: '6px 12px', fontSize: 12
-                        }}>Düzenle</button>
-                        <button onClick={() => openPwd(u)} style={{
-                          ...Btn, background: '#f8fafc', color: '#334155', padding: '6px 12px', fontSize: 12
-                        }}>Şifre</button>
-                        {!isMe && (
-                          <button onClick={() => setDelOpen(u)} style={{
-                            ...Btn, background: '#fee2e2', color: '#b91c1c', padding: '6px 12px', fontSize: 12
-                          }}>Sil</button>
-                        )}
+        {isMobile ? (
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>Yükleniyor...</div>
+            ) : items.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 13 }}>
+                {isAccountScope 
+                  ? 'Yönetim panelinize henüz yardımcı üye eklenmemiş. Yukarıdaki butondan ekleyebilirsiniz.'
+                  : 'Bu okula ait henüz üye eklenmemiş. Yukarıdaki butondan ilk üyeyi ekleyin.'}
+              </div>
+            ) : items.map(u => {
+              const sBdg = statusBadge(u)
+              const rBdg = roleBadge(u.role)
+              const isMe = String(user?.id || user?._id || '') === String(u.id || u._id || '')
+              return (
+                <div key={String(u.id || u._id || u.email)} style={{
+                  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+                  padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{u.name || '-'}</span>
+                        {isMe && <span style={{ fontSize: 10, padding: '2px 6px', background: '#eef2ff', color: '#3730a3', borderRadius: 999, fontWeight: 700 }}>SİZ</span>}
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{u.email || '-'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <span style={rBdg}>{rBdg.text}</span>
+                      <span style={sBdg}>{sBdg.text}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 12, color: '#475569', marginBottom: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {u.username && <div><b>K. Adı:</b> {u.username}</div>}
+                    {u.phone && <div>📞 {u.phone}</div>}
+                  </div>
+
+                  <div style={{
+                    display: 'flex', gap: 8, paddingTop: 10, borderTop: '1px solid #f1f5f9'
+                  }}>
+                    <button onClick={() => openEdit(u)} style={{
+                      ...Btn, flex: 1, justifyContent: 'center', background: '#f1f5f9', color: '#0f172a', padding: '8px', fontSize: 12
+                    }}>✏️ Düzenle</button>
+                    <button onClick={() => openPwd(u)} style={{
+                      ...Btn, flex: 1, justifyContent: 'center', background: '#f8fafc', color: '#334155', border: '1px solid #e2e8f0', padding: '8px', fontSize: 12
+                    }}>🔑 Şifre</button>
+                    {!isMe && (
+                      <button onClick={() => setDelOpen(u)} style={{
+                        ...Btn, padding: '8px 14px', background: '#fee2e2', color: '#b91c1c', fontSize: 12
+                      }}>🗑️ Sil</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div style={{ overflow: 'auto', maxHeight: '70vh' }}>
+            <table style={tbl}>
+              <thead>
+                <tr>
+                  <th style={th}>Ad Soyad</th>
+                  <th style={th}>E-posta</th>
+                  <th style={th}>Kullanıcı Adı / Tel</th>
+                  <th style={th}>Rol</th>
+                  <th style={th}>Durum</th>
+                  <th style={{ ...th, minWidth: 220, textAlign: 'right' }}>İşlemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={6} style={{ ...td, textAlign: 'center', padding: '40px 12px', color: '#94a3b8' }}>Yükleniyor...</td></tr>
+                ) : items.length === 0 ? (
+                  <tr><td colSpan={6} style={{ ...td, textAlign: 'center', padding: '40px 12px', color: '#94a3b8' }}>
+                    {isAccountScope 
+                      ? 'Yönetim panelinize henüz yardımcı üye eklenmemiş. Yukarıdaki butondan ekleyebilirsiniz.'
+                      : 'Bu okula ait henüz üye eklenmemiş. Yukarıdaki butondan ilk üyeyi ekleyin.'}
+                  </td></tr>
+                ) : items.map(u => {
+                  const sBdg = statusBadge(u)
+                  const rBdg = roleBadge(u.role)
+                  const isMe = String(user?.id || user?._id || '') === String(u.id || u._id || '')
+                  return (
+                    <tr key={String(u.id || u._id || u.email)}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <td style={{ ...td, fontWeight: 700 }}>
+                        {u.name || '-'}
+                        {isMe && <span style={{ fontSize: 10, marginLeft: 6, padding: '2px 6px', background: '#eef2ff', color: '#3730a3', borderRadius: 999, fontWeight: 700 }}>SİZ</span>}
+                      </td>
+                      <td style={td}>{u.email || '-'}</td>
+                      <td style={{ ...td, color: '#334155' }}>
+                        <div>{u.username || '-'}</div>
+                        {u.phone && <div style={{ fontSize: 11, color: '#64748b' }}>📞 {u.phone}</div>}
+                      </td>
+                      <td style={td}><span style={rBdg}>{rBdg.text}</span></td>
+                      <td style={td}><span style={sBdg}>{sBdg.text}</span></td>
+                      <td style={{ ...td, textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          <button onClick={() => openEdit(u)} style={{
+                            ...Btn, background: '#f1f5f9', color: '#0f172a', padding: '6px 12px', fontSize: 12
+                          }}>Düzenle</button>
+                          <button onClick={() => openPwd(u)} style={{
+                            ...Btn, background: '#f8fafc', color: '#334155', padding: '6px 12px', fontSize: 12
+                          }}>Şifre</button>
+                          {!isMe && (
+                            <button onClick={() => setDelOpen(u)} style={{
+                              ...Btn, background: '#fee2e2', color: '#b91c1c', padding: '6px 12px', fontSize: 12
+                            }}>Sil</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {createOpen && (
-        <ModalWrap title={scope === 'account' ? 'Yönetim Paneline Yeni Üye Ekle' : 'Yeni Okul Personeli Ekle'} onClose={() => setCreateOpen(false)}>
+        <ModalWrap title={isAccountScope ? 'Yönetim Paneline Yeni Üye Ekle' : 'Yeni Okul Üyesi Ekle'} onClose={() => setCreateOpen(false)}>
           <form onSubmit={onCreate}>
             <div style={FieldCls}>
               <label style={LabelCls}>Ad Soyad *</label>
@@ -505,7 +590,7 @@ export default function AnaokuluUyelerPage() {
               <input style={InputCls} type="password" value={createForm.password}
                 onChange={e => setCreateForm({ ...createForm, password: e.target.value })} />
             </div>
-            {scope === 'account' ? (
+            {isAccountScope ? (
               <div style={FieldCls}>
                 <label style={LabelCls}>Yetki Seviyesi</label>
                 <div style={{
@@ -517,12 +602,17 @@ export default function AnaokuluUyelerPage() {
               </div>
             ) : (
               <div style={FieldCls}>
-                <label style={LabelCls}>Rol</label>
+                <label style={LabelCls}>Yetki / Rol *</label>
                 <select style={InputCls} value={createForm.role}
                   onChange={e => setCreateForm({ ...createForm, role: e.target.value })}>
-                  <option value="staff">👩‍🏫 Personel (Öğretmen / Muhasebeci)</option>
                   <option value="tenant_admin">👑 Okul Yöneticisi (Müdür / Tam Yetki)</option>
+                  <option value="staff">👩‍🏫 Personel (Öğretmen / Personel)</option>
                 </select>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  {createForm.role === 'tenant_admin'
+                    ? 'Okul Yöneticisi: Bu okulun tüm ayarlarına, öğrencilerine, ücretlerine ve tahsilatlarına tam erişim sağlar.'
+                    : 'Personel: Okul içi öğrenci ve tahsilat işlemlerini gerçekleştirebilir.'}
+                </div>
               </div>
             )}
             {formError && <div style={{
@@ -540,7 +630,7 @@ export default function AnaokuluUyelerPage() {
       )}
 
       {editOpen && selected && (
-        <ModalWrap title="Üyeyi Düzenle" onClose={() => setEditOpen(false)}>
+        <ModalWrap title={isAccountScope ? 'Yönetim Paneli Üyesini Düzenle' : 'Okul Üyesini Düzenle'} onClose={() => setEditOpen(false)}>
           <form onSubmit={onEditSave}>
             <div style={FieldCls}>
               <label style={LabelCls}>Ad Soyad *</label>
@@ -563,7 +653,7 @@ export default function AnaokuluUyelerPage() {
                 onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
                 placeholder="05xxxxxxxxx" />
             </div>
-            {scope === 'account' ? (
+            {isAccountScope ? (
               <div style={FieldCls}>
                 <label style={LabelCls}>Yetki Seviyesi</label>
                 <div style={{
@@ -575,11 +665,11 @@ export default function AnaokuluUyelerPage() {
               </div>
             ) : (
               <div style={FieldCls}>
-                <label style={LabelCls}>Rol</label>
+                <label style={LabelCls}>Yetki / Rol *</label>
                 <select style={InputCls} value={editForm.role}
                   onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
-                  <option value="staff">👩‍🏫 Personel</option>
-                  <option value="tenant_admin">👑 Okul Yöneticisi</option>
+                  <option value="tenant_admin">👑 Okul Yöneticisi (Müdür / Tam Yetki)</option>
+                  <option value="staff">👩‍🏫 Personel (Öğretmen / Personel)</option>
                 </select>
               </div>
             )}

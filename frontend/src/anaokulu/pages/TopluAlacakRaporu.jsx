@@ -31,6 +31,14 @@ export default function TopluAlacakRaporu({ initialSchools = null }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [collapsedSchools, setCollapsedSchools] = useState({})
   const [toastMsg, setToastMsg] = useState('')
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3500) }
 
@@ -388,136 +396,249 @@ export default function TopluAlacakRaporu({ initialSchools = null }) {
 
                 {/* Okul İçi Öğrenci Ay Ay Matris Tablosu */}
                 {!isCollapsed && (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                      <thead>
-                        <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', color: '#475569' }}>
-                          <th style={{ padding: '10px 12px', textAlign: 'left', width: 35 }}>#</th>
-                          <th style={{ padding: '10px 12px', textAlign: 'left', minWidth: 140 }}>Öğrenci Adı Soyadı</th>
-                          <th style={{ padding: '10px 10px', textAlign: 'left', width: 50 }}>Sınıf</th>
-                          <th style={{ padding: '10px 12px', textAlign: 'left', minWidth: 130 }}>Veli &amp; İletişim</th>
-                          {report.months.map(m => (
-                            <th
-                              key={m.period}
-                              style={{
-                                padding: '10px 6px', textAlign: 'right', minWidth: 72,
-                                background: '#f1f5f9', fontWeight: 800, fontSize: 11,
-                                color: '#334155'
-                              }}
-                            >
-                              {m.name}
-                            </th>
-                          ))}
-                          <th style={{
-                            padding: '10px 12px', textAlign: 'right', minWidth: 100,
-                            color: '#dc2626', background: '#fee2e2', fontWeight: 900
-                          }}>
-                            Toplam Alacak
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {studentsToShow.length === 0 ? (
-                          <tr>
-                            <td colSpan={5 + report.months.length} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                              Bu okulda seçilen kriterlere uygun öğrenci bulunamadı.
-                            </td>
-                          </tr>
-                        ) : (
-                          studentsToShow.map((student, idx) => (
-                            <tr
+                  isMobile ? (
+                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {studentsToShow.length === 0 ? (
+                        <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13, background: '#f8fafc', borderRadius: 10 }}>
+                          Bu okulda seçilen kriterlere uygun öğrenci bulunamadı.
+                        </div>
+                      ) : (
+                        studentsToShow.map((student, idx) => {
+                          const hasDebt = student.totalDebt > 0
+                          const debtMonths = report.months.filter(m => (student.monthlyDebts[m.period] || 0) > 0)
+                          return (
+                            <div
                               key={student.studentId}
                               style={{
-                                borderBottom: '1px solid #f1f5f9',
-                                background: student.totalDebt > 0 ? (idx % 2 === 0 ? '#fff' : '#fffaf9') : '#fff'
+                                background: hasDebt ? '#fffaf9' : '#fff',
+                                border: hasDebt ? '1.5px solid #fecaca' : '1px solid #e2e8f0',
+                                borderRadius: 12,
+                                padding: '12px 14px',
+                                boxShadow: hasDebt ? '0 2px 8px rgba(220,38,38,0.06)' : '0 1px 3px rgba(0,0,0,0.02)'
                               }}
                             >
-                              <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{idx + 1}</td>
-                              <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span>{student.studentName}</span>
-                                  {!student.active && (
-                                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fee2e2', color: '#991b1b' }}>
-                                      Pasif
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>
+                                      {idx + 1}. {student.studentName}
                                     </span>
+                                    {!student.active && (
+                                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fee2e2', color: '#991b1b', fontWeight: 700 }}>
+                                        Pasif
+                                      </span>
+                                    )}
+                                    {student.studentClass && (
+                                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}>
+                                        {student.studentClass}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
+                                    No: {student.studentId} {student.parentName ? `· 👤 ${student.parentName}` : ''} {student.parentPhone ? `· 📞 ${student.parentPhone}` : ''}
+                                  </div>
+                                </div>
+
+                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                  {hasDebt ? (
+                                    <div style={{
+                                      padding: '4px 10px', borderRadius: 8,
+                                      background: '#fee2e2', color: '#dc2626',
+                                      fontWeight: 900, fontSize: 13
+                                    }}>
+                                      ₺{student.totalDebt.toLocaleString('tr-TR')}
+                                    </div>
+                                  ) : (
+                                    <div style={{
+                                      padding: '4px 10px', borderRadius: 8,
+                                      background: '#dcfce7', color: '#166534',
+                                      fontWeight: 700, fontSize: 12
+                                    }}>
+                                      ✓ Borç Yok
+                                    </div>
                                   )}
                                 </div>
-                                <div style={{ fontSize: 11, color: '#64748b' }}>No: {student.studentId}</div>
-                              </td>
-                              <td style={{ padding: '10px 10px', color: '#334155' }}>{student.studentClass}</td>
-                              <td style={{ padding: '10px 12px' }}>
-                                <div style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>{student.parentName}</div>
-                                <div style={{ fontSize: 11, color: '#64748b' }}>{student.parentPhone}</div>
-                              </td>
-                              {/* 12 Ayın Sütunları */}
-                              {report.months.map(m => {
-                                const d = student.monthlyDebts[m.period] || 0
-                                const due = student.monthlyDues[m.period] || 0
-                                return (
-                                  <td key={m.period} style={{ padding: '10px 6px', textAlign: 'right' }}>
-                                    {d > 0 ? (
-                                      <span style={{
-                                        display: 'inline-block', padding: '3px 6px', borderRadius: 6,
-                                        background: '#fee2e2', color: '#dc2626', fontWeight: 800, fontSize: 11
-                                      }}>
-                                        ₺{d.toLocaleString('tr-TR')}
-                                      </span>
-                                    ) : due > 0 ? (
-                                      <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 11 }}>
-                                        ✓ Ödendi
-                                      </span>
-                                    ) : (
-                                      <span style={{ color: '#cbd5e1', fontSize: 11 }}>—</span>
-                                    )}
-                                  </td>
-                                )
-                              })}
-                              {/* Toplam Alacak Sütunu */}
-                              <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                                {student.totalDebt > 0 ? (
-                                  <span style={{
-                                    display: 'inline-block', padding: '4px 8px', borderRadius: 8,
-                                    background: '#fee2e2', color: '#dc2626', fontWeight: 900, fontSize: 13
-                                  }}>
-                                    ₺{student.totalDebt.toLocaleString('tr-TR')}
+                              </div>
+
+                              {/* Borçlu Aylar Dökümü */}
+                              {hasDebt && debtMonths.length > 0 && (
+                                <div style={{
+                                  marginTop: 8, paddingTop: 8, borderTop: '1px dashed #fecaca',
+                                  display: 'flex', flexWrap: 'wrap', gap: 6
+                                }}>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#991b1b', alignSelf: 'center' }}>
+                                    Açık Taksitler:
                                   </span>
-                                ) : (
-                                  <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 12 }}>
-                                    ✓ Borç Yok
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                      <tfoot>
-                        <tr style={{ background: '#fef3c7', fontWeight: 800, borderTop: '2px solid #fcd34d' }}>
-                          <td colSpan={4} style={{ padding: '11px 12px', textAlign: 'right', color: '#92400e' }}>
-                            {school.schoolName} Ara Toplam:
-                          </td>
-                          {/* Her Ayın Okul Toplamı */}
-                          {report.months.map(m => {
-                            const d = school.monthlyDebts[m.period] || 0
-                            return (
-                              <td
+                                  {debtMonths.map(m => {
+                                    const d = student.monthlyDebts[m.period] || 0
+                                    return (
+                                      <span
+                                        key={m.period}
+                                        style={{
+                                          fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                                          background: '#fee2e2', color: '#b91c1c', fontWeight: 800,
+                                          border: '1px solid #fca5a5'
+                                        }}
+                                      >
+                                        {m.name}: ₺{d.toLocaleString('tr-TR')}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+
+                      {/* Okul Ara Toplam Kartı (Mobil) */}
+                      {studentsToShow.length > 0 && (
+                        <div style={{
+                          background: '#fef3c7', borderRadius: 12, padding: '12px 14px',
+                          border: '1.5px solid #fcd34d', display: 'flex',
+                          justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                          <div style={{ fontWeight: 800, color: '#92400e', fontSize: 13 }}>
+                            {school.schoolName} Ara Toplam
+                          </div>
+                          <div style={{ fontWeight: 900, color: '#dc2626', fontSize: 15 }}>
+                            ₺{school.debt.toLocaleString('tr-TR')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', color: '#475569' }}>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', width: 35 }}>#</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', minWidth: 140 }}>Öğrenci Adı Soyadı</th>
+                            <th style={{ padding: '10px 10px', textAlign: 'left', width: 50 }}>Sınıf</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', minWidth: 130 }}>Veli &amp; İletişim</th>
+                            {report.months.map(m => (
+                              <th
                                 key={m.period}
                                 style={{
-                                  padding: '11px 6px', textAlign: 'right', fontSize: 11,
-                                  color: d > 0 ? '#dc2626' : '#64748b', fontWeight: d > 0 ? 800 : 600
+                                  padding: '10px 6px', textAlign: 'right', minWidth: 72,
+                                  background: '#f1f5f9', fontWeight: 800, fontSize: 11,
+                                  color: '#334155'
                                 }}
                               >
-                                {d > 0 ? `₺${d.toLocaleString('tr-TR')}` : '—'}
+                                {m.name}
+                              </th>
+                            ))}
+                            <th style={{
+                              padding: '10px 12px', textAlign: 'right', minWidth: 100,
+                              color: '#dc2626', background: '#fee2e2', fontWeight: 900
+                            }}>
+                              Toplam Alacak
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {studentsToShow.length === 0 ? (
+                            <tr>
+                              <td colSpan={5 + report.months.length} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                                Bu okulda seçilen kriterlere uygun öğrenci bulunamadı.
                               </td>
-                            )
-                          })}
-                          <td style={{ padding: '11px 12px', textAlign: 'right', color: '#dc2626', fontSize: 14 }}>
-                            ₺{school.debt.toLocaleString('tr-TR')}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                            </tr>
+                          ) : (
+                            studentsToShow.map((student, idx) => (
+                              <tr
+                                key={student.studentId}
+                                style={{
+                                  borderBottom: '1px solid #f1f5f9',
+                                  background: student.totalDebt > 0 ? (idx % 2 === 0 ? '#fff' : '#fffaf9') : '#fff'
+                                }}
+                              >
+                                <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{idx + 1}</td>
+                                <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span>{student.studentName}</span>
+                                    {!student.active && (
+                                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fee2e2', color: '#991b1b' }}>
+                                        Pasif
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: '#64748b' }}>No: {student.studentId}</div>
+                                </td>
+                                <td style={{ padding: '10px 10px', color: '#334155' }}>{student.studentClass}</td>
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>{student.parentName}</div>
+                                  <div style={{ fontSize: 11, color: '#64748b' }}>{student.parentPhone}</div>
+                                </td>
+                                {/* 12 Ayın Sütunları */}
+                                {report.months.map(m => {
+                                  const d = student.monthlyDebts[m.period] || 0
+                                  const due = student.monthlyDues[m.period] || 0
+                                  return (
+                                    <td key={m.period} style={{ padding: '10px 6px', textAlign: 'right' }}>
+                                      {d > 0 ? (
+                                        <span style={{
+                                          display: 'inline-block', padding: '3px 6px', borderRadius: 6,
+                                          background: '#fee2e2', color: '#dc2626', fontWeight: 800, fontSize: 11
+                                        }}>
+                                          ₺{d.toLocaleString('tr-TR')}
+                                        </span>
+                                      ) : due > 0 ? (
+                                        <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 11 }}>
+                                          ✓ Ödendi
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: '#cbd5e1', fontSize: 11 }}>—</span>
+                                      )}
+                                    </td>
+                                  )
+                                })}
+                                {/* Toplam Alacak Sütunu */}
+                                <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                  {student.totalDebt > 0 ? (
+                                    <span style={{
+                                      display: 'inline-block', padding: '4px 8px', borderRadius: 8,
+                                      background: '#fee2e2', color: '#dc2626', fontWeight: 900, fontSize: 13
+                                    }}>
+                                      ₺{student.totalDebt.toLocaleString('tr-TR')}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 12 }}>
+                                      ✓ Borç Yok
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ background: '#fef3c7', fontWeight: 800, borderTop: '2px solid #fcd34d' }}>
+                            <td colSpan={4} style={{ padding: '11px 12px', textAlign: 'right', color: '#92400e' }}>
+                              {school.schoolName} Ara Toplam:
+                            </td>
+                            {/* Her Ayın Okul Toplamı */}
+                            {report.months.map(m => {
+                              const d = school.monthlyDebts[m.period] || 0
+                              return (
+                                <td
+                                  key={m.period}
+                                  style={{
+                                    padding: '11px 6px', textAlign: 'right', fontSize: 11,
+                                    color: d > 0 ? '#dc2626' : '#64748b', fontWeight: d > 0 ? 800 : 600
+                                  }}
+                                >
+                                  {d > 0 ? `₺${d.toLocaleString('tr-TR')}` : '—'}
+                                </td>
+                              )
+                            })}
+                            <td style={{ padding: '11px 12px', textAlign: 'right', color: '#dc2626', fontSize: 14 }}>
+                              ₺{school.debt.toLocaleString('tr-TR')}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )
                 )}
               </div>
             )
@@ -529,28 +650,39 @@ export default function TopluAlacakRaporu({ initialSchools = null }) {
       {!loading && filteredSchools.length > 0 && (
         <div style={{
           background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#fff',
-          borderRadius: 16, padding: '18px 24px', boxShadow: '0 8px 24px rgba(30,27,75,0.2)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16
+          borderRadius: 16, padding: isMobile ? 16 : '18px 24px', boxShadow: '0 8px 24px rgba(30,27,75,0.2)',
+          display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center',
+          gap: 16
         }}>
           <div>
-            <div style={{ fontSize: 13, textTransform: 'uppercase', opacity: 0.8, fontWeight: 700 }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', opacity: 0.8, fontWeight: 700 }}>
               {selectedYear} Yılı — Tüm Okullar Genel Alacak Özeti
             </div>
-            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 4 }}>
+            <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 900, marginTop: 4 }}>
               Toplam {report.totalSchools} Okul | {report.grandDebtStudentsCount} Borçlu Öğrenci
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Yıl İçi Tahsilat</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#4ade80' }}>
-                {money(report.grandPaid)}
+          <div style={{
+            display: 'flex', alignItems: isMobile ? 'stretch' : 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 12 : 24
+          }}>
+            <div style={{
+              display: 'flex', justifyContent: isMobile ? 'space-between' : 'flex-end',
+              gap: 20
+            }}>
+              <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Yıl İçi Tahsilat</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#4ade80' }}>
+                  {money(report.grandPaid)}
+                </div>
               </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Toplam Açık Alacak</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: '#fca5a5' }}>
-                {money(report.grandDebt)}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Toplam Açık Alacak</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#fca5a5' }}>
+                  {money(report.grandDebt)}
+                </div>
               </div>
             </div>
             <button
@@ -558,7 +690,8 @@ export default function TopluAlacakRaporu({ initialSchools = null }) {
               onClick={handleExportExcel}
               style={{
                 ...Btn, background: '#fff', color: '#312e81',
-                padding: '10px 20px', fontSize: 13, fontWeight: 800
+                padding: '10px 20px', fontSize: 13, fontWeight: 800,
+                justifyContent: 'center', width: isMobile ? '100%' : 'auto'
               }}
             >
               📥 Tümünü Excel'e Aktar (.xls)

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { money, trDate, periodName, getDashboardStats, getStudent } from '../utils/calculations.js'
@@ -9,6 +9,15 @@ export default function DashboardPage() {
   const stats = getDashboardStats(state)
   const students = state?.students || []
   const loaded = state?.loaded
+
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
 
   const perSchoolStats = (() => {
     if (!isAdminPanelMode) return []
@@ -137,37 +146,67 @@ export default function DashboardPage() {
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Son Tahsilatlar</h3>
             <span style={{ fontSize: 12, color: '#64748b' }}>son 6 kayıt</span>
           </div>
-          <div className="ak-table-wrap" style={{ maxHeight: 260, overflow: 'auto' }}>
-            <table style={table}>
-              <thead>
-                <tr>
-                  <th style={th}>Tarih</th>
-                  <th style={th}>Öğrenci</th>
-                  <th style={th}>Kalem</th>
-                  <th style={th}>Tutar</th>
-                  <th style={th}>Ödeme</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recent.length === 0 ? (
-                  <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
-                    Henüz tahsilat yok.
-                  </td></tr>
-                ) : stats.recent.map(c => {
-                  const s = getStudent(state, c.studentId)
-                  return (
-                    <tr key={c.id || c._id || c.date + c.studentId}>
-                      <td style={td}>{trDate(c.date)}</td>
-                      <td style={{ ...td, fontWeight: 600 }}>{s?.name || '-'}</td>
-                      <td style={td}>{c.item || '-'}</td>
-                      <td style={{ ...td, fontWeight: 700 }}>{money(c.amount)}</td>
-                      <td style={td}>{c.payment || '-'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          {isMobile ? (
+            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {stats.recent.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 12px', fontSize: 13 }}>
+                  Henüz tahsilat yok.
+                </div>
+              ) : stats.recent.map(c => {
+                const s = getStudent(state, c.studentId)
+                return (
+                  <div key={c.id || c._id || c.date + c.studentId} style={{
+                    background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+                    padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{s?.name || '-'}</div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span>📅 {trDate(c.date)}</span>
+                        {c.item && <span>· {c.item}</span>}
+                        {c.payment && <span style={{ padding: '1px 6px', background: '#e2e8f0', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{c.payment}</span>}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#16a34a', flexShrink: 0 }}>
+                      {money(c.amount)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="ak-table-wrap" style={{ maxHeight: 260, overflow: 'auto' }}>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    <th style={th}>Tarih</th>
+                    <th style={th}>Öğrenci</th>
+                    <th style={th}>Kalem</th>
+                    <th style={th}>Tutar</th>
+                    <th style={th}>Ödeme</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recent.length === 0 ? (
+                    <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
+                      Henüz tahsilat yok.
+                    </td></tr>
+                  ) : stats.recent.map(c => {
+                    const s = getStudent(state, c.studentId)
+                    return (
+                      <tr key={c.id || c._id || c.date + c.studentId}>
+                        <td style={td}>{trDate(c.date)}</td>
+                        <td style={{ ...td, fontWeight: 600 }}>{s?.name || '-'}</td>
+                        <td style={td}>{c.item || '-'}</td>
+                        <td style={{ ...td, fontWeight: 700 }}>{money(c.amount)}</td>
+                        <td style={td}>{c.payment || '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -224,26 +263,48 @@ export default function DashboardPage() {
           <h3 style={{ margin: '0 0 14px 0', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
             🏫 Okul Bazlı Dağılım
           </h3>
-          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-            <table style={table}>
-              <thead>
-                <tr>
-                  <th style={th}>Okul Adı</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Öğrenci Sayısı</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Toplam Tahsilat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {perSchoolStats.map(ps => (
-                  <tr key={ps.schoolId}>
-                    <td style={{ ...td, fontWeight: 600 }}>🏫 {ps.schoolName}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#6366f1' }}>{ps.studentCount}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{money(ps.collected)}</td>
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {perSchoolStats.map(ps => (
+                <div key={ps.schoolId} style={{
+                  background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+                  padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>🏫 {ps.schoolName}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                      <span style={{ fontWeight: 700, color: '#6366f1' }}>{ps.studentCount}</span> Öğrenci
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>Tahsilat</div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#10b981' }}>{money(ps.collected)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    <th style={th}>Okul Adı</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Öğrenci Sayısı</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Toplam Tahsilat</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {perSchoolStats.map(ps => (
+                    <tr key={ps.schoolId}>
+                      <td style={{ ...td, fontWeight: 600 }}>🏫 {ps.schoolName}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#6366f1' }}>{ps.studentCount}</td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{money(ps.collected)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -41,6 +41,7 @@ const anaokuluSettingSchema = new mongoose.Schema(
     feeCategories: { type: [anaokuluFeeCategorySchema], default: [] },
     discounts: { type: [anaokuluDiscountSchema], default: [] },
     luca: { type: anaokuluLucaSchema, default: () => ({}) },
+    lockedDates: { type: [String], default: [] },
     invoiceSettings: {
       companyName: { type: String, default: '' },
       taxOffice: { type: String, default: '' },
@@ -58,6 +59,7 @@ const anaokuluSettingSchema = new mongoose.Schema(
   },
   { _id: false, strict: false }
 )
+
 
 const anaokuluStudentSchema = new mongoose.Schema(
   {

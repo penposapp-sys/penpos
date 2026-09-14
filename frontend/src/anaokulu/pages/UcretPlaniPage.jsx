@@ -58,6 +58,216 @@ function formatTrFullDate(dateStr) {
   return dateStr
 }
 
+// Strict 1-to-1 installment collection matching helper (shared across plans and installment list)
+function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
+  if (!student || !plan) return []
+  const count = Math.max(1, Number(plan.installments) || 1)
+  const total = Number(plan.total) || 0
+  const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
+  const perInstallment = round2(total / count)
+  const startDate = plan.start
+    ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
+    : defaultFullDate
+  const today = new Date().toISOString().slice(0, 10)
+
+  // Skipped installments (devamsızlık)
+  const skippedSet = {}
+  if (Array.isArray(plan.skippedInstallments)) {
+    plan.skippedInstallments.forEach(s => { skippedSet[s.no] = s })
+  }
+
+  // Filter collections strictly for this student and this plan
+  const studentItems = student.items || []
+  const planNameLower = (plan.name || '').trim().toLowerCase()
+  const planCols = (collections || []).filter(c => {
+    if (String(c.studentId) !== String(student.id)) return false
+    const itemLower = (c.item || '').trim().toLowerCase()
+    if (itemLower) {
+      return itemLower === planNameLower
+    }
+    return studentItems.length <= 1 || (studentItems[0]?.name || '').trim().toLowerCase() === planNameLower
+  })
+
+  // Map collections with an explicit installmentNo
+  const explicitCols = {}
+  const unassignedCols = []
+
+  planCols.forEach(c => {
+    const instNo = Number(c.installmentNo)
+    if (Number.isInteger(instNo) && instNo <= count && (instNo > 0 || (downPayment > 0 && instNo === 0))) {
+      if (!explicitCols[instNo]) explicitCols[instNo] = []
+      explicitCols[instNo].push(c)
+    } else {
+      unassignedCols.push(c)
+    }
+  })
+
+  // Unassigned pool for legacy collections that had NO installmentNo
+  let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+  const downPaymentCredit = round2(downPaymentPaid / count)
+
+  const list = []
+  for (let i = 0; i < count; i++) {
+    const installmentNo = i + 1
+    const dueDate = addMonthsToDate(startDate, i)
+    const skipInfo = skippedSet[installmentNo] || null
+
+    if (skipInfo) {
+      const isFull = (skipInfo.period || 'full') === 'full'
+      const deductedAmount = Number(skipInfo.deductedAmount) != null
+        ? Number(skipInfo.deductedAmount)
+        : (isFull ? perInstallment : round2(perInstallment / 2))
+
+      // Tam ay devamsızlık
+      if (isFull || deductedAmount >= perInstallment) {
+        list.push({
+          installmentNo,
+          dueDate,
+          dueDateFormatted: formatTrFullDate(dueDate),
+          amount: 0,
+          originalAmount: perInstallment,
+          paid: 0,
+          remaining: 0,
+          isPaid: true,
+          isSkipped: true,
+          isPartialSkip: false,
+          skipReason: skipInfo.reason || 'Devamsızlık',
+          skipPeriod: 'full',
+          skipDate: skipInfo.date || '',
+          deductedAmount,
+          isOverdue: false,
+          isDueToday: false,
+          daysOverdue: 0,
+          collectionDate: '',
+          paymentMethod: '',
+          collections: []
+        })
+        continue
+      }
+
+      // Kısmi devamsızlık
+      const effectiveAmount = round2(Math.max(0, perInstallment - deductedAmount))
+      const directMatches = explicitCols[installmentNo] || []
+      let paid = downPaymentCredit
+      let collectionDate = ''
+      let paymentMethod = ''
+      let matchedCollections = []
+
+      if (directMatches.length > 0) {
+        paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+        collectionDate = directMatches[0].date || ''
+        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
+        matchedCollections = directMatches
+      } else if (unassignedPool > 0) {
+        if (unassignedPool >= effectiveAmount) {
+          paid = effectiveAmount
+          unassignedPool = round2(unassignedPool - effectiveAmount)
+        } else {
+          paid = unassignedPool
+          unassignedPool = 0
+        }
+        collectionDate = unassignedCols[0]?.date || ''
+        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
+        matchedCollections = unassignedCols
+      }
+
+      const remaining = round2(Math.max(0, effectiveAmount - paid))
+      const isPaid = remaining <= 0
+      const isOverdue = !isPaid && dueDate < today
+      const isDueToday = !isPaid && dueDate === today
+      let daysOverdue = 0
+      if (isOverdue) {
+        const d1 = new Date(today)
+        const d2 = new Date(dueDate)
+        daysOverdue = Math.max(1, Math.floor((d1 - d2) / (1000 * 60 * 60 * 24)))
+      }
+
+      list.push({
+        installmentNo,
+        dueDate,
+        dueDateFormatted: formatTrFullDate(dueDate),
+        amount: effectiveAmount,
+        originalAmount: perInstallment,
+        paid,
+        remaining,
+        isPaid,
+        isSkipped: true,
+        isPartialSkip: true,
+        skipReason: skipInfo.reason || 'Devamsızlık',
+        skipPeriod: 'half',
+        skipDate: skipInfo.date || '',
+        startDate: skipInfo.startDate,
+        endDate: skipInfo.endDate,
+        absentDays: skipInfo.absentDays,
+        monthDays: skipInfo.monthDays,
+        deductedAmount,
+        isOverdue,
+        isDueToday,
+        daysOverdue,
+        collectionDate,
+        paymentMethod,
+        collections: matchedCollections
+      })
+      continue
+    }
+
+    const directMatches = explicitCols[installmentNo] || []
+    let paid = downPaymentCredit
+    let collectionDate = ''
+    let paymentMethod = ''
+    let matchedCollections = []
+
+    if (directMatches.length > 0) {
+      const directTotal = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+      paid = round2(paid + directTotal)
+      collectionDate = directMatches[0].date || ''
+      paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
+      matchedCollections = directMatches
+    } else if (unassignedPool > 0) {
+      const availableSpace = round2(Math.max(0, perInstallment - paid))
+      const applied = Math.min(unassignedPool, availableSpace)
+      paid = round2(paid + applied)
+      unassignedPool = round2(unassignedPool - applied)
+      collectionDate = unassignedCols[0]?.date || ''
+      paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
+      matchedCollections = unassignedCols
+    }
+
+    paid = round2(Math.min(paid, perInstallment))
+    const remaining = round2(Math.max(0, perInstallment - paid))
+    const isPaid = remaining <= 0
+
+    const isOverdue = !isPaid && dueDate < today
+    const isDueToday = !isPaid && dueDate === today
+    let daysOverdue = 0
+    if (isOverdue) {
+      const d1 = new Date(today)
+      const d2 = new Date(dueDate)
+      daysOverdue = Math.max(1, Math.floor((d1 - d2) / (1000 * 60 * 60 * 24)))
+    }
+
+    list.push({
+      installmentNo,
+      dueDate,
+      dueDateFormatted: formatTrFullDate(dueDate),
+      amount: perInstallment,
+      paid,
+      remaining,
+      isPaid,
+      isSkipped: false,
+      isOverdue,
+      isDueToday,
+      daysOverdue,
+      collectionDate,
+      paymentMethod,
+      collections: matchedCollections
+    })
+  }
+
+  return list
+}
+
 export default function UcretPlaniPage() {
   const { isAdminPanelMode, accessibleTenants } = useAuth()
   const { state, actions } = useAnaokuluData()
@@ -174,6 +384,7 @@ export default function UcretPlaniPage() {
   }, [])
 
   const isCompact = windowWidth < 1120
+  const isMobile = windowWidth < 820
 
   // Standard full date default (YYYY-MM-15)
   const defaultFullDate = useMemo(() => {
@@ -224,6 +435,47 @@ export default function UcretPlaniPage() {
     return selStudent.items[selectedPlanIdx] || selStudent.items[0] || null
   }, [selStudent, selectedPlanIdx])
 
+  // Strict installment list for active plan
+  const installmentList = useMemo(() => {
+    return getInstallmentsForPlan(selStudent, activePlan, collections, defaultFullDate)
+  }, [selStudent, activePlan, collections, defaultFullDate])
+
+  // Computed summary for all plans of selected student (paid, remaining, counts)
+  const planSummaries = useMemo(() => {
+    if (!selStudent || !Array.isArray(selStudent.items)) return {}
+    const res = {}
+    selStudent.items.forEach(it => {
+      const list = getInstallmentsForPlan(selStudent, it, collections, defaultFullDate)
+      const paid = round2(list.reduce((sum, inst) => sum + (inst.paid || 0), 0))
+      const total = Number(it.total) || 0
+      const remaining = round2(Math.max(0, total - paid))
+      const paidCount = list.filter(i => i.isPaid).length
+      res[it.name] = {
+        paid,
+        remaining,
+        total,
+        paidCount,
+        totalCount: list.length
+      }
+    })
+    return res
+  }, [selStudent, collections, defaultFullDate])
+
+  // Active plan summary
+  const activePlanSum = useMemo(() => {
+    if (!activePlan) return null
+    if (planSummaries[activePlan.name]) return planSummaries[activePlan.name]
+    const paid = round2(installmentList.reduce((sum, i) => sum + (i.paid || 0), 0))
+    const total = Number(activePlan.total) || 0
+    return {
+      paid,
+      remaining: round2(Math.max(0, total - paid)),
+      total,
+      paidCount: installmentList.filter(i => i.isPaid).length,
+      totalCount: installmentList.length
+    }
+  }, [activePlan, planSummaries, installmentList])
+
   const filteredStudents = useMemo(() => {
     let list = orderedStudents
     if (selectedSchoolId) {
@@ -269,6 +521,8 @@ export default function UcretPlaniPage() {
           case 'name': return String(a.name || '').toLocaleLowerCase('tr')
           case 'basePrice': return Number(a.basePrice || 0)
           case 'total': return Number(a.total || 0)
+          case 'collected': return Number(planSummaries[a.name]?.paid || 0)
+          case 'remaining': return Number(planSummaries[a.name]?.remaining || 0)
           case 'installments': return Number(a.installments || 0)
           case 'month': return Number((Number(a.total || 0) / Math.max(1, Number(a.installments || 1))) || 0)
           case 'start': return new Date(a.start || '1970-01-01').getTime()
@@ -280,6 +534,8 @@ export default function UcretPlaniPage() {
           case 'name': return String(b.name || '').toLocaleLowerCase('tr')
           case 'basePrice': return Number(b.basePrice || 0)
           case 'total': return Number(b.total || 0)
+          case 'collected': return Number(planSummaries[b.name]?.paid || 0)
+          case 'remaining': return Number(planSummaries[b.name]?.remaining || 0)
           case 'installments': return Number(b.installments || 0)
           case 'month': return Number((Number(b.total || 0) / Math.max(1, Number(b.installments || 1))) || 0)
           case 'start': return new Date(b.start || '1970-01-01').getTime()
@@ -294,7 +550,7 @@ export default function UcretPlaniPage() {
       const comparison = String(aValue).localeCompare(String(bValue), 'tr')
       return planSortDir === 'asc' ? comparison : -comparison
     })
-  }, [selStudent, planSearch, planSortKey, planSortDir])
+  }, [selStudent, planSearch, planSortKey, planSortDir, planSummaries])
 
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 2800) }
 
@@ -517,214 +773,7 @@ export default function UcretPlaniPage() {
     toast('Kalem silindi.')
   }
 
-  // =========================================================================
-  // STRICT 1-TO-1 INSTALLMENT COLLECTION MATCHING (NO DOUBLE-COUNTING BUG)
-  // =========================================================================
-  const installmentList = useMemo(() => {
-    if (!selStudent || !activePlan) return []
-    const count = Math.max(1, Number(activePlan.installments) || 1)
-    const total = Number(activePlan.total) || 0
-    const downPayment = round2(Math.max(0, Number(activePlan.downPayment) || 0))
-    const perInstallment = round2(total / count)
-    const startDate = activePlan.start
-      ? (activePlan.start.length === 7 ? `${activePlan.start}-15` : activePlan.start)
-      : defaultFullDate
-    const today = new Date().toISOString().slice(0, 10)
-
-    // Skipped installments (devamsızlık)
-    const skippedSet = {}
-    if (Array.isArray(activePlan.skippedInstallments)) {
-      activePlan.skippedInstallments.forEach(s => { skippedSet[s.no] = s })
-    }
-
-    // Filter collections strictly for this student and this plan
-    const planCols = collections.filter(c =>
-      String(c.studentId) === String(selStudent.id) &&
-      (!c.item || c.item.trim().toLowerCase() === activePlan.name.trim().toLowerCase())
-    )
-
-    // Map collections with an explicit installmentNo
-    const explicitCols = {}
-    const unassignedCols = []
-
-    planCols.forEach(c => {
-      const instNo = Number(c.installmentNo)
-      if (Number.isInteger(instNo) && instNo <= count && (instNo > 0 || (downPayment > 0 && instNo === 0))) {
-        if (!explicitCols[instNo]) explicitCols[instNo] = []
-        explicitCols[instNo].push(c)
-      } else {
-        unassignedCols.push(c)
-      }
-    })
-
-    // Unassigned pool for legacy collections that had NO installmentNo
-    let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-    const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
-    const downPaymentCredit = round2(downPaymentPaid / count)
-
-    const list = []
-    for (let i = 0; i < count; i++) {
-      const installmentNo = i + 1
-      const dueDate = addMonthsToDate(startDate, i)
-      const skipInfo = skippedSet[installmentNo] || null
-
-      if (skipInfo) {
-        const isFull = (skipInfo.period || 'full') === 'full'
-        const deductedAmount = Number(skipInfo.deductedAmount) != null
-          ? Number(skipInfo.deductedAmount)
-          : (isFull ? perInstallment : round2(perInstallment / 2))
-
-        // Eğer tam ay ise VEYA düşülen tutar taksitin tamamını karşılıyorsa
-        if (isFull || deductedAmount >= perInstallment) {
-          list.push({
-            installmentNo,
-            dueDate,
-            dueDateFormatted: formatTrFullDate(dueDate),
-            amount: 0,
-            originalAmount: perInstallment,
-            paid: 0,
-            remaining: 0,
-            isPaid: true,
-            isSkipped: true,
-            isPartialSkip: false,
-            skipReason: skipInfo.reason || 'Devamsızlık',
-            skipPeriod: 'full',
-            skipDate: skipInfo.date || '',
-            deductedAmount,
-            isOverdue: false,
-            isDueToday: false,
-            daysOverdue: 0,
-            collectionDate: '',
-            paymentMethod: '',
-            collections: []
-          })
-          continue
-        }
-
-        // Kısmi (Yarım Ay / Gün bazlı) devamsızlık: kalan tutar veli tarafından ödenir!
-        const effectiveAmount = round2(Math.max(0, perInstallment - deductedAmount))
-        const directMatches = explicitCols[installmentNo] || []
-        let paid = downPaymentCredit
-        let collectionDate = ''
-        let paymentMethod = ''
-        let matchedCollections = []
-
-        if (directMatches.length > 0) {
-          paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-          collectionDate = directMatches[0].date || ''
-          paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
-          matchedCollections = directMatches
-        } else if (unassignedPool > 0) {
-          if (unassignedPool >= effectiveAmount) {
-            paid = effectiveAmount
-            unassignedPool = round2(unassignedPool - effectiveAmount)
-          } else {
-            paid = unassignedPool
-            unassignedPool = 0
-          }
-          collectionDate = unassignedCols[0]?.date || ''
-          paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
-          matchedCollections = unassignedCols
-        }
-
-        const remaining = round2(Math.max(0, effectiveAmount - paid))
-        const isPaid = remaining <= 0
-        const isOverdue = !isPaid && dueDate < today
-        const isDueToday = !isPaid && dueDate === today
-        let daysOverdue = 0
-        if (isOverdue) {
-          const d1 = new Date(today)
-          const d2 = new Date(dueDate)
-          daysOverdue = Math.max(1, Math.floor((d1 - d2) / (1000 * 60 * 60 * 24)))
-        }
-
-        list.push({
-          installmentNo,
-          dueDate,
-          dueDateFormatted: formatTrFullDate(dueDate),
-          amount: effectiveAmount,
-          originalAmount: perInstallment,
-          paid,
-          remaining,
-          isPaid,
-          isSkipped: true,
-          isPartialSkip: true,
-          skipReason: skipInfo.reason || 'Devamsızlık',
-          skipPeriod: 'half',
-          skipDate: skipInfo.date || '',
-          startDate: skipInfo.startDate,
-          endDate: skipInfo.endDate,
-          absentDays: skipInfo.absentDays,
-          monthDays: skipInfo.monthDays,
-          deductedAmount,
-          isOverdue,
-          isDueToday,
-          daysOverdue,
-          collectionDate,
-          paymentMethod,
-          collections: matchedCollections
-        })
-        continue
-      }
-
-      const directMatches = explicitCols[installmentNo] || []
-      let paid = downPaymentCredit
-      let collectionDate = ''
-      let paymentMethod = ''
-      let matchedCollections = []
-
-      // 1. Direct match by installmentNo (PRIMARY & STRICT)
-      if (directMatches.length > 0) {
-        const directTotal = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-        paid = round2(paid + directTotal)
-        collectionDate = directMatches[0].date || ''
-        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
-        matchedCollections = directMatches
-      }
-      // 2. Only unassigned legacy collections can fill unassigned slots (NO double-counting!)
-      else if (unassignedPool > 0) {
-        const availableSpace = round2(Math.max(0, perInstallment - paid))
-        const applied = Math.min(unassignedPool, availableSpace)
-        paid = round2(paid + applied)
-        unassignedPool = round2(unassignedPool - applied)
-        collectionDate = unassignedCols[0]?.date || ''
-        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
-        matchedCollections = unassignedCols
-      }
-
-      paid = round2(Math.min(paid, perInstallment))
-      const remaining = round2(Math.max(0, perInstallment - paid))
-      const isPaid = remaining <= 0
-
-      // Overdue calculation based on exact date
-      const isOverdue = !isPaid && dueDate < today
-      const isDueToday = !isPaid && dueDate === today
-      let daysOverdue = 0
-      if (isOverdue) {
-        const d1 = new Date(today)
-        const d2 = new Date(dueDate)
-        daysOverdue = Math.max(1, Math.floor((d1 - d2) / (1000 * 60 * 60 * 24)))
-      }
-
-      list.push({
-        installmentNo,
-        dueDate,
-        dueDateFormatted: formatTrFullDate(dueDate),
-        amount: perInstallment,
-        paid,
-        remaining,
-        isPaid,
-        isSkipped: false,
-        isOverdue,
-        isDueToday,
-        daysOverdue,
-        collectionDate,
-        paymentMethod,
-        collections: matchedCollections
-      })
-    }
-    return list
-  }, [selStudent, activePlan, collections, defaultFullDate])
+  // Note: installmentList, planSummaries and activePlanSum are declared above
 
   const downPaymentInfo = useMemo(() => {
     if (!selStudent || !activePlan) return null
@@ -924,6 +973,12 @@ export default function UcretPlaniPage() {
     if (amt <= 0) { toast('Geçerli bir tahsilat tutarı giriniz.'); return }
     if (!collectForm.date) { toast('Tahsilat tarihi seçiniz.'); return }
 
+    const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+    if (lockedDates.includes(collectForm.date)) {
+      toast(`🔒 ${collectForm.date} tarihi kilitlidir. Bu güne tahsilat eklenemez.`)
+      return
+    }
+
     const currentInstallment = installmentList.find(i => Number(i.installmentNo) === Number(collectForm.installmentNo))
     const maxCollectable = Number(collectForm.installmentNo) === 0
       ? Number(downPaymentInfo?.remaining || 0)
@@ -1010,6 +1065,17 @@ export default function UcretPlaniPage() {
     if (amt <= 0) { toast('Tutar sıfırdan büyük olmalıdır.'); return }
     if (!editCollectionForm.date) { toast('Tahsilat tarihi seçiniz.'); return }
 
+    const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+    const existingCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
+    if (existingCol?.date && lockedDates.includes(existingCol.date)) {
+      toast(`🔒 ${existingCol.date} tarihi kilitlidir. Kilitli güne ait tahsilat düzenlenemez.`)
+      return
+    }
+    if (editCollectionForm.date && lockedDates.includes(editCollectionForm.date)) {
+      toast(`🔒 ${editCollectionForm.date} tarihi kilitlidir. Kilitli bir tarihe tahsilat taşınamaz.`)
+      return
+    }
+
     const vatEligible = isCollectionInvoiced(state, { item: editCollectionForm.planName }, selStudent)
     const vatRate = vatEligible ? Number(state?.settings?.vat || 0) : 0
     const vat = vatEligible ? round2(amt * (vatRate / (100 + vatRate))) : 0
@@ -1034,11 +1100,22 @@ export default function UcretPlaniPage() {
   // Delete an existing collection (undo / delete payment)
   const deleteExistingCollection = () => {
     if (!editCollectionForm.id) return
+    const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+    const existingCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
+    if (existingCol?.date && lockedDates.includes(existingCol.date)) {
+      toast(`🔒 ${existingCol.date} tarihi kilitlidir. Kilitli güne ait tahsilat silinemez.`)
+      return
+    }
+
     if (!window.confirm(`${editCollectionForm.installmentNo}. taksite ait bu tahsilatı silmek istediğinize emin misiniz?\n\nTaksit tekrar 'Ödenmedi' durumuna dönecektir.`)) return
 
-    actions.deleteCollection(editCollectionForm.id)
-    setEditCollectionModalOpen(false)
-    toast('🗑️ Tahsilat silindi. Taksit tekrar tahsilata açıldı.')
+    try {
+      actions.deleteCollection(editCollectionForm.id)
+      setEditCollectionModalOpen(false)
+      toast('🗑️ Tahsilat silindi. Taksit tekrar tahsilata açıldı.')
+    } catch (err) {
+      toast(err?.message || 'Tahsilat silinemedi.')
+    }
   }
 
   // Open skip (devamsızlık) modal for an unpaid installment
@@ -1548,160 +1625,324 @@ export default function UcretPlaniPage() {
                   />
                 </div>
 
-                <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
-                  <table style={{ ...tbl, minWidth: 620 }}>
-                    <thead>
-                      <tr>
-                        <th style={th}>
-                          <button type="button" onClick={() => togglePlanSort('name')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                            Plan Adı {planSortKey === 'name' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
-                          </button>
-                        </th>
-                        <th style={{ ...th, textAlign: 'right' }}>
-                          <button type="button" onClick={() => togglePlanSort('basePrice')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                            Baz Fiyat {planSortKey === 'basePrice' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
-                          </button>
-                        </th>
-                        <th style={th}>İndirim Durumu</th>
-                        <th style={{ ...th, textAlign: 'right' }}>
-                          <button type="button" onClick={() => togglePlanSort('total')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                            Net Tutar {planSortKey === 'total' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
-                          </button>
-                        </th>
-                        <th style={{ ...th, textAlign: 'center' }}>
-                          <button type="button" onClick={() => togglePlanSort('installments')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                            Taksit {planSortKey === 'installments' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
-                          </button>
-                        </th>
-                        <th style={{ ...th, textAlign: 'right' }}>
-                          <button type="button" onClick={() => togglePlanSort('month')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                            Aylık Tutar {planSortKey === 'month' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
-                          </button>
-                        </th>
-                        <th style={th}>
-                          <button type="button" onClick={() => togglePlanSort('start')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                            Başlangıç {planSortKey === 'start' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
-                          </button>
-                        </th>
-                        <th style={{ ...th, textAlign: 'center', width: 130 }}>İşlem</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selStudent.items || []).length === 0 ? (
-                        <tr>
-                          <td colSpan={8} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '32px 12px' }}>
-                            <div style={{ fontSize: 26, marginBottom: 6 }}>📝</div>
-                            <div>Bu öğrenciye henüz bir ücret planı eklenmemiş.</div>
-                            <div style={{ marginTop: 4, fontSize: 11 }}>
-                              Sağ üstteki <strong>"+ Ücret Planı Ekle"</strong> butonuna tıklayarak yeni plan ekleyebilirsiniz.
-                            </div>
-                          </td>
-                        </tr>
-                      ) : visiblePlans.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '32px 12px' }}>
-                            Plan ara sonuçlarına uygun kayıt bulunamadı.
-                          </td>
-                        </tr>
-                      ) : visiblePlans.map((it) => {
-                        const idx = selStudent.items.findIndex(p => p === it)
-                        const itemCalc = resolveItemDiscounts(it)
-                        const perMonth = round2(Number(it.total) / Math.max(1, it.installments))
-                        const isSelectedPlan = selectedPlanIdx === idx
+                {isMobile ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px' }}>
+                    {(selStudent.items || []).length === 0 ? (
+                      <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>📝</div>
+                        <div>Bu öğrenciye henüz bir ücret planı eklenmemiş.</div>
+                      </div>
+                    ) : visiblePlans.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
+                        Plan ara sonuçlarına uygun kayıt bulunamadı.
+                      </div>
+                    ) : visiblePlans.map((it) => {
+                      const idx = selStudent.items.findIndex(p => p === it)
+                      const itemCalc = resolveItemDiscounts(it)
+                      const perMonth = round2(Number(it.total) / Math.max(1, it.installments))
+                      const isSelectedPlan = selectedPlanIdx === idx
+                      const planSum = planSummaries[it.name] || {
+                        paid: 0,
+                        remaining: Number(it.total) || 0,
+                        paidCount: 0,
+                        totalCount: it.installments || 1
+                      }
 
-                        return (
-                          <tr
-                            key={idx}
-                            onClick={() => setSelectedPlanIdx(idx)}
-                            style={{
-                              cursor: 'pointer',
-                              background: isSelectedPlan ? 'linear-gradient(135deg,rgba(99,102,241,0.07),rgba(139,92,246,0.03))' : 'transparent',
-                              borderLeft: isSelectedPlan ? '4px solid #6366f1' : '4px solid transparent',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <td style={td}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontWeight: 800, color: isSelectedPlan ? '#4338ca' : '#0f172a', fontSize: 13 }}>
-                                  {it.name}
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedPlanIdx(idx)}
+                          style={{
+                            background: isSelectedPlan ? 'linear-gradient(135deg,rgba(99,102,241,0.06),rgba(139,92,246,0.02))' : '#fff',
+                            border: isSelectedPlan ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                            borderRadius: 14,
+                            padding: '12px 14px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 8,
+                            boxShadow: '0 1px 3px rgba(15,23,42,0.03)',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {/* Satır 1: Başlık, Seçili Rozeti ve İşlemler */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontWeight: 800, color: isSelectedPlan ? '#4338ca' : '#0f172a', fontSize: 14 }}>
+                                {it.name}
+                              </span>
+                              {isSelectedPlan && (
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800,
+                                  background: '#e0e7ff', color: '#4338ca'
+                                }}>
+                                  Seçili Plan
                                 </span>
-                                {isSelectedPlan && (
-                                  <span style={{
-                                    padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800,
-                                    background: '#e0e7ff', color: '#4338ca'
-                                  }}>
-                                    Seçili Plan
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td style={{ ...td, textAlign: 'right', color: '#64748b', fontSize: 13 }}>
-                              {money(itemCalc.basePrice)}
-                            </td>
-                            <td style={td}>
-                              {itemCalc.applied.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                    {itemCalc.applied.map((app, i) => (
-                                      <span key={i} style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                                        padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                                        background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
-                                      }}>
-                                        🏷️ {app.name} ({app.label})
-                                      </span>
-                                    ))}
-                                  </div>
-                                  {itemCalc.applied.length > 1 && (
-                                    <div style={{ fontSize: 11, color: '#b91c1c', fontWeight: 700 }}>
-                                      Toplam: -{money(itemCalc.totalDiscount)}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span style={{ color: '#94a3b8', fontSize: 12 }}>— İndirim yok —</span>
                               )}
-                            </td>
-                            <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
-                              {money(it.total)}
-                            </td>
-                            <td style={{ ...td, textAlign: 'center', color: '#334155', fontWeight: 700 }}>
-                              {it.installments}
-                            </td>
-                            <td style={{ ...td, textAlign: 'right', color: '#4f46e5', fontWeight: 700 }}>
-                              {money(perMonth)}
-                            </td>
-                            <td style={{ ...td, color: '#475569', fontSize: 12 }}>
-                              {formatTrFullDate(it.start || ys)}
-                            </td>
-                            <td style={td} onClick={e => e.stopPropagation()}>
-                              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                                <button
-                                  onClick={() => openEdit(idx)}
-                                  style={{
-                                    ...Btn, background: '#eef2ff', color: '#4338ca',
-                                    padding: '4px 8px', fontSize: 11
-                                  }}
-                                >
-                                  ✏️ Düzenle
-                                </button>
-                                <button
-                                  onClick={() => delItem(idx)}
-                                  style={{
-                                    ...Btn, background: '#fee2e2', color: '#991b1b',
-                                    padding: '4px 8px', fontSize: 11
-                                  }}
-                                >
-                                  🗑️ Sil
-                                </button>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                              <button
+                                onClick={() => openEdit(idx)}
+                                style={{
+                                  ...Btn, background: '#eef2ff', color: '#4338ca',
+                                  padding: '4px 8px', fontSize: 11, borderRadius: 6
+                                }}
+                              >
+                                ✏️ Düzenle
+                              </button>
+                              <button
+                                onClick={() => delItem(idx)}
+                                style={{
+                                  ...Btn, background: '#fee2e2', color: '#991b1b',
+                                  padding: '4px 8px', fontSize: 11, borderRadius: 6
+                                }}
+                              >
+                                🗑️ Sil
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* İndirimler */}
+                          {itemCalc.applied.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {itemCalc.applied.map((app, i) => (
+                                <span key={i} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                                  padding: '1px 6px', borderRadius: 5, fontSize: 10, fontWeight: 700,
+                                  background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
+                                }}>
+                                  🏷️ {app.name} ({app.label})
+                                </span>
+                              ))}
+                              {itemCalc.applied.length > 1 && (
+                                <span style={{ fontSize: 10, color: '#b91c1c', fontWeight: 700, marginLeft: 2 }}>
+                                  Toplam: -{money(itemCalc.totalDiscount)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Satır 2: 3'lü Finansal Kutu */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr',
+                            gap: 6,
+                            background: '#f8fafc',
+                            padding: '8px 10px',
+                            borderRadius: 10,
+                            border: '1px solid #e2e8f0',
+                            alignItems: 'center'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Net Tutar</div>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>
+                                {money(it.total)}
+                              </div>
+                            </div>
+                            <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
+                              <div style={{ fontSize: 10, color: '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Tahsil Edilen</div>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: planSum.paid > 0 ? '#059669' : '#64748b', marginTop: 1 }}>
+                                {money(planSum.paid)}
+                              </div>
+                            </div>
+                            <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
+                              <div style={{ fontSize: 10, color: planSum.remaining > 0 ? '#e11d48' : '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Kalan</div>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: planSum.remaining > 0 ? '#e11d48' : '#059669', marginTop: 1 }}>
+                                {money(planSum.remaining)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Satır 3: Taksit Detayları */}
+                          <div style={{ fontSize: 11, color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                            <span>{it.installments} Taksit · Aylık: <strong style={{ color: '#4f46e5' }}>{money(perMonth)}</strong></span>
+                            <span>Başlangıç: {formatTrFullDate(it.start || ys)}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                    <table style={{ ...tbl, minWidth: 780 }}>
+                      <thead>
+                        <tr>
+                          <th style={th}>
+                            <button type="button" onClick={() => togglePlanSort('name')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                              Plan Adı {planSortKey === 'name' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={{ ...th, textAlign: 'right' }}>
+                            <button type="button" onClick={() => togglePlanSort('basePrice')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                              Baz Fiyat {planSortKey === 'basePrice' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={th}>İndirim Durumu</th>
+                          <th style={{ ...th, textAlign: 'right' }}>
+                            <button type="button" onClick={() => togglePlanSort('total')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                              Net Tutar {planSortKey === 'total' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={{ ...th, textAlign: 'right' }}>
+                            <button type="button" onClick={() => togglePlanSort('collected')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#059669' }}>
+                              Tahsil Edilen {planSortKey === 'collected' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={{ ...th, textAlign: 'right' }}>
+                            <button type="button" onClick={() => togglePlanSort('remaining')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#e11d48' }}>
+                              Kalan Bakiye {planSortKey === 'remaining' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={{ ...th, textAlign: 'center' }}>
+                            <button type="button" onClick={() => togglePlanSort('installments')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                              Taksit {planSortKey === 'installments' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={{ ...th, textAlign: 'right' }}>
+                            <button type="button" onClick={() => togglePlanSort('month')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                              Aylık Tutar {planSortKey === 'month' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={th}>
+                            <button type="button" onClick={() => togglePlanSort('start')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                              Başlangıç {planSortKey === 'start' ? (planSortDir === 'asc' ? '↑' : '↓') : ''}
+                            </button>
+                          </th>
+                          <th style={{ ...th, textAlign: 'center', width: 130 }}>İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(selStudent.items || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={10} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '32px 12px' }}>
+                              <div style={{ fontSize: 26, marginBottom: 6 }}>📝</div>
+                              <div>Bu öğrenciye henüz bir ücret planı eklenmemiş.</div>
+                              <div style={{ marginTop: 4, fontSize: 11 }}>
+                                Sağ üstteki <strong>"+ Ücret Planı Ekle"</strong> butonuna tıklayarak yeni plan ekleyebilirsiniz.
                               </div>
                             </td>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                        ) : visiblePlans.length === 0 ? (
+                          <tr>
+                            <td colSpan={10} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '32px 12px' }}>
+                              Plan ara sonuçlarına uygun kayıt bulunamadı.
+                            </td>
+                          </tr>
+                        ) : visiblePlans.map((it) => {
+                          const idx = selStudent.items.findIndex(p => p === it)
+                          const itemCalc = resolveItemDiscounts(it)
+                          const perMonth = round2(Number(it.total) / Math.max(1, it.installments))
+                          const isSelectedPlan = selectedPlanIdx === idx
+                          const planSum = planSummaries[it.name] || {
+                            paid: 0,
+                            remaining: Number(it.total) || 0,
+                            paidCount: 0,
+                            totalCount: it.installments || 1
+                          }
+
+                          return (
+                            <tr
+                              key={idx}
+                              onClick={() => setSelectedPlanIdx(idx)}
+                              style={{
+                                cursor: 'pointer',
+                                background: isSelectedPlan ? 'linear-gradient(135deg,rgba(99,102,241,0.07),rgba(139,92,246,0.03))' : 'transparent',
+                                borderLeft: isSelectedPlan ? '4px solid #6366f1' : '4px solid transparent',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <td style={td}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontWeight: 800, color: isSelectedPlan ? '#4338ca' : '#0f172a', fontSize: 13 }}>
+                                    {it.name}
+                                  </span>
+                                  {isSelectedPlan && (
+                                    <span style={{
+                                      padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800,
+                                      background: '#e0e7ff', color: '#4338ca'
+                                    }}>
+                                      Seçili Plan
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ ...td, textAlign: 'right', color: '#64748b', fontSize: 13 }}>
+                                {money(itemCalc.basePrice)}
+                              </td>
+                              <td style={td}>
+                                {itemCalc.applied.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                      {itemCalc.applied.map((app, i) => (
+                                        <span key={i} style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                                          padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                          background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
+                                        }}>
+                                          🏷️ {app.name} ({app.label})
+                                        </span>
+                                      ))}
+                                    </div>
+                                    {itemCalc.applied.length > 1 && (
+                                      <div style={{ fontSize: 11, color: '#b91c1c', fontWeight: 700 }}>
+                                        Toplam: -{money(itemCalc.totalDiscount)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span style={{ color: '#94a3b8', fontSize: 12 }}>— İndirim yok —</span>
+                                )}
+                              </td>
+                              {/* Net Tutar */}
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
+                                {money(it.total)}
+                              </td>
+                              {/* Tahsil Edilen */}
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: planSum.paid > 0 ? '#059669' : '#64748b', fontSize: 13 }}>
+                                {money(planSum.paid)}
+                              </td>
+                              {/* Kalan Bakiye */}
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: planSum.remaining > 0 ? '#e11d48' : '#059669', fontSize: 13 }}>
+                                {money(planSum.remaining)}
+                              </td>
+                              <td style={{ ...td, textAlign: 'center', color: '#334155', fontWeight: 700 }}>
+                                {it.installments}
+                              </td>
+                              <td style={{ ...td, textAlign: 'right', color: '#4f46e5', fontWeight: 700 }}>
+                                {money(perMonth)}
+                              </td>
+                              <td style={{ ...td, color: '#475569', fontSize: 12 }}>
+                                {formatTrFullDate(it.start || ys)}
+                              </td>
+                              <td style={td} onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                  <button
+                                    onClick={() => openEdit(idx)}
+                                    style={{
+                                      ...Btn, background: '#eef2ff', color: '#4338ca',
+                                      padding: '4px 8px', fontSize: 11
+                                    }}
+                                  >
+                                    ✏️ Düzenle
+                                  </button>
+                                  <button
+                                    onClick={() => delItem(idx)}
+                                    style={{
+                                      ...Btn, background: '#fee2e2', color: '#991b1b',
+                                      padding: '4px 8px', fontSize: 11
+                                    }}
+                                  >
+                                    🗑️ Sil
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* ============================================================ */}
@@ -1718,13 +1959,23 @@ export default function UcretPlaniPage() {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>📅</span>
+                      <span style={{ fontSize: 20 }}>📅</span>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
                           {activePlan.name} — Taksit Dökümü
                         </div>
-                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
-                          Toplam: {money(activePlan.total)} · {installmentList.length} Taksit · Vade Başlangıcı: {formatTrFullDate(activePlan.start || ys)}
+                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span>Toplam: <strong style={{ color: '#0f172a' }}>{money(activePlan.total)}</strong></span>
+                          <span>·</span>
+                          <span style={{ color: '#059669' }}>Tahsil Edilen: <strong style={{ color: '#059669' }}>{money(activePlanSum?.paid ?? 0)}</strong></span>
+                          <span>·</span>
+                          <span style={{ color: (activePlanSum?.remaining ?? 0) > 0 ? '#e11d48' : '#059669' }}>
+                            Kalan: <strong style={{ color: (activePlanSum?.remaining ?? 0) > 0 ? '#e11d48' : '#059669' }}>{money(activePlanSum?.remaining ?? 0)}</strong>
+                          </span>
+                          <span>·</span>
+                          <span>{installmentList.length} Taksit</span>
+                          <span>·</span>
+                          <span>Vade Başlangıcı: {formatTrFullDate(activePlan.start || ys)}</span>
                         </div>
                       </div>
                     </div>
@@ -1742,22 +1993,35 @@ export default function UcretPlaniPage() {
 
                   {downPaymentInfo && (
                     <div style={{
-                      margin: '12px 20px 0', padding: '10px 12px', borderRadius: 10,
+                      margin: '12px 20px 0', padding: '10px 14px', borderRadius: 10,
                       border: '1px solid #fde68a', background: '#fffbeb',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       gap: 12, flexWrap: 'wrap'
                     }}>
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e' }}>💰 Peşin İşlem</div>
-                        <div style={{ fontSize: 11, color: '#78350f', marginTop: 2 }}>
-                          Tutar: {money(downPaymentInfo.amount)} · Tahsil Edilen: {money(downPaymentInfo.paid)} · Kalan: {money(downPaymentInfo.remaining)}
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>💰 Peşin İşlem</span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                            background: downPaymentInfo.remaining === 0 ? '#dcfce7' : '#fef3c7',
+                            color: downPaymentInfo.remaining === 0 ? '#15803d' : '#92400e'
+                          }}>
+                            {downPaymentInfo.remaining === 0 ? '✓ Tamamı Tahsil Edildi' : 'Kalan Var'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#78350f', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          <span>Peşinat Tutarı: <strong style={{ color: '#0f172a' }}>{money(downPaymentInfo.amount)}</strong></span>
+                          <span>·</span>
+                          <span>Tahsil Edilen: <strong style={{ color: '#059669' }}>{money(downPaymentInfo.paid)}</strong></span>
+                          <span>·</span>
+                          <span>Kalan: <strong style={{ color: downPaymentInfo.remaining > 0 ? '#dc2626' : '#059669' }}>{money(downPaymentInfo.remaining)}</strong></span>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={openDownPaymentModal}
                         style={{
-                          ...Btn, padding: '6px 10px', fontSize: 11,
+                          ...Btn, padding: '6px 12px', fontSize: 11, fontWeight: 700,
                           background: downPaymentInfo.remaining > 0 ? '#f59e0b' : '#fef3c7',
                           color: downPaymentInfo.remaining > 0 ? '#fff' : '#92400e',
                           border: '1px solid #fcd34d'
@@ -1768,21 +2032,16 @@ export default function UcretPlaniPage() {
                     </div>
                   )}
 
-                  <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
-                    <table style={{ ...tbl, minWidth: 680 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ ...th, width: 80 }}>Taksit No</th>
-                          <th style={th}>Vade Tarihi</th>
-                          <th style={{ ...th, textAlign: 'right' }}>Tutar</th>
-                          <th style={th}>Vade Durumu</th>
-                          <th style={th}>Tahsilat Bilgisi</th>
-                          <th style={{ ...th, textAlign: 'center', width: 140 }}>İşlem</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {installmentList.map(inst => (
-                          <tr
+                  {/* Installments Container: Mobile Responsive Cards OR Desktop Table */}
+                  {isMobile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+                      {installmentList.length === 0 ? (
+                        <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px 12px', fontSize: 13 }}>
+                          Taksit bilgisi bulunamadı.
+                        </div>
+                      ) : (
+                        installmentList.map(inst => (
+                          <div
                             key={inst.installmentNo}
                             style={{
                               background: inst.isSkipped
@@ -1792,199 +2051,50 @@ export default function UcretPlaniPage() {
                                 : inst.isOverdue
                                 ? '#fffbfb'
                                 : '#fff',
-                              opacity: inst.isSkipped ? 0.75 : 1,
-                              transition: 'background 0.1s'
+                              border: inst.isOverdue && !inst.isPaid && !inst.isSkipped
+                                ? '1.5px solid #fecaca'
+                                : inst.isPaid
+                                ? '1.5px solid #bbf7d0'
+                                : '1px solid #e2e8f0',
+                              borderRadius: 12,
+                              padding: '12px 14px',
+                              boxShadow: '0 1px 4px rgba(15,23,42,0.04)',
+                              opacity: inst.isSkipped ? 0.78 : 1,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 10
                             }}
                           >
-                            {/* Taksit No */}
-                            <td style={td}>
-                              <span style={{
-                                fontWeight: 800,
-                                color: inst.isSkipped ? '#94a3b8' : '#4f46e5',
-                                background: inst.isSkipped ? '#f1f5f9' : '#eef2ff',
-                                padding: '3px 8px', borderRadius: 6, fontSize: 12,
-                                textDecoration: inst.isSkipped ? 'line-through' : 'none'
-                              }}>
-                                {inst.installmentNo}. Taksit
-                              </span>
-                            </td>
-
-                            {/* Vade Tarihi */}
-                            <td style={td}>
-                              <div style={{ fontWeight: 700, color: inst.isSkipped ? '#94a3b8' : '#0f172a', fontSize: 13 }}>
-                                {inst.dueDateFormatted}
+                            {/* Satır 1: Başlık (Taksit No & Vade) ve Aksiyon Butonları */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{
+                                  fontWeight: 800,
+                                  color: inst.isSkipped ? '#94a3b8' : '#4f46e5',
+                                  background: inst.isSkipped ? '#f1f5f9' : '#eef2ff',
+                                  padding: '4px 9px', borderRadius: 7, fontSize: 12,
+                                  textDecoration: inst.isSkipped ? 'line-through' : 'none'
+                                }}>
+                                  {inst.installmentNo}. Taksit
+                                </span>
+                                <div>
+                                  <div style={{ fontWeight: 800, color: inst.isSkipped ? '#94a3b8' : '#0f172a', fontSize: 13 }}>
+                                    {inst.dueDateFormatted}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: '#94a3b8' }}>
+                                    {inst.dueDate}
+                                  </div>
+                                </div>
                               </div>
-                              <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                                {inst.dueDate}
-                              </div>
-                            </td>
 
-                            {/* Taksit Tutarı */}
-                            <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
-                              {inst.isSkipped ? (
-                                inst.isPartialSkip ? (
-                                  <div>
-                                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
-                                      {money(inst.amount)}
-                                    </div>
-                                    <div style={{ fontSize: 10, color: '#d97706', fontWeight: 700 }}>
-                                      (-{money(inst.deductedAmount)} indirim)
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>
-                                    Muaf (₺0)
-                                  </span>
-                                )
-                              ) : (
-                                money(inst.amount)
-                              )}
-                            </td>
-
-                            {/* Vade Durumu */}
-                            <td style={td}>
-                              {inst.isSkipped ? (
-                                inst.isPartialSkip ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
-                                    <span style={{
-                                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                                      padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
-                                      background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a'
-                                    }}>
-                                      🚫 Yarım Ay ({inst.absentDays} Gün)
-                                    </span>
-                                    {inst.isPaid ? (
-                                      <span style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
-                                        background: '#dcfce7', color: '#15803d'
-                                      }}>
-                                        ✓ Kalan Ödendi
-                                      </span>
-                                    ) : inst.isOverdue ? (
-                                      <span style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
-                                        background: '#fee2e2', color: '#b91c1c'
-                                      }}>
-                                        ⚠️ Vadesi Geçti ({inst.daysOverdue}g)
-                                      </span>
-                                    ) : (
-                                      <span style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600,
-                                        background: '#f1f5f9', color: '#475569'
-                                      }}>
-                                        ⏳ Ödeme Bekliyor
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
-                                    background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0'
-                                  }}>
-                                    🚫 Tam Ay Devamsızlık
-                                  </span>
-                                )
-                              ) : inst.isPaid ? (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                                  padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
-                                  background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0'
-                                }}>
-                                  ✓ Tahsil Edildi
-                                </span>
-                              ) : inst.isOverdue ? (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                                  padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
-                                  background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
-                                }}>
-                                  ⚠️ Vadesi Geçti ({inst.daysOverdue} gün)
-                                </span>
-                              ) : inst.isDueToday ? (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                                  padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
-                                  background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
-                                }}>
-                                  ⚡ Vadesi Bugün
-                                </span>
-                              ) : (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                                  padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                                  background: '#f1f5f9', color: '#475569'
-                                }}>
-                                  ⏳ Vadesi Gelmedi
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Tahsilat Bilgisi */}
-                            <td style={td}>
-                              {inst.isSkipped && !inst.isPartialSkip ? (
-                                <div>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                                    🚫 {inst.skipReason}
-                                  </div>
-                                  {inst.skipDate && (
-                                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                                      Kayıt: {formatTrFullDate(inst.skipDate)}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : inst.isPaid ? (
-                                <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 800, color: '#059669' }}>
-                                      {money(inst.paid)} Ödendi
-                                    </span>
-                                    <span style={{
-                                      fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
-                                      background: inst.paymentMethod === 'Nakit' ? '#fef3c7' : '#e0e7ff',
-                                      color: inst.paymentMethod === 'Nakit' ? '#92400e' : '#4338ca'
-                                    }}>
-                                      {inst.paymentMethod}
-                                    </span>
-                                  </div>
-                                  {inst.collectionDate && (
-                                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
-                                      Tarih: {formatTrFullDate(inst.collectionDate)}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : inst.paid > 0 ? (
-                                <div>
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>
-                                    Kısmi: {money(inst.paid)}
-                                  </span>
-                                  <div style={{ fontSize: 11, color: '#ef4444' }}>
-                                    Kalan: {money(inst.remaining)}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <span style={{ fontSize: 12, color: '#94a3b8' }}>Ödeme bekleniyor</span>
-                                  {inst.isPartialSkip && (
-                                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-                                      ({inst.absentDays} gün devamsızlık düşüldü)
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-
-                            {/* İşlem Butonları */}
-                            <td style={td}>
-                              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {/* İşlem Butonları: Mobilde doğrudan erişilebilir */}
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                 {inst.isSkipped ? (
                                   inst.isPartialSkip ? (
                                     <>
                                       {!inst.isPaid && (
                                         <button
+                                          type="button"
                                           onClick={() => openCollectModal(inst)}
                                           style={{
                                             ...Btn,
@@ -1992,66 +2102,47 @@ export default function UcretPlaniPage() {
                                               ? 'linear-gradient(135deg,#ef4444,#dc2626)'
                                               : 'linear-gradient(135deg,#10b981,#059669)',
                                             color: '#fff',
-                                            padding: '6px 11px',
+                                            padding: '6px 12px',
                                             fontSize: 12,
                                             fontWeight: 700,
                                             borderRadius: 8,
                                             boxShadow: '0 2px 8px rgba(16,185,129,0.25)'
                                           }}
-                                          title="Kalan taksit tutarını tahsil et"
                                         >
                                           💰 Tahsil Et
                                         </button>
                                       )}
                                       {inst.collections && inst.collections.length > 0 && (
                                         <button
+                                          type="button"
                                           onClick={() => openEditCollectionModal(inst)}
                                           style={{
-                                            ...Btn,
-                                            background: '#f8fafc',
-                                            color: '#334155',
-                                            border: '1px solid #cbd5e1',
-                                            padding: '5px 9px',
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            borderRadius: 7
+                                            ...Btn, background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1',
+                                            padding: '5px 8px', fontSize: 11, fontWeight: 700, borderRadius: 7
                                           }}
-                                          title="Tahsilat detayını gör / sil / düzenle"
                                         >
-                                          🔍 Detay / Düzenle
+                                          🔍 Detay
                                         </button>
                                       )}
                                       <button
+                                        type="button"
                                         onClick={() => unskipInstallment(inst.installmentNo)}
                                         style={{
-                                          ...Btn,
-                                          background: '#f1f5f9',
-                                          color: '#475569',
-                                          border: '1px solid #cbd5e1',
-                                          padding: '5px 9px',
-                                          fontSize: 11,
-                                          fontWeight: 700,
-                                          borderRadius: 7
+                                          ...Btn, background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1',
+                                          padding: '5px 8px', fontSize: 11, fontWeight: 700, borderRadius: 7
                                         }}
-                                        title="Devamsızlığı iptal et ve bakiyeyi geri yükle"
                                       >
                                         ↩ Geri Al
                                       </button>
                                     </>
                                   ) : (
                                     <button
+                                      type="button"
                                       onClick={() => unskipInstallment(inst.installmentNo)}
                                       style={{
-                                        ...Btn,
-                                        background: '#f1f5f9',
-                                        color: '#475569',
-                                        border: '1px solid #cbd5e1',
-                                        padding: '5px 10px',
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        borderRadius: 7
+                                        ...Btn, background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1',
+                                        padding: '5px 10px', fontSize: 11, fontWeight: 700, borderRadius: 7
                                       }}
-                                      title="Devamsızlık kaydını kaldır"
                                     >
                                       ↩ Geri Al
                                     </button>
@@ -2059,6 +2150,7 @@ export default function UcretPlaniPage() {
                                 ) : !inst.isPaid ? (
                                   <>
                                     <button
+                                      type="button"
                                       onClick={() => openCollectModal(inst)}
                                       style={{
                                         ...Btn,
@@ -2066,9 +2158,9 @@ export default function UcretPlaniPage() {
                                           ? 'linear-gradient(135deg,#ef4444,#dc2626)'
                                           : 'linear-gradient(135deg,#10b981,#059669)',
                                         color: '#fff',
-                                        padding: '6px 12px',
+                                        padding: '7px 14px',
                                         fontSize: 12,
-                                        fontWeight: 700,
+                                        fontWeight: 800,
                                         borderRadius: 8,
                                         boxShadow: '0 2px 8px rgba(16,185,129,0.25)'
                                       }}
@@ -2076,16 +2168,11 @@ export default function UcretPlaniPage() {
                                       💰 Tahsil Et
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() => openSkipModal(inst)}
                                       style={{
-                                        ...Btn,
-                                        background: '#f8fafc',
-                                        color: '#64748b',
-                                        border: '1px solid #e2e8f0',
-                                        padding: '6px 10px',
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        borderRadius: 8
+                                        ...Btn, background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0',
+                                        padding: '6px 9px', fontSize: 11, fontWeight: 700, borderRadius: 8
                                       }}
                                       title="Bu taksiti devamsızlık olarak işaretle ve bakiyeden düş"
                                     >
@@ -2093,48 +2180,556 @@ export default function UcretPlaniPage() {
                                     </button>
                                     {inst.collections && inst.collections.length > 0 && (
                                       <button
+                                        type="button"
                                         onClick={() => openEditCollectionModal(inst)}
                                         style={{
-                                          ...Btn,
-                                          background: '#eff6ff',
-                                          color: '#1d4ed8',
-                                          border: '1px solid #bfdbfe',
-                                          padding: '5px 9px',
-                                          fontSize: 11,
-                                          fontWeight: 700,
-                                          borderRadius: 7
+                                          ...Btn, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                                          padding: '5px 8px', fontSize: 11, fontWeight: 700, borderRadius: 7
                                         }}
-                                        title="Yapılan tahsilatları gör, düzenle veya sil"
                                       >
-                                        🔍 Detay / Düzenle
+                                        🔍 Detay
                                       </button>
                                     )}
                                   </>
                                 ) : (
                                   <button
+                                    type="button"
                                     onClick={() => openEditCollectionModal(inst)}
                                     style={{
-                                      ...Btn,
-                                      background: '#f0fdf4',
-                                      color: '#15803d',
-                                      border: '1px solid #bbf7d0',
-                                      padding: '5px 10px',
-                                      fontSize: 11,
-                                      fontWeight: 700,
-                                      borderRadius: 7
+                                      ...Btn, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0',
+                                      padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 7
                                     }}
-                                    title="Tahsilat detayını gör, ödeme yöntemini/tarihini düzelt veya tahsilatı sil"
                                   >
                                     🔍 Detay / Düzenle
                                   </button>
                                 )}
                               </div>
-                            </td>
+                            </div>
+
+                            {/* Satır 2: Durum & Tahsilat Bilgisi */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                {inst.isSkipped ? (
+                                  inst.isPartialSkip ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                      <span style={{
+                                        padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                        background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a'
+                                      }}>
+                                        🚫 Yarım Ay ({inst.absentDays} Gün)
+                                      </span>
+                                      {inst.isPaid ? (
+                                        <span style={{
+                                          padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
+                                          background: '#dcfce7', color: '#15803d'
+                                        }}>
+                                          ✓ Kalan Ödendi
+                                        </span>
+                                      ) : inst.isOverdue ? (
+                                        <span style={{
+                                          padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
+                                          background: '#fee2e2', color: '#b91c1c'
+                                        }}>
+                                          ⚠️ Vadesi Geçti ({inst.daysOverdue}g)
+                                        </span>
+                                      ) : (
+                                        <span style={{
+                                          padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600,
+                                          background: '#f1f5f9', color: '#475569'
+                                        }}>
+                                          ⏳ Ödeme Bekliyor
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span style={{
+                                      padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                      background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0'
+                                    }}>
+                                      🚫 Tam Ay Devamsızlık
+                                    </span>
+                                  )
+                                ) : inst.isPaid ? (
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0'
+                                  }}>
+                                    ✓ Tahsil Edildi
+                                  </span>
+                                ) : inst.isOverdue ? (
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
+                                  }}>
+                                    ⚠️ Vadesi Geçti ({inst.daysOverdue} gün)
+                                  </span>
+                                ) : inst.isDueToday ? (
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
+                                  }}>
+                                    ⚡ Vadesi Bugün
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                    background: '#f1f5f9', color: '#475569'
+                                  }}>
+                                    ⏳ Vadesi Gelmedi
+                                  </span>
+                                )}
+
+                                {/* Yöntem rozeti */}
+                                {inst.paymentMethod && (
+                                  <span style={{
+                                    fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+                                    background: inst.paymentMethod.includes('Nakit') ? '#fef3c7' : '#e0e7ff',
+                                    color: inst.paymentMethod.includes('Nakit') ? '#92400e' : '#4338ca',
+                                    border: inst.paymentMethod.includes('Nakit') ? '1px solid #fde68a' : '1px solid #c7d2fe'
+                                  }}>
+                                    {inst.paymentMethod}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Tarih veya İndirim açıklaması */}
+                              {inst.collectionDate ? (
+                                <span style={{ color: '#64748b', fontSize: 11 }}>
+                                  Tarih: {formatTrFullDate(inst.collectionDate)}
+                                </span>
+                              ) : inst.isPartialSkip ? (
+                                <span style={{ color: '#d97706', fontSize: 10, fontWeight: 700 }}>
+                                  (-{money(inst.deductedAmount)} indirim)
+                                </span>
+                              ) : null}
+                            </div>
+
+                            {/* Satır 3: 3'lü Finansal Kutu (Tutar, Tahsil Edilen, Kalan) */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr 1fr',
+                              gap: 6,
+                              background: '#f8fafc',
+                              padding: '8px 10px',
+                              borderRadius: 10,
+                              border: '1px solid #e2e8f0',
+                              alignItems: 'center'
+                            }}>
+                              <div>
+                                <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Tutar</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>
+                                  {inst.isSkipped && !inst.isPartialSkip ? (
+                                    <span style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>₺0 (Muaf)</span>
+                                  ) : (
+                                    money(inst.amount)
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
+                                <div style={{ fontSize: 10, color: '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Tahsil Edilen</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: inst.paid > 0 ? '#059669' : '#94a3b8', marginTop: 1 }}>
+                                  {money(inst.paid)}
+                                </div>
+                              </div>
+
+                              <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
+                                <div style={{ fontSize: 10, color: inst.remaining > 0 ? '#dc2626' : '#059669', fontWeight: 700, textTransform: 'uppercase' }}>Kalan</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: inst.remaining > 0 ? '#dc2626' : '#059669', marginTop: 1 }}>
+                                  {money(inst.remaining)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="ak-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                      <table style={{ ...tbl, minWidth: 840 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ ...th, width: 85 }}>Taksit No</th>
+                            <th style={th}>Vade Tarihi</th>
+                            <th style={{ ...th, textAlign: 'right', minWidth: 105 }}>Tutar</th>
+                            <th style={{ ...th, textAlign: 'right', minWidth: 105 }}>Tahsil Edilen</th>
+                            <th style={{ ...th, textAlign: 'right', minWidth: 105 }}>Kalan Tutar</th>
+                            <th style={th}>Vade Durumu</th>
+                            <th style={th}>Tahsilat Bilgisi</th>
+                            <th style={{ ...th, textAlign: 'center', width: 140 }}>İşlem</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {installmentList.map(inst => (
+                            <tr
+                              key={inst.installmentNo}
+                              style={{
+                                background: inst.isSkipped
+                                  ? 'linear-gradient(135deg,#f8f9fa,#f1f5f9)'
+                                  : inst.isPaid
+                                  ? '#fcfdfc'
+                                  : inst.isOverdue
+                                  ? '#fffbfb'
+                                  : '#fff',
+                                opacity: inst.isSkipped ? 0.75 : 1,
+                                transition: 'background 0.1s'
+                              }}
+                            >
+                              {/* Taksit No */}
+                              <td style={td}>
+                                <span style={{
+                                  fontWeight: 800,
+                                  color: inst.isSkipped ? '#94a3b8' : '#4f46e5',
+                                  background: inst.isSkipped ? '#f1f5f9' : '#eef2ff',
+                                  padding: '3px 8px', borderRadius: 6, fontSize: 12,
+                                  textDecoration: inst.isSkipped ? 'line-through' : 'none'
+                                }}>
+                                  {inst.installmentNo}. Taksit
+                                </span>
+                              </td>
+
+                              {/* Vade Tarihi */}
+                              <td style={td}>
+                                <div style={{ fontWeight: 700, color: inst.isSkipped ? '#94a3b8' : '#0f172a', fontSize: 13 }}>
+                                  {inst.dueDateFormatted}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                                  {inst.dueDate}
+                                </div>
+                              </td>
+
+                              {/* Taksit Tutarı */}
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
+                                {inst.isSkipped ? (
+                                  inst.isPartialSkip ? (
+                                    <div>
+                                      <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
+                                        {money(inst.amount)}
+                                      </div>
+                                      <div style={{ fontSize: 10, color: '#d97706', fontWeight: 700 }}>
+                                        (-{money(inst.deductedAmount)} indirim)
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontSize: 12, color: '#94a3b8', textDecoration: 'line-through' }}>
+                                      Muaf (₺0)
+                                    </span>
+                                  )
+                                ) : (
+                                  money(inst.amount)
+                                )}
+                              </td>
+
+                              {/* Tahsil Edilen */}
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 800, fontSize: 14, color: inst.paid > 0 ? '#059669' : '#94a3b8' }}>
+                                {money(inst.paid)}
+                              </td>
+
+                              {/* Kalan Tutar */}
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 800, fontSize: 14, color: inst.remaining > 0 ? '#dc2626' : '#059669' }}>
+                                {money(inst.remaining)}
+                              </td>
+
+                              {/* Vade Durumu */}
+                              <td style={td}>
+                                {inst.isSkipped ? (
+                                  inst.isPartialSkip ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                                      <span style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                                        padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                        background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a'
+                                      }}>
+                                        🚫 Yarım Ay ({inst.absentDays} Gün)
+                                      </span>
+                                      {inst.isPaid ? (
+                                        <span style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                                          padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
+                                          background: '#dcfce7', color: '#15803d'
+                                        }}>
+                                          ✓ Kalan Ödendi
+                                        </span>
+                                      ) : inst.isOverdue ? (
+                                        <span style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                                          padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
+                                          background: '#fee2e2', color: '#b91c1c'
+                                        }}>
+                                          ⚠️ Vadesi Geçti ({inst.daysOverdue}g)
+                                        </span>
+                                      ) : (
+                                        <span style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                                          padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600,
+                                          background: '#f1f5f9', color: '#475569'
+                                        }}>
+                                          ⏳ Ödeme Bekliyor
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                                      padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                      background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0'
+                                    }}>
+                                      🚫 Tam Ay Devamsızlık
+                                    </span>
+                                  )
+                                ) : inst.isPaid ? (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0'
+                                  }}>
+                                    ✓ Tahsil Edildi
+                                  </span>
+                                ) : inst.isOverdue ? (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
+                                  }}>
+                                    ⚠️ Vadesi Geçti ({inst.daysOverdue} gün)
+                                  </span>
+                                ) : inst.isDueToday ? (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'
+                                  }}>
+                                    ⚡ Vadesi Bugün
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                    background: '#f1f5f9', color: '#475569'
+                                  }}>
+                                    ⏳ Vadesi Gelmedi
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Tahsilat Bilgisi */}
+                              <td style={td}>
+                                {inst.isSkipped && !inst.isPartialSkip ? (
+                                  <div>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+                                      🚫 {inst.skipReason}
+                                    </div>
+                                    {inst.skipDate && (
+                                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                                        Kayıt: {formatTrFullDate(inst.skipDate)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : inst.isPaid ? (
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+                                        background: inst.paymentMethod?.includes('Nakit') ? '#fef3c7' : '#e0e7ff',
+                                        color: inst.paymentMethod?.includes('Nakit') ? '#92400e' : '#4338ca',
+                                        border: inst.paymentMethod?.includes('Nakit') ? '1px solid #fde68a' : '1px solid #c7d2fe'
+                                      }}>
+                                        {inst.paymentMethod || 'Tahsil Edildi'}
+                                      </span>
+                                    </div>
+                                    {inst.collectionDate && (
+                                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                        Tarih: {formatTrFullDate(inst.collectionDate)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : inst.paid > 0 ? (
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+                                        background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a'
+                                      }}>
+                                        {inst.paymentMethod || 'Kısmi Ödeme'}
+                                      </span>
+                                    </div>
+                                    {inst.collectionDate && (
+                                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                        Son İşlem: {formatTrFullDate(inst.collectionDate)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span style={{ fontSize: 12, color: '#94a3b8' }}>Ödeme bekleniyor</span>
+                                    {inst.isPartialSkip && (
+                                      <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                                        ({inst.absentDays} gün devamsızlık düşüldü)
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* İşlem Butonları */}
+                              <td style={td}>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  {inst.isSkipped ? (
+                                    inst.isPartialSkip ? (
+                                      <>
+                                        {!inst.isPaid && (
+                                          <button
+                                            onClick={() => openCollectModal(inst)}
+                                            style={{
+                                              ...Btn,
+                                              background: inst.isOverdue
+                                                ? 'linear-gradient(135deg,#ef4444,#dc2626)'
+                                                : 'linear-gradient(135deg,#10b981,#059669)',
+                                              color: '#fff',
+                                              padding: '6px 11px',
+                                              fontSize: 12,
+                                              fontWeight: 700,
+                                              borderRadius: 8,
+                                              boxShadow: '0 2px 8px rgba(16,185,129,0.25)'
+                                            }}
+                                            title="Kalan taksit tutarını tahsil et"
+                                          >
+                                            💰 Tahsil Et
+                                          </button>
+                                        )}
+                                        {inst.collections && inst.collections.length > 0 && (
+                                          <button
+                                            onClick={() => openEditCollectionModal(inst)}
+                                            style={{
+                                              ...Btn,
+                                              background: '#f8fafc',
+                                              color: '#334155',
+                                              border: '1px solid #cbd5e1',
+                                              padding: '5px 9px',
+                                              fontSize: 11,
+                                              fontWeight: 700,
+                                              borderRadius: 7
+                                            }}
+                                            title="Tahsilat detayını gör / sil / düzenle"
+                                          >
+                                            🔍 Detay / Düzenle
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => unskipInstallment(inst.installmentNo)}
+                                          style={{
+                                            ...Btn,
+                                            background: '#f1f5f9',
+                                            color: '#475569',
+                                            border: '1px solid #cbd5e1',
+                                            padding: '5px 9px',
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            borderRadius: 7
+                                          }}
+                                          title="Devamsızlığı iptal et ve bakiyeyi geri yükle"
+                                        >
+                                          ↩ Geri Al
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        onClick={() => unskipInstallment(inst.installmentNo)}
+                                        style={{
+                                          ...Btn,
+                                          background: '#f1f5f9',
+                                          color: '#475569',
+                                          border: '1px solid #cbd5e1',
+                                          padding: '5px 10px',
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          borderRadius: 7
+                                        }}
+                                        title="Devamsızlık kaydını kaldır"
+                                      >
+                                        ↩ Geri Al
+                                      </button>
+                                    )
+                                  ) : !inst.isPaid ? (
+                                    <>
+                                      <button
+                                        onClick={() => openCollectModal(inst)}
+                                        style={{
+                                          ...Btn,
+                                          background: inst.isOverdue
+                                            ? 'linear-gradient(135deg,#ef4444,#dc2626)'
+                                            : 'linear-gradient(135deg,#10b981,#059669)',
+                                          color: '#fff',
+                                          padding: '6px 12px',
+                                          fontSize: 12,
+                                          fontWeight: 700,
+                                          borderRadius: 8,
+                                          boxShadow: '0 2px 8px rgba(16,185,129,0.25)'
+                                        }}
+                                      >
+                                        💰 Tahsil Et
+                                      </button>
+                                      <button
+                                        onClick={() => openSkipModal(inst)}
+                                        style={{
+                                          ...Btn,
+                                          background: '#f8fafc',
+                                          color: '#64748b',
+                                          border: '1px solid #e2e8f0',
+                                          padding: '6px 10px',
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          borderRadius: 8
+                                        }}
+                                        title="Bu taksiti devamsızlık olarak işaretle ve bakiyeden düş"
+                                      >
+                                        🚫 Atla
+                                      </button>
+                                      {inst.collections && inst.collections.length > 0 && (
+                                        <button
+                                          onClick={() => openEditCollectionModal(inst)}
+                                          style={{
+                                            ...Btn,
+                                            background: '#eff6ff',
+                                            color: '#1d4ed8',
+                                            border: '1px solid #bfdbfe',
+                                            padding: '5px 9px',
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            borderRadius: 7
+                                          }}
+                                          title="Yapılan tahsilatları gör, düzenle veya sil"
+                                        >
+                                          🔍 Detay / Düzenle
+                                        </button>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => openEditCollectionModal(inst)}
+                                      style={{
+                                        ...Btn,
+                                        background: '#f0fdf4',
+                                        color: '#15803d',
+                                        border: '1px solid #bbf7d0',
+                                        padding: '5px 10px',
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        borderRadius: 7
+                                      }}
+                                      title="Tahsilat detayını gör, ödeme yöntemini/tarihini düzelt veya tahsilatı sil"
+                                    >
+                                      🔍 Detay / Düzenle
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2700,11 +3295,26 @@ export default function UcretPlaniPage() {
                   📅 Tahsilat Tarihi *
                 </label>
                 <input
-                  style={{ ...InputCls, fontWeight: 700, borderColor: '#10b981' }}
+                  style={{
+                    ...InputCls,
+                    fontWeight: 700,
+                    borderColor: (state?.settings?.lockedDates || []).includes(collectForm.date) ? '#ef4444' : '#10b981'
+                  }}
                   type="date"
                   value={collectForm.date}
                   onChange={e => setCollectForm(prev => ({ ...prev, date: e.target.value }))}
                 />
+                {(state?.settings?.lockedDates || []).includes(collectForm.date) && (
+                  <div style={{
+                    marginTop: 6, padding: '7px 10px', borderRadius: 8,
+                    background: '#fef2f2', border: '1px solid #fecaca',
+                    color: '#991b1b', fontSize: 11, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}>
+                    <span>🔒</span>
+                    <span>Bu tarih kilitlidir! Kilitli bir güne yeni tahsilat girilemez.</span>
+                  </div>
+                )}
               </div>
 
               {/* Tahsil Edilen Tutar */}
@@ -2770,12 +3380,21 @@ export default function UcretPlaniPage() {
               <button
                 type="button"
                 onClick={saveInstallmentCollection}
+                disabled={(state?.settings?.lockedDates || []).includes(collectForm.date)}
                 style={{
-                  ...Btn, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff',
-                  boxShadow: '0 4px 12px rgba(16,185,129,0.25)', padding: '7px 16px'
+                  ...Btn,
+                  background: (state?.settings?.lockedDates || []).includes(collectForm.date)
+                    ? '#94a3b8'
+                    : 'linear-gradient(135deg,#10b981,#059669)',
+                  color: '#fff',
+                  boxShadow: (state?.settings?.lockedDates || []).includes(collectForm.date)
+                    ? 'none'
+                    : '0 4px 12px rgba(16,185,129,0.25)',
+                  padding: '7px 16px',
+                  cursor: (state?.settings?.lockedDates || []).includes(collectForm.date) ? 'not-allowed' : 'pointer'
                 }}
               >
-                Tahsilatı Kaydet
+                {(state?.settings?.lockedDates || []).includes(collectForm.date) ? '🔒 Tarih Kilitli' : 'Tahsilatı Kaydet'}
               </button>
             </div>
 
@@ -2887,6 +3506,32 @@ export default function UcretPlaniPage() {
                 </div>
               </div>
 
+              {/* Gün kilidi uyarısı */}
+              {(() => {
+                const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+                const originalCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
+                const isOrigLocked = originalCol?.date && lockedDates.includes(originalCol.date)
+                const isCurrentLocked = editCollectionForm.date && lockedDates.includes(editCollectionForm.date)
+                if (isOrigLocked || isCurrentLocked) {
+                  return (
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 10, background: '#fef2f2',
+                      border: '1.5px solid #fca5a5', color: '#991b1b', fontSize: 12, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', gap: 8
+                    }}>
+                      <span style={{ fontSize: 18 }}>🔒</span>
+                      <div>
+                        <div>Bu tahsilat kilitli bir güne aittir ({originalCol?.date || editCollectionForm.date}).</div>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: '#b91c1c', marginTop: 2 }}>
+                          Kilitli günlerde yapılmış tahsilatlar silinemez ve düzenlenemez.
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+                return null
+              })()}
+
               {/* Tahsilat Tarihi */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 5 }}>
@@ -2952,16 +3597,29 @@ export default function UcretPlaniPage() {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc'
             }}>
               {/* Delete button (Silme) */}
-              <button
-                type="button"
-                onClick={deleteExistingCollection}
-                style={{
-                  ...Btn, background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5',
-                  padding: '7px 12px', fontSize: 12
-                }}
-              >
-                🗑️ Tahsilatı Sil
-              </button>
+              {(() => {
+                const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+                const originalCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
+                const isLocked = (originalCol?.date && lockedDates.includes(originalCol.date)) || (editCollectionForm.date && lockedDates.includes(editCollectionForm.date))
+                return (
+                  <button
+                    type="button"
+                    onClick={deleteExistingCollection}
+                    disabled={isLocked}
+                    style={{
+                      ...Btn,
+                      background: isLocked ? '#f1f5f9' : '#fee2e2',
+                      color: isLocked ? '#94a3b8' : '#991b1b',
+                      border: `1px solid ${isLocked ? '#cbd5e1' : '#fca5a5'}`,
+                      padding: '7px 12px', fontSize: 12,
+                      cursor: isLocked ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isLocked ? 'Bu gün kilitli olduğu için silinemez' : ''}
+                  >
+                    {isLocked ? '🔒 Silme Kilitli' : '🗑️ Tahsilatı Sil'}
+                  </button>
+                )
+              })()}
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -2973,16 +3631,28 @@ export default function UcretPlaniPage() {
                 >
                   Vazgeç
                 </button>
-                <button
-                  type="button"
-                  onClick={saveEditedCollection}
-                  style={{
-                    ...Btn, background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#fff',
-                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)', padding: '7px 16px'
-                  }}
-                >
-                  💾 Değişiklikleri Kaydet
-                </button>
+                {(() => {
+                  const lockedDates = Array.isArray(state?.settings?.lockedDates) ? state.settings.lockedDates : []
+                  const originalCol = (state?.collections || []).find(c => String(c.id || c._id) === String(editCollectionForm.id))
+                  const isLocked = (originalCol?.date && lockedDates.includes(originalCol.date)) || (editCollectionForm.date && lockedDates.includes(editCollectionForm.date))
+                  return (
+                    <button
+                      type="button"
+                      onClick={saveEditedCollection}
+                      disabled={isLocked}
+                      style={{
+                        ...Btn,
+                        background: isLocked ? '#94a3b8' : 'linear-gradient(135deg,#3b82f6,#2563eb)',
+                        color: '#fff',
+                        boxShadow: isLocked ? 'none' : '0 4px 12px rgba(37,99,235,0.25)',
+                        padding: '7px 16px',
+                        cursor: isLocked ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {isLocked ? '🔒 Gün Kilitli' : '💾 Değişiklikleri Kaydet'}
+                    </button>
+                  )
+                })()}
               </div>
             </div>
 
@@ -3489,89 +4159,171 @@ export default function UcretPlaniPage() {
                         </div>
                       </div>
 
-                      {/* Installments table for this student */}
-                      <div style={{
-                        borderRadius: 10, border: '1px solid #fecaca', overflow: 'hidden',
-                        marginLeft: 8
-                      }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ background: '#fff5f5' }}>
-                              <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'left', borderBottom: '1px solid #fecaca' }}>Plan</th>
-                              <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'center', borderBottom: '1px solid #fecaca' }}>Taksit No</th>
-                              <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'left', borderBottom: '1px solid #fecaca' }}>Vade Tarihi</th>
-                              <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'right', borderBottom: '1px solid #fecaca' }}>Taksit Tutarı</th>
-                              <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'right', borderBottom: '1px solid #fecaca' }}>Kalan</th>
-                              <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'center', borderBottom: '1px solid #fecaca' }}>Gecikme</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rows.map((row, ri) => {
-                              const urgency = row.daysOverdue > 60 ? '#dc2626' : row.daysOverdue > 30 ? '#ea580c' : '#d97706'
-                              const urgencyBg = row.daysOverdue > 60 ? '#fee2e2' : row.daysOverdue > 30 ? '#ffedd5' : '#fefce8'
-                              return (
-                                <tr
-                                  key={`${row.planName}-${row.installmentNo}`}
-                                  onClick={() => openCollectModalFromOverdue(row)}
-                                  onMouseEnter={e => e.currentTarget.style.background = '#fff0f0'}
-                                  onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? '#fff' : '#fff8f8'}
-                                  style={{
-                                    background: ri % 2 === 0 ? '#fff' : '#fff8f8',
-                                    cursor: 'pointer',
-                                    transition: 'background 0.12s'
-                                  }}
-                                  title="Tıklayarak tahsilat yap"
-                                >
-                                  <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', fontWeight: 600, color: '#374151' }}>
-                                    {row.planName}
-                                  </td>
-                                  <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', textAlign: 'center' }}>
+                      {/* Installments table for this student (Mobile Cards OR Desktop Table) */}
+                      {isMobile ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                          {rows.map((row) => {
+                            const urgency = row.daysOverdue > 60 ? '#dc2626' : row.daysOverdue > 30 ? '#ea580c' : '#d97706'
+                            const urgencyBg = row.daysOverdue > 60 ? '#fee2e2' : row.daysOverdue > 30 ? '#ffedd5' : '#fefce8'
+                            return (
+                              <div
+                                key={`${row.planName}-${row.installmentNo}`}
+                                style={{
+                                  background: '#fff',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: 10,
+                                  padding: '10px 12px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 8
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <span style={{
                                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                      width: 26, height: 26, borderRadius: '50%',
+                                      width: 22, height: 22, borderRadius: '50%',
                                       background: '#fca5a5', color: '#7f1d1d', fontWeight: 800, fontSize: 11
                                     }}>
                                       {row.installmentNo}
                                     </span>
-                                  </td>
-                                  <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', fontFamily: 'monospace', color: '#374151' }}>
-                                    {row.dueDateFormatted}
-                                  </td>
-                                  <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', textAlign: 'right', color: '#374151' }}>
-                                    {money(row.amount)}
-                                  </td>
-                                  <td style={{ padding: '9px 12px', fontSize: 13, borderBottom: '1px solid #fee2e2', textAlign: 'right', fontWeight: 800, color: '#dc2626' }}>
-                                    {money(row.remaining)}
-                                  </td>
-                                  <td style={{ padding: '9px 12px', fontSize: 11, borderBottom: '1px solid #fee2e2', textAlign: 'center' }}>
-                                    <span style={{
-                                      display: 'inline-block', padding: '3px 8px', borderRadius: 99,
-                                      background: urgencyBg, color: urgency, fontWeight: 800
-                                    }}>
-                                      {row.daysOverdue} gün gecikmeli
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '6px 10px', borderBottom: '1px solid #fee2e2', textAlign: 'center' }}>
-                                    <button
-                                      onClick={e => { e.stopPropagation(); openCollectModalFromOverdue(row) }}
-                                      style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        padding: '5px 11px', borderRadius: 8, border: 'none',
-                                        background: 'linear-gradient(135deg,#10b981,#059669)',
-                                        color: '#fff', fontWeight: 700, fontSize: 11,
-                                        cursor: 'pointer', whiteSpace: 'nowrap',
-                                        boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
-                                      }}
-                                    >
-                                      💳 Tahsil Et
-                                    </button>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                    <strong style={{ fontSize: 12, color: '#374151' }}>{row.planName}</strong>
+                                  </div>
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: 99,
+                                    background: urgencyBg, color: urgency, fontWeight: 800, fontSize: 10
+                                  }}>
+                                    {row.daysOverdue} gün gecikmeli
+                                  </span>
+                                </div>
+
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 1fr 1fr',
+                                  gap: 4,
+                                  background: '#fff5f5',
+                                  padding: '6px 8px',
+                                  borderRadius: 8,
+                                  fontSize: 11
+                                }}>
+                                  <div>
+                                    <div style={{ fontSize: 9, color: '#991b1b', fontWeight: 700 }}>VADE</div>
+                                    <div style={{ fontWeight: 700, color: '#1f2937', marginTop: 1 }}>{row.dueDateFormatted}</div>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 9, color: '#991b1b', fontWeight: 700 }}>TUTAR</div>
+                                    <div style={{ fontWeight: 700, color: '#1f2937', marginTop: 1 }}>{money(row.amount)}</div>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 9, color: '#dc2626', fontWeight: 700 }}>KALAN</div>
+                                    <div style={{ fontWeight: 800, color: '#dc2626', marginTop: 1, fontSize: 12 }}>{money(row.remaining)}</div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); openCollectModalFromOverdue(row) }}
+                                  style={{
+                                    width: '100%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                    padding: '7px 12px', borderRadius: 8, border: 'none',
+                                    background: 'linear-gradient(135deg,#10b981,#059669)',
+                                    color: '#fff', fontWeight: 800, fontSize: 12,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+                                  }}
+                                >
+                                  💳 Tahsil Et
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{
+                          borderRadius: 10, border: '1px solid #fecaca', overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+                          marginLeft: 8
+                        }}>
+                          <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ background: '#fff5f5' }}>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'left', borderBottom: '1px solid #fecaca' }}>Plan</th>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'center', borderBottom: '1px solid #fecaca' }}>Taksit No</th>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'left', borderBottom: '1px solid #fecaca' }}>Vade Tarihi</th>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'right', borderBottom: '1px solid #fecaca' }}>Taksit Tutarı</th>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'right', borderBottom: '1px solid #fecaca' }}>Kalan</th>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'center', borderBottom: '1px solid #fecaca' }}>Gecikme</th>
+                                <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9f1239', textAlign: 'center', borderBottom: '1px solid #fecaca' }}>İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, ri) => {
+                                const urgency = row.daysOverdue > 60 ? '#dc2626' : row.daysOverdue > 30 ? '#ea580c' : '#d97706'
+                                const urgencyBg = row.daysOverdue > 60 ? '#fee2e2' : row.daysOverdue > 30 ? '#ffedd5' : '#fefce8'
+                                return (
+                                  <tr
+                                    key={`${row.planName}-${row.installmentNo}`}
+                                    onClick={() => openCollectModalFromOverdue(row)}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#fff0f0'}
+                                    onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? '#fff' : '#fff8f8'}
+                                    style={{
+                                      background: ri % 2 === 0 ? '#fff' : '#fff8f8',
+                                      cursor: 'pointer',
+                                      transition: 'background 0.12s'
+                                    }}
+                                    title="Tıklayarak tahsilat yap"
+                                  >
+                                    <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', fontWeight: 600, color: '#374151' }}>
+                                      {row.planName}
+                                    </td>
+                                    <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', textAlign: 'center' }}>
+                                      <span style={{
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        width: 26, height: 26, borderRadius: '50%',
+                                        background: '#fca5a5', color: '#7f1d1d', fontWeight: 800, fontSize: 11
+                                      }}>
+                                        {row.installmentNo}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', fontFamily: 'monospace', color: '#374151' }}>
+                                      {row.dueDateFormatted}
+                                    </td>
+                                    <td style={{ padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #fee2e2', textAlign: 'right', color: '#374151' }}>
+                                      {money(row.amount)}
+                                    </td>
+                                    <td style={{ padding: '9px 12px', fontSize: 13, borderBottom: '1px solid #fee2e2', textAlign: 'right', fontWeight: 800, color: '#dc2626' }}>
+                                      {money(row.remaining)}
+                                    </td>
+                                    <td style={{ padding: '9px 12px', fontSize: 11, borderBottom: '1px solid #fee2e2', textAlign: 'center' }}>
+                                      <span style={{
+                                        display: 'inline-block', padding: '3px 8px', borderRadius: 99,
+                                        background: urgencyBg, color: urgency, fontWeight: 800
+                                      }}>
+                                        {row.daysOverdue} gün gecikmeli
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #fee2e2', textAlign: 'center' }}>
+                                      <button
+                                        onClick={e => { e.stopPropagation(); openCollectModalFromOverdue(row) }}
+                                        style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                                          padding: '5px 11px', borderRadius: 8, border: 'none',
+                                          background: 'linear-gradient(135deg,#10b981,#059669)',
+                                          color: '#fff', fontWeight: 700, fontSize: 11,
+                                          cursor: 'pointer', whiteSpace: 'nowrap',
+                                          boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+                                        }}
+                                      >
+                                        💳 Tahsil Et
+                                      </button>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )
                 })

@@ -161,6 +161,14 @@ export default function TahsilatlarPage() {
   const [sortDir, setSortDir] = useState('desc')
   const [paymentOptions, setPaymentOptions] = useState([])
 
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  const isMobile = windowWidth < 820
+
   useEffect(() => {
     let active = true
     const loadPaymentMethods = async () => {
@@ -441,157 +449,289 @@ export default function TahsilatlarPage() {
       </div>
 
       {/* ── Table ── */}
+      {/* ── Table / Mobile Cards ── */}
       <div className="ak-panel" style={S.panel}>
-        <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
-            <thead>
-              <tr>
-                {isAdminPanelMode && (
-                  <th style={S.th}>
-                    <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                      🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </button>
-                  </th>
-                )}
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('date')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Tarih {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('student')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Öğrenci {sortKey === 'student' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('class')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Sınıf {sortKey === 'class' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('item')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Kalem {sortKey === 'item' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('payment')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Ödeme {sortKey === 'payment' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...S.th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('amount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Tutar {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={{ ...S.th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('vat')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    KDV {sortKey === 'vat' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-                <th style={S.th}>
-                  <button type="button" onClick={() => toggleSort('note')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    Açıklama {sortKey === 'note' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-                    {collections.length === 0
-                      ? 'Henüz hiç tahsilat kaydı yok.'
-                      : 'Seçili tarih aralığında veya filtrelerde kayıt bulunamadı.'}
-                  </td>
-                </tr>
-              ) : filtered.map(c => {
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+            {filtered.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '40px 12px' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                {collections.length === 0
+                  ? 'Henüz hiç tahsilat kaydı yok.'
+                  : 'Seçili tarih aralığında veya filtrelerde kayıt bulunamadı.'}
+              </div>
+            ) : (
+              filtered.map(c => {
                 const s = getStudent(state, c.studentId)
                 const invoiced = isCollectionInvoiced(state, c, s)
                 const vat = invoiced ? (c.vat || 0) : 0
 
                 return (
-                  <tr key={String(c.id || c._id)}
-                    onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    style={{ transition: 'background 0.12s' }}>
-                    {isAdminPanelMode && (
-                      <td style={S.td}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '3px 8px', borderRadius: 6,
-                          fontSize: 11, fontWeight: 700,
-                          background: 'rgba(99,102,241,0.08)', color: '#4338ca',
-                          border: '1px solid rgba(99,102,241,0.2)',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          🏫 {s?._schoolName || c._schoolName || '—'}
-                        </span>
-                      </td>
-                    )}
-                    <td style={{ ...S.td, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      {trDate(c.date)}
-                    </td>
-                    <td style={{ ...S.td, fontWeight: 700 }}>{s?.name || '—'}</td>
-                    <td style={{ ...S.td, color: '#64748b' }}>{s?.class || '—'}</td>
-                    <td style={S.td}>
+                  <div
+                    key={String(c.id || c._id)}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8
+                    }}
+                  >
+                    {/* Satır 1: Öğrenci Adı ve Tutar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>
+                          {s?.name || '—'}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                          {s?.class && (
+                            <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                              {s.class}
+                            </span>
+                          )}
+                          {isAdminPanelMode && (s?._schoolName || c._schoolName) && (
+                            <span style={{
+                              padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                              background: 'rgba(99,102,241,0.08)', color: '#4338ca'
+                            }}>
+                              🏫 {s?._schoolName || c._schoolName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 16, fontWeight: 900, color: '#0f172a' }}>
+                          {money(c.amount)}
+                        </div>
+                        {invoiced && vat > 0 && (
+                          <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>
+                            KDV: {money(vat)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Satır 2: Kalem & Fatura Durumu */}
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      gap: 8, fontSize: 12, color: '#334155', flexWrap: 'wrap'
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>{c.item || '—'}</span>
-                        {!invoiced && (
+                        <span style={{ fontWeight: 600 }}>{c.item || '—'}</span>
+                        {!invoiced ? (
                           <span style={{
                             fontSize: 10, padding: '1px 6px', borderRadius: 4,
                             background: '#f1f5f9', color: '#64748b', fontWeight: 600
                           }}>
                             Faturasız
                           </span>
-                        )}
+                        ) : c.invoiceNo ? (
+                          <span style={{
+                            fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                            background: '#dcfce7', color: '#166534', fontWeight: 700
+                          }}>
+                            Fatura: {c.invoiceNo}
+                          </span>
+                        ) : null}
                       </div>
-                    </td>
-                    <td style={S.td}>
-                      <span style={payBadge(c.payment)}>{c.payment || '—'}</span>
-                    </td>
-                    <td style={{ ...S.td, textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                      {money(c.amount)}
-                    </td>
-                    <td style={{ ...S.td, textAlign: 'right', color: invoiced ? '#f59e0b' : '#94a3b8' }}>
-                      {invoiced ? money(vat) : <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
-                    <td style={{ ...S.td, fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>
-                      {invoiced && c.invoiceNo ? c.invoiceNo : <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
-                    <td style={{
-                      ...S.td, color: c.note ? '#0f172a' : '#94a3b8',
-                      maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
+                        📅 {trDate(c.date)}
+                      </span>
+                    </div>
+
+                    {/* Satır 3: Ödeme Yöntemi ve Açıklama */}
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      gap: 8, paddingTop: 6, borderTop: '1px solid #f1f5f9', flexWrap: 'wrap'
                     }}>
-                      {c.note || '—'}
+                      <span style={payBadge(c.payment)}>{c.payment || '—'}</span>
+                      {c.note && (
+                        <div style={{
+                          fontSize: 11, color: '#64748b', maxWidth: '60%',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}>
+                          💬 {c.note}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+
+            {/* Mobil Toplam Bar */}
+            {filtered.length > 0 && (
+              <div style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+                padding: '10px 14px', display: 'flex', justifyContent: 'space-between',
+                alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#475569', flexWrap: 'wrap', gap: 8
+              }}>
+                <span>TOPLAM ({totals.count} kayıt)</span>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <span style={{ color: '#6366f1', fontWeight: 800 }}>{money(totals.total)}</span>
+                  {totals.vat > 0 && (
+                    <span style={{ color: '#f59e0b', fontWeight: 800 }}>KDV: {money(totals.vat)}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
+              <thead>
+                <tr>
+                  {isAdminPanelMode && (
+                    <th style={S.th}>
+                      <button type="button" onClick={() => toggleSort('school')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                        🏫 Okul {sortKey === 'school' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </button>
+                    </th>
+                  )}
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('date')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Tarih {sortKey === 'date' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('student')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Öğrenci {sortKey === 'student' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('class')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Sınıf {sortKey === 'class' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('item')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Kalem {sortKey === 'item' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('payment')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Ödeme {sortKey === 'payment' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...S.th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('amount')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Tutar {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={{ ...S.th, textAlign: 'right' }}>
+                    <button type="button" onClick={() => toggleSort('vat')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      KDV {sortKey === 'vat' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                  <th style={S.th}>
+                    <button type="button" onClick={() => toggleSort('note')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
+                      Açıklama {sortKey === 'note' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                      {collections.length === 0
+                        ? 'Henüz hiç tahsilat kaydı yok.'
+                        : 'Seçili tarih aralığında veya filtrelerde kayıt bulunamadı.'}
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-            {filtered.length > 0 && (
-              <tfoot>
-                <tr style={{ background: '#f8fafc' }}>
-                  <td colSpan={5} style={{ ...S.td, fontWeight: 700, color: '#475569', fontSize: 12 }}>
-                    TOPLAM ({totals.count} kayıt)
-                  </td>
-                  <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#6366f1' }}>
-                    {money(totals.total)}
-                  </td>
-                  <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#f59e0b' }}>
-                    {money(totals.vat)}
-                  </td>
-                  <td colSpan={2} style={S.td} />
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+                ) : filtered.map(c => {
+                  const s = getStudent(state, c.studentId)
+                  const invoiced = isCollectionInvoiced(state, c, s)
+                  const vat = invoiced ? (c.vat || 0) : 0
+
+                  return (
+                    <tr key={String(c.id || c._id)}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      style={{ transition: 'background 0.12s' }}>
+                      {isAdminPanelMode && (
+                        <td style={S.td}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 8px', borderRadius: 6,
+                            fontSize: 11, fontWeight: 700,
+                            background: 'rgba(99,102,241,0.08)', color: '#4338ca',
+                            border: '1px solid rgba(99,102,241,0.2)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            🏫 {s?._schoolName || c._schoolName || '—'}
+                          </span>
+                        </td>
+                      )}
+                      <td style={{ ...S.td, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>
+                        {trDate(c.date)}
+                      </td>
+                      <td style={{ ...S.td, fontWeight: 700 }}>{s?.name || '—'}</td>
+                      <td style={{ ...S.td, color: '#64748b' }}>{s?.class || '—'}</td>
+                      <td style={S.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>{c.item || '—'}</span>
+                          {!invoiced && (
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                              background: '#f1f5f9', color: '#64748b', fontWeight: 600
+                            }}>
+                              Faturasız
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={S.td}>
+                        <span style={payBadge(c.payment)}>{c.payment || '—'}</span>
+                      </td>
+                      <td style={{ ...S.td, textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                        {money(c.amount)}
+                      </td>
+                      <td style={{ ...S.td, textAlign: 'right', color: invoiced ? '#f59e0b' : '#94a3b8' }}>
+                        {invoiced ? money(vat) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ ...S.td, fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>
+                        {invoiced && c.invoiceNo ? c.invoiceNo : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{
+                        ...S.td, color: c.note ? '#0f172a' : '#94a3b8',
+                        maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {c.note || '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {filtered.length > 0 && (
+                <tfoot>
+                  <tr style={{ background: '#f8fafc' }}>
+                    <td colSpan={5} style={{ ...S.td, fontWeight: 700, color: '#475569', fontSize: 12 }}>
+                      TOPLAM ({totals.count} kayıt)
+                    </td>
+                    <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#6366f1' }}>
+                      {money(totals.total)}
+                    </td>
+                    <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#f59e0b' }}>
+                      {money(totals.vat)}
+                    </td>
+                    <td colSpan={2} style={S.td} />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
