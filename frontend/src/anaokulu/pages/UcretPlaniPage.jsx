@@ -675,25 +675,24 @@ export default function UcretPlaniPage() {
 
       // 1. Direct match by installmentNo (PRIMARY & STRICT)
       if (directMatches.length > 0) {
-        paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+        const directTotal = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+        paid = round2(paid + directTotal)
         collectionDate = directMatches[0].date || ''
         paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
         matchedCollections = directMatches
       }
       // 2. Only unassigned legacy collections can fill unassigned slots (NO double-counting!)
       else if (unassignedPool > 0) {
-        if (unassignedPool >= perInstallment) {
-          paid = perInstallment
-          unassignedPool = round2(unassignedPool - perInstallment)
-        } else {
-          paid = unassignedPool
-          unassignedPool = 0
-        }
+        const availableSpace = round2(Math.max(0, perInstallment - paid))
+        const applied = Math.min(unassignedPool, availableSpace)
+        paid = round2(paid + applied)
+        unassignedPool = round2(unassignedPool - applied)
         collectionDate = unassignedCols[0]?.date || ''
         paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
         matchedCollections = unassignedCols
       }
 
+      paid = round2(Math.min(paid, perInstallment))
       const remaining = round2(Math.max(0, perInstallment - paid))
       const isPaid = remaining <= 0
 

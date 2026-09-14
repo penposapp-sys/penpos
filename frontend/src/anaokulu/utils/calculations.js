@@ -348,20 +348,18 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
         let paymentMethods = []
 
         if (directMatches.length > 0) {
-          paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+          const directTotal = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
+          paid = round2(paid + directTotal)
           collectionDates = directMatches.map(c => c.date).filter(Boolean)
           paymentMethods = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', ...directMatches.map(c => c.payment).filter(Boolean)].filter(Boolean)
         } else if (unassignedPool > 0) {
-          if (unassignedPool >= installmentAmount) {
-            paid = installmentAmount
-            unassignedPool = round2(unassignedPool - installmentAmount)
-          } else {
-            paid = unassignedPool
-            unassignedPool = 0
-          }
+          const availableSpace = round2(Math.max(0, installmentAmount - paid))
+          const applied = Math.min(unassignedPool, availableSpace)
+          paid = round2(paid + applied)
+          unassignedPool = round2(unassignedPool - applied)
         }
 
-        paid = round2(paid)
+        paid = round2(Math.min(paid, installmentAmount))
         const remaining = round2(Math.max(0, installmentAmount - paid))
         const isPaid = paid >= installmentAmount && installmentAmount > 0
         const isPartial = paid > 0 && paid < installmentAmount
