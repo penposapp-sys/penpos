@@ -163,6 +163,7 @@ export const getAnaokuluSchool = async (req, res) => {
     res.json({
       settings,
       students,
+      studentCount: Array.isArray(students) ? students.length : 0,
       collections,
       invoices: normalizedInvoices,
       checks
@@ -198,6 +199,16 @@ export const saveAnaokuluSchool = async (req, res) => {
 
     const studentsChanged = JSON.stringify(reqStudents || []) !== JSON.stringify(school?.students || [])
     const collectionsChanged = JSON.stringify(reqCollections || []) !== JSON.stringify(school?.collections || [])
+    const invoicesChanged = JSON.stringify(reqInvoices || []) !== JSON.stringify(school?.invoices || [])
+    const checksChanged = JSON.stringify(reqChecks || []) !== JSON.stringify(school?.checks || [])
+
+    if (req.user?.role === 'superadmin') {
+      if (studentsChanged || collectionsChanged || invoicesChanged || checksChanged) {
+        return res.status(403).json({
+          error: 'Süper Admin okul içinde öğrenci, taksit, tahsilat veya fatura kaydı değiştiremez.'
+        })
+      }
+    }
 
     if (studentsChanged || collectionsChanged) {
       try {
@@ -323,6 +334,9 @@ export const getAnaokuluStudent = async (req, res) => {
 
 export const delAnaokuluStudent = async (req, res) => {
   try {
+    if (req.user?.role === 'superadmin') {
+      return res.status(403).json({ error: 'Süper Admin okul öğrencilerini silemez.' })
+    }
     const sid = Number(req.params.id)
 
     const school = await AnaokuluSchool.findOne({
@@ -361,6 +375,9 @@ export const delAnaokuluStudent = async (req, res) => {
 
 export const delAnaokuluCollection = async (req, res) => {
   try {
+    if (req.user?.role === 'superadmin') {
+      return res.status(403).json({ error: 'Süper Admin tahsilat silemez veya değiştiremez.' })
+    }
     const cid = Number(req.params.id)
 
     const school = await AnaokuluSchool.findOne({
@@ -399,6 +416,9 @@ export const delAnaokuluCollection = async (req, res) => {
 
 export const delAnaokuluInvoice = async (req, res) => {
   try {
+    if (req.user?.role === 'superadmin') {
+      return res.status(403).json({ error: 'Süper Admin fatura silemez veya iptal edemez.' })
+    }
     const uuid = req.params.uuid
 
     const school = await AnaokuluSchool.findOne({
@@ -1390,6 +1410,9 @@ async function _runLucaJob(
 
 export const updateAnaokuluStudent = async (req, res) => {
   try {
+    if (req.user?.role === 'superadmin') {
+      return res.status(403).json({ error: 'Süper Admin öğrenci bilgisi veya taksit düzenleyemez.' })
+    }
     const studentId = Number(req.params.id)
     const school = await AnaokuluSchool.findOne({
       tenant: req.tenant?._id

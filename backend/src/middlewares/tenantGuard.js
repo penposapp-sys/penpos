@@ -1,5 +1,5 @@
 import { error } from '../utils/errors.js'
-import { findActiveById } from '../repositories/tenantRepository.js'
+import { findActiveById, findTenantById } from '../repositories/tenantRepository.js'
 import { log as auditLog } from '../services/auditService.js'
 import * as logger from '../utils/logger.js'
 import { Types } from 'mongoose'
@@ -38,7 +38,7 @@ export const tenantGuard = async (req, res, next) => {
     const overrideRaw = req.query?.tenantId || req.headers['x-tenant-id'] || req.body?.tenantId
     const overrideId = normalizeObjectId(overrideRaw)
     if (overrideId) {
-      const tenant = await findActiveById(overrideId)
+      const tenant = await findTenantById(overrideId)
       if (tenant) {
         req.tenant = buildTenantReq(tenant)
         req.user = { ...(req.user || {}), tenantId: overrideId }

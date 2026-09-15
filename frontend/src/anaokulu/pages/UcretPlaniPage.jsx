@@ -63,9 +63,12 @@ function formatTrFullDate(dateStr) {
 function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
   if (!student || !plan) return []
   const count = Math.max(1, Number(plan.installments) || 1)
-  const total = Number(plan.total) || 0
+  const totalSkipped = Array.isArray(plan.skippedInstallments)
+    ? plan.skippedInstallments.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+    : 0
+  const contractTotal = round2(Number(plan.contractTotal || plan.originalTotal) || (Number(plan.total) + totalSkipped))
   const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
-  const perInstallment = round2(total / count)
+  const perInstallment = round2(contractTotal / count)
   const startDate = plan.start
     ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
     : defaultFullDate
@@ -106,13 +109,32 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
   // Unassigned pool for legacy collections that had NO installmentNo
   let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
   const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
-  const downPaymentCredit = round2(downPaymentPaid / count)
+
+  // Peşinat tahsilatının aylara eşit dağıtımı (kullanıcının talebi: taksit tutarı değişmez, peşinat toplu tahsilat gibi her aya eşit dağıtılır)
+  const downPaymentCredits = []
+  if (count > 0 && downPaymentPaid > 0) {
+    const baseShare = Math.floor((downPaymentPaid / count) * 100) / 100
+    let distributed = 0
+    for (let k = 0; k < count; k++) {
+      if (k === count - 1) {
+        downPaymentCredits.push(round2(downPaymentPaid - distributed))
+      } else {
+        downPaymentCredits.push(baseShare)
+        distributed = round2(distributed + baseShare)
+      }
+    }
+  } else {
+    for (let k = 0; k < count; k++) {
+      downPaymentCredits.push(0)
+    }
+  }
 
   const list = []
   for (let i = 0; i < count; i++) {
     const installmentNo = i + 1
     const dueDate = addMonthsToDate(startDate, i)
     const skipInfo = skippedSet[installmentNo] || null
+    const dpCredit = downPaymentCredits[i] || 0
 
     if (skipInfo) {
       const isFull = (skipInfo.period || 'full') === 'full'
@@ -120,7 +142,7 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
         ? Number(skipInfo.deductedAmount)
         : (isFull ? perInstallment : round2(perInstallment / 2))
 
-      // Tam ay devamsızlık
+      // Tam ay devamsızlık (taksit tamamen muaf, peşinat tahsilatından pay almaz)
       if (isFull || deductedAmount >= perInstallment) {
         list.push({
           installmentNo,
@@ -142,37 +164,27 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
           daysOverdue: 0,
           collectionDate: '',
           paymentMethod: '',
-          collections: []
+          collections: [],
+          downPaymentCredit: 0,
+          directPaid: 0
         })
         continue
       }
 
-      // Kısmi devamsızlık
+      // Kısmi devamsızlık (Sadece o ayın taksit tutarından düşer, peşinat payı ve doğrudan tahsilat uygulanır)
       const effectiveAmount = round2(Math.max(0, perInstallment - deductedAmount))
       const directMatches = explicitCols[installmentNo] || []
-      let paid = downPaymentCredit
-      let collectionDate = ''
-      let paymentMethod = ''
-      let matchedCollections = []
+      const directPaid = round2(directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0))
+      const appliedDp = Math.min(dpCredit, effectiveAmount)
 
-      if (directMatches.length > 0) {
-        paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-        collectionDate = directMatches[0].date || ''
-        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
-        matchedCollections = directMatches
-      } else if (unassignedPool > 0) {
-        if (unassignedPool >= effectiveAmount) {
-          paid = effectiveAmount
-          unassignedPool = round2(unassignedPool - effectiveAmount)
-        } else {
-          paid = unassignedPool
-          unassignedPool = 0
-        }
-        collectionDate = unassignedCols[0]?.date || ''
-        paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
-        matchedCollections = unassignedCols
+      let unassignedApplied = 0
+      if (unassignedPool > 0) {
+        const space = round2(Math.max(0, effectiveAmount - (directPaid + appliedDp)))
+        unassignedApplied = Math.min(unassignedPool, space)
+        unassignedPool = round2(unassignedPool - unassignedApplied)
       }
 
+      const paid = round2(Math.min(directPaid + appliedDp + unassignedApplied, effectiveAmount))
       const remaining = round2(Math.max(0, effectiveAmount - paid))
       const isPaid = remaining <= 0
       const isOverdue = !isPaid && dueDate < today
@@ -182,6 +194,20 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
         const d1 = new Date(today)
         const d2 = new Date(dueDate)
         daysOverdue = Math.max(1, Math.floor((d1 - d2) / (1000 * 60 * 60 * 24)))
+      }
+
+      let collectionDate = ''
+      let paymentMethod = ''
+      if (directMatches.length > 0) {
+        collectionDate = directMatches[0].date || ''
+        const directMethod = directMatches.map(c => c.payment).filter(Boolean).join(' / ') || 'Nakit'
+        paymentMethod = appliedDp > 0 ? `${directMethod} (+Peşinat)` : directMethod
+      } else if (unassignedApplied > 0) {
+        collectionDate = unassignedCols[0]?.date || ''
+        paymentMethod = unassignedCols[0]?.payment || 'Nakit'
+      } else if (appliedDp > 0) {
+        collectionDate = explicitCols[0]?.[0]?.date || ''
+        paymentMethod = 'Peşin İşlem Payı'
       }
 
       list.push({
@@ -208,34 +234,26 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
         daysOverdue,
         collectionDate,
         paymentMethod,
-        collections: matchedCollections
+        collections: directMatches,
+        downPaymentCredit: appliedDp,
+        directPaid
       })
       continue
     }
 
+    // Normal Taksit: Peşinat payı (downPaymentCredits[i]) ve varsa doğrudan taksit tahsilatı birleşir
     const directMatches = explicitCols[installmentNo] || []
-    let paid = downPaymentCredit
-    let collectionDate = ''
-    let paymentMethod = ''
-    let matchedCollections = []
+    const directPaid = round2(directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0))
+    const appliedDp = Math.min(dpCredit, perInstallment)
 
-    if (directMatches.length > 0) {
-      const directTotal = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-      paid = round2(paid + directTotal)
-      collectionDate = directMatches[0].date || ''
-      paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
-      matchedCollections = directMatches
-    } else if (unassignedPool > 0) {
-      const availableSpace = round2(Math.max(0, perInstallment - paid))
-      const applied = Math.min(unassignedPool, availableSpace)
-      paid = round2(paid + applied)
-      unassignedPool = round2(unassignedPool - applied)
-      collectionDate = unassignedCols[0]?.date || ''
-      paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
-      matchedCollections = unassignedCols
+    let unassignedApplied = 0
+    if (unassignedPool > 0) {
+      const space = round2(Math.max(0, perInstallment - (directPaid + appliedDp)))
+      unassignedApplied = Math.min(unassignedPool, space)
+      unassignedPool = round2(unassignedPool - unassignedApplied)
     }
 
-    paid = round2(Math.min(paid, perInstallment))
+    const paid = round2(Math.min(directPaid + appliedDp + unassignedApplied, perInstallment))
     const remaining = round2(Math.max(0, perInstallment - paid))
     const isPaid = remaining <= 0
 
@@ -246,6 +264,20 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
       const d1 = new Date(today)
       const d2 = new Date(dueDate)
       daysOverdue = Math.max(1, Math.floor((d1 - d2) / (1000 * 60 * 60 * 24)))
+    }
+
+    let collectionDate = ''
+    let paymentMethod = ''
+    if (directMatches.length > 0) {
+      collectionDate = directMatches[0].date || ''
+      const directMethod = directMatches.map(c => c.payment).filter(Boolean).join(' / ') || 'Nakit'
+      paymentMethod = appliedDp > 0 ? `${directMethod} (+Peşinat)` : directMethod
+    } else if (unassignedApplied > 0) {
+      collectionDate = unassignedCols[0]?.date || ''
+      paymentMethod = unassignedCols[0]?.payment || 'Nakit'
+    } else if (appliedDp > 0) {
+      collectionDate = explicitCols[0]?.[0]?.date || ''
+      paymentMethod = 'Peşin İşlem Payı'
     }
 
     list.push({
@@ -262,7 +294,9 @@ function getInstallmentsForPlan(student, plan, collections, defaultFullDate) {
       daysOverdue,
       collectionDate,
       paymentMethod,
-      collections: matchedCollections
+      collections: directMatches,
+      downPaymentCredit: appliedDp,
+      directPaid
     })
   }
 
@@ -447,7 +481,13 @@ export default function UcretPlaniPage() {
     const res = {}
     selStudent.items.forEach(it => {
       const list = getInstallmentsForPlan(selStudent, it, collections, defaultFullDate)
-      const paid = round2(list.reduce((sum, inst) => sum + (inst.paid || 0), 0))
+      const planNameLower = (it.name || '').trim().toLowerCase()
+      const planCols = (collections || []).filter(c =>
+        String(c.studentId) === String(selStudent.id) &&
+        (!c.item || c.item.trim().toLowerCase() === planNameLower)
+      )
+      const paid = round2(planCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+      // plan.total: devamsızlık sonrası güncel net tutar
       const total = Number(it.total) || 0
       const remaining = round2(Math.max(0, total - paid))
       const paidCount = list.filter(i => i.isPaid).length
@@ -466,7 +506,12 @@ export default function UcretPlaniPage() {
   const activePlanSum = useMemo(() => {
     if (!activePlan) return null
     if (planSummaries[activePlan.name]) return planSummaries[activePlan.name]
-    const paid = round2(installmentList.reduce((sum, i) => sum + (i.paid || 0), 0))
+    const planNameLower = (activePlan.name || '').trim().toLowerCase()
+    const planCols = (collections || []).filter(c =>
+      String(c.studentId) === String(selStudent?.id) &&
+      (!c.item || c.item.trim().toLowerCase() === planNameLower)
+    )
+    const paid = round2(planCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
     const total = Number(activePlan.total) || 0
     return {
       paid,
@@ -475,7 +520,7 @@ export default function UcretPlaniPage() {
       paidCount: installmentList.filter(i => i.isPaid).length,
       totalCount: installmentList.length
     }
-  }, [activePlan, planSummaries, installmentList])
+  }, [activePlan, planSummaries, installmentList, selStudent, collections])
 
   const filteredStudents = useMemo(() => {
     let list = orderedStudents
@@ -805,12 +850,20 @@ export default function UcretPlaniPage() {
       const items = student.items || []
       items.forEach(plan => {
         const count = Math.max(1, Number(plan.installments) || 1)
-        const total = Number(plan.total) || 0
+        const totalSkipped = Array.isArray(plan.skippedInstallments)
+          ? plan.skippedInstallments.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+          : 0
+        const contractTotal = round2(Number(plan.contractTotal || plan.originalTotal) || (Number(plan.total) + totalSkipped))
         const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
-        const perInstallment = round2(total / count)
+        const perInstallment = round2(contractTotal / count)
         const startDate = plan.start
           ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
           : defaultFullDate
+
+        const skippedSet = {}
+        if (Array.isArray(plan.skippedInstallments)) {
+          plan.skippedInstallments.forEach(s => { skippedSet[s.no] = s })
+        }
 
         // Filter collections for this student + plan
         const planCols = collections.filter(c =>
@@ -822,36 +875,70 @@ export default function UcretPlaniPage() {
         const unassignedCols = []
         planCols.forEach(c => {
           const instNo = Number(c.installmentNo)
-          if (Number.isInteger(instNo) && instNo <= count && (instNo > 0 || (downPayment > 0 && instNo === 0))) {
+          if (instNo === 0) {
+            // Peşinat tahsilatı — taksit havuzuna karışmamalı, ayrı izlenir
+            if (!explicitCols[0]) explicitCols[0] = []
+            explicitCols[0].push(c)
+          } else if (Number.isInteger(instNo) && instNo >= 1 && instNo <= count) {
             if (!explicitCols[instNo]) explicitCols[instNo] = []
             explicitCols[instNo].push(c)
           } else {
+            // Taksit numarası bilinmeyen eski kayıtlar
             unassignedCols.push(c)
           }
         })
         let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
         const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
-        const downPaymentCredit = round2(downPaymentPaid / count)
+
+        const downPaymentCredits = []
+        if (count > 0 && downPaymentPaid > 0) {
+          const baseShare = Math.floor((downPaymentPaid / count) * 100) / 100
+          let distributed = 0
+          for (let k = 0; k < count; k++) {
+            if (k === count - 1) {
+              downPaymentCredits.push(round2(downPaymentPaid - distributed))
+            } else {
+              downPaymentCredits.push(baseShare)
+              distributed = round2(distributed + baseShare)
+            }
+          }
+        } else {
+          for (let k = 0; k < count; k++) {
+            downPaymentCredits.push(0)
+          }
+        }
 
         for (let i = 0; i < count; i++) {
           const installmentNo = i + 1
           const dueDate = addMonthsToDate(startDate, i)
+          const dpCredit = downPaymentCredits[i] || 0
 
-          const directMatches = explicitCols[installmentNo] || []
-          let paid = downPaymentCredit
-          if (directMatches.length > 0) {
-            paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-          } else if (unassignedPool > 0) {
-            if (unassignedPool >= perInstallment) {
-              paid = perInstallment
-              unassignedPool = round2(unassignedPool - perInstallment)
-            } else {
-              paid = unassignedPool
-              unassignedPool = 0
-            }
+          let instAmount = perInstallment
+          const skipInfo = skippedSet[installmentNo]
+          if (skipInfo) {
+            const isFull = (skipInfo.period || 'full') === 'full'
+            const deducted = Number(skipInfo.deductedAmount) != null
+              ? Number(skipInfo.deductedAmount)
+              : (isFull ? perInstallment : round2(perInstallment / 2))
+            if (isFull || deducted >= perInstallment) instAmount = 0
+            else instAmount = round2(Math.max(0, perInstallment - deducted))
           }
 
-          const remaining = round2(Math.max(0, perInstallment - paid))
+          if (instAmount <= 0) continue
+
+          const directMatches = explicitCols[installmentNo] || []
+          const directPaid = round2(directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0))
+          const appliedDp = Math.min(dpCredit, instAmount)
+
+          let unassignedApplied = 0
+          if (unassignedPool > 0) {
+            const space = round2(Math.max(0, instAmount - (directPaid + appliedDp)))
+            unassignedApplied = Math.min(unassignedPool, space)
+            unassignedPool = round2(unassignedPool - unassignedApplied)
+          }
+
+          const paid = round2(Math.min(directPaid + appliedDp + unassignedApplied, instAmount))
+          const remaining = round2(Math.max(0, instAmount - paid))
           const isPaid = remaining <= 0
           const isOverdue = !isPaid && dueDate < today
 
@@ -865,7 +952,7 @@ export default function UcretPlaniPage() {
               installmentNo,
               dueDate,
               dueDateFormatted: formatTrFullDate(dueDate),
-              amount: perInstallment,
+              amount: instAmount,
               paid,
               remaining,
               collections: directMatches,
@@ -1167,8 +1254,11 @@ export default function UcretPlaniPage() {
     const defEnd = `${y}-${padM}-15`
 
     const count = Math.max(1, Number(activePlan?.installments) || 1)
-    const total = Number(activePlan?.total) || 0
-    const perInst = round2(total / count)
+    const totalSkippedBefore = Array.isArray(activePlan?.skippedInstallments)
+      ? activePlan.skippedInstallments.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+      : 0
+    const contractTotal = round2(Number(activePlan?.contractTotal || activePlan?.originalTotal) || (Number(activePlan?.total) + totalSkippedBefore))
+    const perInst = round2(contractTotal / count)
     const absentDays = 15
     const deduction = round2((perInst / daysInMonth) * absentDays)
 
@@ -1223,16 +1313,19 @@ export default function UcretPlaniPage() {
     const plan = { ...items[planIdx] }
 
     const count = Math.max(1, Number(plan.installments) || 1)
-    const total = Number(plan.total) || 0
-    const perInst = round2(total / count)
+    const totalSkippedBefore = Array.isArray(plan.skippedInstallments)
+      ? plan.skippedInstallments.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+      : 0
+    const contractTotal = round2(Number(plan.contractTotal || plan.originalTotal) || (Number(plan.total) + totalSkippedBefore))
+    const standardPerInst = round2(contractTotal / count)
     const daysInMonth = skipForm.monthDays || 30
 
-    let deduction = perInst
+    let deduction = standardPerInst
     let absentDays = daysInMonth
     if (skipForm.period === 'half') {
       absentDays = Math.max(1, Math.min(daysInMonth, skipForm.absentDays || 1))
-      deduction = round2((perInst / daysInMonth) * absentDays)
-      deduction = Math.min(perInst, deduction)
+      deduction = round2((standardPerInst / daysInMonth) * absentDays)
+      deduction = Math.min(standardPerInst, deduction)
     }
 
     const skipped = Array.isArray(plan.skippedInstallments) ? [...plan.skippedInstallments] : []
@@ -1247,12 +1340,15 @@ export default function UcretPlaniPage() {
       absentDays,
       monthDays: daysInMonth,
       deductedAmount: deduction,
-      originalAmount: perInst
+      originalAmount: standardPerInst
     })
     plan.skippedInstallments = filtered
+    plan.contractTotal = contractTotal
+    plan.originalTotal = contractTotal
 
-    // Bakiyeden düş
-    plan.total = round2(Math.max(0, Number(plan.total) - deduction))
+    // Planın yeni toplamı: Sözleşme ana tutarı - toplam devamsızlık kesintileri
+    const totalSkippedAfter = filtered.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+    plan.total = round2(Math.max(0, contractTotal - totalSkippedAfter))
 
     items[planIdx] = plan
     actions.updateStudent({ id: selStudent.id, items })
@@ -1275,15 +1371,18 @@ export default function UcretPlaniPage() {
 
     const skipped = Array.isArray(plan.skippedInstallments) ? plan.skippedInstallments : []
     const skipRecord = skipped.find(s => s.no === installmentNo)
-    plan.skippedInstallments = skipped.filter(s => s.no !== installmentNo)
+    const filtered = skipped.filter(s => s.no !== installmentNo)
+    plan.skippedInstallments = filtered
 
-    // Restore the exact deducted amount (or fallback) back to total
-    const originalPerInst = round2(Number(activePlan.basePrice || activePlan.total) / Math.max(1, Number(activePlan.installments)))
-    const restore = skipRecord?.deductedAmount != null
-      ? Number(skipRecord.deductedAmount)
-      : (skipRecord?.period === 'half' ? round2(originalPerInst / 2) : originalPerInst)
+    const totalSkippedBefore = skipped.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+    const contractTotal = round2(Number(plan.contractTotal || plan.originalTotal) || (Number(plan.total) + totalSkippedBefore))
+    plan.contractTotal = contractTotal
+    plan.originalTotal = contractTotal
 
-    plan.total = round2(Number(plan.total) + restore)
+    const totalSkippedAfter = filtered.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
+    plan.total = round2(Math.max(0, contractTotal - totalSkippedAfter))
+
+    const restore = skipRecord?.deductedAmount != null ? Number(skipRecord.deductedAmount) : 0
 
     items[planIdx] = plan
     actions.updateStudent({ id: selStudent.id, items })
@@ -2064,6 +2163,14 @@ export default function UcretPlaniPage() {
                           <span>Tahsil Edilen: <strong style={{ color: '#059669' }}>{money(downPaymentInfo.paid)}</strong></span>
                           <span>·</span>
                           <span>Kalan: <strong style={{ color: downPaymentInfo.remaining > 0 ? '#dc2626' : '#059669' }}>{money(downPaymentInfo.remaining)}</strong></span>
+                          {downPaymentInfo.paid > 0 && (
+                            <>
+                              <span>·</span>
+                              <span style={{ color: '#0369a1', fontWeight: 600 }}>
+                                Aylık Dağıtılan Peşinat Payı: <strong>{money(round2(downPaymentInfo.paid / (activePlan?.installments || 1)))}/ay</strong>
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <button
@@ -2380,6 +2487,11 @@ export default function UcretPlaniPage() {
                                 <div style={{ fontSize: 13, fontWeight: 800, color: inst.paid > 0 ? '#059669' : '#94a3b8', marginTop: 1 }}>
                                   {money(inst.paid)}
                                 </div>
+                                {inst.downPaymentCredit > 0 && (
+                                  <div style={{ fontSize: 9, color: '#0284c7', fontWeight: 600, marginTop: 1 }}>
+                                    Peşinat: {money(inst.downPaymentCredit)}
+                                  </div>
+                                )}
                               </div>
 
                               <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 8 }}>
@@ -2471,7 +2583,12 @@ export default function UcretPlaniPage() {
 
                               {/* Tahsil Edilen */}
                               <td style={{ ...td, textAlign: 'right', fontWeight: 800, fontSize: 14, color: inst.paid > 0 ? '#059669' : '#94a3b8' }}>
-                                {money(inst.paid)}
+                                <div>{money(inst.paid)}</div>
+                                {inst.downPaymentCredit > 0 && (
+                                  <div style={{ fontSize: 10, color: '#0284c7', fontWeight: 600, marginTop: 1 }}>
+                                    (Peşinat: {money(inst.downPaymentCredit)})
+                                  </div>
+                                )}
                               </td>
 
                               {/* Kalan Tutar */}

@@ -21,7 +21,8 @@ const InputCls = {
 }
 
 export default function OgrencilerPage() {
-  const { isAdminPanelMode } = useAuth()
+  const { isAdminPanelMode, user } = useAuth()
+  const isSuperAdmin = user?.role === 'superadmin'
   const { state, actions } = useAnaokuluData()
   const students = state?.students || []
   const ys = getYearStart(state)
@@ -114,6 +115,7 @@ export default function OgrencilerPage() {
   }
 
   const openForm = (s = null) => {
+    if (isSuperAdmin) return
     if (s) {
       setForm({
         id: s.id,
@@ -161,6 +163,7 @@ export default function OgrencilerPage() {
   })
 
   const saveForm = () => {
+    if (isSuperAdmin) { toast('Süper Admin öğrenci ekleyemez veya düzenleyemez.'); return }
     if (!form.name || !form.name.trim()) { toast('Ad Soyad zorunlu.'); return }
     const data = buildStudentData()
     if (form.id) {
@@ -174,6 +177,7 @@ export default function OgrencilerPage() {
   }
 
   const saveFormAndNew = () => {
+    if (isSuperAdmin) { toast('Süper Admin öğrenci ekleyemez veya düzenleyemez.'); return }
     if (!form.name || !form.name.trim()) { toast('Ad Soyad zorunlu.'); return }
     const data = buildStudentData()
     actions.addStudent({ ...data })
@@ -194,6 +198,7 @@ export default function OgrencilerPage() {
   }
 
   const handleDelete = (id) => {
+    if (isSuperAdmin) { toast('Süper Admin öğrenci silemez.'); return }
     if (!window.confirm('Bu öğrenciyi ve ilişkili tüm tahsilat/faturaları silmek istediğinize emin misiniz?')) return
     const nextStudents = state.students.filter(s => String(s.id || s._id) !== String(id))
     const nextCollections = state.collections.filter(c => String(c.studentId) !== String(id))
@@ -691,7 +696,7 @@ export default function OgrencilerPage() {
               : `${students.length} öğrenci · ${list.length} listeleniyor`}
           </p>
         </div>
-        {!isAdminPanelMode && (
+        {!isAdminPanelMode && !isSuperAdmin && (
           <div className="ak-actions">
             <button onClick={() => openForm(null)} style={{
               ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
@@ -831,7 +836,7 @@ export default function OgrencilerPage() {
                       <button onClick={() => { setFileTab('info'); openFile(s.id) }} style={{
                         ...Btn, background: '#f1f5f9', color: '#0f172a', padding: '5px 12px', fontSize: 11
                       }}>Dosya</button>
-                      {!isAdminPanelMode && (
+                      {!isAdminPanelMode && !isSuperAdmin && (
                         <>
                           <button onClick={() => openForm(s)} style={{
                             ...Btn, background: '#eef2ff', color: '#4338ca', padding: '5px 12px', fontSize: 11
@@ -966,7 +971,7 @@ export default function OgrencilerPage() {
                           <button onClick={() => { setFileTab('info'); openFile(s.id) }} style={{
                             ...Btn, background: '#f1f5f9', color: '#0f172a'
                           }}>Dosya</button>
-                          {!isAdminPanelMode && (
+                          {!isAdminPanelMode && !isSuperAdmin && (
                             <>
                               <button onClick={() => openForm(s)} style={{
                                 ...Btn, background: '#eef2ff', color: '#4338ca'

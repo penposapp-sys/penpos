@@ -67,10 +67,17 @@ export default function AnaokuluLayout() {
   if (loading || !user) return null
 
   const isManager = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
+  const isSuperAdmin = user?.role === 'superadmin'
   const isStaff = user?.role === 'staff'
   const isTenantAdmin = user?.role === 'tenant_admin'
 
-  const NAV = [...BASE_NAV]
+  const superAdminPanelNav = [
+    { to: '/anaokulu/okullarim', label: 'Okullar', icon: '🏫' },
+    { to: '/anaokulu/raporlar', label: 'Raporlar', icon: '📊' },
+    { to: '/anaokulu/ayarlar', label: 'Ayarlar', icon: '⚙️' }
+  ]
+  const isAnaokuluAdminPanel = isManager && isAdminPanelMode
+  const NAV = isAnaokuluAdminPanel ? superAdminPanelNav : [...BASE_NAV]
   if (isTenantAdmin) {
     NAV.push({
       to: '/anaokulu/ayarlar',
@@ -78,14 +85,19 @@ export default function AnaokuluLayout() {
       icon: '⚙️',
       subItems: [{ to: '/anaokulu/ayarlar/uyeler', label: 'Üyeler', icon: '👤' }]
     })
-  } else if (isManager) {
+  } else if (isManager && !isAnaokuluAdminPanel) {
     NAV.push({
       to: '/anaokulu/ayarlar',
       label: 'Ayarlar',
       icon: '⚙️',
       subItems: [{ to: '/anaokulu/ayarlar/uyeler', label: 'Üyeler', icon: '👤' }]
     })
-    NAV.push({ to: '/anaokulu/okullarim', label: 'Okullarım', icon: '🏫', regionOnly: true })
+    NAV.push({
+      to: '/anaokulu/okullarim',
+      label: isSuperAdmin ? 'Okullar' : 'Okul’larım',
+      icon: '🏫',
+      regionOnly: true
+    })
   } else if (isStaff) {
     NAV.push({ to: '/anaokulu/ayarlar', label: 'Ayarlar', icon: '⚙️' })
   }
@@ -97,6 +109,9 @@ export default function AnaokuluLayout() {
     if (isAdminPanelMode) return 'Süper Admin Paneli'
     return currentTenantForTitle?.name || (isManager && accessibleTenants.length === 0 ? 'Okul Seçiniz / Ekleyiniz' : 'Anaokulu Yönetimi')
   })()
+  const currentContextLabel = isSuperAdmin
+    ? (isAdminPanelMode ? 'SUPER ADMİN MODU' : `SUPER ADMİN MODU · ${currentSchoolName}`)
+    : currentSchoolName
   const headerHeight = isMobile ? 48 : 62
 
   return (
@@ -186,7 +201,7 @@ export default function AnaokuluLayout() {
                   }}
                 >
                   <span style={{ maxWidth: isMobile ? 110 : 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {currentSchoolName}
+                    {currentContextLabel}
                   </span>
                   <span style={{ opacity: 0.8, fontSize: 10 }}>▾</span>
                 </button>
@@ -261,11 +276,11 @@ export default function AnaokuluLayout() {
               </div>
             ) : !isMobile ? (
               <span style={{ fontSize: 13, color: '#94a3b8', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentSchoolName}
+                {currentContextLabel}
               </span>
             ) : (
               <span style={{ fontSize: 12, color: '#94a3b8', maxWidth: 132, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentSchoolName}
+                {currentContextLabel}
               </span>
             )}
           </div>
@@ -418,7 +433,7 @@ export default function AnaokuluLayout() {
                       fontWeight: 700
                     }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentSchoolName}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentContextLabel}</span>
                     <span style={{ opacity: 0.8, fontSize: 10 }}>▾</span>
                   </button>
                   {schoolDropdownOpen && (

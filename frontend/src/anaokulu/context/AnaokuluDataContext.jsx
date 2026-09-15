@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import { api } from '../../lib/apiClient.js'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { mergeAnaokuluResponses } from '../utils/schoolScope.js'
 
 const AnaokuluDataContext = createContext()
 
@@ -102,7 +103,7 @@ export function AnaokuluDataProvider({ children }) {
 
   const saveToBackend = async (nextState = state) => {
     if (loading) return
-    if (isRegionAdmin && !regionCurrentTenantId) return
+    if (isManager && !regionCurrentTenantId) return
     if (isAdminPanelMode) return
     if (saveInFlightRef.current) {
       return { ok: true, skipped: true }
@@ -148,7 +149,8 @@ export function AnaokuluDataProvider({ children }) {
 
   const loadFromBackend = async () => {
     if (loading) return
-    if (isRegionAdmin && !regionCurrentTenantId && !isAdminPanelMode) return
+    const needsTenantId = isRegionAdmin && !isAdminPanelMode
+    if (needsTenantId && !regionCurrentTenantId) return
 
     if (isAdminPanelMode) {
       try {
@@ -181,10 +183,6 @@ export function AnaokuluDataProvider({ children }) {
           })
         )
 
-        const allStudents = []
-        const allCollections = []
-        const allInvoices = []
-        const allChecks = []
         let firstSettings = { ...initialState.settings }
 
         results.forEach(({ tenant, data }, idx) => {
@@ -206,46 +204,18 @@ export function AnaokuluDataProvider({ children }) {
               }
             }
           }
-          const schoolId = String(tenant.id || tenant._id)
-          const schoolName = tenant.name || 'İsimsiz Okul'
-          ;(data.students || []).forEach(s => {
-            allStudents.push({
-              ...s,
-              _schoolId: schoolId,
-              _schoolName: schoolName
-            })
-          })
-          ;(data.collections || []).forEach(c => {
-            allCollections.push({
-              ...c,
-              _schoolId: schoolId,
-              _schoolName: schoolName
-            })
-          })
-          ;(data.invoices || []).forEach(i => {
-            allInvoices.push({
-              ...i,
-              _schoolId: schoolId,
-              _schoolName: schoolName
-            })
-          })
-          ;(data.checks || []).forEach(ch => {
-            allChecks.push({
-              ...ch,
-              _schoolId: schoolId,
-              _schoolName: schoolName
-            })
-          })
         })
+
+        const merged = mergeAnaokuluResponses(results)
 
         dispatch({
           type: 'LOAD',
           payload: {
             settings: firstSettings,
-            students: allStudents,
-            collections: allCollections,
-            invoices: allInvoices,
-            checks: allChecks
+            students: merged.students,
+            collections: merged.collections,
+            invoices: merged.invoices,
+            checks: merged.checks
           }
         })
       } catch {

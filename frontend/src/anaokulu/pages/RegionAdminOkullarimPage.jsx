@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
 import { useAuth } from '../../context/AuthContext.jsx'
-import TopluAlacakRaporu from './TopluAlacakRaporu.jsx'
 
 const INPUT_STYLE = {
   width: '100%',
@@ -21,9 +20,9 @@ const LABEL_STYLE = { fontSize: 12, fontWeight: 700, color: '#475569', marginBot
 
 export default function RegionAdminOkullarimPage() {
   const { user, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isAdminPanelMode, refresh } = useAuth()
+  const isSuperAdminReadOnly = user?.role === 'superadmin'
   const navigate = useNavigate()
 
-  const [pageTab, setPageTab] = useState('okullarim')
   const [schools, setSchools] = useState([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -122,50 +121,18 @@ export default function RegionAdminOkullarimPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 20, maxWidth: pageTab === 'alacak-raporu' ? 1200 : 960 }}>
-      {/* Sayfa Üst Sekmeleri */}
-      <div style={{ display: 'flex', gap: 10, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
-        <button
-          type="button"
-          onClick={() => setPageTab('okullarim')}
-          style={{
-            padding: '12px 20px', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800,
-            background: 'transparent', borderRadius: '10px 10px 0 0',
-            borderBottom: pageTab === 'okullarim' ? '3px solid #6366f1' : '3px solid transparent',
-            color: pageTab === 'okullarim' ? '#6366f1' : '#64748b',
-            marginBottom: -2, display: 'inline-flex', alignItems: 'center', gap: 8
-          }}
-        >
-          🏫 Okullarım ({schools.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setPageTab('alacak-raporu')}
-          style={{
-            padding: '12px 20px', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800,
-            background: 'transparent', borderRadius: '10px 10px 0 0',
-            borderBottom: pageTab === 'alacak-raporu' ? '3px solid #6366f1' : '3px solid transparent',
-            color: pageTab === 'alacak-raporu' ? '#6366f1' : '#64748b',
-            marginBottom: -2, display: 'inline-flex', alignItems: 'center', gap: 8
-          }}
-        >
-          📊 Toplu Öğrenci Alacak Raporu (Excel)
-        </button>
-      </div>
-
-      {pageTab === 'alacak-raporu' ? (
-        <TopluAlacakRaporu initialSchools={schools} />
-      ) : (
-        <>
+    <div style={{ display: 'grid', gap: 20, maxWidth: 960 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Okullarim
+                {isSuperAdminReadOnly ? '🏫 Tüm Okullar' : 'Okullarim'}
               </h1>
               <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
-                {isAdminPanelMode
-                  ? 'Süper Admin Paneli · Yönetiminiz altındaki anaokulu ve kreşleri görüntüleyin, seçin veya yeni ekleyin.'
-                  : 'Yonetiminiz altindaki anaokulu ve kresleri goruntuleyin, secin veya yeni ekleyin.'}
+                {isSuperAdminReadOnly
+                  ? 'Süper Admin · Tüm okulları görüntüleyebilir ve platform seviyesinde yeni okul oluşturabilirsiniz.'
+                  : isAdminPanelMode
+                    ? 'Süper Admin Paneli · Yönetiminiz altındaki anaokulu ve kreşleri görüntüleyin, seçin veya yeni ekleyin.'
+                    : 'Yonetiminiz altindaki anaokulu ve kresleri goruntuleyin, secin veya yeni ekleyin.'}
               </p>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -190,19 +157,19 @@ export default function RegionAdminOkullarimPage() {
                 </button>
               )}
               <button
-                type="button"
-                onClick={() => setCreateOpen(true)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 8,
-                  padding: '11px 20px', borderRadius: 12,
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  color: '#fff', border: 'none', cursor: 'pointer',
-                  fontWeight: 700, fontSize: 14,
-                  boxShadow: '0 6px 20px rgba(99,102,241,0.3)'
-                }}
-              >
-                + Yeni Anaokulu Ekle
-              </button>
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '11px 20px', borderRadius: 12,
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    color: '#fff', border: 'none', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 14,
+                    boxShadow: '0 6px 20px rgba(99,102,241,0.3)'
+                  }}
+                >
+                  + Yeni Anaokulu Ekle
+                </button>
             </div>
           </div>
 
@@ -296,12 +263,12 @@ export default function RegionAdminOkullarimPage() {
                   }}>
                     Anaokulu
                   </span>
-                  {school.detail?.students?.length > 0 && (
+                  {Number(school.detail?.studentCount ?? school.studentCount ?? school.detail?.students?.length ?? 0) >= 0 && (
                     <span style={{
                       padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                       background: 'rgba(99, 102, 241, 0.08)', color: '#4f46e5'
                     }}>
-                      {school.detail.students.length} Ogrenci
+                      {Number(school.detail?.studentCount ?? school.studentCount ?? school.detail?.students?.length ?? 0)} Ogrenci
                     </span>
                   )}
                 </div>
@@ -317,7 +284,7 @@ export default function RegionAdminOkullarimPage() {
                       cursor: 'pointer', fontWeight: 700, fontSize: 13
                     }}
                   >
-                    {isActive ? 'Secili Okul' : 'Bu Okulu Sec'}
+                    {isActive ? 'Secili Okul' : 'Okula Git'}
                   </button>
                 </div>
               </div>
@@ -325,9 +292,6 @@ export default function RegionAdminOkullarimPage() {
           })}
         </div>
       )}
-        </>
-      )}
-
       {createOpen && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1000,

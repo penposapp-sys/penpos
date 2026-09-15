@@ -89,7 +89,8 @@ export const AuthProvider = ({ children }) => {
   const initInFlightRef = useRef(false)
 
   const isRegionAdmin = Boolean(user?.role === 'anaokulu_region_admin' && user?.regionSystemType === 'anaokulu')
-  const isAdminPanelMode = Boolean(isRegionAdmin && !regionCurrentTenantId)
+  const isSuperOrPlatformAdmin = Boolean(user?.role === 'superadmin' || user?.role === 'platform_admin')
+  const isAdminPanelMode = Boolean((isRegionAdmin || isSuperOrPlatformAdmin) && !regionCurrentTenantId)
 
   const hydratePortalState = async (portal, meRes) => {
     const meUser = meRes?.user
@@ -97,15 +98,41 @@ export const AuthProvider = ({ children }) => {
     setUser(normalized)
 
     const isRegion = Boolean(normalized?.role === 'anaokulu_region_admin' && normalized?.regionSystemType === 'anaokulu')
-    const accList = Array.isArray(normalized?.accessibleTenants) ? normalized.accessibleTenants : []
-    const accIds = accList.length > 0
+    const isSuperOrPlatform = Boolean(normalized?.role === 'superadmin' || normalized?.role === 'platform_admin')
+    const isManager = isRegion || isSuperOrPlatform
+
+    let accList = Array.isArray(normalized?.accessibleTenants) ? normalized.accessibleTenants : []
+    let accIds = accList.length > 0
       ? accList.map(t => String(t.id || t._id)).filter(Boolean)
       : (Array.isArray(normalized?.accessibleTenantIds) ? normalized.accessibleTenantIds.map(String).filter(Boolean) : [])
+
+    // superadmin / platform_admin için tüm anaokulu tenantlarını çek
+    if (isSuperOrPlatform && accList.length === 0) {
+      try {
+        const tenantsRes = await api('/api/platform/tenants?system=anaokulu', {
+          silent: true,
+          suppressAuthRedirect: true,
+          portalOverride: portal
+        })
+        const tenantArr = Array.isArray(tenantsRes) ? tenantsRes
+          : Array.isArray(tenantsRes?.items) ? tenantsRes.items
+          : Array.isArray(tenantsRes?.tenants) ? tenantsRes.tenants
+          : []
+        const anaokuluTenants = tenantArr
+          .filter(t => !t.isDeleted && (t.systemType === 'anaokulu' || !t.systemType))
+          .map(t => ({ id: String(t._id || t.id), _id: String(t._id || t.id), name: t.name || 'İsimsiz Okul', systemType: t.systemType, studentCount: Number(t.studentCount || 0) }))
+        accList = anaokuluTenants
+        accIds = anaokuluTenants.map(t => String(t.id))
+      } catch {
+        // tenant listesi alınamazsa boş bırak
+      }
+    }
+
     setAccessibleTenantIds(accIds)
     setAccessibleTenants(accList)
 
     let effectiveTenantId = normalized?.tenantId || null
-    if (isRegion) {
+    if (isManager) {
       if (accIds.length > 0) {
         if (regionCurrentTenantId && accIds.includes(String(regionCurrentTenantId))) {
           effectiveTenantId = regionCurrentTenantId
@@ -119,7 +146,7 @@ export const AuthProvider = ({ children }) => {
       }
     } else {
       setRegionCurrentTenantId(null)
-      setAccessibleTenants([])
+      if (!isSuperOrPlatform) setAccessibleTenants([])
     }
 
     if (effectiveTenantId) {
@@ -314,7 +341,8 @@ export const AuthProvider = ({ children }) => {
   }
 
   useEffect(() => {
-    if (!isRegionAdmin || !regionCurrentTenantId) return undefined
+    const isManagerRole = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
+    if (!isManagerRole || !regionCurrentTenantId) return undefined
     if (accessibleTenantIds.length > 0 && !accessibleTenantIds.includes(String(regionCurrentTenantId))) {
       setRegionCurrentTenantId(accessibleTenantIds[0])
       return undefined
@@ -331,10 +359,10 @@ export const AuthProvider = ({ children }) => {
     }
     run()
     return () => { cancelled = true }
-  }, [isRegionAdmin, regionCurrentTenantId, accessibleTenantIds, user])
+  }, [isRegionAdmin, user, regionCurrentTenantId, accessibleTenantIds])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh, tenantCtx, allowedBranchIds, setAllowedBranchIds, accessibleTenantIds, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin, isAdminPanelMode }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh, tenantCtx, allowedBranchIds, setAllowedBranchIds, accessibleTenantIds, accessibleTenants, regionCurrentTenantId, setRegionCurrentTenantId, isRegionAdmin, isSuperOrPlatformAdmin, isAdminPanelMode }}>
       {children}
     </AuthContext.Provider>
   )

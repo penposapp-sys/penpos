@@ -148,7 +148,8 @@ function exportPDF(rows, state, totals, dateFrom, dateTo, isAdminPanelMode) {
 
 /* ─── Page ────────────────────────────────────────────────── */
 export default function TahsilatlarPage() {
-  const { isAdminPanelMode, accessibleTenants } = useAuth()
+  const { isAdminPanelMode, accessibleTenants, user } = useAuth()
+  const isSuperAdmin = user?.role === 'superadmin'
   const { state } = useAnaokuluData()
   const collections = state?.collections || []
 

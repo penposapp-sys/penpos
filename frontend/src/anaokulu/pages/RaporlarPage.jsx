@@ -1,585 +1,160 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { financialSummaryForStudent, getMonthlyInvoicableInstallments, money, round2 } from '../utils/calculations.js'
 import TopluAlacakRaporu from './TopluAlacakRaporu.jsx'
-import {
-  money, getStudent, expectedFor, expectedTotalFor, collectedAll,
-  balanceFor, invStatus, invoiceFor, periodsOfYear, periodName,
-  inPeriod, periodLabel, exportCSV, round2, getYearStart, isCollectionInvoiced
-} from '../utils/calculations.js'
 
-const Btn = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '8px 14px', borderRadius: 10, fontWeight: 600,
-  cursor: 'pointer', border: 'none', fontSize: 13
-}
-
-const InputCls = {
-  padding: '9px 12px', borderRadius: 10,
-  border: '1px solid #cbd5e1', background: '#fff',
-  fontSize: 13, outline: 'none'
-}
+const TABS = [
+  ['overview', 'Genel Ozet'],
+  ['students', 'Ogrenci Durumu'],
+  ['receivables', 'Alacak Durumu'],
+  ['invoices', 'Fatura Durumu'],
+  ['comparison', 'Okul Karsilastirma']
+]
+const buttonStyle = { border: 'none', borderRadius: 9, padding: '9px 14px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }
+const cell = { padding: '10px 12px', borderBottom: '1px solid #eef2f7', fontSize: 13, textAlign: 'left' }
+const head = { ...cell, background: '#f8fafc', color: '#475569', fontWeight: 800, fontSize: 12 }
+const InputStyle = { padding: '9px 12px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', fontSize: 13 }
+const KpiGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12 }
+const Kpi = { padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff' }
+const Panel = ({ children }) => <div style={{ padding: 18, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', overflow: 'auto' }}>{children}</div>
+const monthOf = (date) => String(date || '').slice(0, 7)
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))
 
 export default function RaporlarPage() {
-  const { user, isRegionAdmin, isAdminPanelMode, accessibleTenants } = useAuth()
-  const isManager = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
-  const [reportTab, setReportTab] = useState('single')
-  const [selectedSchoolId, setSelectedSchoolId] = useState('')
-
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200)
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-  const isMobile = windowWidth < 820
-
+  const { user, isRegionAdmin, isAdminPanelMode, accessibleTenants, regionCurrentTenantId, tenantCtx } = useAuth()
   const { state } = useAnaokuluData()
+  const isManager = isRegionAdmin || user?.role === 'superadmin' || user?.role === 'platform_admin'
+  const [tab, setTab] = useState('receivables')
+  const [selectedSchoolId, setSelectedSchoolId] = useState('')
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const rawStudents = state?.students || []
   const rawCollections = state?.collections || []
   const rawInvoices = state?.invoices || []
-  const ys = getYearStart(state)
+  const activeSchoolId = selectedSchoolId || (!isAdminPanelMode ? String(regionCurrentTenantId || '') : '')
 
-  const students = useMemo(() => {
-    if (!selectedSchoolId) return rawStudents
-    return rawStudents.filter(s => String(s._schoolId) === String(selectedSchoolId))
-  }, [rawStudents, selectedSchoolId])
+  const schools = useMemo(() => {
+    const tenants = Array.isArray(accessibleTenants) && accessibleTenants.length > 0
+      ? accessibleTenants
+      : (tenantCtx?.tenant ? [tenantCtx.tenant] : [{ id: activeSchoolId || 'current', name: 'Secili Okul' }])
+    return tenants.filter((tenant) => !activeSchoolId || String(tenant.id || tenant._id) === activeSchoolId)
+  }, [accessibleTenants, tenantCtx, activeSchoolId])
 
-  const collections = useMemo(() => {
-    if (!selectedSchoolId) return rawCollections
-    return rawCollections.filter(c => String(c._schoolId) === String(selectedSchoolId))
-  }, [rawCollections, selectedSchoolId])
+  const rows = useMemo(() => schools.map((tenant) => {
+    const schoolId = String(tenant.id || tenant._id)
+    const students = rawStudents.filter((item) => !item._schoolId || String(item._schoolId) === schoolId)
+    const collections = rawCollections.filter((item) => !item._schoolId || String(item._schoolId) === schoolId)
+    const invoices = rawInvoices.filter((item) => !item._schoolId || String(item._schoolId) === schoolId)
+    const scopedState = { ...state, students, collections, invoices }
+    const studentSummaries = students.map((student) => ({ student, financial: financialSummaryForStudent(scopedState, student.id) }))
+    const planned = studentSummaries.reduce((sum, item) => sum + item.financial.net, 0)
+    const paid = studentSummaries.reduce((sum, item) => sum + item.financial.paid, 0)
+    const overdue = studentSummaries.reduce((sum, item) => sum + item.financial.overdue, 0)
+    const overdueStudents = studentSummaries.filter((item) => item.financial.overdue > 0).map((item) => item.student)
+    const monthInvoices = invoices.filter((invoice) => monthOf(invoice.date || invoice.period) === month)
+    const billableInstallments = getMonthlyInvoicableInstallments(scopedState, month)
+    const invoicedStudentIds = new Set(monthInvoices.map((invoice) => String(invoice.studentId)).filter(Boolean))
+    const invoicedStudentCount = students.filter((student) => invoicedStudentIds.has(String(student.id))).length
+    const activeStudents = students.filter((student) => student.active !== false).length
+    return {
+      id: schoolId,
+      name: tenant.name || 'Isimsiz Okul',
+      students,
+      collections,
+      invoices,
+      studentCount: students.length,
+      activeStudents,
+      passiveStudents: students.length - activeStudents,
+      planned: round2(planned),
+      paid: round2(paid),
+      remaining: round2(planned - paid),
+      overdue: round2(overdue),
+      overdueStudents,
+      studentSummaries,
+      monthInvoices,
+      invoiceAmount: round2(monthInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0)),
+      invoiceRequiredAmount: round2(billableInstallments.reduce((sum, installment) => sum + Number(installment.amount || 0), 0)),
+      invoiceRequiredVat: round2(billableInstallments.reduce((sum, installment) => sum + Number(installment.vatAmount || 0), 0)),
+      invoicedStudentCount,
+      uninvoicedStudentCount: Math.max(0, students.length - invoicedStudentCount),
+      invoiceRate: students.length ? (invoicedStudentCount / students.length) * 100 : null
+    }
+  }), [schools, rawStudents, rawCollections, rawInvoices, state, month])
 
-  const invoices = useMemo(() => {
-    if (!selectedSchoolId) return rawInvoices
-    return rawInvoices.filter(i => String(i._schoolId) === String(selectedSchoolId))
-  }, [rawInvoices, selectedSchoolId])
+  const total = useMemo(() => rows.reduce((sum, row) => ({
+    schools: sum.schools + 1,
+    students: sum.students + row.studentCount,
+    planned: sum.planned + row.planned,
+    paid: sum.paid + row.paid,
+    remaining: sum.remaining + row.remaining,
+    overdue: sum.overdue + row.overdue,
+    invoices: sum.invoices + row.monthInvoices.length,
+    invoiceAmount: sum.invoiceAmount + row.invoiceAmount,
+    invoiceRequiredAmount: sum.invoiceRequiredAmount + row.invoiceRequiredAmount,
+    invoiceRequiredVat: sum.invoiceRequiredVat + row.invoiceRequiredVat,
+    invoicedStudents: sum.invoicedStudents + row.invoicedStudentCount,
+    uninvoicedStudents: sum.uninvoicedStudents + row.uninvoicedStudentCount
+  }), { schools: 0, students: 0, planned: 0, paid: 0, remaining: 0, overdue: 0, invoices: 0, invoiceAmount: 0, invoiceRequiredAmount: 0, invoiceRequiredVat: 0, invoicedStudents: 0, uninvoicedStudents: 0 }), [rows])
 
-  const [periodType, setPeriodType] = useState('month')
-  const [rdate, setRdate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [toastMsg, setToastMsg] = useState('')
+  const detailRows = rows.flatMap((row) => row.studentSummaries.map(({ student, financial }) => {
+    const studentCollections = row.collections.filter((collection) => String(collection.studentId) === String(student.id))
+    const lastCollectionDate = studentCollections.map((collection) => collection.date).filter(Boolean).sort().at(-1) || '-'
+    return [row.name, student.name, student.parent || '-', student.class || '-', financial.net, financial.discount, financial.downPayment, financial.paid, financial.remaining, financial.overdue, lastCollectionDate, financial.remaining <= 0 ? 'Tamamlandı' : 'Bekliyor']
+  }))
+  const exportHeaders = tab === 'receivables'
+    ? ['Okul', 'Ogrenci', 'Veli', 'Sinif', 'Net Plan', 'Indirim', 'Pesinat', 'Toplam Tahsilat', 'Kalan Alacak', 'Vadesi Gecmis', 'Son Tahsilat', 'Odeme Durumu']
+    : tab === 'students'
+    ? ['Okul', 'Ogrenci', 'Aktif', 'Pasif']
+      : tab === 'invoices'
+        ? ['Okul', 'Ogrenci', 'Faturasi Kesilen', 'Kesilmeyen', 'Kesilen Fatura Tutari', 'Kesilmesi Gereken', 'Toplam KDV Tutari', 'Oran']
+        : tab === 'comparison' || tab === 'overview'
+          ? ['Okul', 'Ogrenci', 'Net Planlanan', 'Toplam Tahsilat', 'Kalan Alacak', 'Vadesi Gecmis', 'Fatura Kesilen', 'Fatura Kesilmeyen']
+          : ['Okul', 'Ogrenci', 'Aktif', 'Pasif']
+  const exportRows = tab === 'receivables'
+    ? detailRows
+    : rows.map((row) => tab === 'students'
+    ? [row.name, row.studentCount, row.activeStudents, row.passiveStudents]
+      : tab === 'invoices'
+        ? [row.name, row.studentCount, row.invoicedStudentCount, row.uninvoicedStudentCount, row.invoiceAmount, row.invoiceRequiredAmount, row.invoiceRequiredVat, row.invoiceRate == null ? '-' : `${row.invoiceRate.toFixed(2)}%`]
+        : tab === 'comparison' || tab === 'overview'
+          ? [row.name, row.studentCount, row.planned, row.paid, row.remaining, row.overdue, row.invoicedStudentCount, row.uninvoicedStudentCount]
+          : [row.name, row.studentCount, row.activeStudents, row.passiveStudents])
 
-  const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg(''), 3000) }
-
-  const data = useMemo(() => {
-    const a = collections.filter(c => inPeriod(c.date, rdate, periodType))
-    const totalAmount = a.reduce((x, c) => x + (c.amount || 0), 0)
-    const totalVat = a.reduce((x, c) => {
-      const inv = isCollectionInvoiced(state, c)
-      return x + (inv ? (c.vat || 0) : 0)
-    }, 0)
-    const count = a.length
-
-    const typeMap = {}
-    a.forEach(c => {
-      const t = c.payment || 'Diğer'
-      if (!typeMap[t]) typeMap[t] = { n: 0, amount: 0, vat: 0 }
-      typeMap[t].n++
-      typeMap[t].amount += (c.amount || 0)
-      const inv = isCollectionInvoiced(state, c)
-      typeMap[t].vat += (inv ? (c.vat || 0) : 0)
-    })
-    const types = Object.keys(typeMap).map(t => ({ type: t, ...typeMap[t] }))
-
-    const months = (periodType === 'month') ? [rdate.slice(0, 7)] : periodsOfYear(ys)
-    let ok = 0, none = 0, diff = 0, expSum = 0, invSum = 0
-    months.forEach(m => {
-      students.filter(s => s.active).forEach(s => {
-        const e = expectedFor(state, s.id, m)
-        if (e <= 0) return
-        expSum += e
-        const stt = invStatus(state, s.id, m)
-        if (stt === 'ok') { ok++; invSum += (invoiceFor(state, s.id, m)?.total || 0) }
-        else if (stt === 'diff') { diff++; invSum += (invoiceFor(state, s.id, m)?.total || 0) }
-        else none++
-      })
-    })
-
-    const stuRows = students.slice()
-      .sort((x, y) => balanceFor(state, y.id) - balanceFor(state, x.id))
-      .map(s => {
-        const exp = expectedTotalFor(state, s.id)
-        const col = collectedAll(state, s.id)
-        const bal = round2(exp - col)
-        const pct = exp > 0 ? Math.min(100, Math.round(col / exp * 100)) : 0
-        return { s, exp, col, bal, pct }
-      })
-
-    return { totalAmount, totalVat, count, types, ok, none, diff, expSum, invSum, stuRows }
-  }, [state, students, collections, invoices, periodType, rdate, ys])
-
-  const panel = {
-    background: '#fff', borderRadius: 14, border: '1px solid #e6ebf3',
-    boxShadow: '0 1px 2px rgba(15,23,42,0.04)', overflow: 'hidden'
+  const downloadExcel = () => {
+    const html = `<table><thead><tr>${exportHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${exportRows.map((row) => `<tr>${row.map((value) => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    const url = URL.createObjectURL(new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `anaokulu-${tab}-${month}.xls`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
-  const miniBox = {
-    padding: '14px 18px', borderRadius: 12,
-    background: '#fff', border: '1px solid #e2e8f0'
+  const moneyValue = (value) => money(round2(value || 0))
+  const reportTitle = TABS.find(([key]) => key === tab)?.[1] || 'Genel Ozet'
+  const formatTableValue = (value, cellIndex) => {
+    const isMoneyColumn = tab === 'invoices' ? cellIndex >= 4 && cellIndex <= 6 : cellIndex > 1
+    return typeof value === 'number' && isMoneyColumn ? moneyValue(value) : value
   }
-  const th = {
-    padding: '10px 12px', fontSize: 12, fontWeight: 700, color: '#475569',
-    background: '#f8fafc', borderBottom: '1px solid #e6ebf3', textAlign: 'left'
-  }
-  const td = {
-    padding: '10px 12px', fontSize: 13, borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle'
-  }
-  const tbl = { width: '100%', borderCollapse: 'collapse' }
-  const sect = {
-    fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '22px 0 10px 0'
-  }
-  const emptyRow = (n) => (
-    <tr><td colSpan={n} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
-      Bu dönem için kayıt bulunamadı.
-    </td></tr>
-  )
+  const comparisonTable = <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>{exportHeaders.map((header) => <th key={header} style={head}>{header}</th>)}</tr></thead><tbody>{exportRows.map((row, index) => <tr key={`${row[0]}-${index}`}>{row.map((value, cellIndex) => <td key={`${index}-${cellIndex}`} style={cell}>{formatTableValue(value, cellIndex)}</td>)}</tr>)}</tbody>{tab === 'invoices' && <tfoot><tr>{['Toplam', '-', total.invoicedStudents, total.uninvoicedStudents, total.invoiceAmount, total.invoiceRequiredAmount, total.invoiceRequiredVat, total.students ? `${((total.invoicedStudents / total.students) * 100).toFixed(2)}%` : '-'].map((value, cellIndex) => <td key={`invoice-total-${cellIndex}`} style={{ ...cell, fontWeight: 800, background: '#f8fafc', borderTop: '2px solid #cbd5e1' }}>{formatTableValue(value, cellIndex)}</td>)}</tr></tfoot>}</table></div>
 
-  return (
-    <div>
-      {/* Süper Admin Sekmeleri */}
-      {isManager && (
-        <div style={{ display: 'flex', gap: 10, borderBottom: '2px solid #e2e8f0', marginBottom: 20, paddingBottom: 0 }}>
-          <button
-            type="button"
-            onClick={() => setReportTab('single')}
-            style={{
-              padding: '11px 18px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 800,
-              background: 'transparent', borderRadius: '10px 10px 0 0',
-              borderBottom: reportTab === 'single' ? '3px solid #6366f1' : '3px solid transparent',
-              color: reportTab === 'single' ? '#6366f1' : '#64748b',
-              marginBottom: -2, display: 'inline-flex', alignItems: 'center', gap: 6
-            }}
-          >
-            {isAdminPanelMode ? '🏫 Konsolide / Seçili Okul Raporu' : '🏫 Seçili Okul Raporu'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setReportTab('all-schools-debt')}
-            style={{
-              padding: '11px 18px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 800,
-              background: 'transparent', borderRadius: '10px 10px 0 0',
-              borderBottom: reportTab === 'all-schools-debt' ? '3px solid #6366f1' : '3px solid transparent',
-              color: reportTab === 'all-schools-debt' ? '#6366f1' : '#64748b',
-              marginBottom: -2, display: 'inline-flex', alignItems: 'center', gap: 6
-            }}
-          >
-            🌐 Tüm Okullar Öğrenci Alacak Raporu (Excel)
-          </button>
-        </div>
-      )}
-
-      {isManager && reportTab === 'all-schools-debt' ? (
-        <TopluAlacakRaporu />
-      ) : (
-        <>
-      <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📈 Finansal Raporlar</h2>
-          <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
-            Günlük / haftalık / aylık / yıllık tahsilat, KDV ve fatura raporları
-          </p>
-        </div>
-        <div className="ak-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => {
-            const n = exportCSV(state, periodType, rdate)
-            toast(`CSV indirildi (${n} kayıt).`)
-          }} style={{
-            ...Btn, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
-            boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
-          }}>⬇ CSV indir</button>
-          <button onClick={() => window.print()} style={{
-            ...Btn, background: '#f1f5f9', color: '#0f172a'
-          }}>🖨 Yazdır / PDF</button>
-        </div>
+  return <div style={{ display: 'grid', gap: 16 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div><h2 style={{ margin: 0, color: '#0f172a' }}>📊 {reportTitle}</h2><div style={{ marginTop: 4, color: '#64748b', fontSize: 13 }}>Anaokulu Super Admin raporu · {month}</div></div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {isManager && <select value={selectedSchoolId} onChange={(event) => setSelectedSchoolId(event.target.value)} style={InputStyle}><option value="">Tum Okullar</option>{(accessibleTenants || []).map((tenant) => <option key={tenant.id || tenant._id} value={tenant.id || tenant._id}>{tenant.name}</option>)}</select>}
+        <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} style={InputStyle} />
+        <button type="button" onClick={downloadExcel} style={{ ...buttonStyle, background: '#0f766e', color: '#fff' }}>Excel'e Aktar</button>
+        <button type="button" onClick={() => window.print()} style={{ ...buttonStyle, background: '#1d4ed8', color: '#fff' }}>PDF Indir</button>
       </div>
-
-      <div className="ak-panel ak-filter-bar" style={{
-        ...panel, marginBottom: 16, padding: '14px 16px',
-        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center'
-      }}>
-        {/* Okul Seçici */}
-        {(isAdminPanelMode || (accessibleTenants && accessibleTenants.length > 0)) && (
-          <select
-            style={{ ...InputCls, fontWeight: 700, minWidth: 180, background: '#f8fafc' }}
-            value={selectedSchoolId}
-            onChange={e => setSelectedSchoolId(e.target.value)}
-          >
-            <option value="">🏫 Tüm Okullar (Konsolide)</option>
-            {accessibleTenants.map(t => (
-              <option key={t.id || t._id} value={t.id || t._id}>🏫 {t.name}</option>
-            ))}
-          </select>
-        )}
-
-        <select style={{ ...InputCls, minWidth: 160, fontWeight: 600 }} value={periodType}
-          onChange={e => setPeriodType(e.target.value)}>
-          <option value="day">Günlük</option>
-          <option value="week">Haftalık</option>
-          <option value="month">Aylık</option>
-          <option value="year">Yıllık</option>
-          <option value="all">Tüm zamanlar</option>
-        </select>
-        <input type="date" style={InputCls} value={rdate} onChange={e => setRdate(e.target.value)} />
-        <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>
-          <b style={{ color: '#0f172a' }}>{periodLabel(periodType)}</b> dönemi · {rdate}
-        </span>
-      </div>
-
-      <div style={{
-        padding: '12px 18px', background: '#fff', borderRadius: 14,
-        border: '1px solid #e6ebf3', marginBottom: 16
-      }}>
-        <div className="ak-stats-grid" style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12
-        }}>
-          <div style={miniBox}>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Brüt Tahsilat</div>
-            <b style={{ fontSize: 20, color: '#0f172a' }}>{money(data.totalAmount)}</b>
-          </div>
-          <div style={{ ...miniBox, background: 'linear-gradient(135deg,#fffbeb,#fef3c7)', borderColor: '#fde68a' }}>
-            <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600 }}>KDV Tutarı</div>
-            <b style={{ fontSize: 20, color: '#92400e' }}>{money(data.totalVat)}</b>
-          </div>
-          <div style={{ ...miniBox, background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', borderColor: '#a7f3d0' }}>
-            <div style={{ fontSize: 11, color: '#065f46', fontWeight: 600 }}>KDV Hariç (Matrah)</div>
-            <b style={{ fontSize: 20, color: '#065f46' }}>{money(data.totalAmount - data.totalVat)}</b>
-          </div>
-          <div style={{ ...miniBox, background: 'linear-gradient(135deg,#eef2ff,#e0e7ff)', borderColor: '#c7d2fe' }}>
-            <div style={{ fontSize: 11, color: '#3730a3', fontWeight: 600 }}>İşlem Sayısı</div>
-            <b style={{ fontSize: 20, color: '#3730a3' }}>{data.count}</b>
-          </div>
-        </div>
-      </div>
-
-      <div style={panel}>
-        <div style={{ padding: '18px 20px', overflow: 'auto' }}>
-          <h3 style={sect}>Ödeme türüne göre</h3>
-          {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {data.types.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 12px', fontSize: 12 }}>
-                  Bu dönem için kayıt bulunamadı.
-                </div>
-              ) : (
-                data.types.map(t => (
-                  <div
-                    key={t.type}
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 10,
-                      padding: '10px 12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{t.type}</span>
-                      <span style={{
-                        background: '#e0e7ff', color: '#3730a3', padding: '2px 8px',
-                        borderRadius: 6, fontSize: 11, fontWeight: 700
-                      }}>
-                        {t.n} İşlem
-                      </span>
-                    </div>
-                    <div style={{
-                      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4,
-                      background: '#fff', padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0',
-                      fontSize: 11
-                    }}>
-                      <div>
-                        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700 }}>BRÜT</div>
-                        <div style={{ fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{money(t.amount)}</div>
-                      </div>
-                      <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: 6 }}>
-                        <div style={{ fontSize: 9, color: '#b45309', fontWeight: 700 }}>KDV</div>
-                        <div style={{ fontWeight: 800, color: '#b45309', marginTop: 1 }}>{money(t.vat)}</div>
-                      </div>
-                      <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: 6 }}>
-                        <div style={{ fontSize: 9, color: '#10b981', fontWeight: 700 }}>KDV HARİÇ</div>
-                        <div style={{ fontWeight: 800, color: '#10b981', marginTop: 1 }}>{money(t.amount - t.vat)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-              <table style={tbl}>
-                <thead>
-                  <tr>
-                    <th style={th}>Ödeme Türü</th>
-                    <th style={{ ...th, textAlign: 'right' }}>İşlem</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Brüt</th>
-                    <th style={{ ...th, textAlign: 'right' }}>KDV</th>
-                    <th style={{ ...th, textAlign: 'right' }}>KDV Hariç</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.types.length === 0 ? emptyRow(5) : data.types.map(t => (
-                    <tr key={t.type}>
-                      <td style={{ ...td, fontWeight: 600 }}>{t.type}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{t.n}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{money(t.amount)}</td>
-                      <td style={{ ...td, textAlign: 'right', color: '#b45309' }}>{money(t.vat)}</td>
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(t.amount - t.vat)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 style={sect}>Seçili dönem fatura durumu</h3>
-          {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Kesildi */}
-              <div style={{
-                background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
-                padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: 99 }}>
-                    🟢 Kesildi
-                  </span>
-                  <span style={{ fontWeight: 800, color: '#166534', fontSize: 13 }}>{data.ok} Öğrenci</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#334155' }}>
-                  <span>Beklenen: <strong>{money(data.expSum)}</strong></span>
-                  <span>Fatura Tutarı: <strong style={{ color: '#166534' }}>{money(data.invSum)}</strong></span>
-                </div>
-              </div>
-
-              {/* Tutar Farklı */}
-              <div style={{
-                background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10,
-                padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 99 }}>
-                    🟡 Tutar farklı
-                  </span>
-                  <span style={{ fontWeight: 800, color: '#92400e', fontSize: 13 }}>{data.diff} Öğrenci</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#334155' }}>
-                  <span>Beklenen: <strong>{money(data.expSum)}</strong></span>
-                  <span>Fatura Tutarı: <strong>—</strong></span>
-                </div>
-              </div>
-
-              {/* Kesilmedi */}
-              <div style={{
-                background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
-                padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '2px 8px', borderRadius: 99 }}>
-                    🔴 Kesilmedi
-                  </span>
-                  <span style={{ fontWeight: 800, color: '#991b1b', fontSize: 13 }}>{data.none} Öğrenci</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#334155' }}>
-                  <span>Beklenen: <strong>{money(data.expSum)}</strong></span>
-                  <span>Fatura Tutarı: <strong>—</strong></span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-              <table style={tbl}>
-                <thead>
-                  <tr>
-                    <th style={th}>Durum</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Öğrenci Sayısı</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Beklenen</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Fatura Tutarı</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={td}>
-                      <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534' }}>
-                        🟢 Kesildi
-                      </span>
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#166534' }}>{data.ok}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(data.invSum)}</td>
-                  </tr>
-                  <tr>
-                    <td style={td}>
-                      <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>
-                        🟡 Tutar farklı
-                      </span>
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#92400e' }}>{data.diff}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>—</td>
-                  </tr>
-                  <tr>
-                    <td style={td}>
-                      <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: '#fee2e2', color: '#991b1b' }}>
-                        🔴 Kesilmedi
-                      </span>
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: '#991b1b' }}>{data.none}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>{money(data.expSum)}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 style={sect}>Öğrenci bazlı özet (en yüksek bakiye önce)</h3>
-          {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {data.stuRows.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 12px', fontSize: 12 }}>
-                  Bu dönem için kayıt bulunamadı.
-                </div>
-              ) : (
-                data.stuRows.map(({ s, exp, col, bal, pct }) => (
-                  <div
-                    key={String(s.id)}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 10,
-                      padding: '10px 12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ fontSize: 13, color: '#0f172a' }}>{s.name}</strong>
-                        {s.class && (
-                          <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>
-                            {s.class}
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#334155' }}>%{pct}</span>
-                    </div>
-
-                    {/* Finansal 3'lü Kutu */}
-                    <div style={{
-                      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4,
-                      background: '#f8fafc', padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0',
-                      fontSize: 11
-                    }}>
-                      <div>
-                        <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700 }}>PLANLANAN</div>
-                        <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 1 }}>{money(exp)}</div>
-                      </div>
-                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 6 }}>
-                        <div style={{ fontSize: 9, color: '#047857', fontWeight: 700 }}>TAHSİLAT</div>
-                        <div style={{ fontWeight: 700, color: '#047857', marginTop: 1 }}>{money(col)}</div>
-                      </div>
-                      <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: 6 }}>
-                        <div style={{ fontSize: 9, color: bal > 0 ? '#b91c1c' : '#047857', fontWeight: 700 }}>KALAN</div>
-                        <div style={{ fontWeight: 800, color: bal > 0 ? '#b91c1c' : '#047857', marginTop: 1 }}>{money(bal)}</div>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden' }}>
-                      <div style={{
-                        width: pct + '%', height: '100%',
-                        background: pct === 100
-                          ? '#10b981'
-                          : pct >= 70
-                            ? '#6366f1'
-                            : pct >= 30
-                              ? '#f59e0b'
-                              : '#ef4444',
-                        borderRadius: 999
-                      }} />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-              <table style={tbl}>
-                <thead>
-                  <tr>
-                    {isAdminPanelMode && !selectedSchoolId && <th style={th}>🏫 Okul</th>}
-                    <th style={th}>Öğrenci</th>
-                    <th style={th}>Sınıf</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Planlanan</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Tahsil Edilen</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Kalan Bakiye</th>
-                    <th style={{ ...th, minWidth: 180 }}>Tamamlanma</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.stuRows.length === 0 ? emptyRow(isAdminPanelMode && !selectedSchoolId ? 7 : 6) : data.stuRows.map(({ s, exp, col, bal, pct }) => (
-                    <tr key={String(s.id)}>
-                      {isAdminPanelMode && !selectedSchoolId && (
-                        <td style={td}>
-                          <span style={{
-                            display: 'inline-block',
-                            padding: '2px 8px', borderRadius: 6,
-                            fontSize: 11, fontWeight: 700,
-                            background: 'rgba(99,102,241,0.08)', color: '#4338ca',
-                            border: '1px solid rgba(99,102,241,0.2)'
-                          }}>
-                            🏫 {s._schoolName || '—'}
-                          </span>
-                        </td>
-                      )}
-                      <td style={{ ...td, fontWeight: 700 }}>{s.name}</td>
-                      <td style={td}>{s.class || '-'}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{money(exp)}</td>
-                      <td style={{ ...td, textAlign: 'right', color: '#047857' }}>{money(col)}</td>
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: bal > 0 ? '#b91c1c' : '#047857' }}>
-                        {money(bal)}
-                      </td>
-                      <td style={td}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#334155', minWidth: 40 }}>{pct}%</span>
-                          <div style={{
-                            flex: 1, height: 10, background: '#e2e8f0',
-                            borderRadius: 999, overflow: 'hidden'
-                          }}>
-                            <div style={{
-                              width: pct + '%', height: '100%',
-                              background: pct === 100
-                                ? 'linear-gradient(90deg,#10b981,#059669)'
-                                : pct >= 70
-                                  ? 'linear-gradient(90deg,#6366f1,#8b5cf6)'
-                                  : pct >= 30
-                                    ? 'linear-gradient(90deg,#f59e0b,#d97706)'
-                                    : 'linear-gradient(90deg,#ef4444,#dc2626)',
-                              borderRadius: 999, transition: 'width 0.3s'
-                            }} />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-        </>
-      )}
-
-      {toastMsg && (
-        <div style={{
-          position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
-          background: '#0f172a', color: '#fff', padding: '12px 22px', borderRadius: 14,
-          fontWeight: 600, fontSize: 13, zIndex: 99999,
-          boxShadow: '0 8px 24px rgba(15,23,42,0.3)'
-        }}>{toastMsg}</div>
-      )}
     </div>
-  )
+    {isManager && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '2px solid #e2e8f0' }}>{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} style={{ ...buttonStyle, background: tab === key ? '#e0e7ff' : 'transparent', color: tab === key ? '#3730a3' : '#64748b', borderRadius: '8px 8px 0 0' }}>{label}</button>)}</div>}
+
+    {tab === 'overview' && <><div style={KpiGrid}>{[
+      ['Toplam Okul', total.schools], ['Toplam Ogrenci', total.students], ['Toplam Alacak', moneyValue(total.remaining)], ['Vadesi Gecmis Alacak', moneyValue(total.overdue)], ['Tahsil Edilen', moneyValue(total.paid)], ['Toplam Fatura', total.invoices], ['Faturasi Kesilen Ogrenci', total.invoicedStudents], ['Faturasi Kesilmeyen Ogrenci', total.uninvoicedStudents]
+    ].map(([label, value]) => <div key={label} style={Kpi}><div style={{ color: '#64748b', fontSize: 12 }}>{label}</div><strong style={{ display: 'block', marginTop: 6, fontSize: 22, color: '#0f172a' }}>{value}</strong></div>)}</div><Panel>{comparisonTable}</Panel></>}
+    {tab === 'students' && <Panel><h3>Ogrenci Durumu</h3>{comparisonTable}</Panel>}
+    {tab === 'receivables' && <TopluAlacakRaporu selectedSchoolId={activeSchoolId} />}
+    {tab === 'invoices' && <><div style={KpiGrid}>{[['Toplam Ogrenci', total.students], ['Faturasi Kesilen', total.invoicedStudents], ['Faturasi Kesilmeyen', total.uninvoicedStudents], ['Toplam Fatura', total.invoices], ['Kesilen Fatura Tutari', moneyValue(total.invoiceAmount)], ['Kesilmesi Gereken Toplam', moneyValue(total.invoiceRequiredAmount)], ['Kesilmesi Gereken Toplam KDV', moneyValue(total.invoiceRequiredVat)], ['Fatura Orani', total.students ? `${((total.invoicedStudents / total.students) * 100).toFixed(2)}%` : '-']].map(([label, value]) => <div key={label} style={Kpi}><div style={{ color: '#64748b', fontSize: 12 }}>{label}</div><strong style={{ display: 'block', marginTop: 6, fontSize: 22 }}>{value}</strong></div>)}</div><Panel><h3>{month} Fatura Durumu</h3>{comparisonTable}</Panel></>}
+    {tab === 'comparison' && <Panel><h3>Okul Karsilastirma</h3>{comparisonTable}</Panel>}
+  </div>
 }

@@ -26,6 +26,24 @@ import { requireLucaDevice } from '../middlewares/requireLucaDevice.js'
 
 const router = Router()
 
+const forbidSuperadminSchoolMutation = (req, res, next) => {
+  if (req.user?.role !== 'superadmin') return next()
+
+  const body = req.body || {}
+  const hasSchoolMutationPayload = Array.isArray(body.students)
+    || Array.isArray(body.collections)
+    || Array.isArray(body.invoices)
+    || Array.isArray(body.checks)
+
+  if (hasSchoolMutationPayload) {
+    return res.status(403).json({
+      error: 'Süper Admin okul içi öğrenci, taksit, tahsilat ve fatura verisini düzenleyemez.'
+    })
+  }
+
+  next()
+}
+
 // ============================================================
 // LUCA CHROME EXTENSION BRIDGE
 // ============================================================
@@ -76,6 +94,7 @@ router.get(
 
 router.put(
   '/',
+  forbidSuperadminSchoolMutation,
   saveAnaokuluSchool
 )
 
@@ -88,11 +107,13 @@ router.get(
 
 router.put(
   '/students/:id',
+  forbidSuperadminSchoolMutation,
   updateAnaokuluStudent
 )
 
 router.delete(
   '/students/:id',
+  forbidSuperadminSchoolMutation,
   delAnaokuluStudent
 )
 
@@ -100,6 +121,7 @@ router.delete(
 // Tahsilat
 router.delete(
   '/collections/:id',
+  forbidSuperadminSchoolMutation,
   delAnaokuluCollection
 )
 
@@ -107,6 +129,7 @@ router.delete(
 // Fatura
 router.delete(
   '/invoices/:uuid',
+  forbidSuperadminSchoolMutation,
   delAnaokuluInvoice
 )
 

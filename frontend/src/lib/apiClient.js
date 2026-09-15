@@ -165,7 +165,7 @@ export const api = async (path, options = {}) => {
     ...(!skipBranchHeader && shouldAttachBranch && (branchIdOverride || selectedBranchId) ? { 'x-branch-id': String(branchIdOverride || selectedBranchId) } : {}),
     ...incomingHeaders,
   }
-  const { silent: _silent, skipBranchHeader: _skipBranchHeader, branchIdOverride: _branchIdOverride, data: _data, suppressAuthRedirect: _suppressAuthRedirect, portalOverride: _portalOverride, cacheTtlMs: _cacheTtlMs, cacheMode: _cacheMode, retryOn429: _retryOn429, ...fetchOptions } = options
+  const { silent: _silent, skipBranchHeader: _skipBranchHeader, branchIdOverride: _branchIdOverride, data: _data, params: requestParams, suppressAuthRedirect: _suppressAuthRedirect, portalOverride: _portalOverride, cacheTtlMs: _cacheTtlMs, cacheMode: _cacheMode, retryOn429: _retryOn429, ...fetchOptions } = options
 
   const wrap = (ok, status, data) => {
     const basePayload = {
@@ -183,8 +183,15 @@ export const api = async (path, options = {}) => {
     const urlRaw = /^https?:\/\//i.test(normalizedPath) ? normalizedPath : `${base}${normalizedPath}`
     let url = urlRaw
     try {
+      if (requestParams && typeof requestParams === 'object') {
+        const parsed = new URL(urlRaw, typeof window !== 'undefined' ? window.location?.origin : 'http://localhost')
+        Object.entries(requestParams).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') parsed.searchParams.set(key, String(value))
+        })
+        url = /^https?:\/\//i.test(urlRaw) ? parsed.toString() : `${parsed.pathname}${parsed.search}`
+      }
       if (import.meta.env.DEV && /^https?:\/\//i.test(urlRaw)) {
-        const u = new URL(urlRaw)
+        const u = new URL(url)
         u.port = '4000'
         url = u.toString()
       }
@@ -203,9 +210,9 @@ export const api = async (path, options = {}) => {
     }
 
     const bodyKey = bodyIsFormData ? '[formdata]' : String(fetchOptions.body || '')
-    const key = `${method} ${url} | ${bodyKey} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')}`
+    const key = `${method} ${url} | ${bodyKey} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')} | ${(headers['x-tenant-id'] || '')}`
     const canDedupe = !fetchOptions.signal && !bodyIsFormData
-    const cacheKey = `${method} ${url} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')}`
+    const cacheKey = `${method} ${url} | ${(headers.Authorization || '')} | ${(headers['x-branch-id'] || '')} | ${(headers['x-tenant-id'] || '')}`
     const shouldCache = method === 'GET' && !fetchOptions.signal && !bodyIsFormData && cacheMode !== 'no-store'
     const ttl = (() => {
       if (!shouldCache) return 0

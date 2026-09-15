@@ -2,13 +2,26 @@ import mongoose from 'mongoose'
 import AuditLog from '../models/AuditLog.js'
 
 export const log = async (tenantId, actorUserId, action, entityType, entityId, meta = {}) => {
-  const clean = { tenantId, actorUserId, action, entityType, meta }
+  const clean = { action, entityType, meta }
+
+  if (tenantId && mongoose.isValidObjectId(tenantId)) {
+    clean.tenantId = tenantId
+  }
+
+  if (actorUserId && mongoose.isValidObjectId(actorUserId)) {
+    clean.actorUserId = actorUserId
+  }
+
   if (entityId !== undefined && entityId !== null && entityId !== '') {
     if (mongoose.isValidObjectId(entityId)) {
       clean.entityId = entityId
     }
   }
-  await AuditLog.create(clean)
+
+  if (!clean.actorUserId) return
+  try {
+    await AuditLog.create(clean)
+  } catch {}
 }
 
 export const list = async (tenantId, query = {}) => {
