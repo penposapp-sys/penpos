@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
 import mongoose from 'mongoose'
+import fs from 'fs/promises'
 import { error } from '../utils/errors.js'
 import { listTenants, updateById as updateTenantById, findTenantById } from '../repositories/tenantRepository.js'
 import { log as auditLog } from './auditService.js'
@@ -14,8 +15,13 @@ import Order from '../models/Order.js'
 import PaymentSettings from '../models/PaymentSettings.js'
 import PaymentRequest from '../models/PaymentRequest.js'
 import Tenant from '../models/Tenant.js'
+import { AnaokuluSchool } from '../models/AnaokuluSchool.js'
+import CanteenCategory from '../modules/canteen/models/CanteenCategory.js'
 import CanteenBranch from '../modules/canteen/models/CanteenBranch.js'
+import CanteenProduct from '../modules/canteen/models/CanteenProduct.js'
 import CanteenTenantSettings from '../modules/canteen/models/CanteenTenantSettings.js'
+import { resolveUploadDirCandidates } from '../utils/uploads.js'
+import { deleteProductImageFile } from '../utils/productImageStorage.js'
 import { getPlanStatus, hasActiveSubscription } from './planService.js'
 import { normalizeSystemType, resolvePlanPackageType, resolveTenantPackageType, toLegacySystemType } from '../utils/systemType.js'
 
@@ -508,42 +514,66 @@ export const softDeleteTenantService = async (tenantId, actorUserId) => {
 }
 
 export const hardDeleteTenantService = async (tenantId, actorUserId) => {
+  if (!mongoose.isValidObjectId(tenantId)) throw error('invalid_request', 'Invalid tenant id', 400)
+
+  const tenantObjectId = new mongoose.Types.ObjectId(String(tenantId))
+  const tenantIdString = String(tenantId)
+  const tenantUploadDirs = resolveUploadDirCandidates(`tenant-${tenantIdString}`)
+
+  const imageDocs = await Promise.all([
+    MenuItem.find({ tenantId: tenantObjectId }).select('imageUrl galleryImages').lean(),
+    CanteenCategory.find({ tenantId: tenantObjectId }).select('imageUrl').lean(),
+    CanteenProduct.find({ tenantId: tenantObjectId }).select('imageUrl galleryImages').lean()
+  ])
+  const productImageUrls = new Set()
+  for (const docs of imageDocs) {
+    for (const doc of docs) {
+      if (doc?.imageUrl) productImageUrls.add(doc.imageUrl)
+      for (const imageUrl of Array.isArray(doc?.galleryImages) ? doc.galleryImages : []) {
+        if (imageUrl) productImageUrls.add(imageUrl)
+      }
+    }
+  }
+
+  for (const imageUrl of productImageUrls) {
+    await deleteProductImageFile(imageUrl)
+  }
+
+  for (const dir of new Set(tenantUploadDirs)) {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+
+  const deleteTenantData = async (session = null) => {
+    const options = session ? { session } : {}
+    const collections = await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray()
+    const tenantFilter = { $or: [{ tenantId: tenantObjectId }, { tenantId: tenantIdString }] }
+
+    for (const { name } of collections) {
+      if (!name || name.startsWith('system.')) continue
+      await mongoose.connection.db.collection(name).deleteMany(tenantFilter, options)
+    }
+
+    await AnaokuluSchool.deleteMany({ tenant: tenantObjectId }, options)
+    await User.updateMany({ accessibleTenantIds: tenantObjectId }, { $pull: { accessibleTenantIds: tenantObjectId } }, options)
+    await Tenant.deleteOne({ _id: tenantObjectId }, options)
+  }
+
   let session
   try {
     session = await mongoose.startSession()
     session.startTransaction()
-    await User.deleteMany({ tenantId }, { session })
-    await Branch.deleteMany({ tenantId }, { session })
-    await Table.deleteMany({ tenantId }, { session })
-    await Category.deleteMany({ tenantId }, { session })
-    await MenuItem.deleteMany({ tenantId }, { session })
-    await Order.deleteMany({ tenantId }, { session })
-    await PaymentSettings.deleteMany({ tenantId }, { session })
-    await PaymentRequest.deleteMany({ tenantId }, { session })
-    await Tenant.deleteOne({ _id: tenantId }, { session })
+    await deleteTenantData(session)
     await session.commitTransaction()
-    await auditLog(tenantId, actorUserId || null, 'uye_tamamen_silindi', 'Tenant', tenantId, {})
     return { success: true }
   } catch (e) {
     try { if (session) await session.abortTransaction().catch(() => {}) } catch {}
     try {
-      await User.deleteMany({ tenantId })
-      await Branch.deleteMany({ tenantId })
-      await Table.deleteMany({ tenantId })
-      await Category.deleteMany({ tenantId })
-      await MenuItem.deleteMany({ tenantId })
-      await Order.deleteMany({ tenantId })
-      await PaymentSettings.deleteMany({ tenantId })
-      await PaymentRequest.deleteMany({ tenantId })
-      await Tenant.deleteOne({ _id: tenantId })
-      await auditLog(tenantId, actorUserId || null, 'uye_tamamen_silindi', 'Tenant', tenantId, {})
+      await deleteTenantData()
       return { success: true }
     } catch (err2) {
       throw error('internal_error', err2.message || e.message || 'Internal error', 500)
-    } finally {
-      if (session) session.endSession()
     }
   } finally {
-    if (session) session.endSession()
+    if (session) await session.endSession()
   }
 }

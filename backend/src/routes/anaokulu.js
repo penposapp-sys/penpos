@@ -3,6 +3,7 @@ import { Router } from 'express'
 import {
   getAnaokuluSchool,
   saveAnaokuluSchool,
+  resetAnaokuluSchool,
   getAnaokuluStudent,
   updateAnaokuluStudent,
   delAnaokuluStudent,
@@ -96,6 +97,11 @@ router.put(
   '/',
   forbidSuperadminSchoolMutation,
   saveAnaokuluSchool
+)
+
+router.delete(
+  '/reset',
+  resetAnaokuluSchool
 )
 
 

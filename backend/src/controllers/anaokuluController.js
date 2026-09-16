@@ -309,6 +309,26 @@ export const saveAnaokuluSchool = async (req, res) => {
   }
 }
 
+export const resetAnaokuluSchool = async (req, res) => {
+  try {
+    const tenantId = req.tenant?._id || req.tenant?.id
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Lütfen işlem yapacağınız bir anaokulu seçiniz.' })
+    }
+
+    if (req.user?.role === 'superadmin' || req.user?.role === 'platform_admin') {
+      return res.status(403).json({ error: 'Bu işlem okul yöneticisi hesabından yapılmalıdır.' })
+    }
+
+    await AnaokuluSchool.deleteOne({ tenant: tenantId })
+
+    res.json({ ok: true, message: 'Anaokulu verileri kalıcı olarak silindi.' })
+  } catch (err) {
+    res.status(500).json({ error: err?.message || 'Veriler silinemedi.' })
+  }
+}
+
 // Alt endpointler — tek öğrencinin dökümünü getir/sil
 export const getAnaokuluStudent = async (req, res) => {
   try {

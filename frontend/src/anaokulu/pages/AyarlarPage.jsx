@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { api } from '../../lib/apiClient.js'
 import { resolveApiOrigin } from '../../lib/runtimeApi.js'
 import { exportDataJSON, getYearStart, periodsOfYear, periodName, DEFAULT_YEAR_START, DEFAULT_PERIODS } from '../utils/calculations.js'
+import * as XLSX from 'xlsx'
 
 const Btn = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -215,7 +216,6 @@ export default function AyarlarPage() {
 
   const [activeTab, setActiveTab] = useState((isStaff || isAdminPanelMode) ? 'hesap' : 'genel')
   const [toastMsg, setToastMsg] = useState('')
-  const fileRef = useRef(null)
 
   const [emailForm, setEmailForm] = useState({
     email: user?.email || '',
@@ -464,29 +464,172 @@ export default function AyarlarPage() {
     toast('İndirimler kaydedildi.')
   }
 
-  const handleImportJSON = (e) => {
-    const f = e.target.files && e.target.files[0]
-    if (!f) return
-    const r = new FileReader()
-    r.onload = () => {
+  const fileRef = useRef(null)
+
+  const handleImportJSON = (event) => {
+    const file = event.target.files && event.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
       try {
-        const d = JSON.parse(r.result)
-        if (!d || !Array.isArray(d.students)) throw new Error('students eksik')
-        const payload = {
-          settings: d.settings || {},
-          students: d.students || [],
-          collections: d.collections || [],
-          invoices: d.invoices || [],
-          checks: d.checks || []
-        }
-        actions.replaceAll(payload)
-        toast('Veriler içe aktarıldı.')
+        const data = JSON.parse(reader.result)
+        if (!data || !Array.isArray(data.students)) throw new Error('students eksik')
+        actions.replaceAll({
+          settings: data.settings || {},
+          students: data.students || [],
+          collections: data.collections || [],
+          invoices: data.invoices || [],
+          checks: data.checks || []
+        })
+        toast('JSON verileri içe aktarıldı.')
       } catch {
-        toast('Geçersiz yedek dosyası.')
+        toast('Geçersiz JSON yedek dosyası.')
       }
-      e.target.value = ''
+      event.target.value = ''
     }
-    r.readAsText(f)
+    reader.readAsText(file)
+  }
+
+  const exportDataExcel = () => {
+    const workbook = XLSX.utils.book_new()
+    const students = state.students || []
+    const collections = state.collections || []
+    const invoices = state.invoices || []
+    const checks = state.checks || []
+    const settings = state.settings || {}
+    const studentById = new Map(students.map(student => [String(student.id || student._id), student]))
+    const formatDate = value => {
+      const text = String(value || '')
+      if (!/^\d{4}-\d{2}-\d{2}/.test(text)) return text
+      const [year, month, day] = text.slice(0, 10).split('-')
+      return `${day}.${month}.${year}`
+    }
+    const moneyValue = value => Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const planRows = students.flatMap(student => (student.items || []).map((item, index) => ({
+      'Öğrenci No': student.id || '',
+      'Öğrenci Adı': student.name || '',
+      'Sınıf': student.class || '',
+      'Veli Adı': student.parent || '',
+      'Plan Sırası': index + 1,
+      'Ücret Planı': item.name || '',
+      'Liste Fiyatı (₺)': moneyValue(item.basePrice),
+      'İndirim': item.discountLabel || item.discountName || '',
+      'Net Plan Tutarı (₺)': moneyValue(item.total),
+      'Peşinat (₺)': moneyValue(item.downPayment),
+      'Taksit Sayısı': Number(item.installments || 1),
+      'Taksit Tutarı (₺)': moneyValue(Number(item.total || 0) / Math.max(1, Number(item.installments || 1))),
+      'Başlangıç Tarihi': formatDate(item.start),
+      'Fatura Durumu': item.invoiced === false ? 'Faturasız' : 'Faturalı'
+    })))
+    const sheets = [
+      ['Özet', [{
+        'Okul Adı': settings.school || '',
+        'Rapor Tarihi': formatDate(new Date().toISOString()),
+        'Toplam Öğrenci': students.length,
+        'Aktif Öğrenci': students.filter(student => student.active !== false).length,
+        'Toplam Ücret Planı': planRows.length,
+        'Toplam Tahsilat (₺)': moneyValue(collections.reduce((sum, collection) => sum + Number(collection.amount || 0), 0)),
+        'Toplam Fatura': invoices.length,
+        'Toplam Çek': checks.length
+      }]],
+      ['Öğrenciler', students.map(student => ({
+        'Öğrenci No': student.id || '',
+        'Öğrenci Adı': student.name || '',
+        'Sınıf': student.class || '',
+        'Veli Adı': student.parent || '',
+        'Telefon': student.phone || '',
+        'TCKN / VKN': student.tax || '',
+        'Kayıt Tarihi': formatDate(student.regDate),
+        'Adres': student.address || '',
+        'Not': student.note || '',
+        'Durum': student.active === false ? 'Pasif' : 'Aktif',
+        'Fatura Durumu': student.invoiced === false ? 'Faturasız' : 'Faturalı',
+        'Ücret Planı Sayısı': (student.items || []).length
+      }))],
+      ['Taksit Planları', planRows],
+      ['Tahsilatlar', collections.map(collection => {
+        const student = studentById.get(String(collection.studentId)) || {}
+        return {
+          'Tahsilat No': collection.id || '',
+          'Tarih': formatDate(collection.date),
+          'Öğrenci No': collection.studentId || '',
+          'Öğrenci Adı': student.name || '',
+          'Sınıf': student.class || '',
+          'Ücret Kalemi': collection.item || '',
+          'Taksit No': Number(collection.installmentNo || 0) === 0 ? 'Peşinat' : collection.installmentNo,
+          'Tutar (₺)': moneyValue(collection.amount),
+          'KDV (₺)': moneyValue(collection.vat),
+          'KDV Oranı (%)': collection.vatRate || 0,
+          'Ödeme Türü': collection.payment || '',
+          'Fatura No': collection.invoiceNo || '',
+          'Açıklama': collection.note || ''
+        }
+      })],
+      ['Faturalar', invoices.map(invoice => {
+        const student = studentById.get(String(invoice.studentId)) || {}
+        return {
+          'Fatura UUID': invoice.uuid || '',
+          'Fatura No': invoice.no || '',
+          'Fatura Tarihi': formatDate(invoice.date),
+          'Dönem': invoice.period || '',
+          'Öğrenci No': invoice.studentId || '',
+          'Öğrenci Adı': student.name || invoice.buyer || '',
+          'Veli / Alıcı': invoice.buyer || '',
+          'TCKN / VKN': invoice.taxId || '',
+          'Plan': invoice.planName || '',
+          'Matrah (₺)': moneyValue(invoice.base || invoice.subtotal),
+          'KDV (₺)': moneyValue(invoice.vat || invoice.vatTotal),
+          'Genel Toplam (₺)': moneyValue(invoice.total || invoice.grandTotal),
+          'Durum': invoice.status || '',
+          'Fatura Türü': invoice.type || invoice.invoiceType || '',
+          'ETTN': invoice.ettn || ''
+        }
+      })],
+      ['Çekler', checks.map(check => ({
+        'Dönem': check.period || '',
+        'Kontrol Tarihi': check.at ? formatDate(new Date(check.at).toISOString()) : '',
+        'Bulunan Fatura': check.found || 0,
+        'Eşleşen Fatura': check.matched || 0
+      }))],
+      ['Ayarlar', Object.entries(settings).map(([field, value]) => ({
+        'Ayar': field,
+        'Değer': typeof value === 'object' ? JSON.stringify(value) : value
+      }))]
+    ]
+
+    sheets.forEach(([name, rows]) => {
+      const worksheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ 'Bilgi': 'Kayıt yok' }])
+      const headers = rows.length ? Object.keys(rows[0]) : ['Bilgi']
+      worksheet['!cols'] = headers.map(header => ({ wch: Math.min(36, Math.max(14, header.length + 3)) }))
+      worksheet['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, rows.length), c: Math.max(0, headers.length - 1) } }) }
+      worksheet['!freeze'] = { xSplit: 0, ySplit: 1 }
+      XLSX.utils.book_append_sheet(workbook, worksheet, name)
+    })
+
+    const schoolName = String(state.settings?.school || 'anaokulu').replace(/[\\/:*?"<>|]/g, '-').trim()
+    XLSX.writeFile(workbook, `${schoolName || 'anaokulu'}-veri-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    toast('Excel dosyası indirildi.')
+  }
+
+  const handleResetAllData = async () => {
+    if (!window.confirm('DİKKAT: Bu okulun öğrencileri, taksit planları, tahsilatları, faturaları, çekleri ve ayarları kalıcı olarak silinecek. Devam etmek istiyor musunuz?')) return
+    const confirmation = window.prompt('İkinci onay için TAMAMEN SİL yazın.')
+    if (confirmation !== 'TAMAMEN SİL') {
+      toast('İkinci onay verilmedi; veriler silinmedi.')
+      return
+    }
+
+    try {
+      const result = await api('/api/anaokulu/reset', {
+        method: 'DELETE',
+        portalOverride: 'anaokulu'
+      })
+      if (result?.ok === false) throw new Error(result.message || result.error || 'Veriler silinemedi.')
+      await actions.reload()
+      toast('Okul verileri MongoDB dahil kalıcı olarak silindi.')
+    } catch (error) {
+      toast(error?.message || 'Veriler silinemedi.')
+    }
   }
 
   const handleEmailSubmit = async () => {
@@ -1520,18 +1663,24 @@ export default function AyarlarPage() {
           <h3 style={h3}>💾 Veri</h3>
           <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 14px 0' }}>
             Tüm veriler (öğrenci, taksit, tahsilat, fatura) sunucu tarafında tenant bazlı saklanır.
-            Yedek almak veya başka bir ortama taşımak için dışa aktarın.
+            Öğrenci, taksit planı, tahsilat, fatura, çek ve ayar verilerini ayrı Excel sekmeleri olarak dışa aktarın.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button onClick={() => { exportDataJSON(state); toast('Yedek indirildi.') }} style={{
+            <button onClick={() => { exportDataJSON(state); toast('JSON yedeği indirildi.') }} style={{
+              ...Btn, background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1'
+            }}>⬇ JSON olarak dışa aktar</button>
+            <button onClick={() => fileRef.current?.click()} style={{
+              ...Btn, background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1'
+            }}>⬆ JSON içe aktar</button>
+            <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
+              onChange={handleImportJSON} />
+            <button onClick={exportDataExcel} style={{
               ...Btn, background: 'linear-gradient(135deg,#0891b2,#06b6d4)', color: '#fff',
               boxShadow: '0 4px 12px rgba(8,145,178,0.25)'
-            }}>⬇ Verileri dışa aktar (JSON)</button>
-            <button onClick={() => fileRef.current?.click()} style={{
-              ...Btn, background: '#f1f5f9', color: '#0f172a'
-            }}>⬆ Verileri içe aktar</button>
-            <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }}
-              onChange={handleImportJSON} />
+            }}>⬇ Excel olarak dışa aktar</button>
+            <button onClick={handleResetAllData} style={{
+              ...Btn, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca'
+            }}>🗑 Her şeyi sıfırla</button>
             <span style={{ fontSize: 12, color: '#94a3b8', alignSelf: 'center' }}>
               {state.saving ? '⏳ Kaydediliyor...' : '✓ Son değişiklikler: otomatik kaydedildi'}
             </span>
