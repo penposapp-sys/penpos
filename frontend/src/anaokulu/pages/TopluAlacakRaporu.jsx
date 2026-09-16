@@ -7,8 +7,9 @@ const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz'
 const control = { padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', fontSize: 13 }
 const cell = { padding: '9px 10px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', fontSize: 12 }
 
-export default function TopluAlacakRaporu({ selectedSchoolId = '' }) {
-  const { accessibleTenants } = useAuth()
+export default function TopluAlacakRaporu({ selectedSchoolId = '', schoolOnly = false }) {
+  const { accessibleTenants, tenantCtx } = useAuth()
+  const reportTenants = schoolOnly && tenantCtx?.tenant ? [tenantCtx.tenant] : (accessibleTenants || [])
   const [year, setYear] = useState(String(new Date().getFullYear()))
   const [schoolFilter, setSchoolFilter] = useState(selectedSchoolId)
   const [schools, setSchools] = useState([])
@@ -16,7 +17,7 @@ export default function TopluAlacakRaporu({ selectedSchoolId = '' }) {
 
   const load = async () => {
     setLoading(true)
-    const results = await Promise.all((accessibleTenants || []).map(async (tenant) => {
+    const results = await Promise.all(reportTenants.map(async (tenant) => {
       try {
         const response = await api('/api/anaokulu/', { portalOverride: 'anaokulu', params: { tenantId: tenant.id }, headers: { 'X-Tenant-Id': tenant.id }, silent: true, cacheMode: 'no-cache' })
         return { ...tenant, detail: response?.ok !== false ? response : null }
@@ -28,7 +29,7 @@ export default function TopluAlacakRaporu({ selectedSchoolId = '' }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [accessibleTenants])
+  useEffect(() => { load() }, [accessibleTenants, tenantCtx, schoolOnly])
 
   const report = useMemo(() => {
     const scoped = schoolFilter ? schools.filter(school => String(school.id || school._id) === String(schoolFilter)) : schools
@@ -51,9 +52,9 @@ export default function TopluAlacakRaporu({ selectedSchoolId = '' }) {
 
   return <div style={{ display: 'grid', gap: 14 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-      <div><h3 style={{ margin: 0 }}>Toplu Öğrenci Alacak Matrisi</h3><div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>Her satır öğrenci, her sütun gerçek vade ayıdır.</div></div>
+      <div><h3 style={{ margin: 0 }}>{schoolOnly ? 'Öğrenci Alacak Durumu' : 'Toplu Öğrenci Alacak Matrisi'}</h3><div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>Her satır öğrenci, her sütun gerçek vade ayıdır.</div></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <select value={schoolFilter} onChange={event => setSchoolFilter(event.target.value)} style={control}><option value="">Tüm Okullar</option>{(accessibleTenants || []).map(tenant => <option key={tenant.id || tenant._id} value={tenant.id || tenant._id}>{tenant.name}</option>)}</select>
+        {!schoolOnly && <select value={schoolFilter} onChange={event => setSchoolFilter(event.target.value)} style={control}><option value="">Tüm Okullar</option>{(accessibleTenants || []).map(tenant => <option key={tenant.id || tenant._id} value={tenant.id || tenant._id}>{tenant.name}</option>)}</select>}
         <select value={year} onChange={event => setYear(event.target.value)} style={control}>{['2025', '2026', '2027'].map(value => <option key={value} value={value}>{value} Yılı</option>)}</select>
         <button type="button" onClick={download} style={{ ...control, background: '#0f766e', color: '#fff', border: 'none', fontWeight: 700 }}>Excel'e Aktar</button>
       </div>
