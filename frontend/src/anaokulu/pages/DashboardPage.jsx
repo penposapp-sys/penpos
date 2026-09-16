@@ -77,7 +77,6 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="ak-page-header" style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>🏠 Genel Bakış</h2>
         <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
           {isAdminPanelMode
             ? `Süper Admin Paneli · Toplam ${perSchoolStats.length} okul · ${students.length} öğrenci`

@@ -345,7 +345,6 @@ export default function TahsilatlarPage() {
       {/* ── Header ── */}
       <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📊 Tahsilat Raporu</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
             {isAdminPanelMode
               ? `Süper Admin Paneli · Tüm Okullar · ${collections.length} toplam kayıt · ${filtered.length} listeleniyor`

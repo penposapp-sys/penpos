@@ -1484,16 +1484,6 @@ export default function UcretPlaniPage() {
   return (
     <div style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
       
-      {/* Page Title */}
-      <div className="ak-page-header" style={{ marginBottom: 14 }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: 22, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>💳</span> Ücret &amp; Taksit Yönetimi
-        </h2>
-        <p style={{ margin: 0, color: '#64748b', fontSize: 13 }}>
-          Planlara tıklayarak alt alta taksit dökümünü görüntüleyin, vade gecikmelerini takip edin, tahsilat yapın veya eski tahsilatları düzenleyin
-        </p>
-      </div>
-
       {isAdminPanelMode && (
         <div style={{
           padding: '12px 16px', borderRadius: 12, marginBottom: 14,
@@ -1627,24 +1617,22 @@ export default function UcretPlaniPage() {
               <div style={{
                 background: '#fff', borderRadius: 16, border: '1px solid #e6ebf3',
                 boxShadow: '0 1px 4px rgba(15,23,42,0.04)',
-                padding: isMobile ? '12px 14px' : '16px 20px',
-                display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-                justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center',
-                gap: 12,
+                padding: isMobile ? '10px 12px' : '12px 16px',
+                display: 'flex', flexDirection: 'column', gap: 10,
                 overflow: 'hidden'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0, width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <div style={{
-                    width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                     background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
                     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 800, fontSize: 17, boxShadow: '0 4px 10px rgba(99,102,241,0.25)'
+                    fontWeight: 800, fontSize: 15, boxShadow: '0 4px 10px rgba(99,102,241,0.25)'
                   }}>
                     {(selStudent.name || 'Ö')[0]?.toUpperCase()}
                   </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a', wordBreak: 'break-word' }}>
+                  <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
                         {selStudent.name}
                       </h3>
                       {selStudent.class && (
@@ -1656,14 +1644,12 @@ export default function UcretPlaniPage() {
                         </span>
                       )}
                     </div>
-                    <div style={{ marginTop: 3, fontSize: 12, color: '#64748b', display: 'flex', gap: '4px 10px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 11, color: '#64748b', display: 'flex', gap: '4px 8px', flexWrap: 'wrap' }}>
                       {selStudent.parent && <span>👤 Veli: <strong>{selStudent.parent}</strong></span>}
                       {selStudent.phone && <span>📞 Tel: <strong>{selStudent.phone}</strong></span>}
                       {selStudent.tax && <span>🆔 TC: <strong>{selStudent.tax}</strong></span>}
                     </div>
                   </div>
-                </div>
-
                 {/* Action Buttons */}
                 <div style={{
                   display: 'flex', gap: 8, flexWrap: 'wrap',
@@ -1671,33 +1657,6 @@ export default function UcretPlaniPage() {
                   borderTop: isMobile ? '1px solid #f1f5f9' : 'none',
                   paddingTop: isMobile ? 8 : 0
                 }}>
-                  {allOverdueInstallments.length > 0 && (
-                    <button
-                      id="btn-vadesi-gecmis"
-                      type="button"
-                      onClick={() => setOverdueModalOpen(true)}
-                      style={{
-                        ...Btn,
-                        flex: isMobile ? '1 1 120px' : '0 0 auto',
-                        justifyContent: 'center',
-                        background: 'linear-gradient(135deg,#ef4444,#dc2626)',
-                        color: '#fff',
-                        padding: '8px 12px',
-                        fontSize: 12,
-                        boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
-                      }}
-                    >
-                      <span style={{ fontSize: 14 }}>⚠️</span>
-                      Vadesi Geçmiş
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        background: '#fff', color: '#dc2626', borderRadius: '50%',
-                        width: 18, height: 18, fontSize: 10, fontWeight: 900, marginLeft: 2
-                      }}>
-                        {allOverdueInstallments.length}
-                      </span>
-                    </button>
-                  )}
                   <button
                     id="btn-ucret-plani-ekle"
                     type="button"
@@ -1708,7 +1667,7 @@ export default function UcretPlaniPage() {
                       justifyContent: 'center',
                       background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
                       color: '#fff',
-                      padding: '8px 14px',
+                      padding: '8px 14px', height: 38, boxSizing: 'border-box',
                       fontSize: 12,
                       boxShadow: '0 4px 12px rgba(99,102,241,0.25)'
                     }}
@@ -1716,26 +1675,25 @@ export default function UcretPlaniPage() {
                     <span style={{ fontSize: 14 }}>+</span> Ücret Planı Ekle
                   </button>
                 </div>
-              </div>
+                </div>
 
-              {/* Summary 4-Box Cards */}
-              <div className="ak-stats-grid" style={{
-                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10
-              }}>
-                {[
-                  { label: 'Toplam Planlanan', val: money(pt?.totalExpected || 0), color: '#0f172a' },
-                  { label: 'Tahsil Edilen', val: money(pt?.totalCollected || 0), color: '#059669' },
-                  { label: 'Kalan Bakiye', val: money(pt?.totalRemaining || 0), color: (pt?.totalRemaining || 0) > 0 ? '#e11d48' : '#059669' },
-                  { label: 'Kayıtlı Plan', val: `${(selStudent.items || []).length} Plan`, color: '#6366f1' }
-                ].map(({ label, val, color }) => (
-                  <div key={label} style={{
-                    background: '#fff', borderRadius: 14, border: '1px solid #e6ebf3',
-                    padding: '12px 14px', boxShadow: '0 1px 3px rgba(15,23,42,0.03)'
-                  }}>
-                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>{label}</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
-                  </div>
-                ))}
+                <div className="ak-stats-grid" style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(4, minmax(130px, 1fr))', gap: 8
+                }}>
+                  {[
+                    { label: 'Toplam Planlanan', val: money(pt?.totalExpected || 0), color: '#0f172a' },
+                    { label: 'Tahsil Edilen', val: money(pt?.totalCollected || 0), color: '#059669' },
+                    { label: 'Kalan Bakiye', val: money(pt?.totalRemaining || 0), color: (pt?.totalRemaining || 0) > 0 ? '#e11d48' : '#059669' },
+                    { label: 'Kayıtlı Plan', val: `${(selStudent.items || []).length} Plan`, color: '#6366f1' }
+                  ].map(({ label, val, color }) => (
+                    <div key={label} style={{
+                      background: '#f8fafc', borderRadius: 10, border: '1px solid #e6ebf3', padding: '8px 10px'
+                    }}>
+                      <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* ============================================================ */}
@@ -1761,16 +1719,6 @@ export default function UcretPlaniPage() {
                   <div style={{ fontSize: 11, color: '#64748b' }}>
                     {(selStudent.items || []).length} kayıtlı plan
                   </div>
-                </div>
-
-                <div style={{ padding: '12px 18px 0', display: 'flex', justifyContent: 'flex-end' }}>
-                  <input
-                    type="text"
-                    placeholder="🔍 Plan ara: ad, başlangıç, tutar, taksit..."
-                    value={planSearch}
-                    onChange={e => setPlanSearch(e.target.value)}
-                    style={{ ...InputCls, maxWidth: 300, background: '#fff' }}
-                  />
                 </div>
 
                 {isMobile ? (
@@ -2907,11 +2855,26 @@ export default function UcretPlaniPage() {
         {/* DESKTOP RIGHT COLUMN - STUDENT LIST                          */}
         {/* ============================================================ */}
         {!isCompact && (
-          <div style={{
+          <div style={{ width: 290, flexShrink: 0, position: 'sticky', top: 10, maxHeight: 'calc(100vh - 26px)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {allOverdueInstallments.length > 0 && (
+              <button
+                id="btn-vadesi-gecmis"
+                type="button"
+                onClick={() => setOverdueModalOpen(true)}
+                style={{
+                  ...Btn, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff',
+                  padding: '20px 10px', height: 'auto', boxSizing: 'border-box', fontSize: 12, fontWeight: 800, boxShadow: '0 3px 8px rgba(239,68,68,0.2)'
+                }}
+              >
+                ⚠️ Vadesi Geçmiş Taksitler <span style={{ fontWeight: 900 }}>{allOverdueInstallments.length}</span>
+              </button>
+            )}
+            <div style={{
             width: 290, flexShrink: 0,
             background: '#fff', borderRadius: 16, border: '1px solid #e6ebf3',
             boxShadow: '0 1px 4px rgba(15,23,42,0.04)', overflow: 'hidden',
-            position: 'sticky', top: 78, maxHeight: 'calc(100vh - 94px)',
+            maxHeight: 'calc(100vh - 26px)',
             display: 'flex', flexDirection: 'column'
           }}>
             {/* List Header */}
@@ -2921,12 +2884,14 @@ export default function UcretPlaniPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>👥 Öğrenci Listesi</div>
-                <span style={{
-                  background: '#e0e7ff', color: '#4338ca', fontSize: 11,
-                  fontWeight: 700, padding: '2px 7px', borderRadius: 10
-                }}>
-                  {students.length} Kayıt
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{
+                    background: '#e0e7ff', color: '#4338ca', fontSize: 11,
+                    fontWeight: 700, padding: '2px 7px', borderRadius: 10
+                  }}>
+                    {students.length} Kayıt
+                  </span>
+                </div>
               </div>
 
               {/* Quick Search */}
@@ -2975,6 +2940,7 @@ export default function UcretPlaniPage() {
                   {filteredStudents.map(renderStudentCard)}
                 </div>
               )}
+            </div>
             </div>
           </div>
         )}

@@ -570,7 +570,6 @@ export default function AyarlarPage() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>⚙️ Ayarlar</h2>
         <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
           {isAdminPanelMode
             ? 'Süper admin hesap ayarlarınızı buradan yönetebilirsiniz. Okul ayarları için bir okul seçin.'

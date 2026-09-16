@@ -689,7 +689,6 @@ export default function OgrencilerPage() {
     <div>
       <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>👥 Öğrenciler</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
             {isAdminPanelMode
               ? `Süper Admin Paneli · Tüm okullar: ${students.length} öğrenci · ${list.length} listeleniyor`

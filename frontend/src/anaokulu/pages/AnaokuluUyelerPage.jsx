@@ -330,7 +330,6 @@ export default function AnaokuluUyelerPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>👤 {isAccountScope ? 'Yönetim Paneli Üyeleri' : 'Okul Üyeleri'}</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 14 }}>
             {isAccountScope 
               ? 'Yönetim paneliniz için yardımcı yöneticileri buradan yönetin. Tüm bağlı okulların verilerine erişebilirler.'

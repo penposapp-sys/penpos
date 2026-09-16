@@ -107,6 +107,14 @@
     gap: 6px !important;
   }
 
+  .anaokulu-layout-main #btn-vadesi-gecmis {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 20px 10px !important;
+    line-height: 22px !important;
+    box-sizing: border-box !important;
+  }
+
   /* ── İstatistik Kartları: 2'li Izgara ── */
   .ak-stats-grid {
     display: grid !important;

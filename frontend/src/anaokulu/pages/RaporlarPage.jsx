@@ -138,22 +138,22 @@ export default function RaporlarPage() {
   const comparisonTable = <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>{exportHeaders.map((header) => <th key={header} style={head}>{header}</th>)}</tr></thead><tbody>{exportRows.map((row, index) => <tr key={`${row[0]}-${index}`}>{row.map((value, cellIndex) => <td key={`${index}-${cellIndex}`} style={cell}>{formatTableValue(value, cellIndex)}</td>)}</tr>)}</tbody>{tab === 'invoices' && <tfoot><tr>{['Toplam', '-', total.invoicedStudents, total.uninvoicedStudents, total.invoiceAmount, total.invoiceRequiredAmount, total.invoiceRequiredVat, total.students ? `${((total.invoicedStudents / total.students) * 100).toFixed(2)}%` : '-'].map((value, cellIndex) => <td key={`invoice-total-${cellIndex}`} style={{ ...cell, fontWeight: 800, background: '#f8fafc', borderTop: '2px solid #cbd5e1' }}>{formatTableValue(value, cellIndex)}</td>)}</tr></tfoot>}</table></div>
 
   return <div style={{ display: 'grid', gap: 16 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div><h2 style={{ margin: 0, color: '#0f172a' }}>📊 {reportTitle}</h2><div style={{ marginTop: 4, color: '#64748b', fontSize: 13 }}>Anaokulu Super Admin raporu · {month}</div></div>
+    {tab !== 'receivables' && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div><div style={{ marginTop: 4, color: '#64748b', fontSize: 13 }}>Anaokulu Super Admin raporu · {month}</div></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {isManager && <select value={selectedSchoolId} onChange={(event) => setSelectedSchoolId(event.target.value)} style={InputStyle}><option value="">Tum Okullar</option>{(accessibleTenants || []).map((tenant) => <option key={tenant.id || tenant._id} value={tenant.id || tenant._id}>{tenant.name}</option>)}</select>}
         <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} style={InputStyle} />
         <button type="button" onClick={downloadExcel} style={{ ...buttonStyle, background: '#0f766e', color: '#fff' }}>Excel'e Aktar</button>
         <button type="button" onClick={() => window.print()} style={{ ...buttonStyle, background: '#1d4ed8', color: '#fff' }}>PDF Indir</button>
       </div>
-    </div>
+    </div>}
     {isManager && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '2px solid #e2e8f0' }}>{TABS.map(([key, label]) => <button key={key} type="button" onClick={() => setTab(key)} style={{ ...buttonStyle, background: tab === key ? '#e0e7ff' : 'transparent', color: tab === key ? '#3730a3' : '#64748b', borderRadius: '8px 8px 0 0' }}>{label}</button>)}</div>}
 
     {tab === 'overview' && <><div style={KpiGrid}>{[
       ['Toplam Okul', total.schools], ['Toplam Ogrenci', total.students], ['Toplam Alacak', moneyValue(total.remaining)], ['Vadesi Gecmis Alacak', moneyValue(total.overdue)], ['Tahsil Edilen', moneyValue(total.paid)], ['Toplam Fatura', total.invoices], ['Faturasi Kesilen Ogrenci', total.invoicedStudents], ['Faturasi Kesilmeyen Ogrenci', total.uninvoicedStudents]
     ].map(([label, value]) => <div key={label} style={Kpi}><div style={{ color: '#64748b', fontSize: 12 }}>{label}</div><strong style={{ display: 'block', marginTop: 6, fontSize: 22, color: '#0f172a' }}>{value}</strong></div>)}</div><Panel>{comparisonTable}</Panel></>}
     {tab === 'students' && <Panel><h3>Ogrenci Durumu</h3>{comparisonTable}</Panel>}
-    {tab === 'receivables' && <TopluAlacakRaporu selectedSchoolId={activeSchoolId} />}
+    {tab === 'receivables' && <TopluAlacakRaporu selectedSchoolId={activeSchoolId} schoolOnly={!isManager} />}
     {tab === 'invoices' && <><div style={KpiGrid}>{[['Toplam Ogrenci', total.students], ['Faturasi Kesilen', total.invoicedStudents], ['Faturasi Kesilmeyen', total.uninvoicedStudents], ['Toplam Fatura', total.invoices], ['Kesilen Fatura Tutari', moneyValue(total.invoiceAmount)], ['Kesilmesi Gereken Toplam', moneyValue(total.invoiceRequiredAmount)], ['Kesilmesi Gereken Toplam KDV', moneyValue(total.invoiceRequiredVat)], ['Fatura Orani', total.students ? `${((total.invoicedStudents / total.students) * 100).toFixed(2)}%` : '-']].map(([label, value]) => <div key={label} style={Kpi}><div style={{ color: '#64748b', fontSize: 12 }}>{label}</div><strong style={{ display: 'block', marginTop: 6, fontSize: 22 }}>{value}</strong></div>)}</div><Panel><h3>{month} Fatura Durumu</h3>{comparisonTable}</Panel></>}
     {tab === 'comparison' && <Panel><h3>Okul Karsilastirma</h3>{comparisonTable}</Panel>}
   </div>

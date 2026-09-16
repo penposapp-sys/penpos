@@ -422,7 +422,6 @@ export default function FaturalarPage() {
       {/* Üst Başlık ve Luca Aksiyonları */}
       <div className="ak-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px 0', fontSize: 24, color: '#0f172a' }}>📄 Faturalar ve Dönem Taksitleri</h2>
           <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
             {isAdminPanelMode
               ? `Süper Admin Paneli · Tüm Okullar · ${processedData.totalCount} faturalanabilir taksit · ${processedData.filteredCount} listeleniyor`

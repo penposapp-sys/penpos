@@ -124,9 +124,6 @@ export default function RegionAdminOkullarimPage() {
     <div style={{ display: 'grid', gap: 20, maxWidth: 960 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                {isSuperAdminReadOnly ? '🏫 Tüm Okullar' : 'Okullarim'}
-              </h1>
               <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
                 {isSuperAdminReadOnly
                   ? 'Süper Admin · Tüm okulları görüntüleyebilir ve platform seviyesinde yeni okul oluşturabilirsiniz.'
