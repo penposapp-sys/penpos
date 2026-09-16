@@ -1621,8 +1621,8 @@ export default function UcretPlaniPage() {
                 display: 'flex', flexDirection: 'column', gap: 10,
                 overflow: 'hidden'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0, width: '100%', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0, width: '100%', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1, flexWrap: 'wrap' }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                     background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
@@ -1631,8 +1631,8 @@ export default function UcretPlaniPage() {
                   }}>
                     {(selStudent.name || 'Ö')[0]?.toUpperCase()}
                   </div>
-                  <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                  <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         {selStudent.name}
                       </h3>
                       {selStudent.class && (
@@ -1657,6 +1657,24 @@ export default function UcretPlaniPage() {
                   borderTop: isMobile ? '1px solid #f1f5f9' : 'none',
                   paddingTop: isMobile ? 8 : 0
                 }}>
+                  {isMobile && allOverdueInstallments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOverdueModalOpen(true)}
+                      style={{
+                        ...Btn,
+                        flex: isMobile ? '1 1 140px' : '0 0 auto',
+                        justifyContent: 'center',
+                        background: 'linear-gradient(135deg,#ef4444,#dc2626)',
+                        color: '#fff',
+                        padding: '8px 12px', height: 38, boxSizing: 'border-box',
+                        fontSize: 12, fontWeight: 800,
+                        boxShadow: '0 3px 8px rgba(239,68,68,0.2)'
+                      }}
+                    >
+                      ⚠️ Vadesi Geçmiş ({allOverdueInstallments.length})
+                    </button>
+                  )}
                   <button
                     id="btn-ucret-plani-ekle"
                     type="button"
