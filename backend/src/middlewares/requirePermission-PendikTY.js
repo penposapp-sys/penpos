@@ -22,21 +22,9 @@ export const requirePermission = (perms, options = {}) => {
   const requiredInput = Array.isArray(perms) ? perms : [perms]
   const mode = options.mode === 'any' ? 'any' : 'all'
   const required = normalizePermissions(requiredInput)
-  const allowRole = (role, user = {}) => {
-    if (role === 'tenant_admin' || role === 'anaokulu_region_admin') return true
-    if (role === 'staff') {
-      const systemType = String(user?.systemType || user?.regionSystemType || '').trim().toLowerCase()
-      if (systemType === 'anaokulu') return true
-    }
-    if (options.allowSuperadmin && role === 'superadmin') return true
-    if (options.allowPlatformAdmin && role === 'platform_admin') return true
-    return false
-  }
-
   return (req, res, next) => {
     const role = req.user.role
-    if (allowRole(role, req.user)) return next()
-
+    if (role === 'tenant_admin' || role === 'superadmin') return next()
     const userPerms = normalizePermissions(req.user.permissions)
     const ok = mode === 'any'
       ? required.some(p => userPerms.includes(p))

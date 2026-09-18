@@ -25,17 +25,6 @@ const canonicalizePermissions = (perms) => {
   return Array.from(set)
 }
 
-const getDefaultStaffPermissions = (systemType) => {
-  const normalizedSystemType = String(systemType || '').trim().toLowerCase()
-  if (normalizedSystemType !== 'anaokulu') return []
-  return [
-    PERMISSIONS.VIEW_ACCOUNTS,
-    PERMISSIONS.MANAGE_ACCOUNTS,
-    PERMISSIONS.REPORTS_DASHBOARD_VIEW,
-    PERMISSIONS.MANAGE_SETTINGS
-  ]
-}
-
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 const normalizeUsername = (username) => {
   const s = String(username || '').trim().toLowerCase()
@@ -74,8 +63,6 @@ const toStaffDto = (staff) => {
     name: staff.name,
     email: staff.email,
     username: staff.username || null,
-    phone: staff.phone || '',
-    role: staff.role || 'staff',
     isActive: staff.isActive,
     active: staff.active !== false,
     isDeleted: staff.isDeleted === true,
@@ -117,10 +104,6 @@ export const createStaffService = async (tenantId, dto) => {
   const passwordHash = await bcrypt.hash(dto.password, 10)
   const accessibleBranchIds = await normalizeAccessibleBranchIds(tenantId, dto)
   const branchId = accessibleBranchIds.length === 1 ? accessibleBranchIds[0] : null
-  const defaultPerms = getDefaultStaffPermissions(dto.systemType)
-  const staffPermissions = Array.isArray(dto.permissions) && dto.permissions.length > 0
-    ? canonicalizePermissions(dto.permissions)
-    : defaultPerms
   const staff = await createStaff({
     tenantId,
     branchId,
@@ -128,11 +111,9 @@ export const createStaffService = async (tenantId, dto) => {
     accessibleBranchIds,
     name: dto.name,
     email,
-    phone: dto.phone ? String(dto.phone).trim() : '',
-    role: dto.role === 'tenant_admin' ? 'tenant_admin' : 'staff',
     username: username || undefined,
     passwordHash,
-    permissions: staffPermissions,
+    permissions: canonicalizePermissions(dto.permissions),
     systemType: dto.systemType
   })
   await (await import('./auditService.js')).log(tenantId, dto.actorUserId || tenantId, 'staff_create', 'User', staff.id, { email: staff.email, systemType: staff.systemType })
@@ -160,18 +141,10 @@ export const updateStaff = async (tenantId, staffId, dto) => {
 
   const accessibleBranchIds = await normalizeAccessibleBranchIds(tenantId, dto, staff)
   const branchId = accessibleBranchIds.length === 1 ? accessibleBranchIds[0] : null
-  const defaultPerms = getDefaultStaffPermissions(dto.systemType ?? staff.systemType)
-  const nextPermissions = Array.isArray(dto.permissions)
-    ? canonicalizePermissions(dto.permissions)
-    : (Array.isArray(staff.permissions) && staff.permissions.length > 0
-      ? staff.permissions
-      : defaultPerms)
   const updated = await updateById(staffId, {
     name: dto.name ?? staff.name,
     email: dto.email ?? staff.email,
     username: dto.username ?? staff.username,
-    phone: dto.phone !== undefined ? String(dto.phone).trim() : staff.phone,
-    role: dto.role ? (dto.role === 'tenant_admin' ? 'tenant_admin' : 'staff') : staff.role,
     branchId,
     branchIds: accessibleBranchIds,
     accessibleBranchIds,
@@ -180,7 +153,7 @@ export const updateStaff = async (tenantId, staffId, dto) => {
     isDeleted: staff.isDeleted === true ? true : false,
     deletedAt: staff.isDeleted === true ? (staff.deletedAt || new Date()) : null,
     status: staff.isDeleted === true ? 'deleted' : ((dto.isActive ?? staff.isActive) ? 'active' : 'inactive'),
-    permissions: nextPermissions,
+    permissions: Array.isArray(dto.permissions) ? canonicalizePermissions(dto.permissions) : staff.permissions,
     systemType: dto.systemType ?? staff.systemType
   })
   await (await import('./auditService.js')).log(tenantId, dto.actorUserId || tenantId, 'staff_update', 'User', updated.id, {})

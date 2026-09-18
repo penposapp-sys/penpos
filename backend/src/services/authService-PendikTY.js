@@ -21,23 +21,7 @@ const normalizePortal = (portal) => {
   if (p === 'platform' || p === 'platform_admin') return 'platform'
   if (p === 'restaurant' || p === 'restoran' || p === 'kermes') return 'kermes'
   if (p === 'canteen' || p === 'kantin') return 'canteen'
-  if (['anaokulu', 'kindergarten', 'kres', 'kre-s', 'okul-oncesi', 'kre', 'kres'].includes(p)) return 'anaokulu'
   return p
-}
-
-const buildEffectiveStaffPermissions = (user, systemType) => {
-  const explicitPermissions = Array.isArray(user?.permissions) ? user.permissions : []
-  if (explicitPermissions.length > 0) return explicitPermissions
-
-  const normalizedSystemType = String(systemType || user?.systemType || '').trim().toLowerCase()
-  if (normalizedSystemType !== 'anaokulu') return []
-
-  return [
-    'view_accounts',
-    'manage_accounts',
-    'reports_dashboard_view',
-    'manage_settings'
-  ]
 }
 
 const getFrontendBaseUrl = () => {
@@ -68,20 +52,12 @@ const resolveForgotFilter = (portal) => {
   if (normalizedPortal === 'platform') return { role: { $in: ['platform_admin', 'superadmin'] } }
   if (normalizedPortal === 'canteen') return { systemType: 'kantin' }
   if (normalizedPortal === 'kermes') return { systemType: 'kermes' }
-  if (normalizedPortal === 'anaokulu') return {
-    $or: [
-      { systemType: 'anaokulu' },
-      { role: 'anaokulu_region_admin', regionSystemType: 'anaokulu' }
-    ]
-  }
   return { role: { $nin: ['platform_admin', 'superadmin'] } }
 }
 
 const resolveLoginPathForUser = (user) => {
   if (user?.role === 'platform_admin' || user?.role === 'superadmin') return '/platform-login'
-  if (user?.role === 'anaokulu_region_admin') return '/anaokulu/login'
   if (user?.systemType === 'kantin') return '/canteen/login'
-  if (user?.systemType === 'anaokulu') return '/anaokulu/login'
   return '/login/restoran'
 }
 
@@ -119,47 +95,18 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
   const isEmail = normalizedIdentifier.includes('@')
   const portalSystemType = portal === 'kermes'
     ? 'kermes'
-    : (portal === 'canteen' ? 'kantin' : (portal === 'anaokulu' ? 'anaokulu' : null))
+    : (portal === 'canteen' ? 'kantin' : null)
   const portalUsernameFilter = portal === 'platform'
     ? { role: { $in: ['platform_admin', 'superadmin'] } }
-    : (portal === 'anaokulu'
-        ? { $or: [{ systemType: portalSystemType }, { role: 'anaokulu_region_admin', regionSystemType: 'anaokulu' }] }
-        : (portalSystemType ? { systemType: portalSystemType } : {}))
+    : (portalSystemType ? { systemType: portalSystemType } : {})
 
   let user = null
 
   try {
-    const searchFilter = portal === 'platform' || portal === 'anaokulu'
-      ? portalUsernameFilter
-      : (portalSystemType ? { systemType: portalSystemType } : {})
-
     user = isEmail
-      ? ((await findByEmail(normalizedIdentifier, searchFilter)) || (await findByEmail(normalizedIdentifier)))
-      : ((await findByUsername(normalizedIdentifier, searchFilter)) || (await findByUsername(normalizedIdentifier)))
-
-    if (!user) {
-      if (process.env.DEBUG_LOGIN === '1') {
-        try { info('[AUTH_LOGIN_LAST_RESORT]', { portal, identifier: normalizedIdentifier, note: 'Filtresiz son deneme' }) } catch {}
-      }
-      const lastResort = isEmail
-        ? await User.findOne({ email: new RegExp(`^${String(normalizedIdentifier).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') })
-        : await User.findOne({ username: new RegExp(`^${String(normalizedIdentifier).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') })
-      if (lastResort) {
-        const canLogin = (() => {
-          if (portal === 'platform') return lastResort.role === 'platform_admin' || lastResort.role === 'superadmin'
-          if (portal === 'anaokulu') {
-            if (lastResort.role === 'anaokulu_region_admin') return true
-            const lst = String(lastResort.systemType || '').trim().toLowerCase()
-            const lstTenant = String(lastResort.tenantSystemType || '').trim().toLowerCase()
-            return lst === 'anaokulu' || lstTenant === 'anaokulu' || lastResort.tenantId != null
-          }
-          if (portal === 'kermes') return String(lastResort.systemType || '').trim().toLowerCase() === 'kermes'
-          if (portal === 'canteen') return String(lastResort.systemType || '').trim().toLowerCase() === 'kantin'
-          return true
-        })()
-        if (canLogin) user = lastResort
-      }
-    }
+      ? await findByEmail(normalizedIdentifier, portal === 'platform' ? portalUsernameFilter : (portalSystemType ? { systemType: portalSystemType } : {}))
+      : (await findByUsername(normalizedIdentifier, portal ? portalUsernameFilter : {}))
+        || (await findByUsername(normalizedIdentifier))
 
     if (process.env.DEBUG_LOGIN === '1') {
       try {
@@ -208,14 +155,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     tenant = await findTenantById(user.tenantId)
     if (!tenant || !tenant.isActive || tenant.status !== 'active') throw error('tenant_inactive', 'Tenant inactive', 403)
     if (!tenant.systemType) {
-      const tenantDefault = (() => {
-        if (user.role === 'anaokulu_region_admin') return 'anaokulu'
-        if (portal === 'anaokulu') return 'anaokulu'
-        if (portal === 'canteen') return 'kantin'
-        if (portal === 'kermes') return 'kermes'
-        return 'kermes'
-      })()
-      tenant.systemType = tenantDefault
+      tenant.systemType = 'kermes'
       await tenant.save().catch(() => {})
     }
   }
@@ -223,29 +163,19 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
   let branchIds = getUserAccessibleBranchIds(user)
 
   const isPlatformUser = user.role === 'platform_admin' || user.role === 'superadmin'
-  const isRegionAdmin = user.role === 'anaokulu_region_admin' || user.regionSystemType === 'anaokulu'
-
-  if (!isPlatformUser && !user.tenantId && !isRegionAdmin) {
+  if (!isPlatformUser && !user.tenantId) {
     throw error('tenant_required', 'Tenant hesabı gerekli.', 403)
   }
 
   let systemType = null
   if (!isPlatformUser) {
-    if (isRegionAdmin) {
-      systemType = 'anaokulu'
-    } else {
-      const defaultFromPortal = portal === 'kermes' ? 'kermes' : portal === 'canteen' ? 'kantin' : portal === 'anaokulu' ? 'anaokulu' : 'kermes'
-      systemType = tenant?.systemType || user.systemType || defaultFromPortal
+    systemType = tenant?.systemType || user.systemType || 'kermes'
+    if (systemType !== 'kermes' && systemType !== 'kantin') {
+      throw error('invalid_system_type', 'Invalid system type', 403)
     }
-    if (systemType !== 'kermes' && systemType !== 'kantin' && systemType !== 'anaokulu') {
-      const defaultFromPortal2 = portal === 'kermes' ? 'kermes' : portal === 'canteen' ? 'kantin' : portal === 'anaokulu' ? 'anaokulu' : 'kermes'
-      systemType = defaultFromPortal2
-    }
-    if (!isRegionAdmin && user.systemType !== systemType) {
-      try {
-        user.systemType = systemType
-        await user.save().catch(() => {})
-      } catch {}
+    if (user.systemType !== systemType) {
+      user.systemType = systemType
+      await user.save().catch(() => {})
     }
   }
 
@@ -256,10 +186,6 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
       if (isPlatformUser) throw error('wrong_portal', 'Wrong portal', 403)
       if (portal === 'kermes' && systemType !== 'kermes') throw error('wrong_portal', 'Wrong portal', 403)
       if (portal === 'canteen' && systemType !== 'kantin') throw error('wrong_portal', 'Wrong portal', 403)
-    } else if (portal === 'anaokulu') {
-      if (!isPlatformUser && !isRegionAdmin && systemType !== 'anaokulu') {
-        throw error('wrong_portal', 'Wrong portal', 403)
-      }
     }
   }
 
@@ -271,7 +197,7 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
 
   if (user.role === 'staff') {
     if (branchIds.length === 0 && branchId) branchIds = [String(branchId)]
-    if (systemType === 'kantin' || systemType === 'anaokulu') {
+    if (systemType === 'kantin') {
       branchId = branchIds.length > 0 ? branchIds[0] : null
     } else {
       if (branchIds.length === 1) {
@@ -330,48 +256,15 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
     }
   }
 
-  if (!isPlatformUser && systemType === 'anaokulu') {
-    if (!isRegionAdmin && !branchId && branchIds.length === 1) {
-      branchId = branchIds[0]
-    }
-  }
-
-  let accessibleTenantsForDto = []
-  let validAccessibleTenantIds = []
-  if (isRegionAdmin && Array.isArray(user.accessibleTenantIds)) {
-    try {
-      const tenants = await Promise.all(
-        user.accessibleTenantIds.map((tid) => findTenantById(tid).catch(() => null))
-      )
-      accessibleTenantsForDto = tenants
-        .filter((t) => t && t.status !== 'deleted' && t.status !== 'inactive')
-        .map((t) => ({
-          id: String(t._id || t.id),
-          name: t.name || 'Anaokulu',
-          slug: t.slug || '',
-          systemType: t.systemType || ''
-        }))
-      validAccessibleTenantIds = accessibleTenantsForDto.map((t) => t.id)
-    } catch {
-      accessibleTenantsForDto = []
-      validAccessibleTenantIds = []
-    }
-  }
-
-  const effectivePermissions = buildEffectiveStaffPermissions(user, systemType)
-
     const token = signToken({
       sub: user.id,
       name: user.name,
       role: user.role,
       tenantId: isPlatformUser ? null : (user.tenantId || null),
-      permissions: effectivePermissions,
+      permissions: user.permissions || [],
       systemType,
       branchId,
-      branchIds: user.role === 'staff' ? branchIds : undefined,
-      accessibleTenantIds: isRegionAdmin ? validAccessibleTenantIds : undefined,
-      accessibleTenants: accessibleTenantsForDto.length > 0 ? accessibleTenantsForDto : undefined,
-      regionSystemType: isRegionAdmin ? user.regionSystemType : undefined
+      branchIds: user.role === 'staff' ? branchIds : undefined
     })
     const userDto = {
       id: user.id,
@@ -380,15 +273,12 @@ export const login = async (identifier, password, _portal, { requestId } = {}) =
       username: user.username || null,
       role: user.role,
       tenantId: isPlatformUser ? null : (user.tenantId || null),
-      permissions: effectivePermissions,
+      permissions: user.permissions || [],
       systemType,
       vertical: normalizePackageType(systemType),
       branchId,
       branchIds,
-      accessibleBranchIds: user.role === 'staff' ? branchIds : [],
-      accessibleTenantIds: isRegionAdmin ? validAccessibleTenantIds : [],
-      accessibleTenants: accessibleTenantsForDto,
-      regionSystemType: isRegionAdmin ? user.regionSystemType : null
+      accessibleBranchIds: user.role === 'staff' ? branchIds : []
     }
     return { token, user: userDto }
   } catch (err) {
@@ -531,55 +421,13 @@ export const me = async (userId) => {
   }
   if (user.role === 'tenant_admin' || user.role === 'staff') {
     const next = tenant?.systemType || user.systemType || 'kermes'
-    if (next === 'kermes' || next === 'kantin' || next === 'anaokulu') {
+    if (next === 'kermes' || next === 'kantin') {
       if (user.systemType !== next) {
         user.systemType = next
         await user.save().catch(() => {})
       }
     }
   }
-  let accessibleTenants = []
-  const isRegion = user.role === 'anaokulu_region_admin' || user.regionSystemType === 'anaokulu'
-  if (isRegion && Array.isArray(user.accessibleTenantIds) && user.accessibleTenantIds.length > 0) {
-    try {
-      const Tenant = (await import('../models/Tenant.js')).default
-      const tList = await Tenant.find({
-        _id: { $in: user.accessibleTenantIds },
-        isDeleted: { $ne: true },
-        status: { $ne: 'deleted' }
-      }).select('name slug status systemType vertical businessType').lean()
-      accessibleTenants = (tList || []).map(t => ({
-        id: String(t._id),
-        _id: String(t._id),
-        name: t.name,
-        slug: t.slug,
-        status: t.status,
-        systemType: t.systemType || t.vertical || 'anaokulu'
-      }))
-    } catch {}
-  } else if (user.role === 'superadmin' || user.role === 'platform_admin') {
-    try {
-      const Tenant = (await import('../models/Tenant.js')).default
-      const tList = await Tenant.find({
-        $or: [
-          { systemType: 'anaokulu' },
-          { vertical: 'anaokulu' },
-          { businessType: 'anaokulu' }
-        ],
-        isDeleted: { $ne: true },
-        status: { $ne: 'deleted' }
-      }).select('name slug status systemType vertical businessType').lean()
-      accessibleTenants = (tList || []).map(t => ({
-        id: String(t._id),
-        _id: String(t._id),
-        name: t.name,
-        slug: t.slug,
-        status: t.status,
-        systemType: t.systemType || t.vertical || 'anaokulu'
-      }))
-    } catch {}
-  }
-
   return {
     id: user.id,
     name: user.name,
@@ -588,12 +436,7 @@ export const me = async (userId) => {
     role: user.role,
     tenantId: user.tenantId || null,
     permissions: user.permissions || [],
-    systemType: user.systemType || (isRegion ? 'anaokulu' : null),
-    regionSystemType: user.regionSystemType || (isRegion ? 'anaokulu' : null),
-    accessibleTenantIds: isRegion
-      ? accessibleTenants.map((t) => t.id)
-      : (Array.isArray(user.accessibleTenantIds) ? user.accessibleTenantIds.map(String) : []),
-    accessibleTenants,
+    systemType: user.systemType || null,
     branchIds: getUserAccessibleBranchIds(user),
     accessibleBranchIds: getUserAccessibleBranchIds(user),
     pushNotificationsEnabled: Array.isArray(user.pushDevices) && user.pushDevices.some((device) => !device?.disabledAt && String(device?.token || '').trim()),
