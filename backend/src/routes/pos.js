@@ -47,6 +47,7 @@ router.post('/tables/:tableId/start', requireAuth, tenantGuard, resolveBranchFro
 router.put('/tables/:tableId/close', requireAuth, tenantGuard, resolveBranchFromTable, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_tables']), ctrl.closeTable)
 router.put('/tables/:tableId/abandon', requireAuth, tenantGuard, resolveBranchFromTable, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access']), ctrl.abandonTable)
 router.get('/tables/:tableId/meta', requireAuth, tenantGuard, resolveBranchFromTable, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_tables']), ctrl.getTableMeta)
+router.put('/tables/:tableId/note', requireAuth, tenantGuard, resolveBranchFromTable, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_tables']), ctrl.setTableNote)
 router.get('/tables/:tableId/order', requireAuth, tenantGuard, resolveBranchFromTable, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_tables']), ctrl.getTableOrder)
 router.put('/tables/:targetTableId/merge', requireAuth, tenantGuard, resolveBranchFromTable, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['manage_tables']), ctrl.mergeTables)
 

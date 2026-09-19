@@ -35,6 +35,7 @@ export const listTablesService = async (tenantId, branchFilter) => {
   return list.map(t => ({
     id: t.id,
     name: t.name,
+    note: t.note || '',
     status: t.status,
     isActive: !!t.isActive,
     branchId: t.branchId ? String(t.branchId) : null,
@@ -45,7 +46,16 @@ export const listTablesService = async (tenantId, branchFilter) => {
 export const getTableMetaService = async (tenantId, tableId) => {
   const t = await findByIdAndTenant(tableId, tenantId)
   if (!t) throw error('not_found', 'Table not found', 404)
-  return { id: t.id, name: t.name, branchId: t.branchId }
+  return { id: t.id, name: t.name, note: t.note || '', branchId: t.branchId }
+}
+
+export const setTableNoteService = async (tenantId, userId, tableId, note) => {
+  const table = await findByIdAndTenant(tableId, tenantId)
+  if (!table) throw error('not_found', 'Table not found', 404)
+  table.note = String(note ?? '')
+  await table.save()
+  await (await import('./auditService.js')).log(tenantId, userId, 'table_set_note', 'Table', table.id, {})
+  return { id: table.id, name: table.name, note: table.note || '', status: table.status }
 }
 
 export const createTableService = async (tenantId, userId, dto) => {
@@ -249,7 +259,6 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
     const isPaid = grandTotal > 0 && remaining <= 0.01
     paidByTable[key] = {
       isPaid,
-      note: ord.note || '',
       createdAt: ord.createdAt,
       hasCancelAlert: ord.cancelAlertActive === true,
       createdByName: String(
@@ -264,6 +273,7 @@ export const getTablesOverviewService = async (tenantId, branchFilter) => {
     tables: tables.map(t => ({
       id: String(t._id),
       name: t.name,
+      note: t.note || '',
       status: t.status,
       activeOrderId: t.activeOrderId ? String(t.activeOrderId) : null,
       isActive: t.isActive,

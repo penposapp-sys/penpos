@@ -431,6 +431,12 @@ export default function KitchenPage() {
               </div>
             </div>
 
+            {String(o?.note || '').trim() ? (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: '#fef3c7', color: '#7c2d12', fontWeight: 700, lineHeight: 1.4 }}>
+                Sipariş Notu: {String(o.note).trim()}
+              </div>
+            ) : null}
+
             <div className="kitchenItemsList kitchenOrderItems" style={{ marginTop: 4 }}>
               {(Array.isArray(o.displayItems) ? o.displayItems : []).map((it, index) => {
                 const orderServingType = trOrderServingType(o)

@@ -75,6 +75,7 @@ export default function PosPage() {
   const [veresiyeAmount, setVeresiyeAmount] = useState('')
   const [veresiyeNote, setVeresiyeNote] = useState('')
   const [tableName, setTableName] = useState('')
+  const [tableNote, setTableNote] = useState('')
   const [transferOpen, setTransferOpen] = useState(false)
   const [emptyTables, setEmptyTables] = useState([])
   const [targetTableId, setTargetTableId] = useState('')
@@ -83,9 +84,11 @@ export default function PosPage() {
   const [splitSelection, setSplitSelection] = useState({})
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [orderNoteModalOpen, setOrderNoteModalOpen] = useState(false)
+  const [tableNoteModalOpen, setTableNoteModalOpen] = useState(false)
   const [selectedItemForNote, setSelectedItemForNote] = useState(null)
   const [itemNote, setItemNoteText] = useState('')
   const [orderNoteDraft, setOrderNoteDraft] = useState('')
+  const [tableNoteDraft, setTableNoteDraft] = useState('')
   const [weightModalOpen, setWeightModalOpen] = useState(false)
   const [pendingWeightItem, setPendingWeightItem] = useState(null)
   const [weightModalValue, setWeightModalValue] = useState('')
@@ -501,6 +504,7 @@ export default function PosPage() {
       const due = Number(order.balanceDue ?? order.totals?.balanceDue ?? order.remainingBalance ?? 0)
       setPaymentAmount(due > 0 ? String(due) : '')
       if (order.tableId) {
+        setTableId(String(order.tableId))
         const tablesRes = await api('/api/tenant/tables', { silent: true })
         if (tablesRes?.success === false) {
           setTableName('')
@@ -510,9 +514,11 @@ export default function PosPage() {
         const tables = Array.isArray(tablesRes?.tables) ? tablesRes.tables : []
         const t = tables.find(x => x.id === order.tableId)
         setTableName(t?.name || '')
+        setTableNote(String(t?.note || ''))
         setEmptyTables(tables.filter(x => x.status === 'empty'))
       } else {
         setTableName('')
+        setTableNote('')
       }
       return order
     } catch (err) {
@@ -562,6 +568,8 @@ export default function PosPage() {
       }
 
       const meta = metaRes?.data?.data || metaRes?.data
+      setTableName(String(meta?.name || ''))
+      setTableNote(String(meta?.note || ''))
       const tableBranchId = String(meta?.branchId || '')
       if (!tableBranchId) {
         toast.error('Masa şubesi alınamadı')
@@ -1149,6 +1157,27 @@ export default function PosPage() {
     if (ok) {
       setOrderNoteModalOpen(false)
     }
+  }
+
+  const openTableNoteModal = () => {
+    if (!tableId) return
+    setTableNoteDraft(String(tableNote || ''))
+    setTableNoteModalOpen(true)
+  }
+
+  const submitTableNote = async () => {
+    if (!tableId) return
+    const res = await api(`/api/pos/tables/${tableId}/note`, {
+      method: 'PUT',
+      data: { note: tableNoteDraft },
+      silent: true
+    })
+    if (!res?.ok) {
+      toast.error(res?.message || 'Masa notu kaydedilemedi')
+      return
+    }
+    setTableNote(String(res?.data?.table?.note ?? tableNoteDraft))
+    setTableNoteModalOpen(false)
   }
 
   const cancelOrder = async () => {
@@ -2085,6 +2114,9 @@ export default function PosPage() {
                   onClick={openPaymentModal}
                   disabled={!getOrderId(order)}
                 >Ödeme Al</button>
+                <button className="btn saleCartFooterActionBtn" type="button" onClick={openTableNoteModal} disabled={!tableId}>
+                  Masa Notu
+                </button>
                 <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
                 <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
                   Sipariş Notu
@@ -2097,6 +2129,9 @@ export default function PosPage() {
               <div className="saleCartFooterActions">
                 <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
                   Sipariş Notu
+                </button>
+                <button className="btn saleCartFooterActionBtn" type="button" onClick={openTableNoteModal} disabled={!tableId}>
+                  Masa Notu
                 </button>
                 <button
                   className="btn saleCartFooterActionBtn"
@@ -2568,6 +2603,25 @@ export default function PosPage() {
             Vazgeç
           </button>
           <button className="btn" type="button" onClick={submitOrderNote} disabled={!getOrderId(order)}>
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </Modal>
+    <Modal open={tableNoteModalOpen} onClose={() => setTableNoteModalOpen(false)} title="Masa Notu" dialogStyle={{ width: 'min(560px, calc(100vw - 32px))' }}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <textarea
+          className="input saleOrderNoteModalTextarea"
+          rows="4"
+          value={tableNoteDraft}
+          onChange={(e) => setTableNoteDraft(e.target.value)}
+          placeholder="Masa notu..."
+        />
+        <div className="app-modal-footer" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" type="button" onClick={() => setTableNoteModalOpen(false)}>
+            Vazgeç
+          </button>
+          <button className="btn" type="button" onClick={submitTableNote} disabled={!tableId}>
             Kaydet
           </button>
         </div>

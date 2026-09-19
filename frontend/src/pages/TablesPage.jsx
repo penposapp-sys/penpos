@@ -488,7 +488,7 @@ export function TablesManagementContent({ embedded = false }) {
                 </div>
               )}
 
-              {!!paid?.note && (
+              {!!table?.note && (
                 <div
                   style={{
                     fontSize: 12,
@@ -500,7 +500,7 @@ export function TablesManagementContent({ embedded = false }) {
                     overflow: 'hidden'
                   }}
                 >
-                  {paid.note}
+                  {table.note}
                 </div>
               )}
 

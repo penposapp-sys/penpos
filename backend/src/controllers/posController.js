@@ -56,6 +56,16 @@ export const getTableMeta = async (req, res) => {
   }
 }
 
+export const setTableNote = async (req, res) => {
+  try {
+    const { setTableNoteService } = await import('../services/tableService.js')
+    const table = await setTableNoteService(req.user.tenantId, req.user.id, req.params.tableId, req.body?.note)
+    res.json({ success: true, table })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const createOrder = async (req, res) => {
   try {
     const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)

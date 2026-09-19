@@ -327,8 +327,8 @@ const RootEntryRoute = () => {
 
   const nextPath = getDefaultRoute(user, tenantCtx)
   if (nextPath) return <Navigate to={nextPath} replace />
-  if (isNativeApp()) return <Navigate to="/login" replace />
-  return <LandingPage />
+  if (isNativeApp()) return <Navigate to="/login/restoran" replace />
+  return <Navigate to="/login/restoran" replace />
 }
 
 const KermesIndexRedirect = () => {
@@ -363,7 +363,7 @@ export default function App() {
         <Routes>
         <Route path="/" element={<RootEntryRoute />} />
         <Route path="/landing" element={<LandingPage />} />
-        <Route path="/login" element={<LoginSelectionPage />} />
+        <Route path="/login" element={<Navigate to="/login/restoran" replace />} />
         <Route path="/platform-login" element={<PlatformLogin />} />
         <Route path="/platform/login" element={<Navigate to="/platform-login" replace />} />
         <Route path="/login/platform" element={<Navigate to="/platform-login" replace />} />
