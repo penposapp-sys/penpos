@@ -67,9 +67,14 @@ export default function LoginSelectionPage() {
         <div className="public-auth-head">
           <div className="public-auth-head-row">
             <div className="marketing-trial-badge login-selection-badge">Giris secimi</div>
-            <Link to="/" className="public-auth-close public-auth-close--website" aria-label="Ana sayfaya don">
+            <button
+              type="button"
+              className="public-auth-close public-auth-close--website"
+              aria-label="Ana sayfaya don"
+              onClick={() => nav('/landing', { replace: true })}
+            >
               x
-            </Link>
+            </button>
           </div>
           <h1>Giris yapmak istediginiz sistemi secin</h1>
           <p>Mevcut baglantilar korunur. Isletmeniz icin uygun giris ekranina ayni tema ile devam edin.</p>
