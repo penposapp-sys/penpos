@@ -13,6 +13,19 @@ const pageTheme = {
   shadow: '0 18px 50px rgba(15, 23, 42, 0.18)',
 }
 
+const normalizePublicSlug = (value) => String(value || '')
+  .trim()
+  .toLocaleLowerCase('tr-TR')
+  .replace(/ç/g, 'c')
+  .replace(/ğ/g, 'g')
+  .replace(/ı/g, 'i')
+  .replace(/ö/g, 'o')
+  .replace(/ş/g, 's')
+  .replace(/ü/g, 'u')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+  .replace(/-+/g, '-')
+
 const qrSwitches = [
   ['enabled', 'QR Menü aç/kapat', 'Public menü yayınının aktif olup olmayacağını belirler.'],
   ['showLogo', 'Logo gösterimi', 'Kapakta ve üst alanda işletme logosunu gösterir.'],
@@ -122,6 +135,7 @@ export default function QrMenuSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tenant, setTenant] = useState(null)
+  const [websiteSlug, setWebsiteSlug] = useState('')
   const [settings, setSettings] = useState(() => mergeBusinessSettings())
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [qrTables, setQrTables] = useState([])
@@ -135,7 +149,8 @@ export default function QrMenuSettingsPage() {
   )
 
   const liveLink = useMemo(() => {
-    const slug = String(tenant?.slug || '').trim()
+    const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
+    const slug = normalizePublicSlug(businessName) || String(websiteSlug || tenant?.slug || '').trim()
     if (!slug) return ''
     const next = new URL(buildPublicAppUrl(`/menu/${slug}`))
     if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
@@ -143,10 +158,11 @@ export default function QrMenuSettingsPage() {
       next.searchParams.set('table', String(selectedTable.name || ''))
     }
     return next.toString()
-  }, [tenant?.slug, settings.qrMenu?.tableQrEnabled, selectedTable])
+  }, [websiteSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   const previewLink = useMemo(() => {
-    const slug = String(tenant?.slug || '').trim()
+    const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
+    const slug = normalizePublicSlug(businessName) || String(websiteSlug || tenant?.slug || '').trim()
     if (!slug) return ''
     const next = new URL(buildPublicAppUrl(`/menu/${slug}`, null, { originMode: 'current' }))
     if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
@@ -154,7 +170,7 @@ export default function QrMenuSettingsPage() {
       next.searchParams.set('table', String(selectedTable.name || ''))
     }
     return next.toString()
-  }, [tenant?.slug, settings.qrMenu?.tableQrEnabled, selectedTable])
+  }, [websiteSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   const hasSeparateLocalPreview = import.meta.env.DEV && !!previewLink && !!liveLink && previewLink !== liveLink
 
@@ -172,9 +188,10 @@ export default function QrMenuSettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const [profileRes, businessRes, tablesRes, productsRes] = await Promise.all([
+      const [profileRes, businessRes, websiteRes, tablesRes, productsRes] = await Promise.all([
         api('/api/tenant/profile', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/settings/business', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api('/api/tenant/website', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/settings/business/qr-tables', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/tenant/menu-items?active=true', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
       ])
@@ -192,6 +209,7 @@ export default function QrMenuSettingsPage() {
       }
       const nextTenant = profileRes?.tenant || null
       setTenant(nextTenant)
+      setWebsiteSlug(String(websiteRes?.settings?.slug || '').trim())
       setSettings(mergeBusinessSettings(businessRes?.settings || nextTenant?.settings || {}))
       const nextTables = Array.isArray(tablesRes?.tables) ? tablesRes.tables : []
       const nextProducts = Array.isArray(productsRes?.items) ? productsRes.items : []

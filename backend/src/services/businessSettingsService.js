@@ -2,11 +2,13 @@ import fs from 'fs/promises'
 import path from 'path'
 import mongoose from 'mongoose'
 import Tenant from '../models/Tenant.js'
+import TenantWebsiteSettings from '../models/TenantWebsiteSettings.js'
 import Branch from '../models/Branch.js'
 import { error } from '../utils/errors.js'
 import { buildIncomingBusinessSettings, mergeBusinessSettings } from '../utils/businessSettings.js'
 import { resolveUploadDir } from '../utils/uploads.js'
 import { listTablesService } from './tableService.js'
+import { normalizeTenantWebsiteSlug } from './tenantWebsiteService.js'
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -105,6 +107,7 @@ export const updateBusinessSettings = async (tenantId, payload = {}, actorUserId
   if (!tenant) throw error('not_found', 'Tenant not found', 404)
 
   const incoming = buildIncomingBusinessSettings(payload)
+  const previousTenantName = String(tenant.name || '').trim()
   const nextTenantName = String(payload?.name ?? tenant.name ?? '').trim()
   const nextDescription = String(payload?.description ?? tenant.description ?? '').trim()
   const allBranches = await Branch.find({ tenantId, isDeleted: { $ne: true }, status: { $ne: 'deleted' } }).select('_id isActive').lean()
@@ -151,6 +154,24 @@ export const updateBusinessSettings = async (tenantId, payload = {}, actorUserId
   }
   tenant.allowedBranchIds = mergedSettings.authorizedBranches.branchIds
   await tenant.save()
+
+  const nextAutoSlug = normalizeTenantWebsiteSlug(nextTenantName)
+  if (previousTenantName && nextTenantName && payload?.name !== undefined && tenant.slug !== nextAutoSlug) {
+    const slugConflict = await Tenant.findOne({ slug: nextAutoSlug, _id: { $ne: tenant._id } }).select('_id').lean()
+    const websiteSlugConflict = await TenantWebsiteSettings.findOne({
+      slug: nextAutoSlug,
+      tenantId: { $ne: tenant._id }
+    }).select('_id').lean()
+    if (!slugConflict && !websiteSlugConflict) {
+      const currentTenantSlug = String(tenant.slug || '').trim()
+      tenant.slug = nextAutoSlug
+      await tenant.save()
+      await TenantWebsiteSettings.updateOne(
+        { tenantId: tenant._id, slug: currentTenantSlug },
+        { $set: { slug: nextAutoSlug } }
+      )
+    }
+  }
 
   await (await import('./auditService.js')).log(tenantId, actorUserId || tenantId, 'tenant_business_settings_update', 'Tenant', tenant.id, {})
 

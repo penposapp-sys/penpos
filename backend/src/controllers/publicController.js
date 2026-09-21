@@ -252,11 +252,18 @@ export const getPublicOnlineStore = async (req, res) => {
   const tenantIdRaw = String(req.query?.tenantId || '').trim()
   const requestedBranchId = String(req.query?.branchId || '').trim()
 
-  const tenant = tenantSlug
+  let tenant = tenantSlug
     ? await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
     : (mongoose.Types.ObjectId.isValid(tenantIdRaw)
       ? await Tenant.findOne({ _id: tenantIdRaw, isActive: true, status: 'active' }).lean()
       : null)
+
+  if (!tenant && tenantSlug) {
+    const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
+    if (website?.tenantId) {
+      tenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
+    }
+  }
 
   if (!tenant) {
     return res.status(404).json({ success: false, code: 'not_found', error: 'not_found', message: 'Tenant not found' })

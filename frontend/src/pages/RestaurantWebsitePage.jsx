@@ -164,8 +164,15 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     )
   )
   const tenantName = String(site.tenant?.name || (isStore ? 'Magaza' : 'Restoran'))
-  const qrMenuUrl = integrations?.qrMenuUrl || (isStore ? '' : `/menu/${site.tenant?.slug || slug}`)
-  const onlineOrderUrl = integrations?.onlineOrderUrl || (isStore ? `/qr/${site.tenant?.slug || slug}` : `/online/${site.tenant?.slug || slug}`)
+  const publicSiteSlug = String(slug || site.tenant?.slug || '').trim()
+  const storedQrMenuUrl = String(integrations?.qrMenuUrl || '').trim()
+  const storedOnlineOrderUrl = String(integrations?.onlineOrderUrl || '').trim()
+  const qrMenuUrl = storedQrMenuUrl.startsWith('/menu/')
+    ? `/menu/${publicSiteSlug}`
+    : (storedQrMenuUrl || (isStore ? '' : `/menu/${publicSiteSlug}`))
+  const onlineOrderUrl = storedOnlineOrderUrl.startsWith('/online/')
+    ? `/online/${publicSiteSlug}`
+    : (storedOnlineOrderUrl || (isStore ? `/qr/${publicSiteSlug}` : `/online/${publicSiteSlug}`))
   const seoTitle = site.settings?.seo?.title || tenantName
   const resolvedLogoUrl = resolveWebsiteImageUrl(hero.logoUrl || site.tenant?.logoUrl)
   const resolvedHeroGallery = (hero.coverImageUrl ? [hero.coverImageUrl, ...site.gallery] : site.gallery)
