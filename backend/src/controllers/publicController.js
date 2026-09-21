@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import mongoose from 'mongoose'
 import Tenant from '../models/Tenant.js'
+import TenantWebsiteSettings from '../models/TenantWebsiteSettings.js'
 import Category from '../models/Category.js'
 import MenuItem from '../models/MenuItem.js'
 import Table from '../models/Table.js'
@@ -150,11 +151,18 @@ export const getPublicMenu = async (req, res) => {
   const requestedTableId = String(req.query?.tableId || '').trim()
   const requestedTableName = String(req.query?.table || req.query?.tableName || '').trim()
 
-  const tenant = tenantSlug
+  let tenant = tenantSlug
     ? await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
     : (mongoose.Types.ObjectId.isValid(tenantIdRaw)
       ? await Tenant.findOne({ _id: tenantIdRaw, isActive: true, status: 'active' }).lean()
       : null)
+
+  if (!tenant && tenantSlug) {
+    const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
+    if (website?.tenantId) {
+      tenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
+    }
+  }
 
   if (!tenant) {
     return res.status(404).json({ success: false, code: 'not_found', error: 'not_found', message: 'Tenant not found' })
