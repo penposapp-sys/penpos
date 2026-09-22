@@ -759,10 +759,18 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
 
 function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabel, branchesLabel }) {
   const metricGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
+  const [productSearch, setProductSearch] = useState('')
   const metricEntries = Array.isArray(detailData?.metricEntries) && detailData.metricEntries.length > 0
     ? detailData.metricEntries
     : report.metrics.map((metric) => ({ label: metric, value: detailData?.metricValues?.[metric] ?? 'Veri yok' }))
   const canPrint = report?.key === 'productPerformance'
+  const detailRows = canPrint
+    ? detailData.rows.filter((row) => {
+        const search = productSearch.trim().toLocaleLowerCase('tr-TR')
+        if (!search) return true
+        return [row.Urun, row.Kategori].some((value) => String(value || '').toLocaleLowerCase('tr-TR').includes(search))
+      })
+    : detailData.rows
 
   return (
     <Modal
@@ -816,19 +824,37 @@ function ReportDetail({ report, onClose, detailData, isMobilePortrait, rangeLabe
         </div>
 
         <div style={{ marginTop: 24, border: '1px solid var(--app-border, var(--border))', borderRadius: 24, overflowX: 'auto', overflowY: 'hidden' }}>
+          {canPrint && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: 14, borderBottom: '1px solid var(--app-border, var(--border))' }}>
+              <input
+                type="search"
+                className="input"
+                value={productSearch}
+                onChange={(event) => setProductSearch(event.target.value)}
+                placeholder="Ürün veya kategori ara"
+                aria-label="Ürün veya kategori ara"
+                style={{ minWidth: isMobilePortrait ? '100%' : 280, maxWidth: 420 }}
+              />
+              <span style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13, fontWeight: 700 }}>
+                {detailRows.length} / {detailData.rows.length} ürün
+              </span>
+            </div>
+          )}
           <table className="table" style={{ width: '100%' }}>
             <thead>
               <tr style={{ background: 'var(--app-surface-soft, var(--panelElevated))' }}>
+                {canPrint && <th style={{ padding: '14px 16px', fontWeight: 900, textAlign: 'left' }}>No</th>}
                 {report.tableColumns.map((col) => <th key={col} style={{ padding: '14px 16px', fontWeight: 900, textAlign: 'left' }}>{col}</th>)}
               </tr>
             </thead>
             <tbody>
-              {detailData.rows.length === 0 ? (
+              {detailRows.length === 0 ? (
                 <tr>
-                  <td colSpan={report.tableColumns.length} style={{ padding: '18px 16px', color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bu rapor için sistemde uygun veri bulunamadı.</td>
+                  <td colSpan={report.tableColumns.length + (canPrint ? 1 : 0)} style={{ padding: '18px 16px', color: 'var(--app-text-secondary, var(--text-secondary))' }}>{productSearch ? 'Aramanızla eşleşen ürün bulunamadı.' : 'Bu rapor için sistemde uygun veri bulunamadı.'}</td>
                 </tr>
-              ) : detailData.rows.map((row, rowIndex) => (
+              ) : detailRows.map((row, rowIndex) => (
                 <tr key={`${report.key}-${rowIndex}`}>
+                  {canPrint && <td style={{ padding: '14px 16px', color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 800 }}>{rowIndex + 1}</td>}
                   {report.tableColumns.map((col) => <td key={col} style={{ padding: '14px 16px', color: 'var(--app-text, var(--text))' }}>{getRowValueByColumn(row, col) ?? '-'}</td>)}
                 </tr>
               ))}
@@ -1066,7 +1092,7 @@ export const buildReportDetailData = (report, datasets, summary) => {
       { Saat: 'Dönem', 'Ödeme Tipi': 'Online', 'İşlem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.bank || 0), Oran: fmtPct((toMoney(sales.byMethod?.bank || 0) / Math.max(1, summary.totalRevenue)) * 100) },
       { Saat: 'Dönem', 'Ödeme Tipi': 'Açık Hesap', 'İşlem Sayisi': String(summary.orderCount), Tutar: fmtTl(sales.byMethod?.account || 0), Oran: fmtPct((toMoney(sales.byMethod?.account || 0) / Math.max(1, summary.totalRevenue)) * 100) }
     ].filter((row) => toMoney(String(row.Tutar).replace(/[^\d,.-]/g, '').replace(',', '.')) >= 0),
-    productPerformance: productWithMeta.slice(0, 20).map((item) => ({ Urun: item.name || '-', Kategori: item.categoryName || '-', Adet: String(item.qty || 0), 'Birim Fiyat': fmtTl(item.price || 0), Ciro: fmtTl(item.revenue || 0), Kar: '-' })),
+    productPerformance: productWithMeta.map((item) => ({ Urun: item.name || '-', Kategori: item.categoryName || '-', Adet: String(item.qty || 0), 'Birim Fiyat': fmtTl(item.price || 0), Ciro: fmtTl(item.revenue || 0), Kar: '-' })),
     categoryRevenue: categoryRows.slice(0, 20).map((item) => ({ Kategori: item.category, 'Ürün Adedi': String(item.itemCount), 'Satis Adedi': String(item.qty), Ciro: fmtTl(item.revenue), Oran: fmtPct((item.revenue / Math.max(1, summary.totalRevenue)) * 100) })),
     hourlyDensity: hourly.map((item) => ({ Saat: item.label, Siparis: String(item.count || 0), Masa: String(item.tableCount || 0), Paket: String(item.deliveryCount || 0), Ciro: fmtTl(item.revenue || 0) })),
     waiterPerformance: [],
