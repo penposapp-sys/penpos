@@ -2367,6 +2367,17 @@ body.modal-open .qr-menu .menu-row:hover {
   font-size: 12px;
 }
 
+.delivery-card-action {
+  width: 68px;
+  min-width: 68px;
+  height: 38px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
 .delivery-card-info {
   display: grid;
   gap: 8px;

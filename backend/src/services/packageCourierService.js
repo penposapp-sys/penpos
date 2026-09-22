@@ -589,6 +589,47 @@ export const approveOnlinePackageOrderService = async (tenantId, user, orderId) 
   return { order: mapOrder(result?.order || order) }
 }
 
+export const cancelOnlinePackageOrderService = async (tenantId, user, orderId) => {
+  if (!canManageAllPackageOrders(user)) {
+    throw error('forbidden', 'Online siparis iptal etme yetkiniz yok', 403)
+  }
+  if (!mongoose.Types.ObjectId.isValid(orderId)) throw error('invalid_request', 'Geçersiz sipariş id', 400)
+
+  const order = await Order.findOne({ _id: orderId, tenantId })
+  ensurePackageOrder(order)
+  if (normalizeText(order?.orderChannel) !== 'online') {
+    throw error('invalid_request', 'Bu siparis online siparis degil', 400)
+  }
+  if (normalizePackageStatus(order) === 'teslim_edildi' || String(order?.status || '') === 'cancelled') {
+    throw error('invalid_request', 'Bu siparis artik iptal edilemez', 400)
+  }
+  if (String(order?.paymentStatus || '') === 'paid') {
+    throw error('invalid_request', 'Odemesi alinmis siparis iade islemi olmadan iptal edilemez', 400)
+  }
+
+  const oldStatus = normalizePackageStatus(order)
+  order.cancelRequestStatus = 'approved'
+  order.deliveryStatus = 'iptal_edildi'
+  order.status = 'cancelled'
+  order.approvalStatus = order.approvalStatus === 'pending' ? 'rejected' : order.approvalStatus
+  order.closedAt = order.closedAt || new Date()
+  ;(Array.isArray(order.items) ? order.items : []).forEach((item) => {
+    if (String(item?.status || '') !== 'cancelled') item.status = 'cancelled'
+    item.cancelReason = String(item?.cancelReason || '') || 'Isletme online siparisi iptal etti'
+    item.cancelledAt = item?.cancelledAt || new Date()
+  })
+  appendDeliveryEvent(order, {
+    type: 'online_order_cancelled_by_business',
+    oldStatus,
+    newStatus: 'iptal_edildi',
+    userId: getUserActorId(user),
+    userName: user.name,
+    note: 'Isletme online siparisi iptal etti'
+  })
+  await order.save()
+  return { order: mapOrder(order) }
+}
+
 export const approveOnlineCancelRequestService = async (tenantId, user, orderId) => {
   if (!canManageAllPackageOrders(user)) {
     throw error('forbidden', 'Online siparis iptal onayi yetkiniz yok', 403)

@@ -1,6 +1,7 @@
 import { sendError, error } from '../utils/errors.js'
 import {
   approveOnlinePackageOrderService,
+  cancelOnlinePackageOrderService,
   approveOnlineCancelRequestService,
   assignCourierService,
   countPendingOnlineOrdersService,
@@ -44,6 +45,15 @@ export const assignCourier = async (req, res) => {
 export const approveOnlinePackageOrder = async (req, res) => {
   try {
     const result = await approveOnlinePackageOrderService(req.user.tenantId, req.user, req.params.id)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const cancelOnlinePackageOrder = async (req, res) => {
+  try {
+    const result = await cancelOnlinePackageOrderService(req.user.tenantId, req.user, req.params.id)
     res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)

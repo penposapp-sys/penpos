@@ -381,6 +381,35 @@ export default function DeliveryOrdersPage() {
     }
   }
 
+  const cancelOnlineOrder = async (order) => {
+    const id = String(getOrderId(order) || '').trim()
+    if (!id) return
+    if (!canManageDelivery) {
+      toast.error('Bu islem icin yetkiniz yok')
+      return
+    }
+    if (!window.confirm('Bu online siparisi iptal etmek istiyor musunuz?')) return
+
+    setApprovingId(id)
+    try {
+      const res = await api(`/api/pos/package-orders/${id}/cancel-online`, {
+        method: 'POST',
+        silent: true
+      })
+      if (res?.success === false) {
+        toast.error(res?.message || 'Siparis iptal edilemedi')
+        return
+      }
+      setOrders((prev) => prev.filter((item) => String(getOrderId(item) || '') !== id))
+      setTotalCount((prev) => Math.max(0, Number(prev || 0) - 1))
+      toast.success('Online siparis iptal edildi')
+    } catch (err) {
+      toast.error(err?.message || 'Siparis iptal edilemedi')
+    } finally {
+      setApprovingId('')
+    }
+  }
+
   return (
     <div className="delivery-page-shell scrollbar-hidden">
       <div className="delivery-page-header">
@@ -495,7 +524,7 @@ export default function DeliveryOrdersPage() {
                 {status === 'approval_pending' && canManageDelivery && (
                   <button
                     type="button"
-                    className="btn"
+                    className="btn delivery-card-action"
                     disabled={approvingId === String(id)}
                     onClick={(event) => {
                       event.preventDefault()
@@ -506,10 +535,24 @@ export default function DeliveryOrdersPage() {
                     {approvingId === String(id) ? 'Onaylaniyor...' : 'Onayla'}
                   </button>
                 )}
+                {String(order?.orderChannel || '') === 'online' && status !== 'cancel_pending' && canManageDelivery && (
+                  <button
+                    type="button"
+                    className="btn delivery-card-action"
+                    disabled={approvingId === String(id)}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      cancelOnlineOrder(order)
+                    }}
+                  >
+                    {approvingId === String(id) ? 'Isleniyor...' : 'Iptal Et'}
+                  </button>
+                )}
                 {status === 'cancel_pending' && canManageDelivery && (
                   <button
                     type="button"
-                    className="btn"
+                    className="btn delivery-card-action"
                     disabled={approvingId === String(id)}
                     onClick={(event) => {
                       event.preventDefault()

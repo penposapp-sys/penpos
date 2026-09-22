@@ -354,7 +354,13 @@ export const createPublicOnlineStoreOrder = async (req, res) => {
       return res.status(400).json({ success: false, code: 'tenant_required', message: 'Isletme bilgisi gerekli' })
     }
 
-    const tenant = await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
+    let tenant = await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
+    if (!tenant) {
+      const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
+      if (website?.tenantId) {
+        tenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
+      }
+    }
     if (!tenant) {
       return res.status(404).json({ success: false, code: 'not_found', message: 'Isletme bulunamadi' })
     }
@@ -545,17 +551,25 @@ export const createPublicWaiterCall = async (req, res) => {
       ? await Tenant.findOne({ _id: tenantIdRaw, isActive: true, status: 'active' }).lean()
       : null)
 
-  if (!tenant) {
+  let resolvedTenant = tenant
+  if (!resolvedTenant && tenantSlug) {
+    const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
+    if (website?.tenantId) {
+      resolvedTenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
+    }
+  }
+
+  if (!resolvedTenant) {
     return res.status(404).json({ success: false, code: 'not_found', error: 'not_found', message: 'Tenant not found' })
   }
 
-  const mergedSettings = mergeBusinessSettings(tenant?.settings || {})
+  const mergedSettings = mergeBusinessSettings(resolvedTenant?.settings || {})
   if (mergedSettings.qrMenu?.enabled === false || mergedSettings.qrMenu?.waiterCall !== true) {
     return res.status(400).json({ success: false, code: 'feature_disabled', message: 'Garson çağır özelliği aktif değil' })
   }
 
   const created = await createWaiterCall({
-    tenantId: tenant._id,
+    tenantId: resolvedTenant._id,
     tableId: mergedSettings.qrMenu?.tableQrEnabled === true ? requestedTableId : '',
     tableName: requestedTableName,
   })
