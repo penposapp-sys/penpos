@@ -24,7 +24,7 @@ export default function EntryPage() {
             <div style={{ fontSize: 40 }}>🍽️</div>
             <div style={{ fontWeight: 700 }}>Restoran</div>
           </button>
-          <button type="button" className="card public-touch-card" onClick={() => nav('/login/kantin')} style={{ textDecoration: 'none', color: 'inherit', padding: 30, display: 'grid', placeItems: 'center', gap: 15, width: '100%', border: 'none', cursor: 'pointer' }}>
+          <button type="button" className="card public-touch-card" onClick={() => nav('/login/magaza')} style={{ textDecoration: 'none', color: 'inherit', padding: 30, display: 'grid', placeItems: 'center', gap: 15, width: '100%', border: 'none', cursor: 'pointer' }}>
             <div style={{ fontSize: 40 }}>🛒</div>
             <div style={{ fontWeight: 700 }}>Mağaza</div>
           </button>

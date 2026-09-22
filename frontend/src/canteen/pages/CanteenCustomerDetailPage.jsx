@@ -80,8 +80,8 @@ export default function CanteenCustomerDetailPage() {
       setError('')
     }
 
-    const customerResponse = await api(`/api/canteen/customers/${id}`, { silent: true })
-    const salesResponse = await api(`/api/canteen/customers/${id}/sales`, { silent: true })
+    const customerResponse = await api(`/api/magaza/customers/${id}`, { silent: true })
+    const salesResponse = await api(`/api/magaza/customers/${id}/sales`, { silent: true })
 
     if (!background) setMovementsLoading(true)
     const movementResponse = await getCustomerMovements(id)
@@ -128,7 +128,7 @@ export default function CanteenCustomerDetailPage() {
       return
     }
     setProfileSaving(true)
-    const res = await api(`/api/canteen/customers/${id}`, { method: 'PUT', data: { name, phone }, silent: true })
+    const res = await api(`/api/magaza/customers/${id}`, { method: 'PUT', data: { name, phone }, silent: true })
     if (!res?.ok || !res?.customer) {
       toast.error(res?.message || 'Cari guncellenemedi')
       setProfileSaving(false)
@@ -143,7 +143,7 @@ export default function CanteenCustomerDetailPage() {
   const deleteCustomer = async () => {
     if (!canManage) return
     setDeleteLoading(true)
-    const res = await api(`/api/canteen/customers/${id}`, { method: 'DELETE', silent: true })
+    const res = await api(`/api/magaza/customers/${id}`, { method: 'DELETE', silent: true })
     if (!res?.ok) {
       toast.error(res?.message || 'Cari silinemedi')
       setDeleteLoading(false)
@@ -152,7 +152,7 @@ export default function CanteenCustomerDetailPage() {
     toast.success('Cari silindi')
     setDeleteLoading(false)
     setDeleteOpen(false)
-    nav('/canteen/cariler')
+    nav('/magaza/cariler')
   }
 
   const toggleSale = (saleId) => {
@@ -187,12 +187,12 @@ export default function CanteenCustomerDetailPage() {
     setError('')
 
     const res = actionType === 'collect'
-      ? await api(`/api/canteen/customers/${id}/collect?branchId=${encodeURIComponent(branchId)}`, {
+      ? await api(`/api/magaza/customers/${id}/collect?branchId=${encodeURIComponent(branchId)}`, {
           method: 'POST',
           data: { method: actionMethod, amount: amt, note: String(actionNote || '').trim() },
           silent: true
         })
-      : await api(`/api/canteen/customers/${id}/adjust?branchId=${encodeURIComponent(branchId)}`, {
+      : await api(`/api/magaza/customers/${id}/adjust?branchId=${encodeURIComponent(branchId)}`, {
           method: 'POST',
           data: { action: actionType === 'add' ? 'add' : 'subtract', amount: amt, note: String(actionNote || '').trim() },
           silent: true
@@ -222,7 +222,7 @@ export default function CanteenCustomerDetailPage() {
     if (!canDeleteSale) return
     if (!window.confirm('Islemi silmek istiyor musun?')) return
     setLoading(true)
-    const res = await api(`/api/canteen/sales/${saleId}`, { method: 'DELETE', silent: true })
+    const res = await api(`/api/magaza/sales/${saleId}`, { method: 'DELETE', silent: true })
     if (!res?.ok) {
       setError(res?.message || 'Silinemedi')
       setLoading(false)
@@ -262,7 +262,7 @@ export default function CanteenCustomerDetailPage() {
           <div style={{ color: 'var(--muted)', fontSize: 13 }}>{customer?.phone || ''}</div>
         </div>
         <div className="actionWrap">
-          <button className="btn btn--compact" type="button" onClick={() => nav('/canteen/cariler')}>Geri</button>
+          <button className="btn btn--compact" type="button" onClick={() => nav('/magaza/cariler')}>Geri</button>
           <button className="btn btn--compact" type="button" onClick={load} disabled={loading}>{loading ? '...' : 'Yenile'}</button>
         </div>
       </div>

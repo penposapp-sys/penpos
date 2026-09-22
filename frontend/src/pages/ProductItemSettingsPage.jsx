@@ -379,7 +379,7 @@ export default function ProductItemSettingsPage() {
             <>
               <section className="product-hero product-settings-sticky">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  <button className="product-secondary-btn" onClick={() => navigate('/kermes/settings/catalog/items')}>← Geri</button>
+                  <button className="product-secondary-btn" onClick={() => navigate('/restoran/settings/catalog/items')}>← Geri</button>
                   <div className="product-thumb">
                     {form.imageUrl ? <ProductImage product={form} alt={form.name} /> : <span>{String(form.name || 'Ü').slice(0, 2).toUpperCase()}</span>}
                   </div>

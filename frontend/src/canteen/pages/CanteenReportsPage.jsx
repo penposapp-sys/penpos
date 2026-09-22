@@ -500,7 +500,7 @@ export default function CanteenReportsPage() {
     const loadBranches = async () => {
       const needsFallback = (!Array.isArray(session?.allowedBranches) || session.allowedBranches.length === 0) && allowedBranchIds.length > 0
       if (!needsFallback) return
-      const res = await api('/api/canteen/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
+      const res = await api('/api/magaza/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
       if (cancelled || !res?.ok) return
       setLoadedBranchOptions(Array.isArray(res?.branches) ? res.branches : [])
     }
@@ -592,7 +592,7 @@ export default function CanteenReportsPage() {
       const token = (() => {
         try { return String(getAuthToken('token_canteen') || '') } catch { return '' }
       })()
-      const url = `/api/canteen/reports/export?${qs}`
+      const url = `/api/magaza/reports/export?${qs}`
       const res = await fetch(url, {
         method: 'GET',
         headers: {
@@ -634,9 +634,9 @@ export default function CanteenReportsPage() {
     const background = options?.background === true
     if (!background) setLoading(true)
     if (!background) setError('')
-    const s = await api(`/api/canteen/reports/summary?${qs}`, { silent: true })
-    const p = await api(`/api/canteen/reports/products?${qs}`, { silent: true })
-    const c = await api(`/api/canteen/reports/customers?${qs}`, { silent: true })
+    const s = await api(`/api/magaza/reports/summary?${qs}`, { silent: true })
+    const p = await api(`/api/magaza/reports/products?${qs}`, { silent: true })
+    const c = await api(`/api/magaza/reports/customers?${qs}`, { silent: true })
     if (!s?.ok) setError(s?.message || 'Rapor alınamadı')
     setSummary(s?.ok ? (s.summary || null) : null)
     setProducts(Array.isArray(p?.items) ? p.items : [])
@@ -660,7 +660,7 @@ export default function CanteenReportsPage() {
       if (branch.params) {
         for (const [key, value] of branch.params.entries()) params.set(key, value)
       }
-      const res = await api(`/api/canteen/reports/z-report?${params.toString()}`, {
+      const res = await api(`/api/magaza/reports/z-report?${params.toString()}`, {
         silent: true,
         skipBranchHeader: true,
         suppressBranchModal: true,

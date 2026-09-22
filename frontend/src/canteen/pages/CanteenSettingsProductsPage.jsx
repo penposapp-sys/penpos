@@ -155,7 +155,7 @@ export default function CanteenSettingsProductsPage() {
       setCategories([])
       return
     }
-    const response = await api('/api/canteen/categories', {
+    const response = await api('/api/magaza/categories', {
       silent: true,
       headers: { 'x-branch-id': currentBranchId }
     })
@@ -168,7 +168,7 @@ export default function CanteenSettingsProductsPage() {
       setItems([])
       return
     }
-    const response = await api(`/api/canteen/products?branchId=${encodeURIComponent(currentBranchId)}`, { silent: true })
+    const response = await api(`/api/magaza/products?branchId=${encodeURIComponent(currentBranchId)}`, { silent: true })
     setItems(Array.isArray(response?.products) ? response.products : [])
   }
 
@@ -295,7 +295,7 @@ export default function CanteenSettingsProductsPage() {
     const preparedFile = await optimizeProductImageForUpload(file)
     const formData = new FormData()
     formData.append('file', preparedFile || file)
-    return api(`/api/canteen/products/${encodeURIComponent(productId)}/image?branchId=${encodeURIComponent(branchId)}`, {
+    return api(`/api/magaza/products/${encodeURIComponent(productId)}/image?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       body: formData,
       silent: true
@@ -341,7 +341,7 @@ export default function CanteenSettingsProductsPage() {
     }
 
     setError('')
-    const response = await api(`/api/canteen/products?branchId=${encodeURIComponent(branchId)}`, {
+    const response = await api(`/api/magaza/products?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       data: {
         name,
@@ -408,7 +408,7 @@ export default function CanteenSettingsProductsPage() {
     const preparedFile = await optimizeProductImageForUpload(file)
     const formData = new FormData()
     formData.append('file', preparedFile || file)
-    return api(`/api/canteen/products/${encodeURIComponent(productId)}/gallery?branchId=${encodeURIComponent(branchId)}`, {
+    return api(`/api/magaza/products/${encodeURIComponent(productId)}/gallery?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       body: formData,
       silent: true
@@ -417,7 +417,7 @@ export default function CanteenSettingsProductsPage() {
 
   const removeGalleryImage = async (productId, imageUrl, branchId) => {
     if (!productId || !imageUrl || !branchId) return null
-    return api(`/api/canteen/products/${encodeURIComponent(productId)}/gallery?branchId=${encodeURIComponent(branchId)}&imageUrl=${encodeURIComponent(imageUrl)}`, {
+    return api(`/api/magaza/products/${encodeURIComponent(productId)}/gallery?branchId=${encodeURIComponent(branchId)}&imageUrl=${encodeURIComponent(imageUrl)}`, {
       method: 'DELETE',
       silent: true
     })
@@ -474,7 +474,7 @@ export default function CanteenSettingsProductsPage() {
     const price = Number(String(editSellPrice || '').replace(',', '.'))
     const cost = Number(String(editBuyPrice || '').replace(',', '.'))
     const nextStock = Number(String(editStockQty || '').replace(',', '.'))
-    const response = await api(`/api/canteen/products/${encodeURIComponent(id)}?branchId=${encodeURIComponent(branchId)}`, {
+    const response = await api(`/api/magaza/products/${encodeURIComponent(id)}?branchId=${encodeURIComponent(branchId)}`, {
       method: 'PUT',
       data: {
         name: String(editName || '').trim(),
@@ -517,7 +517,7 @@ export default function CanteenSettingsProductsPage() {
     const branchId = String(selectedBranchId || '').trim()
     const id = String(editId || '').trim()
     if (!branchId || !id) return
-    const response = await api(`/api/canteen/products/${encodeURIComponent(id)}/image?branchId=${encodeURIComponent(branchId)}`, {
+    const response = await api(`/api/magaza/products/${encodeURIComponent(id)}/image?branchId=${encodeURIComponent(branchId)}`, {
       method: 'DELETE',
       silent: true
     })
@@ -537,7 +537,7 @@ export default function CanteenSettingsProductsPage() {
     if (!branchId) return
     if (!window.confirm('Ürünü silmek istiyor musun?')) return
     setError('')
-    const response = await api(`/api/canteen/products/${id}?branchId=${encodeURIComponent(branchId)}`, { method: 'DELETE', silent: true })
+    const response = await api(`/api/magaza/products/${id}?branchId=${encodeURIComponent(branchId)}`, { method: 'DELETE', silent: true })
     if (!response?.ok) {
       setError(response?.message || 'Silinemedi')
       return
@@ -578,7 +578,7 @@ export default function CanteenSettingsProductsPage() {
     const preparedFile = await optimizeProductImageForUpload(file)
     const formData = new FormData()
     formData.append('file', preparedFile || file)
-    return api(`/api/canteen/categories/${encodeURIComponent(categoryIdToUpload)}/image?branchId=${encodeURIComponent(branchId)}`, {
+    return api(`/api/magaza/categories/${encodeURIComponent(categoryIdToUpload)}/image?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       body: formData,
       silent: true
@@ -589,7 +589,7 @@ export default function CanteenSettingsProductsPage() {
     const branchId = String(selectedBranchId || '').trim()
     const id = String(categoryForm.id || '').trim()
     if (!branchId || !id) return
-    const response = await api(`/api/canteen/categories/${encodeURIComponent(id)}/image?branchId=${encodeURIComponent(branchId)}`, {
+    const response = await api(`/api/magaza/categories/${encodeURIComponent(id)}/image?branchId=${encodeURIComponent(branchId)}`, {
       method: 'DELETE',
       silent: true
     })
@@ -623,8 +623,8 @@ export default function CanteenSettingsProductsPage() {
     const isEdit = !!String(categoryForm.id || '').trim()
     const response = await api(
       isEdit
-        ? `/api/canteen/categories/${encodeURIComponent(categoryForm.id)}?branchId=${encodeURIComponent(branchId)}`
-        : `/api/canteen/categories?branchId=${encodeURIComponent(branchId)}`,
+        ? `/api/magaza/categories/${encodeURIComponent(categoryForm.id)}?branchId=${encodeURIComponent(branchId)}`
+        : `/api/magaza/categories?branchId=${encodeURIComponent(branchId)}`,
       {
         method: isEdit ? 'PUT' : 'POST',
         data: {
@@ -666,7 +666,7 @@ export default function CanteenSettingsProductsPage() {
     const id = String(category?.id || '').trim()
     if (!branchId || !id) return
     if (!window.confirm(`"${category.name}" kategorisini pasife almak istiyor musun?`)) return
-    const response = await api(`/api/canteen/categories/${encodeURIComponent(id)}?branchId=${encodeURIComponent(branchId)}`, {
+    const response = await api(`/api/magaza/categories/${encodeURIComponent(id)}?branchId=${encodeURIComponent(branchId)}`, {
       method: 'DELETE',
       silent: true
     })

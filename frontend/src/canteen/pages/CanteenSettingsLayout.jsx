@@ -5,7 +5,7 @@ import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { isSubscriptionExpired } from '../../lib/subscription.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 
-const ROOT_PATH = '/canteen/ayarlar'
+const ROOT_PATH = '/magaza/ayarlar'
 
 const SETTINGS_ICONS = {
   website: Globe,
@@ -63,21 +63,21 @@ function buildSettingsThemeVars(theme) {
 function getSettingsItems(isExpired) {
   if (isExpired) {
     return [
-      { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-      { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
-      { key: 'plan', path: '/canteen/ayarlar/paket', label: 'Uyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
+      { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
+      { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
+      { key: 'plan', path: '/magaza/ayarlar/paket', label: 'Uyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
     ]
   }
 
   return [
-    { key: 'system', path: '/canteen/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
-    { key: 'products', path: '/canteen/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
-    { key: 'staff', path: '/canteen/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
-    { key: 'qr', path: '/canteen/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri online siparis sayfasi ve yayin ayarlari' },
-    { key: 'website', path: '/canteen/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-    { key: 'printers', path: '/canteen/ayarlar/yazicilar', label: 'Yazici Ayarlari', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fis ve etiket yazicilari' },
-    { key: 'payments', path: '/canteen/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
-    { key: 'billing', path: '/canteen/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
+    { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
+    { key: 'products', path: '/magaza/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
+    { key: 'staff', path: '/magaza/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
+    { key: 'qr', path: '/magaza/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri online siparis sayfasi ve yayin ayarlari' },
+    { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
+    { key: 'printers', path: '/magaza/ayarlar/yazicilar', label: 'Yazici Ayarlari', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fis ve etiket yazicilari' },
+    { key: 'payments', path: '/magaza/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
+    { key: 'billing', path: '/magaza/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
   ]
 }
 
@@ -456,7 +456,7 @@ function DesktopSettingsDetail({ current, sections, onOpen, children }) {
     <div style={{ display: 'grid', gap: 18 }}>
       <SettingsTopHeader
         title={current?.label || 'Ayarlar'}
-        subtitle={current?.desc || 'Kantin ayarlarını buradan yönetin'}
+        subtitle={current?.desc || 'Mağaza ayarlarını buradan yönetin'}
         icon={current?.icon || 'AY'}
         leftSlot={(
           <button type="button" className="canteen-settings-menu-toggle" onClick={() => setMenuOpen((value) => !value)}>
@@ -628,7 +628,7 @@ function MobileSettingsDetail({ current, items, onOpen, children }) {
     <div style={{ display: 'grid', gap: 10 }}>
       <SettingsTopHeader
         title={current?.label || 'Ayarlar'}
-        subtitle={current?.desc || 'Kantin ayarlarını düzenleyin'}
+        subtitle={current?.desc || 'Mağaza ayarlarını düzenleyin'}
         icon={current?.icon || 'AY'}
         compact
         rightSlot={(

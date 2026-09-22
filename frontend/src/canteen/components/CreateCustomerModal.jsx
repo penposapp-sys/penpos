@@ -33,7 +33,7 @@ export default function CreateCustomerModal({ open, onClose, onCreated }) {
     const cleanNote = String(note || '').trim()
 
     setLoading(true)
-    const res = await api('/api/canteen/customers', {
+    const res = await api('/api/magaza/customers', {
       method: 'POST',
       data: { name: cleanName, phone: cleanPhone, note: cleanNote },
       silent: true

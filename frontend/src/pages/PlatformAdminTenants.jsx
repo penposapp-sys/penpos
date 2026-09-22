@@ -150,8 +150,8 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
         throw new Error('Sifre en az 6 karakter olmalidir')
       }
       const target =
-        pagePlanType === 'canteen' ? '/api/platform/tenants/canteen' :
-        (pagePlanType === 'anaokulu' ? '/api/platform/tenants/anaokulu' : '/api/platform/tenants/kermes')
+        pagePlanType === 'canteen' ? '/api/platform/tenants/magaza' :
+        (pagePlanType === 'anaokulu' ? '/api/platform/tenants/anaokulu' : '/api/platform/tenants/restoran')
       const res = await api(target, { method: 'POST', body: JSON.stringify({ ...form }), portalOverride: 'platform' })
       if (!res?.ok) {
         throw new Error(res?.message || 'Uye olusturulamadi')

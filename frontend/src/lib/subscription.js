@@ -8,18 +8,18 @@ export const isSubscriptionExpired = (tenantCtx) => getSubscriptionStatus(tenant
 
 export const getSubscriptionPortal = (value) => {
   const raw = String(value || '').trim().toLowerCase()
-  if (raw === 'canteen' || raw === 'kantin' || raw.startsWith('/canteen')) return 'canteen'
+  if (raw === 'canteen' || raw === 'kantin' || raw.startsWith('/magaza')) return 'canteen'
   return 'restaurant'
 }
 
 export const getSubscriptionUpgradePath = (portalOrPathname) => {
   const portal = getSubscriptionPortal(portalOrPathname)
-  return portal === 'canteen' ? '/canteen/ayarlar/paket' : '/kermes/settings/billing'
+  return portal === 'canteen' ? '/magaza/ayarlar/paket' : '/restoran/settings/billing'
 }
 
 export const getSubscriptionProfilePath = (portalOrPathname) => {
   const portal = getSubscriptionPortal(portalOrPathname)
-  return portal === 'canteen' ? '/canteen/ayarlar/me' : '/kermes/settings/me'
+  return portal === 'canteen' ? '/magaza/ayarlar/me' : '/restoran/settings/me'
 }
 
 export const isSubscriptionAllowedPath = (pathname, portalOrPathname) => {
@@ -27,8 +27,8 @@ export const isSubscriptionAllowedPath = (pathname, portalOrPathname) => {
   const portal = getSubscriptionPortal(portalOrPathname || pathname)
 
   if (portal === 'canteen') {
-    return path === '/canteen/ayarlar' || path === '/canteen/ayarlar/paket' || path === '/canteen/ayarlar/me'
+    return path === '/magaza/ayarlar' || path === '/magaza/ayarlar/paket' || path === '/magaza/ayarlar/me'
   }
 
-  return path === '/kermes/settings' || path === '/kermes/settings/billing' || path === '/kermes/settings/me'
+  return path === '/restoran/settings' || path === '/restoran/settings/billing' || path === '/restoran/settings/me'
 }

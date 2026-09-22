@@ -73,7 +73,7 @@ export default function SettingsDeliveryPage() {
             Paket siparislerinde kayitli kisi bilgileri burada tutulur. Isim veya telefonla arayip eski siparislerini gorebilirsin.
           </div>
         </div>
-        <Link className="btn" to="/kermes/app/delivery">Paket Servise Git</Link>
+        <Link className="btn" to="/restoran/app/delivery">Paket Servise Git</Link>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait || isTablet ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr)', gap: 12 }}>

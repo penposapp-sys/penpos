@@ -293,13 +293,13 @@ export function TablesManagementContent({ embedded = false }) {
 
     const active = activeByTable[tableId]
     if (active?.hasActive && active?.orderId) {
-      nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true, tableName: table?.name || '' } })
+      nav(`/restoran/app/pos?orderId=${active.orderId}`, { state: { fromTables: true, tableName: table?.name || '' } })
       return
     }
 
     const params = new URLSearchParams({ tableId })
     if (entryDate) params.set('entryDate', entryDate)
-    nav(`/kermes/app/pos?${params.toString()}`, { state: { fromTables: true, tableName: table?.name || '' } })
+    nav(`/restoran/app/pos?${params.toString()}`, { state: { fromTables: true, tableName: table?.name || '' } })
   }
 
   const openMerge = (table) => {
@@ -333,7 +333,7 @@ export function TablesManagementContent({ embedded = false }) {
 
       const active = latest?.activeByTable?.[targetTable?.id]
       if (active?.orderId) {
-        nav(`/kermes/app/pos?orderId=${active.orderId}`, { state: { fromTables: true, tableName: targetTable?.name || '' } })
+        nav(`/restoran/app/pos?orderId=${active.orderId}`, { state: { fromTables: true, tableName: targetTable?.name || '' } })
       }
     } catch (err) {
       const message = parseApiError(err)
@@ -389,7 +389,7 @@ export function TablesManagementContent({ embedded = false }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <button className="btn" type="button" onClick={() => nav('/kermes/app/waiter-calls')} style={{ flexShrink: 0 }}>
+            <button className="btn" type="button" onClick={() => nav('/restoran/app/waiter-calls')} style={{ flexShrink: 0 }}>
               Garson Cagrilari
               {totalWaiterCalls > 0 ? (
                 <span

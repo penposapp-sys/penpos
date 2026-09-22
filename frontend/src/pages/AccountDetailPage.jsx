@@ -391,7 +391,7 @@ export default function AccountDetailPage() {
     if (!txId || !accountId) return
     setDeleteLoading(true)
     try {
-      const res = await api(`/api/kermes/cari/transactions/${txId}`, { method: 'DELETE', silent: true })
+      const res = await api(`/api/restoran/cari/transactions/${txId}`, { method: 'DELETE', silent: true })
       if (!res?.ok) {
         const code = res?.code
         if (code === 'payment_locked') toast.error('Bu hareket silinemez')
@@ -410,7 +410,7 @@ export default function AccountDetailPage() {
 
   const header = (
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-      <button className="btn" type="button" onClick={() => nav('/kermes/app/accounts')}>← Cari Listesi</button>
+      <button className="btn" type="button" onClick={() => nav('/restoran/app/accounts')}>← Cari Listesi</button>
       <div className="account-header-right">
         <div className="breakAny account-header-name">{account?.name || 'Cari'}</div>
         {((account?.phone && String(account.phone).trim()) || (account?.note && String(account.note).trim())) && (
@@ -795,7 +795,7 @@ export default function AccountDetailPage() {
           <div style={{ fontWeight: 800 }}>Hata</div>
           <div style={{ color: 'var(--muted)' }}>{error}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn" type="button" onClick={() => nav('/kermes/app/accounts')}>Cari Listesi</button>
+            <button className="btn" type="button" onClick={() => nav('/restoran/app/accounts')}>Cari Listesi</button>
             <button className="btn" type="button" onClick={() => window.location.reload()}>Yenile</button>
           </div>
         </div>
@@ -803,7 +803,7 @@ export default function AccountDetailPage() {
         <div className="card" style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontWeight: 800 }}>Cari bulunamadı</div>
           <div style={{ color: 'var(--muted)' }}>Kayıt silinmiş olabilir veya erişiminiz olmayabilir.</div>
-          <button className="btn" type="button" onClick={() => nav('/kermes/app/accounts')}>Cari Listesi</button>
+          <button className="btn" type="button" onClick={() => nav('/restoran/app/accounts')}>Cari Listesi</button>
         </div>
       ) : (
         <>

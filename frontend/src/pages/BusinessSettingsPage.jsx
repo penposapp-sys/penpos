@@ -1342,7 +1342,7 @@ export function SettingsMenuHub() {
           title="Kategori Sıralama Yönetimi"
           description="Kategoriler aynı sayfada toplu görünür ve manuel sıralama buradan yapılır."
           icon="🏷️"
-          action={<Link className="btn" to="/kermes/settings/catalog/categories">Kategorileri Yönet</Link>}
+          action={<Link className="btn" to="/restoran/settings/catalog/categories">Kategorileri Yönet</Link>}
         >
           <div className="catalog-sort-list">
             {sortedCategories.map((category, index) => (
@@ -1364,7 +1364,7 @@ export function SettingsMenuHub() {
           title="Ürünler Tablosu"
           description="Ürünler aynı sayfada toplu görünür, sıralama ve yönetim kısayolları korunur."
           icon="🍽️"
-          action={<Link className="btn" to="/kermes/settings/catalog/items">Ürünleri Yönet</Link>}
+          action={<Link className="btn" to="/restoran/settings/catalog/items">Ürünleri Yönet</Link>}
         >
           <div className="catalog-table">
             <div className="catalog-table-head">
@@ -1385,7 +1385,7 @@ export function SettingsMenuHub() {
                 <div>
                   <SoftButton onClick={() => persistItemOrder(moveInList(sortedItems, item.id, 'up'))} disabled={index === 0 || sortSaving === 'item'}>Yukarı</SoftButton>
                   <SoftButton onClick={() => persistItemOrder(moveInList(sortedItems, item.id, 'down'))} disabled={index === sortedItems.length - 1 || sortSaving === 'item'}>Aşağı</SoftButton>
-                  <Link className="btn" to="/kermes/settings/catalog/items">Düzenle</Link>
+                  <Link className="btn" to="/restoran/settings/catalog/items">Düzenle</Link>
                 </div>
               </div>
             ))}

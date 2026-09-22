@@ -599,14 +599,14 @@ export default function SettingsPage() {
   const canSee = !!(canManageSettings || canManageMenu)
   const isExpired = getSubscriptionStatus(tenantCtx) === 'expired'
 
-  const basePath = '/kermes/settings'
+  const basePath = '/restoran/settings'
   const isRoot = pathname === basePath || pathname === basePath + '/'
 
   const settingsGroups = useMemo(() => {
     const primaryItems = [
       {
         key: 'system',
-        to: '/kermes/settings/system',
+        to: '/restoran/settings/system',
         label: 'İşletme Ayarları',
         icon: 'business',
         group: 'İşletme',
@@ -615,7 +615,7 @@ export default function SettingsPage() {
       ...(canManageMenu && !isExpired
         ? [{
             key: 'catalog',
-            to: '/kermes/settings/catalog',
+            to: '/restoran/settings/catalog',
             label: 'Ürün & Kategori',
             icon: 'catalog',
             group: 'Ürün',
@@ -626,7 +626,7 @@ export default function SettingsPage() {
         ? [
             {
               key: 'tables',
-              to: '/kermes/settings/tables',
+              to: '/restoran/settings/tables',
               label: 'Masa Ayarları',
               icon: 'tables',
               group: 'Satış',
@@ -634,7 +634,7 @@ export default function SettingsPage() {
             },
             {
               key: 'staff',
-              to: '/kermes/settings/staff',
+              to: '/restoran/settings/staff',
               label: 'Personel Ayarları',
               icon: 'staff',
               group: 'Personel',
@@ -642,7 +642,7 @@ export default function SettingsPage() {
             },
             {
               key: 'delivery',
-              to: '/kermes/settings/delivery',
+              to: '/restoran/settings/delivery',
               label: 'Paket Servis',
               icon: 'delivery',
               group: 'Satış',
@@ -654,7 +654,7 @@ export default function SettingsPage() {
         ? [
             {
               key: 'qr',
-              to: '/kermes/settings/qr',
+              to: '/restoran/settings/qr',
               label: 'QR Menü',
               icon: 'qr',
               group: 'Dijital',
@@ -662,7 +662,7 @@ export default function SettingsPage() {
             },
             {
               key: 'online-sales',
-              to: '/kermes/settings/online-sales',
+              to: '/restoran/settings/online-sales',
               label: 'Online Satış',
               icon: 'delivery',
               group: 'Dijital',
@@ -670,7 +670,7 @@ export default function SettingsPage() {
             },
             {
               key: 'website',
-              to: '/kermes/settings/website',
+              to: '/restoran/settings/website',
               label: 'Web Site Ayarları',
               icon: 'business',
               group: 'Dijital',
@@ -682,7 +682,7 @@ export default function SettingsPage() {
         ? [
             {
               key: 'printers',
-              to: '/kermes/settings/printers',
+              to: '/restoran/settings/printers',
               label: 'Yazıcı Ayarları',
               icon: 'printers',
               group: 'Cihaz',
@@ -691,7 +691,7 @@ export default function SettingsPage() {
             ...(user?.role === 'tenant_admin'
               ? [{
                   key: 'billing',
-                  to: '/kermes/settings/billing',
+                  to: '/restoran/settings/billing',
                   label: 'Paket & Satın Alma',
                   icon: 'billing',
                   group: 'Finans',
@@ -700,7 +700,7 @@ export default function SettingsPage() {
               : []),
             {
               key: 'payments',
-              to: '/kermes/settings/payments',
+              to: '/restoran/settings/payments',
               label: 'Ödeme Seçenekleri',
               icon: 'payments',
               group: 'Satış',
@@ -720,7 +720,7 @@ export default function SettingsPage() {
         title: 'Abonelik',
         items: [{
           key: 'billing',
-          to: '/kermes/settings/billing',
+          to: '/restoran/settings/billing',
           label: 'Paket & Satın Alma',
           icon: 'billing',
           group: 'Finans',
@@ -728,7 +728,7 @@ export default function SettingsPage() {
         },
         {
           key: 'website',
-          to: '/kermes/settings/website',
+          to: '/restoran/settings/website',
           label: 'Web Site Ayarları',
           icon: 'business',
           group: 'Dijital',
@@ -787,7 +787,7 @@ export default function SettingsPage() {
   }
 
   const goSettingsHome = () => {
-    nav('/kermes/settings')
+    nav('/restoran/settings')
     setSettingsMenuOpen(false)
   }
 
@@ -1641,14 +1641,14 @@ export const SettingsMenuHub = () => {
             <div style={{ fontWeight: 600 }}>Kategoriler</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kategori ekleme/düzenleme/pasifleştirme</div>
           </div>
-          <Link className="btn" to="/kermes/settings/menu/categories">Kategorileri Yönet</Link>
+          <Link className="btn" to="/restoran/settings/menu/categories">Kategorileri Yönet</Link>
         </div>
         <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontWeight: 600 }}>Ürünler</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ürün ekleme/düzenleme/pasifleştirme</div>
           </div>
-          <Link className="btn" to="/kermes/settings/menu/items">Ürünleri Yönet</Link>
+          <Link className="btn" to="/restoran/settings/menu/items">Ürünleri Yönet</Link>
         </div>
         {canBulk && <BulkProductsExcelCard />}
       </div>
@@ -1702,7 +1702,7 @@ export const SettingsTablesContent = () => {
       if (!next) params.delete('branchId')
       else params.set('branchId', String(next))
       const qs = params.toString()
-      nav({ pathname: '/kermes/settings/tables', search: qs ? `?${qs}` : '' }, { replace: true })
+      nav({ pathname: '/restoran/settings/tables', search: qs ? `?${qs}` : '' }, { replace: true })
     } catch {}
   }
 

@@ -90,7 +90,7 @@ export function BusinessSettingsProvider({ children }) {
     setError('')
     try {
       if (isCanteenSystemType(user?.systemType)) {
-        const settingsRes = await api('/api/canteen/settings', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
+        const settingsRes = await api('/api/magaza/settings', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
         const merged = mergeBusinessSettings({
           appearance: {
             themeId: normalizeThemeId(settingsRes?.settings?.appearance?.themeId || 'white'),

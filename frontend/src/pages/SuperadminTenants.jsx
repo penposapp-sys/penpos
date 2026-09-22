@@ -24,7 +24,7 @@ function getPlanMeta(tenant) {
 const SYSTEM_TYPE_LABEL = (value) => {
   const raw = String(value || '').trim().toLowerCase()
   if (['anaokulu', 'kindergarten', 'kre'].includes(raw)) return 'ANAOKULU'
-  if (['canteen', 'kantin', 'market'].includes(raw)) return 'KANTİN'
+  if (['canteen', 'kantin', 'market'].includes(raw)) return 'MAĞAZA'
   return 'RESTORAN'
 }
 
@@ -352,8 +352,8 @@ export default function SuperadminTenants() {
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sistem Tipi</div>
             <select className="input" value={createSystemType} onChange={(e) => setCreateSystemType(e.target.value)}>
-              <option value="restaurant">🍽️ Restoran / Cafe / Kermes</option>
-              <option value="canteen">🛒 Mağaza / Market / Kantin</option>
+              <option value="restaurant">🍽️ Restoran / Cafe / Restoran</option>
+              <option value="canteen">🛒 Mağaza / Market / Mağaza</option>
               <option value="anaokulu">🏫 Anaokulu / Kreş</option>
             </select>
           </label>

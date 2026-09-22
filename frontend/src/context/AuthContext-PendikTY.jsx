@@ -14,7 +14,7 @@ const resolvePortalFromPathname = (pathname) => {
     path.startsWith('/login/platform') ||
     path.startsWith('/platform-login')
   ) return 'platform'
-  if (path.startsWith('/canteen') || path.startsWith('/login/kantin')) return 'canteen'
+  if (path.startsWith('/magaza') || path.startsWith('/login/magaza')) return 'canteen'
   return 'restaurant'
 }
 
@@ -202,8 +202,8 @@ export const AuthProvider = ({ children }) => {
       if (pathname.startsWith('/platform') || pathname.startsWith('/platform-admin') || pathname.startsWith('/superadmin') || String(user?.role || '') === 'platform_admin' || String(user?.role || '') === 'superadmin') {
         return '/platform-login'
       }
-      if (pathname.startsWith('/canteen') || String(user?.systemType || '') === 'kantin' || String(user?.systemType || '') === 'canteen') {
-        return '/canteen/login'
+      if (pathname.startsWith('/magaza') || String(user?.systemType || '') === 'kantin' || String(user?.systemType || '') === 'canteen') {
+        return '/magaza/login'
       }
       return '/login/restoran'
     })()

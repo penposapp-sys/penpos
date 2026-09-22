@@ -338,7 +338,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
         api(`/api/tenant/website${websiteApiQuery}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/tenant/profile', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         isStore
-          ? api('/api/canteen/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen', cacheMode: 'no-store' })
+          ? api('/api/magaza/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen', cacheMode: 'no-store' })
           : Promise.resolve(null),
       ])
       const nextTenant = websiteRes?.tenant || profileRes?.tenant || null
@@ -362,7 +362,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
           : activeBranches[0]?.id) || activeBranches[0]?.id || ''
 
         if (selectedBranchId) {
-          const productsRes = await api(`/api/canteen/products?branchId=${encodeURIComponent(selectedBranchId)}`, {
+          const productsRes = await api(`/api/magaza/products?branchId=${encodeURIComponent(selectedBranchId)}`, {
             silent: true,
             skipBranchHeader: true,
             portalOverride: 'canteen',
@@ -653,7 +653,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       navigate(-1)
       return
     }
-    navigate(isStore ? '/canteen/ayarlar' : '/kermes/settings')
+    navigate(isStore ? '/magaza/ayarlar' : '/restoran/settings')
   }
 
   const openSystemMenu = () => {

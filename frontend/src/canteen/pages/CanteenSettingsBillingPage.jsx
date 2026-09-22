@@ -104,7 +104,7 @@ export default function CanteenSettingsBillingPage() {
     const background = options?.background === true
     if (!background) setLoading(true)
     if (!background) setError('')
-    const res = await api('/api/canteen/billing/requests', { silent: true })
+    const res = await api('/api/magaza/billing/requests', { silent: true })
     if (!res?.ok) {
       setError(res?.message || 'Uyelik talepleri alinamadi')
       setItems([])
@@ -118,7 +118,7 @@ export default function CanteenSettingsBillingPage() {
   const loadPlans = async () => {
     setPlansLoading(true)
     setPlansError('')
-    const res = await api('/api/canteen/billing/plans', { silent: true })
+    const res = await api('/api/magaza/billing/plans', { silent: true })
     if (!res?.ok) {
       setPlansError(res?.message || 'Planlar alinamadi')
       setPlans([])
@@ -169,7 +169,7 @@ export default function CanteenSettingsBillingPage() {
       note: String(note || '').trim()
     }
     setSaving(true)
-    const res = await api('/api/canteen/billing/requests', { method: 'POST', data: payload, silent: true })
+    const res = await api('/api/magaza/billing/requests', { method: 'POST', data: payload, silent: true })
     setSaving(false)
     if (!res?.ok) {
       setError(res?.message || 'Talep olusturulamadi')
@@ -184,7 +184,7 @@ export default function CanteenSettingsBillingPage() {
     const rid = String(id || '').trim()
     if (!rid) return
     setSaving(true)
-    const res = await api(`/api/canteen/billing/requests/${encodeURIComponent(rid)}/cancel`, { method: 'POST', silent: true })
+    const res = await api(`/api/magaza/billing/requests/${encodeURIComponent(rid)}/cancel`, { method: 'POST', silent: true })
     setSaving(false)
     if (!res?.ok) {
       setError(res?.message || 'Talep iptal edilemedi')

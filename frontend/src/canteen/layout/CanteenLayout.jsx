@@ -104,7 +104,7 @@ export default function CanteenLayout() {
   }, [isMobilePortrait])
 
   useEffect(() => {
-    const enabled = !!(isMobilePortrait && pathname.startsWith('/canteen/kasa'))
+    const enabled = !!(isMobilePortrait && pathname.startsWith('/magaza/kasa'))
     try {
       if (enabled) document.body.classList.add('mobile-sales-mode')
       else document.body.classList.remove('mobile-sales-mode')
@@ -144,7 +144,7 @@ export default function CanteenLayout() {
       }
       setMe(normalized)
 
-      const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
+      const sess = await api('/api/magaza/session', { silent: true, suppressAuthRedirect: true })
       if (sess?.ok) syncCanteenBranchSelection(sess)
       setSession(sess?.ok ? sess : null)
       const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
@@ -157,7 +157,7 @@ export default function CanteenLayout() {
   useEffect(() => {
     if (!me) return
     const run = async () => {
-      const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
+      const sess = await api('/api/magaza/session', { silent: true, suppressAuthRedirect: true })
       if (sess?.ok) syncCanteenBranchSelection(sess)
       setSession(sess?.ok ? sess : null)
       const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
@@ -169,7 +169,7 @@ export default function CanteenLayout() {
   useEffect(() => {
     if (!me) return
     const handler = async () => {
-      const sess = await api('/api/canteen/session', { silent: true, suppressAuthRedirect: true })
+      const sess = await api('/api/magaza/session', { silent: true, suppressAuthRedirect: true })
       if (sess?.ok) syncCanteenBranchSelection(sess)
       setSession(sess?.ok ? sess : null)
       const ctx = await api('/api/tenant/context', { silent: true, suppressAuthRedirect: true, portalOverride: 'canteen' })
@@ -217,7 +217,7 @@ export default function CanteenLayout() {
 
   useEffect(() => {
     if (!canQrOrders) return
-    if (!pathname.startsWith('/canteen/qr-siparisleri')) return
+    if (!pathname.startsWith('/magaza/qr-siparisleri')) return
     setQrSeenAt(Date.now())
     setQrAlertCount(0)
   }, [canQrOrders, pathname])
@@ -232,7 +232,7 @@ export default function CanteenLayout() {
     let timerId = null
 
     const loadQrAlerts = async () => {
-      const response = await api('/api/canteen/qr-orders?status=new', { silent: true, suppressAuthRedirect: true })
+      const response = await api('/api/magaza/qr-orders?status=new', { silent: true, suppressAuthRedirect: true })
       if (cancelled) return
       if (!response?.ok || !Array.isArray(response?.items)) {
         setQrAlertCount(0)
@@ -266,12 +266,12 @@ export default function CanteenLayout() {
     }
 
     const base = []
-    if (canReports) base.push({ to: '/canteen/raporlar', label: 'Raporlar', icon: IconBarChart })
-    if (canPos) base.push({ to: '/canteen/kasa', label: 'Kasa', icon: IconCart })
-    if (canQrOrders) base.push({ to: '/canteen/qr-siparisleri', label: 'Online Siparişler', icon: IconQrOrders })
-    if (canSales) base.push({ to: '/canteen/yapilan-satislar', label: 'Yapılan Satışlar', icon: IconHistory })
-    if (canCustomers) base.push({ to: '/canteen/cariler', label: 'Cariler', icon: IconUsers })
-    if (canSettings) base.push({ to: '/canteen/ayarlar', label: 'Ayarlar', icon: IconSettings })
+    if (canReports) base.push({ to: '/magaza/raporlar', label: 'Raporlar', icon: IconBarChart })
+    if (canPos) base.push({ to: '/magaza/kasa', label: 'Kasa', icon: IconCart })
+    if (canQrOrders) base.push({ to: '/magaza/qr-siparisleri', label: 'Online Siparişler', icon: IconQrOrders })
+    if (canSales) base.push({ to: '/magaza/yapilan-satislar', label: 'Yapılan Satışlar', icon: IconHistory })
+    if (canCustomers) base.push({ to: '/magaza/cariler', label: 'Cariler', icon: IconUsers })
+    if (canSettings) base.push({ to: '/magaza/ayarlar', label: 'Ayarlar', icon: IconSettings })
     return base
   }, [canCustomers, canPos, canQrOrders, canReports, canSales, canSettings, isExpired])
 
@@ -317,7 +317,7 @@ export default function CanteenLayout() {
   const activeIndex = items.findIndex((item) => item.to === current?.to)
 
   if (!getAuthToken(tokenKey) && !loading) {
-    return <Navigate to="/canteen/login" replace />
+    return <Navigate to="/magaza/login" replace />
   }
 
   if (loading) {
@@ -325,7 +325,7 @@ export default function CanteenLayout() {
   }
 
   if (!me) {
-    return <Navigate to="/canteen/login" replace />
+    return <Navigate to="/magaza/login" replace />
   }
 
   if (isExpired && !isSubscriptionAllowedPath(pathname, 'canteen')) {
@@ -534,7 +534,7 @@ export default function CanteenLayout() {
                               style={{ position: 'relative', display: 'grid', placeItems: 'center', color: active ? activeSidebarIconColor : 'currentColor' }}
                             >
                               <Icon size={13} color="currentColor" />
-                              {item.to === '/canteen/qr-siparisleri' && qrAlertCount > 0 && (
+                              {item.to === '/magaza/qr-siparisleri' && qrAlertCount > 0 && (
                                 <span
                                   style={{
                                     position: 'absolute',

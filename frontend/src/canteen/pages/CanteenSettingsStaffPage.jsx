@@ -33,7 +33,7 @@ const CANTEEN_PERMISSION_GROUPS = [
   {
     title: 'Kasa & Satış',
     items: [
-      { permission: PERMISSIONS.CANTEEN_POS_ACCESS, label: 'Kasa erişimi', description: 'Kantin kasa ekranına giriş yapabilir.' },
+      { permission: PERMISSIONS.CANTEEN_POS_ACCESS, label: 'Kasa erişimi', description: 'Mağaza kasa ekranına giriş yapabilir.' },
       { permission: PERMISSIONS.CANTEEN_SALES_VIEW, label: 'Satış raporları', description: 'Tamamlanan satış akışını ve satış raporlarını görüntüler.' },
       { permission: PERMISSIONS.CANTEEN_REPORTS_VIEW, label: 'Raporlar', description: 'Mağaza rapor ekranını görüntüler.' },
       { permission: PERMISSIONS.CANTEEN_REPORTS_EXPORT, label: 'Rapor dışa aktarma', description: 'Raporları Excel olarak indirebilir.' }
@@ -62,7 +62,7 @@ const CANTEEN_PERMISSION_GROUPS = [
   {
     title: 'Yönetim',
     items: [
-      { permission: PERMISSIONS.CANTEEN_SETTINGS_MANAGE, label: 'Ayarlar', description: 'Kantin ayar ekranlarını yönetebilir.' },
+      { permission: PERMISSIONS.CANTEEN_SETTINGS_MANAGE, label: 'Ayarlar', description: 'Mağaza ayar ekranlarını yönetebilir.' },
       { permission: PERMISSIONS.CANTEEN_STAFF_MANAGE, label: 'Personel', description: 'Personel hesaplarını ve yetkilerini yönetebilir.' },
       { permission: PERMISSIONS.CANTEEN_BILLING_VIEW, label: 'Üyelik talepleri', description: 'Paket ve üyelik ekranlarını görüntüler.' },
       { permission: PERMISSIONS.CANTEEN_BILLING_MANAGE, label: 'Üyelik yönetimi', description: 'Üyelik ve paket taleplerini yönetebilir.' }
@@ -125,7 +125,7 @@ export default function CanteenSettingsStaffPage() {
           <SettingsCard
             key={group.title}
             title={group.title}
-            description="Kantin personelinin erişim kapsamını bu gruptan yönetin."
+            description="Mağaza personelinin erişim kapsamını bu gruptan yönetin."
             icon="🔐"
             style={{ padding: 16 }}
           >
@@ -147,7 +147,7 @@ export default function CanteenSettingsStaffPage() {
   }
 
   const loadBranches = async () => {
-    const response = await api('/api/canteen/branches', { silent: true })
+    const response = await api('/api/magaza/branches', { silent: true })
     setBranches(Array.isArray(response?.branches) ? response.branches : [])
   }
 
@@ -156,7 +156,7 @@ export default function CanteenSettingsStaffPage() {
     setError('')
     try {
       const [staffRes] = await Promise.all([
-        api(`/api/canteen/staff${includeInactive ? '?includeInactive=true' : ''}`, { silent: true }),
+        api(`/api/magaza/staff${includeInactive ? '?includeInactive=true' : ''}`, { silent: true }),
         loadBranches()
       ])
       setItems(Array.isArray(staffRes?.staff) ? staffRes.staff : [])
@@ -190,7 +190,7 @@ export default function CanteenSettingsStaffPage() {
         permissions: canonicalizePermissions(createForm.permissions || []),
         branchIds: toBranchIds(createForm.branchAccess)
       }
-      const res = await api('/api/canteen/staff', { method: 'POST', data: payload, silent: true })
+      const res = await api('/api/magaza/staff', { method: 'POST', data: payload, silent: true })
       if (!res?.ok) {
         const code = res?.code
         if (code === 'duplicate_email') setFormError('Bu e-posta zaten kayıtlı.')
@@ -236,7 +236,7 @@ export default function CanteenSettingsStaffPage() {
         permissions: canonicalizePermissions(editForm.permissions || []),
         branchIds: toBranchIds(editForm.branchAccess)
       }
-      const res = await api(`/api/canteen/staff/${selected.id}`, { method: 'PUT', data: payload, silent: true })
+      const res = await api(`/api/magaza/staff/${selected.id}`, { method: 'PUT', data: payload, silent: true })
       if (!res?.ok) {
         const code = res?.code
         if (code === 'duplicate_email') setFormError('Bu e-posta zaten kayıtlı.')
@@ -269,7 +269,7 @@ export default function CanteenSettingsStaffPage() {
     setFormLoading(true)
     setFormError('')
     try {
-      const res = await api(`/api/canteen/staff/${selected.id}`, {
+      const res = await api(`/api/magaza/staff/${selected.id}`, {
         method: 'PUT',
         data: { password: pwdForm.password },
         silent: true
@@ -296,7 +296,7 @@ export default function CanteenSettingsStaffPage() {
     setDeleteLoading(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/staff/${staff.id}`, { method: 'DELETE', silent: true })
+      const res = await api(`/api/magaza/staff/${staff.id}`, { method: 'DELETE', silent: true })
       if (!res?.ok) {
         setError(res?.message || 'Personel silinemedi.')
         return
@@ -315,7 +315,7 @@ export default function CanteenSettingsStaffPage() {
   return (
     <CanteenSettingsSection
       badge="Personel Yönetimi"
-      title="Kantin personelini restoran panelindeki akışla yönetin"
+      title="Mağaza personelini restoran panelindeki akışla yönetin"
       description="Yeni personel ekleme, düzenleme, şifre sıfırlama ve şube erişimi atama işlemlerini tek panelden yönetin."
       stats={stats}
       actions={
@@ -334,7 +334,7 @@ export default function CanteenSettingsStaffPage() {
         <div className="settings-ui-toolbar">
           <div>
             <h3 style={{ margin: 0 }}>Personel</h3>
-            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--app-text-secondary)' }}>Kantin personel erişim, giriş ve şube görünürlüğünü bu panelden yönetin.</div>
+            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--app-text-secondary)' }}>Mağaza personel erişim, giriş ve şube görünürlüğünü bu panelden yönetin.</div>
           </div>
           <button
             className="settings-ui-btn"

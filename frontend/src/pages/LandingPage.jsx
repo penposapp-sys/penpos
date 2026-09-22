@@ -845,7 +845,7 @@ export default function LandingPage() {
         .lp-mock-grid--split {
           background-image:
             linear-gradient(180deg, rgba(8, 7, 6, 0.04), rgba(8, 7, 6, 0.04)),
-            url('/images/canteen-preview-v2.png');
+            url('/images/magaza-preview-v2.png');
         }
         .lp-mock-grid--split > *,
         .lp-mock-grid--reports > * {

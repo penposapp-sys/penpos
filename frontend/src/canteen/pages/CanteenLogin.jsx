@@ -26,7 +26,7 @@ export default function CanteenLogin() {
     setError('')
     try {
       await login({ identifier, password, portal: 'canteen', rememberMe })
-      nav('/canteen', { replace: true })
+      nav('/magaza', { replace: true })
     } catch (err) {
       setError(getFriendlyLoginError(err, {
         wrongPortalMessage: 'Bu hesap magaza giris ekrani icin uygun degil.'
@@ -41,7 +41,7 @@ export default function CanteenLogin() {
       backTo="/login"
       backLabel="Sistem secimine don"
       brand="PenPOS"
-      systemLabel="KANTIN / MARKET YONETIMI"
+      systemLabel="MAGAZA / MARKET YONETIMI"
       welcomeTitle="Hizli kasa, stok ve cari akislarinizi tek ekranda toplayin."
       welcomeText="Barkodlu satis, stok hareketleri, cari bakiyeler ve gunluk raporlar ile operasyonu sade ve hizli yonetin."
       formTitle="Magaza Girisi"

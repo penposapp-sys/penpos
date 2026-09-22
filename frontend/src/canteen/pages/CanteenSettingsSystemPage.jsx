@@ -82,9 +82,9 @@ export default function CanteenSettingsSystemPage() {
 
     try {
       const [settingsRes, branchesRes, meRes] = await Promise.all([
-        api('/api/canteen/settings', { silent: true }),
-        api('/api/canteen/branches', { silent: true, skipBranchHeader: true }),
-        api('/api/canteen/me', { silent: true, skipBranchHeader: true }),
+        api('/api/magaza/settings', { silent: true }),
+        api('/api/magaza/branches', { silent: true, skipBranchHeader: true }),
+        api('/api/magaza/me', { silent: true, skipBranchHeader: true }),
       ])
 
       const nextAppearance = buildAppearanceSnapshot(settingsRes?.settings?.appearance)
@@ -121,7 +121,7 @@ export default function CanteenSettingsSystemPage() {
     setLoading(true)
     setError('')
     setSuccess('')
-    const res = await api('/api/canteen/settings', { method: 'PUT', data: patch, silent: true })
+    const res = await api('/api/magaza/settings', { method: 'PUT', data: patch, silent: true })
     if (!res?.ok) {
       setError(res?.message || 'Guncellenemedi')
       setLoading(false)
@@ -198,7 +198,7 @@ export default function CanteenSettingsSystemPage() {
     event.preventDefault()
     setAccountSaving(true)
     try {
-      const res = await api('/api/canteen/me/email', {
+      const res = await api('/api/magaza/me/email', {
         method: 'PUT',
         data: { email, currentPassword: emailPw },
         silent: true,
@@ -228,7 +228,7 @@ export default function CanteenSettingsSystemPage() {
     }
     setAccountSaving(true)
     try {
-      const res = await api('/api/canteen/me/username', {
+      const res = await api('/api/magaza/me/username', {
         method: 'PUT',
         data: { username: value, currentPassword: usernamePw },
         silent: true,
@@ -261,7 +261,7 @@ export default function CanteenSettingsSystemPage() {
     }
     setAccountSaving(true)
     try {
-      const res = await api('/api/canteen/me/password', {
+      const res = await api('/api/magaza/me/password', {
         method: 'PUT',
         data: { currentPassword: pwCurrent, newPassword: pwNext },
         silent: true,
@@ -295,7 +295,7 @@ export default function CanteenSettingsSystemPage() {
     setBranchSaving(true)
     setError('')
     try {
-      const res = await api('/api/canteen/branches', {
+      const res = await api('/api/magaza/branches', {
         method: 'POST',
         data: { name, description: String(createDescription || '').trim() },
         silent: true,
@@ -322,7 +322,7 @@ export default function CanteenSettingsSystemPage() {
     setBranchSaving(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/branches/${editId}`, {
+      const res = await api(`/api/magaza/branches/${editId}`, {
         method: 'PUT',
         data: { name, description: String(editDescription || '').trim() },
         silent: true,
@@ -349,7 +349,7 @@ export default function CanteenSettingsSystemPage() {
     setBranchSaving(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/branches/${id}/status`, {
+      const res = await api(`/api/magaza/branches/${id}/status`, {
         method: 'PUT',
         data: { isActive: nextActive },
         silent: true,
@@ -374,7 +374,7 @@ export default function CanteenSettingsSystemPage() {
     setBranchSaving(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/branches/${id}`, {
+      const res = await api(`/api/magaza/branches/${id}`, {
         method: 'DELETE',
         silent: true,
         skipBranchHeader: true,

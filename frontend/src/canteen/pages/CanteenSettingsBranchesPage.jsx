@@ -32,7 +32,7 @@ export default function CanteenSettingsBranchesPage() {
     if (!background) setLoading(true)
     if (!background) setError('')
     try {
-      const res = await api('/api/canteen/branches', { silent: true })
+      const res = await api('/api/magaza/branches', { silent: true })
       setItems(Array.isArray(res?.branches) ? res.branches : [])
     } finally {
       if (!background) setLoading(false)
@@ -56,7 +56,7 @@ export default function CanteenSettingsBranchesPage() {
     const name = String(createName || '').trim()
     if (!name) return
     setError('')
-    const res = await api('/api/canteen/branches', {
+    const res = await api('/api/magaza/branches', {
       method: 'POST',
       data: { name, description: String(createDescription || '').trim() },
       silent: true,
@@ -83,7 +83,7 @@ export default function CanteenSettingsBranchesPage() {
     const name = String(editName || '').trim()
     if (!name) return
     setError('')
-    const res = await api(`/api/canteen/branches/${editId}`, {
+    const res = await api(`/api/magaza/branches/${editId}`, {
       method: 'PUT',
       data: { name, description: String(editDescription || '').trim() },
       silent: true,
@@ -103,7 +103,7 @@ export default function CanteenSettingsBranchesPage() {
     const confirmed = window.confirm(nextActive ? 'Şubeyi aktifleştirmek istiyor musunuz?' : 'Şubeyi pasifleştirmek istiyor musunuz?')
     if (!confirmed) return
     setError('')
-    const res = await api(`/api/canteen/branches/${id}/status`, {
+    const res = await api(`/api/magaza/branches/${id}/status`, {
       method: 'PUT',
       data: { isActive: nextActive },
       silent: true,
@@ -124,7 +124,7 @@ export default function CanteenSettingsBranchesPage() {
     setStaffLoading(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/branches/${id}/staff`, { silent: true })
+      const res = await api(`/api/magaza/branches/${id}/staff`, { silent: true })
       setStaffList(Array.isArray(res?.staff) ? res.staff : [])
       setAssignedStaffIds(Array.isArray(res?.assignedStaffIds) ? res.assignedStaffIds.map(String) : [])
     } finally {
@@ -137,7 +137,7 @@ export default function CanteenSettingsBranchesPage() {
     setStaffLoading(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/branches/${staffBranchId}/staff`, {
+      const res = await api(`/api/magaza/branches/${staffBranchId}/staff`, {
         method: 'PUT',
         data: { staffIds: assignedStaffIds },
         silent: true,

@@ -83,7 +83,7 @@ export default function WaiterCallsPage() {
           <button className="btn" type="button" onClick={load} disabled={loading}>
             {loading ? 'Yukleniyor...' : 'Yenile'}
           </button>
-          <button className="btn" type="button" onClick={() => nav('/kermes/app/tables')}>
+          <button className="btn" type="button" onClick={() => nav('/restoran/app/tables')}>
             Masalara Don
           </button>
         </div>

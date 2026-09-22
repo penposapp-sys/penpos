@@ -302,7 +302,7 @@ export default function DeliveryOrdersPage() {
         deliveryPaymentMethod: pickInitialPaymentMethod(payMethods, '')
       })
       setCustomerSuggestions([])
-      nav(`/kermes/app/delivery/${getOrderId(normalized)}`)
+      nav(`/restoran/app/delivery/${getOrderId(normalized)}`)
     } catch (err) {
       toast.error(err?.data?.message || err?.message || 'Sunucu hatasi. Tekrar deneyin.')
     }
@@ -498,7 +498,7 @@ export default function DeliveryOrdersPage() {
               onClick={() => {
                 const targetId = getOrderId(order) || order.id
                 if (!targetId) return
-                nav(`/kermes/app/delivery/${targetId}`)
+                nav(`/restoran/app/delivery/${targetId}`)
               }}
             >
               <div className="delivery-card-top">

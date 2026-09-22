@@ -49,7 +49,7 @@ export default function EditCustomerModal({ open, onClose, customer, onSaved }) 
     }
     const cleanPhone = normalizePhone(phone)
     setLoading(true)
-    const res = await api(`/api/canteen/customers/${customer.id}`,
+    const res = await api(`/api/magaza/customers/${customer.id}`,
       { method: 'PUT', data: { name: cleanName, phone: cleanPhone }, silent: true }
     )
     setLoading(false)

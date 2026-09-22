@@ -50,7 +50,7 @@ export default function Layout() {
   }, [pathname])
 
   useEffect(() => {
-    if (pathname === '/kermes/app/dashboard') return
+    if (pathname === '/restoran/app/dashboard') return
     const today = todayYmd()
     if (selectedDate !== today) setSelectedDate(today)
   }, [pathname, selectedDate, setSelectedDate])
@@ -74,10 +74,10 @@ export default function Layout() {
 
   useEffect(() => {
     const enabled = !!(isMobilePortrait && (
-      pathname.startsWith('/kermes/app/pos') ||
-      pathname.startsWith('/kermes/app/walkin') ||
-      pathname.startsWith('/kermes/app/delivery') ||
-      pathname.startsWith('/canteen/kasa')
+      pathname.startsWith('/restoran/app/pos') ||
+      pathname.startsWith('/restoran/app/walkin') ||
+      pathname.startsWith('/restoran/app/delivery') ||
+      pathname.startsWith('/magaza/kasa')
     ))
 
     try {
@@ -107,16 +107,16 @@ export default function Layout() {
   useEffect(() => {
     if (pathname.startsWith('/login/platform') || pathname.startsWith('/platform-login')) document.title = 'PenPOS - Platform Yönetimi Girişi'
     else if (pathname.startsWith('/login/restoran')) document.title = 'PenPOS - Restoran Girisi'
-    else if (pathname.startsWith('/login/kantin')) document.title = 'PenPOS - Mağaza Girişi'
+    else if (pathname.startsWith('/login/magaza')) document.title = 'PenPOS - Mağaza Girişi'
     else if (pathname === '/') document.title = 'PenPOS - Giris Secimi'
     else if (pathname.startsWith('/superadmin/website-settings')) document.title = 'PenPOS - Web Site Ayarlari'
     else if (pathname.startsWith('/superadmin/tenants')) document.title = 'PenPOS - Uyeler'
     else if (pathname.startsWith('/platform/billing-requests')) document.title = 'PenPOS - Uyelik Talepleri'
-    else if (pathname.startsWith('/platform/kermes-tenants')) document.title = 'PenPOS - Kermes Uyeler'
-    else if (pathname.startsWith('/platform/canteen-tenants')) document.title = 'PenPOS - Mağaza Üyeleri'
+    else if (pathname.startsWith('/platform/restoran-tenants')) document.title = 'PenPOS - Restoran Uyeler'
+    else if (pathname.startsWith('/platform/magaza-tenants')) document.title = 'PenPOS - Mağaza Üyeleri'
     else if (pathname.startsWith('/platform/anaokulu-tenants')) document.title = 'PenPOS - Anaokulu Üyeleri'
     else if (pathname.startsWith('/platform/plans')) document.title = 'PenPOS - Paketler'
-    else if (pathname.startsWith('/kermes')) document.title = 'PenPOS - Kermes'
+    else if (pathname.startsWith('/restoran')) document.title = 'PenPOS - Restoran'
     else document.title = 'PenPOS'
   }, [pathname])
 
@@ -228,16 +228,16 @@ export default function Layout() {
   } else if (user.role === 'superadmin') {
     items.push({ path: '/superadmin/tenants', label: 'Uyeler', icon: IconTenant, show: true })
     items.push({ path: '/superadmin/website-settings', label: 'Web Site Ayarlari', icon: IconWebsite, show: true })
-    items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
-    items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/restoran-tenants', label: 'Restoran Uyeler', icon: IconStore, show: true })
+    items.push({ path: '/platform/magaza-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/anaokulu-tenants', label: '🏫 Anaokulu Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/anaokulu-region-admins', label: '🏫 Okul Süper Adminleri', icon: IconUserCog, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
     items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })
   } else if (user.role === 'platform_admin') {
-    items.push({ path: '/platform/kermes-tenants', label: 'Kermes Uyeler', icon: IconStore, show: true })
-    items.push({ path: '/platform/canteen-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
+    items.push({ path: '/platform/restoran-tenants', label: 'Restoran Uyeler', icon: IconStore, show: true })
+    items.push({ path: '/platform/magaza-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/anaokulu-tenants', label: '🏫 Anaokulu Üyeleri', icon: IconBuilding, show: true })
     items.push({ path: '/platform/anaokulu-region-admins', label: '🏫 Okul Süper Adminleri', icon: IconUserCog, show: true })
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
@@ -251,27 +251,27 @@ export default function Layout() {
     const kitchenPagesEnabled = getSetting('general.kitchenPagesEnabled', true) !== false
 
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view'))) {
-      items.push({ path: '/kermes/app/dashboard', label: 'Anasayfa', icon: IconHome, show: true })
-      items.push({ path: '/kermes/app/reports', label: 'Raporlar', icon: IconFileCheck, show: true })
+      items.push({ path: '/restoran/app/dashboard', label: 'Anasayfa', icon: IconHome, show: true })
+      items.push({ path: '/restoran/app/reports', label: 'Raporlar', icon: IconFileCheck, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('manage_tables'))) {
-      items.push({ path: '/kermes/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
+      items.push({ path: '/restoran/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
     }
     if (!isExpired && kitchenPagesEnabled && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) {
-      items.push({ path: '/kermes/app/kitchen', label: 'Hazirlanacaklar', icon: IconUtensils, show: true })
-      items.push({ path: '/kermes/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
+      items.push({ path: '/restoran/app/kitchen', label: 'Hazirlanacaklar', icon: IconUtensils, show: true })
+      items.push({ path: '/restoran/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) {
-      items.push({ path: '/kermes/app/walkin', label: 'Masasız Satış', icon: IconShoppingCart, show: true })
+      items.push({ path: '/restoran/app/walkin', label: 'Masasız Satış', icon: IconShoppingCart, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) {
-      items.push({ path: '/kermes/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true, badgeCount: pendingOnlineCount })
+      items.push({ path: '/restoran/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true, badgeCount: pendingOnlineCount })
     }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('package_courier_page_view') || perms.includes('package_orders_view'))) {
-      items.push({ path: '/kermes/app/package-courier', label: 'Paket Kurye', icon: IconTruck, show: true })
+      items.push({ path: '/restoran/app/package-courier', label: 'Paket Kurye', icon: IconTruck, show: true })
     }
     if (!creditAccountsDisabled && !isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) {
-      items.push({ path: '/kermes/app/accounts', label: 'Cari Hesaplar', icon: IconWallet, show: true })
+      items.push({ path: '/restoran/app/accounts', label: 'Cari Hesaplar', icon: IconWallet, show: true })
     }
     if (isExpired) {
       if (user.role === 'tenant_admin') {
@@ -279,13 +279,13 @@ export default function Layout() {
       }
       items.push({ path: getSubscriptionProfilePath(user.systemType), label: 'Hesabım', icon: IconUserCog, show: true })
     } else if (canSettings) {
-      items.push({ path: '/kermes/settings', label: 'Ayarlar', icon: IconSettings, show: true })
+      items.push({ path: '/restoran/settings', label: 'Ayarlar', icon: IconSettings, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) {
-      items.push({ path: '/kermes/app/reports/sales', label: 'Kapanan Masalar', icon: IconFileCheck, show: true })
+      items.push({ path: '/restoran/app/reports/sales', label: 'Kapanan Masalar', icon: IconFileCheck, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('audit_view'))) {
-      items.push({ path: '/kermes/app/audit', label: 'Denetim', icon: IconShieldCheck, show: true })
+      items.push({ path: '/restoran/app/audit', label: 'Denetim', icon: IconShieldCheck, show: true })
     }
   }
 
@@ -298,8 +298,8 @@ export default function Layout() {
         icon: item.icon,
         badgeCount: Number(item.badgeCount || 0),
         active: pathname === item.path
-          || (item.path === '/kermes/app/tables' && pathname === '/kermes/app/pos')
-          || (item.path !== '/kermes/app/kitchen' && pathname.startsWith(item.path + '/'))
+          || (item.path === '/restoran/app/tables' && pathname === '/restoran/app/pos')
+          || (item.path !== '/restoran/app/kitchen' && pathname.startsWith(item.path + '/'))
       }))
   }, [pathname, items])
 
@@ -309,17 +309,17 @@ export default function Layout() {
 
   const activeIndex = navItems.findIndex((item) => item.to === current?.to)
   const accountLabel = String(user?.name || user?.fullName || user?.username || user?.email || 'Kullanıcı').trim()
-  const pageTitle = pathname === '/kermes/app/pos'
+  const pageTitle = pathname === '/restoran/app/pos'
     ? (String(location.state?.tableName || '').trim() || current?.label || 'Masalar')
     : (current?.label || 'Panel')
-  const isDashboardPage = pathname === '/kermes/app/dashboard'
-  const isReportsPage = pathname === '/kermes/app/reports'
-  const isSettingsRoute = pathname.startsWith('/kermes/settings')
+  const isDashboardPage = pathname === '/restoran/app/dashboard'
+  const isReportsPage = pathname === '/restoran/app/reports'
+  const isSettingsRoute = pathname.startsWith('/restoran/settings')
   const isMobileSettingsRoute = isMobilePortrait && isSettingsRoute
   const isDesktopSalesRoute = !isMobilePortrait && (
-    pathname.startsWith('/kermes/app/pos') ||
-    pathname.startsWith('/kermes/app/walkin') ||
-    pathname.startsWith('/kermes/app/delivery')
+    pathname.startsWith('/restoran/app/pos') ||
+    pathname.startsWith('/restoran/app/walkin') ||
+    pathname.startsWith('/restoran/app/delivery')
   )
 
   useEffect(() => {

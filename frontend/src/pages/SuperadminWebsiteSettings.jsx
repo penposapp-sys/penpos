@@ -376,8 +376,8 @@ export default function SuperadminWebsiteSettings() {
                   <div className="website-settings-grid" style={{ display: 'grid' }}>
                     {renderInput('Restoran giris buton yazisi', 'restaurantLoginText')}
                     {renderInput('Restoran giris linki', 'restaurantLoginUrl', { placeholder: '/login/restoran' })}
-                    {renderInput('Kantin giris buton yazisi', 'canteenLoginText')}
-                    {renderInput('Kantin giris linki', 'canteenLoginUrl', { placeholder: '/canteen/login' })}
+                    {renderInput('Mağaza giris buton yazisi', 'canteenLoginText')}
+                    {renderInput('Mağaza giris linki', 'canteenLoginUrl', { placeholder: '/magaza/login' })}
                   </div>
                 </div>
               </AdminTableCard>

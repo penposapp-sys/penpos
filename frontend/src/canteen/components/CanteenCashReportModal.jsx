@@ -90,7 +90,7 @@ export default function CanteenCashReportModal({
       if (branch.params) {
         for (const [key, value] of branch.params.entries()) params.set(key, value)
       }
-      const res = await api(`/api/canteen/reports/cash?${params.toString()}`, {
+      const res = await api(`/api/magaza/reports/cash?${params.toString()}`, {
         silent: true,
         skipBranchHeader: true,
         suppressBranchModal: true,

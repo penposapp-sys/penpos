@@ -19,11 +19,11 @@ export const defaultWebsiteSettings = {
   secondaryCtaUrl: '/login',
   restaurantLoginText: 'Restoran Girisi',
   restaurantLoginUrl: '/login/restoran',
-  canteenLoginText: 'Kantin Girisi',
-  canteenLoginUrl: '/canteen/login',
+  canteenLoginText: 'Mağaza Girisi',
+  canteenLoginUrl: '/magaza/login',
   platformLoginText: 'Platform Girisi',
   platformLoginUrl: '/platform/login',
-  marketLoginUrl: '/canteen/login',
+  marketLoginUrl: '/magaza/login',
   registerUrl: '/register',
   androidButtonText: 'Android Uygulamasini Indir',
   androidApkUrl: 'https://drive.google.com/uc?id=1_QZs8wYc0mtVSfPtBllJIXt5r-e9M9iv&export=download',
@@ -76,15 +76,15 @@ export const defaultWebsiteSettings = {
   trainingVideos: [
     { id: 'video-1', title: 'Uyelik ve Ilk Kurulum', description: 'Ilk hesap acilisi ve panel tanitimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'general', active: true, sortOrder: 1 },
     { id: 'video-2', title: 'Restoran Satis Akisi', description: 'Masa ve adisyon akisinin temel kullanimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'restaurant', active: true, sortOrder: 2 },
-    { id: 'video-3', title: 'Kantin Barkodlu Satis', description: 'Hizli kasa ve barkodlu satis ornegi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 3 }
+    { id: 'video-3', title: 'Mağaza Barkodlu Satis', description: 'Hizli kasa ve barkodlu satis ornegi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 3 }
   ],
   integrations: [],
-  seoTitle: 'PenPOS | Restoran ve Kantin Otomasyonu',
+  seoTitle: 'PenPOS | Restoran ve Mağaza Otomasyonu',
   seoDescription: 'PenPOS ile restoran/cafe ve kantin/market akislarÄ± ayri girislerle yonetilir. QR menu dahil, sinirsiz sube ve raporlama hazir.',
   seoKeywords: 'penpos,pos,restoran otomasyonu,kantin otomasyonu,market otomasyonu,qr menu',
   isPublished: true,
   updatedAt: null
 }
 
-export const heroBadges = ['1 Hafta Ucretsiz', 'Kredi Kartsiz Basla', 'Ayri Restoran ve Kantin Girisi', 'QR Menu Dahil', 'Sinirsiz Sube', 'Raporlama']
+export const heroBadges = ['1 Hafta Ucretsiz', 'Kredi Kartsiz Basla', 'Ayri Restoran ve Mağaza Girisi', 'QR Menu Dahil', 'Sinirsiz Sube', 'Raporlama']
 export const reportItems = ['Gunluk ciro', 'Saatlik satis yogunlugu', 'En cok satan urunler', 'Kategori karliligi', 'Garson performansi', 'Paket servis durumu', 'Odeme tipi analizi', 'Sube karsilastirmasi']

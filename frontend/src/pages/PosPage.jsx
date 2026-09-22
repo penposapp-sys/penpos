@@ -1218,7 +1218,7 @@ export default function PosPage() {
       }
     }
     if (result && returnToOpenTablesAfterOrder && order?.tableId) {
-      nav('/kermes/app/tables')
+      nav('/restoran/app/tables')
     }
   }
 
@@ -1489,13 +1489,13 @@ export default function PosPage() {
       )
       if (res) {
         toast.success('Masa kapatıldı')
-        nav('/kermes/app/tables', { replace: true })
+        nav('/restoran/app/tables', { replace: true })
       }
     } catch {}
   }
 
   const backToTables = () => {
-    nav('/kermes/app/tables')
+    nav('/restoran/app/tables')
   }
 
   const openTransfer = async () => {

@@ -17,7 +17,7 @@ export default function CanteenBranchSelector({ compact = false }) {
 
   const load = async () => {
     setLoading(true)
-    const res = await api('/api/canteen/branches', { silent: true })
+    const res = await api('/api/magaza/branches', { silent: true })
     const list = Array.isArray(res?.branches) ? res.branches : []
     setBranches(list)
     setLoading(false)

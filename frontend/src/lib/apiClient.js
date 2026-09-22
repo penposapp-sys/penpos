@@ -40,7 +40,7 @@ const normalizeApiPath = (path) => {
 
 const inferPortalFromPathname = (pathname) => {
   const p = String(pathname || '').trim().toLowerCase()
-  if (p.startsWith('/canteen')) return 'canteen'
+  if (p.startsWith('/magaza')) return 'canteen'
   if (p.startsWith('/platform') || p.startsWith('/platform-admin') || p.startsWith('/superadmin') || p.startsWith('/login/platform') || p.startsWith('/platform-login')) return 'platform'
   if (p.startsWith('/anaokulu') || p.startsWith('/anaokulu-login') || p.startsWith('/anaokul') || p.startsWith('/kres') || p.startsWith('/kreş')) return 'anaokulu'
   return 'restaurant'
@@ -91,7 +91,7 @@ const getDefaultCacheTtlMs = (normalizedPath, method) => {
 
 const getAuthRedirectPath = (portal) => (
   portal === 'canteen'
-    ? '/canteen/login'
+    ? '/magaza/login'
     : (portal === 'platform' ? '/platform-login' : (portal === 'anaokulu' ? '/anaokulu/login' : '/login/restoran'))
 )
 
@@ -103,8 +103,8 @@ const isPublicAuthPath = (pathname) => {
     path === '/login/platform' ||
     path === '/platform-login' ||
     path === '/login/restoran' ||
-    path === '/login/kantin' ||
-    path === '/canteen/login' ||
+    path === '/login/magaza' ||
+    path === '/magaza/login' ||
     path === '/anaokulu/login' ||
     path.startsWith('/anaokulu/login') ||
     path.startsWith('/forgot-password') ||

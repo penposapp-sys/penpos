@@ -23,7 +23,7 @@ export default function CanteenSettingsMePage() {
     const background = options?.background === true
     if (!background) setLoading(true)
     try {
-      const res = await api('/api/canteen/me', { silent: true, skipBranchHeader: true })
+      const res = await api('/api/magaza/me', { silent: true, skipBranchHeader: true })
       if (!res?.ok || res?.success === false) {
         setMe(null)
         return
@@ -51,7 +51,7 @@ export default function CanteenSettingsMePage() {
     event.preventDefault()
     setSaving(true)
     try {
-      const res = await api('/api/canteen/me/email', {
+      const res = await api('/api/magaza/me/email', {
         method: 'PUT',
         data: { email, currentPassword: emailPw },
         silent: true,
@@ -81,7 +81,7 @@ export default function CanteenSettingsMePage() {
     }
     setSaving(true)
     try {
-      const res = await api('/api/canteen/me/username', {
+      const res = await api('/api/magaza/me/username', {
         method: 'PUT',
         data: { username: value, currentPassword: usernamePw },
         silent: true,
@@ -114,7 +114,7 @@ export default function CanteenSettingsMePage() {
     }
     setSaving(true)
     try {
-      const res = await api('/api/canteen/me/password', {
+      const res = await api('/api/magaza/me/password', {
         method: 'PUT',
         data: { currentPassword: pwCurrent, newPassword: pwNext },
         silent: true,

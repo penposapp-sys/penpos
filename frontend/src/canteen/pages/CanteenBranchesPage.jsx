@@ -11,7 +11,7 @@ export default function CanteenBranchesPage() {
   const load = async (options = {}) => {
     const background = options?.background === true
     if (!background) setLoading(true)
-    const res = await api('/api/canteen/branches', { silent: true, skipBranchHeader: true })
+    const res = await api('/api/magaza/branches', { silent: true, skipBranchHeader: true })
     setItems(Array.isArray(res?.branches) ? res.branches : [])
     if (!background) setLoading(false)
   }
@@ -21,7 +21,7 @@ export default function CanteenBranchesPage() {
 
   const create = async (e) => {
     e.preventDefault()
-    const res = await api('/api/canteen/branches', { method: 'POST', data: { name, description }, skipBranchHeader: true })
+    const res = await api('/api/magaza/branches', { method: 'POST', data: { name, description }, skipBranchHeader: true })
     if (res?.ok) {
       setName('')
       setDescription('')
@@ -31,7 +31,7 @@ export default function CanteenBranchesPage() {
 
   const remove = async (id) => {
     if (!window.confirm('Şubeyi silmek istiyor musun?')) return
-    const res = await api(`/api/canteen/branches/${id}`, { method: 'DELETE', skipBranchHeader: true })
+    const res = await api(`/api/magaza/branches/${id}`, { method: 'DELETE', skipBranchHeader: true })
     if (res?.ok) load()
   }
 

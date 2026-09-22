@@ -280,7 +280,7 @@ export default function CanteenCashierPage() {
     if (!background) setLoadingProducts(true)
     if (!background) setError('')
     const qs = allowedIds.length > 0 ? `?branchIds=${encodeURIComponent(allowedIds.join(','))}` : ''
-    const res = await api(`/api/canteen/products${qs}`, { silent: true })
+    const res = await api(`/api/magaza/products${qs}`, { silent: true })
     setProducts(Array.isArray(res?.products) ? res.products : [])
     if (!background) setLoadingProducts(false)
   }
@@ -290,7 +290,7 @@ export default function CanteenCashierPage() {
   }, [session?.allowedBranchIds])
 
   const loadPaymentMethods = async () => {
-    const res = await api('/api/canteen/payment-settings', { silent: true })
+    const res = await api('/api/magaza/payment-settings', { silent: true })
     const enabled = buildCanteenPaymentMethods(res?.settings || {})
     setPaymentMethods(enabled)
     if (enabled.length === 0) {
@@ -608,7 +608,7 @@ export default function CanteenCashierPage() {
       const nextPreview = {}
       const nextLines = {}
       for (const [bid, items] of groups.entries()) {
-        const res = await api(`/api/canteen/sales/preview?branchId=${encodeURIComponent(String(bid))}`, {
+        const res = await api(`/api/magaza/sales/preview?branchId=${encodeURIComponent(String(bid))}`, {
           method: 'POST',
           data: { items },
           silent: true
@@ -746,7 +746,7 @@ export default function CanteenCashierPage() {
     scanInFlightRef.current.add(code)
 
     try {
-      const res = await api(`/api/canteen/products/by-barcode/${encodeURIComponent(code)}`, { silent: true, headers: { 'x-branch-id': String(selectedBranchId) } })
+      const res = await api(`/api/magaza/products/by-barcode/${encodeURIComponent(code)}`, { silent: true, headers: { 'x-branch-id': String(selectedBranchId) } })
       if (!res?.ok || !res?.product) {
         if (final && res?.code === 'not_found') {
           setError('Barkod bulunamadı')
@@ -986,7 +986,7 @@ export default function CanteenCashierPage() {
     customerAbortRef.current = controller
     setLoadingCustomers(true)
 
-    api(`/api/canteen/customers?q=${encodeURIComponent(term)}`, { silent: true, signal: controller.signal })
+    api(`/api/magaza/customers?q=${encodeURIComponent(term)}`, { silent: true, signal: controller.signal })
       .then((res) => {
         setCustomers(Array.isArray(res?.customers) ? res.customers : [])
         setLoadingCustomers(false)
@@ -1006,7 +1006,7 @@ export default function CanteenCashierPage() {
   const submitNewCustomer = async () => {
     const name = String(newCustomerName || '').trim()
     if (!name) return
-    const res = await api('/api/canteen/customers', {
+    const res = await api('/api/magaza/customers', {
       method: 'POST',
       data: { name, phone: String(newCustomerPhone || '').trim() },
       silent: true
@@ -1025,7 +1025,7 @@ export default function CanteenCashierPage() {
   const completeSale = async () => {
     if (cart.length === 0) return
     if (paymentMethods.length === 0 || !payMethod) {
-      setError('Aktif ödeme yöntemi yok. Kantin ödeme ayarlarını kontrol edin.')
+      setError('Aktif ödeme yöntemi yok. Mağaza ödeme ayarlarını kontrol edin.')
       return
     }
     if (selectedPayMethodType === 'account' && !customerId) {
@@ -1102,7 +1102,7 @@ export default function CanteenCashierPage() {
         note: String(saleNote || payNote || '').trim()
       }
 
-      const res = await api(`/api/canteen/sales?branchId=${encodeURIComponent(String(bid))}`, { method: 'POST', data: payload, silent: true })
+      const res = await api(`/api/magaza/sales?branchId=${encodeURIComponent(String(bid))}`, { method: 'POST', data: payload, silent: true })
       if (!res?.ok || !res?.sale) {
         const bname = allowedBranches.find(b => String(b.id) === String(bid))?.name || bid
         setError(`${bname} satışında hata: ${res?.message || 'Satış oluşturulamadı'}`)

@@ -30,7 +30,7 @@ export default function CanteenCustomersPage() {
   const load = async (options = {}) => {
     const background = options?.background === true
     if (!background) setLoading(true)
-    const res = await api('/api/canteen/customers', { silent: true })
+    const res = await api('/api/magaza/customers', { silent: true })
     setItems(Array.isArray(res?.customers) ? res.customers : [])
     if (!background) setLoading(false)
   }
@@ -42,7 +42,7 @@ export default function CanteenCustomersPage() {
     if (!canManage || !customer?.id) return
     const confirmed = window.confirm('Bu cari aktif listeden kaldirilacak. Gecmis satis ve rapor verileri korunur. Devam edilsin mi?')
     if (!confirmed) return
-    const res = await api(`/api/canteen/customers/${customer.id}`, { method: 'DELETE', silent: true })
+    const res = await api(`/api/magaza/customers/${customer.id}`, { method: 'DELETE', silent: true })
     if (!res?.ok) {
       toast.error(res?.message || 'Cari silinemedi')
       return
@@ -79,7 +79,7 @@ export default function CanteenCustomersPage() {
           {filtered.map((c) => (
             <div key={c.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
               <Link
-                to={`/canteen/cariler/${c.id}`}
+                to={`/magaza/cariler/${c.id}`}
                 style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}
               >
                 <div style={{ minWidth: 0 }}>

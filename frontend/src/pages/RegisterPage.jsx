@@ -126,7 +126,7 @@ export default function RegisterPage() {
 
     toast.success('Üyelik oluşturuldu. Deneme süresi başlatıldı.')
     const defaultRedirect =
-      res.portal === 'canteen' ? '/canteen' : '/kermes'
+      res.portal === 'canteen' ? '/magaza' : '/restoran'
     window.location.href = res.redirectTo || defaultRedirect
   }
 
@@ -264,7 +264,7 @@ export default function RegisterPage() {
             <Link
               className="marketing-btn marketing-btn--ghost"
               to={
-                form.businessType === 'market' ? (settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login') :
+                form.businessType === 'market' ? (settings.canteenLoginUrl || settings.marketLoginUrl || '/magaza/login') :
                 (settings.restaurantLoginUrl || '/login/restoran')
               }
             >

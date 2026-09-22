@@ -714,7 +714,7 @@ export default function WalkInPosPage() {
           toast.error('Sipariş başlatılamadı')
           return
         }
-        nav(`/kermes/app/walkin/${newId}`)
+        nav(`/restoran/app/walkin/${newId}`)
       } catch (err) {
         toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
       }
@@ -1176,7 +1176,7 @@ export default function WalkInPosPage() {
     }
 
     if (balanceDue > 0.01) {
-      nav('/kermes/app/walkin')
+      nav('/restoran/app/walkin')
       return
     }
 
@@ -1189,7 +1189,7 @@ export default function WalkInPosPage() {
     if (fresh) {
       toast.success('Sipariş kapatıldı')
     }
-    nav('/kermes/app/walkin', { state: { removedOrderId: orderId } })
+    nav('/restoran/app/walkin', { state: { removedOrderId: orderId } })
   }
 
   const sendKitchen = async () => {
@@ -1665,7 +1665,7 @@ export default function WalkInPosPage() {
               <div
                 key={oid}
                 className="card"
-                onClick={() => nav(`/kermes/app/walkin/${oid}`)}
+                onClick={() => nav(`/restoran/app/walkin/${oid}`)}
                 style={{ cursor: 'pointer', display: 'grid', gap: 8, borderColor, position: 'relative' }}
               >
                 <span className="page-pill" style={{ position: 'absolute', top: 10, left: 10, background: '#f3f4f6', borderColor: '#d1d5db', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -1701,7 +1701,7 @@ export default function WalkInPosPage() {
   return (
     <div className="pageShell walkin-sales-page walkin-layout" style={{ gap: 12 }}>
       <div className="card stickyTop" style={topbarStyle}>
-        <button className="btn" onClick={() => nav('/kermes/app/walkin')}>← Geri</button>
+        <button className="btn" onClick={() => nav('/restoran/app/walkin')}>← Geri</button>
         <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', whiteSpace: 'nowrap', minWidth: 0 }}>
             <span>Masasız Satış —</span>
@@ -2590,7 +2590,7 @@ export default function WalkInPosPage() {
                       toast.error('Sipariş başlatılamadı')
                       return
                     }
-                    nav(`/kermes/app/walkin/${newId}`)
+                    nav(`/restoran/app/walkin/${newId}`)
                   }).catch((err) => {
                     toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
                   })

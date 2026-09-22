@@ -15,7 +15,7 @@ export default function LoginSelectionPage() {
 
   useEffect(() => {
     if (type === 'restaurant') nav('/login/restoran', { replace: true })
-    if (type === 'market') nav('/canteen/login', { replace: true })
+    if (type === 'market') nav('/magaza/login', { replace: true })
   }, [nav, type])
 
   const handleCardKeyDown = (event, target) => {
@@ -92,8 +92,8 @@ export default function LoginSelectionPage() {
             tabIndex={0}
             data-selected="false"
             className="public-auth-card public-auth-card--website public-auth-card--canteen public-touch-card"
-            onClick={() => nav('/canteen/login')}
-            onKeyDown={(event) => handleCardKeyDown(event, '/canteen/login')}
+            onClick={() => nav('/magaza/login')}
+            onKeyDown={(event) => handleCardKeyDown(event, '/magaza/login')}
           >
             <span aria-hidden="true">🛒</span>
             <strong>Magaza / Market Girisi</strong>

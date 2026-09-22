@@ -112,7 +112,7 @@ export default function RegisterPage() {
     } catch {}
 
     toast.success('Üyelik oluşturuldu. Deneme süresi başlatıldı.')
-    window.location.href = res.redirectTo || (res.portal === 'canteen' ? '/canteen' : '/kermes')
+    window.location.href = res.redirectTo || (res.portal === 'canteen' ? '/magaza' : '/restoran')
   }
 
   return (
@@ -248,7 +248,7 @@ export default function RegisterPage() {
             </button>
             <Link
               className="marketing-btn marketing-btn--ghost"
-              to={form.businessType === 'market' ? settings.canteenLoginUrl || settings.marketLoginUrl || '/canteen/login' : settings.restaurantLoginUrl || '/login/restoran'}
+              to={form.businessType === 'market' ? settings.canteenLoginUrl || settings.marketLoginUrl || '/magaza/login' : settings.restaurantLoginUrl || '/login/restoran'}
             >
               Mevcut Hesabım Var
             </Link>

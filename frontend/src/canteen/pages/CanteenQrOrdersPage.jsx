@@ -953,7 +953,7 @@ export default function CanteenQrOrdersPage() {
     const background = options?.background === true
     if (!background) setLoading(true)
     if (!background) setError('')
-    const response = await api(`/api/canteen/qr-orders${queryString ? `?${queryString}` : ''}`, { silent: true })
+    const response = await api(`/api/magaza/qr-orders${queryString ? `?${queryString}` : ''}`, { silent: true })
     if (!response?.ok) {
       setOrders([])
       setError(response?.message || 'QR siparisleri yuklenemedi.')
@@ -965,7 +965,7 @@ export default function CanteenQrOrdersPage() {
   }
 
   const loadPaymentMethods = async () => {
-    const res = await api('/api/canteen/payment-settings', { silent: true })
+    const res = await api('/api/magaza/payment-settings', { silent: true })
     const enabled = buildCanteenPaymentMethods(res?.settings || {})
     setPaymentMethods(enabled)
   }
@@ -992,14 +992,14 @@ export default function CanteenQrOrdersPage() {
   }
 
   const updateStatus = async (order, orderStatus) => {
-    await callAction(`/api/canteen/qr-orders/${encodeURIComponent(order.id)}/status`, {
+    await callAction(`/api/magaza/qr-orders/${encodeURIComponent(order.id)}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ orderStatus })
     })
   }
 
   const updatePayment = async (order, paymentStatus, paymentMethod = '') => {
-    await callAction(`/api/canteen/qr-orders/${encodeURIComponent(order.id)}/payment`, {
+    await callAction(`/api/magaza/qr-orders/${encodeURIComponent(order.id)}/payment`, {
       method: 'PATCH',
       body: JSON.stringify({ paymentStatus, paymentMethod, discountPercent: selectedDiscountPercent })
     })
@@ -1026,7 +1026,7 @@ export default function CanteenQrOrdersPage() {
         return
       }
 
-      const collectResponse = await api(`/api/canteen/customers/${encodeURIComponent(customerId)}/collect`, {
+      const collectResponse = await api(`/api/magaza/customers/${encodeURIComponent(customerId)}/collect`, {
         method: 'POST',
         silent: true,
         headers: { 'x-branch-id': String(selectedBranchId || '') },
@@ -1046,7 +1046,7 @@ export default function CanteenQrOrdersPage() {
   }
 
   const transferToCari = async (order, createCustomerIfMissing = false) => {
-    const response = await api(`/api/canteen/qr-orders/${encodeURIComponent(order.id)}/transfer-to-cari`, {
+    const response = await api(`/api/magaza/qr-orders/${encodeURIComponent(order.id)}/transfer-to-cari`, {
       method: 'POST',
       silent: true,
       headers: { 'x-branch-id': String(selectedBranchId || '') },
@@ -1066,7 +1066,7 @@ export default function CanteenQrOrdersPage() {
   }
 
   const removeOrder = async (order) => {
-    const response = await callAction(`/api/canteen/qr-orders/${encodeURIComponent(order.id)}`, { method: 'DELETE' })
+    const response = await callAction(`/api/magaza/qr-orders/${encodeURIComponent(order.id)}`, { method: 'DELETE' })
     if (response?.ok && String(selectedOrderId) === String(order.id)) setSelectedOrderId(null)
   }
 
@@ -1667,7 +1667,7 @@ export default function CanteenQrOrdersPage() {
                         </div>
                         {paymentMethodOptions.length === 0 ? (
                           <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 12 }}>
-                            Aktif ödeme yöntemi yok. Kantin ödeme ayarlarından en az bir yöntem açılmalı.
+                            Aktif ödeme yöntemi yok. Mağaza ödeme ayarlarından en az bir yöntem açılmalı.
                           </div>
                         ) : null}
                       </div>

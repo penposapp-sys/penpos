@@ -10,7 +10,7 @@ const resolvePortalMeta = (portal) => {
       portal: 'canteen',
       title: 'Mağaza Şifre Sıfırlama',
       subtitle: 'Mağaza veya market hesabınız için sıfırlama bağlantısı gönderelim.',
-      backTo: '/canteen/login',
+      backTo: '/magaza/login',
     }
   }
   if (normalized === 'platform') {

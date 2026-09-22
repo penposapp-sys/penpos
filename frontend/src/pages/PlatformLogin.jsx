@@ -35,7 +35,7 @@ export default function PlatformLogin() {
         toast.error(message)
         return
       }
-      nav('/platform/kermes-tenants', { replace: true })
+      nav('/platform/restoran-tenants', { replace: true })
     } catch (err) {
       const message = getFriendlyLoginError(err, {
         accountDisabledMessage: 'Hesabiniz devre disi. Lutfen sistem yoneticinizle iletisime gecin.',

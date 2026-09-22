@@ -732,7 +732,7 @@ export default function MenuItemsPage() {
       {
         key: 'settings',
         label: 'Ürün Ayarları',
-        onClick: () => navigate(`/kermes/settings/catalog/items/${item.id}`)
+        onClick: () => navigate(`/restoran/settings/catalog/items/${item.id}`)
       },
       {
         key: 'active',
@@ -770,7 +770,7 @@ export default function MenuItemsPage() {
             <details className="product-kebab">
               <summary>...</summary>
               <div className="product-kebab-menu">
-                <button type="button" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+                <button type="button" onClick={() => navigate(`/restoran/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
                 <button type="button" onClick={() => updateItem(item, { isActive: item.isActive === false })}>{item.isActive === false ? 'Aktif Yap' : 'Pasife Al'}</button>
                 <button type="button" onClick={() => setDeleteTarget(item)} style={{ color: '#b42318' }}>Sil</button>
               </div>
@@ -787,7 +787,7 @@ export default function MenuItemsPage() {
             <div className="product-chip product-money-chip" style={{ width: '100%' }}>{Number(item.price || 0).toFixed(2)} TL</div>
             <div className="product-chip product-stock-chip" style={{ width: '100%' }}>Stok: {Number(settings.stockQty || 0)}</div>
           </div>
-          <button className="product-dark-btn product-card-settings-btn" type="button" disabled={isSaving} onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+          <button className="product-dark-btn product-card-settings-btn" type="button" disabled={isSaving} onClick={() => navigate(`/restoran/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
         </article>
       )
     }
@@ -850,13 +850,13 @@ export default function MenuItemsPage() {
               </div>
             </div>
             <div className="product-row-actions product-list-actions">
-              <button type="button" className="product-dark-btn" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+              <button type="button" className="product-dark-btn" onClick={() => navigate(`/restoran/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
             </div>
             <KebabMenu className="product-list-kebab" items={actionItems} />
             <details className="product-kebab">
               <summary>...</summary>
               <div className="product-kebab-menu">
-                <button type="button" onClick={() => navigate(`/kermes/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
+                <button type="button" onClick={() => navigate(`/restoran/settings/catalog/items/${item.id}`)}>Ürün Ayarları</button>
                 <button type="button" onClick={() => updateItem(item, { isActive: item.isActive === false })}>{item.isActive === false ? 'Aktif Yap' : 'Pasife Al'}</button>
                 <button type="button" onClick={() => updateItem(item, {}, { isFavorite: !settings.isFavorite })}>{settings.isFavorite ? 'Favoriden Çıkar' : 'Favori Yap'}</button>
                 <button type="button" onClick={() => updateItem(item, {}, { qrMenuVisible: !settings.qrMenuVisible })}>{settings.qrMenuVisible ? 'QR Menüyü Gizle' : 'QR Menüde Göster'}</button>
@@ -903,7 +903,7 @@ export default function MenuItemsPage() {
                     {branches.map((branch) => <option key={branch._id || branch.id} value={branch._id || branch.id}>{branch.name}</option>)}
                   </select>
                 </div>
-                <button type="button" className="product-dark-btn product-header-back-btn" onClick={() => navigate('/kermes/settings')}>← Ayarlara Dön</button>
+                <button type="button" className="product-dark-btn product-header-back-btn" onClick={() => navigate('/restoran/settings')}>← Ayarlara Dön</button>
               </div>
               <HorizontalScrollStrip className="product-toolbar product-toolbar-scroll scrollbar-hidden">
                 <button type="button" className="product-action-btn" disabled={isExpired} onClick={() => setCreateOpen(true)}>+ Yeni Ürün Ekle</button>
@@ -1012,7 +1012,7 @@ export default function MenuItemsPage() {
             setCreateForm(createEmptyProductForm(sortedCategories[0]?.id || ''))
             setCreateImageFile(null)
             setCreateImageError('')
-            navigate(`/kermes/settings/catalog/items/${createdItem.id}`)
+            navigate(`/restoran/settings/catalog/items/${createdItem.id}`)
           }}>{submitting ? 'Kaydediliyor...' : 'Kaydet'}</button>
         </div>
       </Modal>

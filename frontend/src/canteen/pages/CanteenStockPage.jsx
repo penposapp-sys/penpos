@@ -914,7 +914,7 @@ function StockMovementsPanel({
       setItems([])
       return
     }
-    const res = await api(`/api/canteen/stock/movements?branchId=${encodeURIComponent(String(branchId))}`, { silent: true })
+    const res = await api(`/api/magaza/stock/movements?branchId=${encodeURIComponent(String(branchId))}`, { silent: true })
     setItems(Array.isArray(res?.items) ? res.items : [])
   }
 
@@ -923,7 +923,7 @@ function StockMovementsPanel({
       setCatalogItems([])
       return
     }
-    const res = await api(`/api/canteen/products?branchId=${encodeURIComponent(String(branchId))}`, { silent: true })
+    const res = await api(`/api/magaza/products?branchId=${encodeURIComponent(String(branchId))}`, { silent: true })
     setCatalogItems(Array.isArray(res?.products) ? res.products : [])
   }
 
@@ -950,7 +950,7 @@ function StockMovementsPanel({
   const lookup = async (code, { final = false } = {}) => {
     const c = String(code || '').trim()
     if (!c || !canUse) return
-    const res = await api(`/api/canteen/products/by-barcode/${encodeURIComponent(c)}`, { silent: true, headers: { 'x-branch-id': String(branchId) } })
+    const res = await api(`/api/magaza/products/by-barcode/${encodeURIComponent(c)}`, { silent: true, headers: { 'x-branch-id': String(branchId) } })
     if (!res?.ok || !res?.product) {
       if (final && res?.code === 'not_found') {
         setError('Barkod bulunamadı')
@@ -1083,7 +1083,7 @@ function StockMovementsPanel({
     if (!Number.isFinite(costPrice) || costPrice < 0) return toast.error('Alis fiyati gecersiz')
     if (!Number.isFinite(salePrice) || salePrice < 0) return toast.error('Satis fiyati gecersiz')
     setLoading(true)
-    const res = await api('/api/canteen/stock/receipts', {
+    const res = await api('/api/magaza/stock/receipts', {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       data: {
@@ -1119,7 +1119,7 @@ function StockMovementsPanel({
     if (!qtyValid) return toast.error('Miktar geçersiz')
     if (!product) return toast.error('Önce ürün bulunmalı')
     setLoading(true)
-    const res = await api('/api/canteen/stock/movements', {
+    const res = await api('/api/magaza/stock/movements', {
       method: 'POST',
       data: { type, qty: qtyNum, note: String(note || '').trim(), productId: product?.id ? String(product.id) : undefined, barcode: product?.id ? undefined : bc },
       headers: { 'x-branch-id': String(branchId) },
@@ -1561,8 +1561,8 @@ function StockReceiptsPanel({
       return
     }
     const [productRes, categoryRes] = await Promise.all([
-      api(`/api/canteen/products?branchId=${encodeURIComponent(String(branchId))}`, { silent: true }),
-      api('/api/canteen/categories', { silent: true, headers: { 'x-branch-id': String(branchId) } })
+      api(`/api/magaza/products?branchId=${encodeURIComponent(String(branchId))}`, { silent: true }),
+      api('/api/magaza/categories', { silent: true, headers: { 'x-branch-id': String(branchId) } })
     ])
     setCatalogItems(Array.isArray(productRes?.products) ? productRes.products : [])
     setCategories(Array.isArray(categoryRes?.categories) ? categoryRes.categories : [])
@@ -1573,7 +1573,7 @@ function StockReceiptsPanel({
       setItems([])
       return
     }
-    const res = await api(`/api/canteen/stock/movements?branchId=${encodeURIComponent(String(branchId))}`, { silent: true })
+    const res = await api(`/api/magaza/stock/movements?branchId=${encodeURIComponent(String(branchId))}`, { silent: true })
     const list = Array.isArray(res?.items) ? res.items : []
     setItems(list.filter((item) => String(item?.type || '') === 'in').slice(0, 12))
   }
@@ -1622,7 +1622,7 @@ function StockReceiptsPanel({
   const lookup = async (code, { final = false } = {}) => {
     const c = String(code || '').trim()
     if (!c || !canUse) return
-    const res = await api(`/api/canteen/products/by-barcode/${encodeURIComponent(c)}`, { silent: true, headers: { 'x-branch-id': String(branchId) } })
+    const res = await api(`/api/magaza/products/by-barcode/${encodeURIComponent(c)}`, { silent: true, headers: { 'x-branch-id': String(branchId) } })
     if (!res?.ok || !res?.product) {
       if (final) {
         setError('Barkod bulunamadı')
@@ -1705,7 +1705,7 @@ function StockReceiptsPanel({
     if (!minimumStockValid) return toast.error('Asgari stok gecersiz')
 
     setLoading(true)
-    const res = await api('/api/canteen/stock/receipts', {
+    const res = await api('/api/magaza/stock/receipts', {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       data: {
@@ -2039,7 +2039,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
   const loadSummary = async (sid) => {
     const id = String(sid || '').trim()
     if (!id) return
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(id)}/summary`, { headers: { 'x-branch-id': String(branchId) }, silent: true })
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(id)}/summary`, { headers: { 'x-branch-id': String(branchId) }, silent: true })
     if (!res?.ok || !res?.summary) {
       try { if (storageKey) localStorage.removeItem(storageKey) } catch {}
       setSessionId('')
@@ -2096,7 +2096,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
   const start = async () => {
     if (!canUse) return toast.error('Şube seç')
     setLoading(true)
-    const res = await api('/api/canteen/stock-counts', { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
+    const res = await api('/api/magaza/stock-counts', { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
     if (!res?.ok || !res?.sessionId) {
       toast.error(res?.message || 'Sayım başlatılamadı')
       setLoading(false)
@@ -2124,7 +2124,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
     const q = qtyRaw === undefined || qtyRaw === null || String(qtyRaw).trim() === '' ? 1 : Number(String(qtyRaw).replace(',', '.'))
     if (!Number.isFinite(q) || q <= 0) return toast.error('Miktar geçersiz')
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/scan`, {
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/scan`, {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       data: { qty: q, barcode: productId ? undefined : code, productId: productId ? productId : undefined },
@@ -2189,7 +2189,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
       }
 
       const before = lastCommittedRef.current.get(id)
-      const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/items/${encodeURIComponent(id)}`, {
+      const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/items/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'x-branch-id': String(branchId) },
         data: { countedQty: qty },
@@ -2215,7 +2215,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
   const finish = async () => {
     if (!sessionId) return
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/finish`, { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/finish`, { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
     if (!res?.ok || !res?.summary) {
       toast.error(res?.message || 'Özet alınamadı')
       setLoading(false)
@@ -2243,7 +2243,7 @@ function StockCountPanel({ branchId, onScanRef, me, isCompact = false }) {
   const apply = async () => {
     if (!sessionId) return
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/apply`, {
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/apply`, {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       silent: true
@@ -2592,7 +2592,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
       setPreviewProduct(null)
       return null
     }
-    const res = await api(`/api/canteen/products/by-barcode/${encodeURIComponent(code)}`, {
+    const res = await api(`/api/magaza/products/by-barcode/${encodeURIComponent(code)}`, {
       silent: true,
       headers: { 'x-branch-id': String(branchId) }
     })
@@ -2663,7 +2663,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
   const loadSummary = async (sid) => {
     const id = String(sid || '').trim()
     if (!id) return
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(id)}/summary`, { headers: { 'x-branch-id': String(branchId) }, silent: true })
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(id)}/summary`, { headers: { 'x-branch-id': String(branchId) }, silent: true })
     if (!res?.ok || !res?.summary) {
       try { if (storageKey) localStorage.removeItem(storageKey) } catch {}
       setSessionId('')
@@ -2698,7 +2698,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
     const confirmed = window.confirm('Bu sayımı geri almak istediğine emin misin?')
     if (!confirmed) return
     setRevertingDetail(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sid)}/revert`, {
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sid)}/revert`, {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       silent: true
@@ -2770,7 +2770,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
   const start = async () => {
     if (!canUse) return toast.error('Şube seç')
     setLoading(true)
-    const res = await api('/api/canteen/stock-counts', { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
+    const res = await api('/api/magaza/stock-counts', { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
     if (!res?.ok || !res?.sessionId) {
       toast.error(res?.message || 'Sayım başlatılamadı')
       setLoading(false)
@@ -2798,7 +2798,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
     const q = qtyRaw === undefined || qtyRaw === null || String(qtyRaw).trim() === '' ? 1 : Number(String(qtyRaw).replace(',', '.'))
     if (!Number.isFinite(q) || q <= 0) return toast.error('Miktar geçersiz')
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/scan`, {
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/scan`, {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       data: { qty: q, barcode: productId ? undefined : code, productId: productId || undefined },
@@ -2870,7 +2870,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
         return
       }
       const before = lastCommittedRef.current.get(id)
-      const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/items/${encodeURIComponent(id)}`, {
+      const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/items/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'x-branch-id': String(branchId) },
         data: { countedQty: qtyValue },
@@ -2896,7 +2896,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
   const finish = async () => {
     if (!sessionId) return
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/finish`, { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/finish`, { method: 'POST', headers: { 'x-branch-id': String(branchId) }, silent: true })
     if (!res?.ok || !res?.summary) {
       toast.error(res?.message || 'Özet alınamadı')
       setLoading(false)
@@ -2909,7 +2909,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
   const apply = async () => {
     if (!sessionId) return
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/apply`, {
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/apply`, {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       silent: true
@@ -2934,7 +2934,7 @@ function StockCountPanelLegacyLike({ branchId, onScanRef, me, isCompact = false 
   const cancelCount = async () => {
     if (!sessionId) return
     setLoading(true)
-    const res = await api(`/api/canteen/stock-counts/${encodeURIComponent(sessionId)}/cancel`, {
+    const res = await api(`/api/magaza/stock-counts/${encodeURIComponent(sessionId)}/cancel`, {
       method: 'POST',
       headers: { 'x-branch-id': String(branchId) },
       silent: true
@@ -3280,7 +3280,7 @@ function ProductSearchBox({ branchId, onSelect, disabled, inputClassName = '', s
 
     setLoading(true)
     const t = setTimeout(() => {
-      api(`/api/canteen/products/search?q=${encodeURIComponent(term)}&limit=20`, { silent: true, headers: { 'x-branch-id': String(branchId) }, signal: controller.signal })
+      api(`/api/magaza/products/search?q=${encodeURIComponent(term)}&limit=20`, { silent: true, headers: { 'x-branch-id': String(branchId) }, signal: controller.signal })
         .then((res) => {
           setItems(Array.isArray(res?.items) ? res.items : [])
           setLoading(false)
@@ -3416,7 +3416,7 @@ function StockHistoryPanelLegacy({ branchId, me, isCompact = false }) {
     setError('')
     const [countRes, movementRes] = await Promise.all([
       canViewCountHistory ? getStockCounts(branchId, { limit: 30, from: rangeFrom }) : Promise.resolve({ ok: true, items: [] }),
-      api(`/api/canteen/stock/movements?branchId=${encodeURIComponent(String(branchId))}${rangeFrom ? `&from=${encodeURIComponent(rangeFrom)}` : ''}`, { silent: true })
+      api(`/api/magaza/stock/movements?branchId=${encodeURIComponent(String(branchId))}${rangeFrom ? `&from=${encodeURIComponent(rangeFrom)}` : ''}`, { silent: true })
     ])
     let nextError = ''
     if (!countRes?.ok && canViewCountHistory) nextError = countRes?.message || 'Sayım geçmişi yüklenemedi'
@@ -3704,7 +3704,7 @@ function StockHistoryPanel({ branchId, me, isCompact = false }) {
       setError('')
       const [countRes, movementRes] = await Promise.all([
         canViewCountHistory ? getStockCounts(branchId, { limit: 60, from: rangeFrom }) : Promise.resolve({ ok: true, items: [] }),
-        api(`/api/canteen/stock/movements?branchId=${encodeURIComponent(String(branchId))}${rangeFrom ? `&from=${encodeURIComponent(rangeFrom)}` : ''}`, { silent: true })
+        api(`/api/magaza/stock/movements?branchId=${encodeURIComponent(String(branchId))}${rangeFrom ? `&from=${encodeURIComponent(rangeFrom)}` : ''}`, { silent: true })
       ])
       if (cancelled) return
       let nextError = ''

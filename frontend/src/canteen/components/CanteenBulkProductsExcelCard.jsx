@@ -89,7 +89,7 @@ export default function CanteenBulkProductsExcelCard({ branchId, onImportDone, c
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetchWithAuth(`/api/canteen/products/import?branchId=${encodeURIComponent(bid)}`, { method: 'POST', body: fd }, { branchId: bid })
+      const res = await fetchWithAuth(`/api/magaza/products/import?branchId=${encodeURIComponent(bid)}`, { method: 'POST', body: fd }, { branchId: bid })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || data?.success === false) {
         throw new Error(data.message || 'Yükleme başarısız')
@@ -111,13 +111,13 @@ export default function CanteenBulkProductsExcelCard({ branchId, onImportDone, c
 
   const exportPath = useMemo(() => {
     const bid = String(branchId || '').trim()
-    return `/api/canteen/products/export?format=xlsx&branchId=${encodeURIComponent(bid)}`
+    return `/api/magaza/products/export?format=xlsx&branchId=${encodeURIComponent(bid)}`
   }, [branchId])
 
   const actions = (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => setImportOpen(true)} disabled={busy || !String(branchId || '').trim()}>Excel ile Ürün Yükle</button>
-      <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => onDownload('/api/canteen/products/template?format=xlsx', 'canteen_products_template.xlsx')} disabled={busy}>Örnek Excel İndir</button>
+      <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => onDownload('/api/magaza/products/template?format=xlsx', 'canteen_products_template.xlsx')} disabled={busy}>Örnek Excel İndir</button>
       <button className={compact ? 'product-secondary-btn' : 'btn'} onClick={() => onDownload(exportPath, 'canteen_products_export.xlsx')} disabled={busy || !String(branchId || '').trim()}>Mevcut Ürünleri İndir</button>
     </div>
   )

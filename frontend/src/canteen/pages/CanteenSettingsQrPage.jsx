@@ -72,7 +72,7 @@ export default function CanteenSettingsQrPage() {
     if (!background) setMessage('')
     const [profileResponse, settingsResponse] = await Promise.all([
       api('/api/tenant/profile', { silent: true }),
-      api('/api/canteen/settings', { silent: true })
+      api('/api/magaza/settings', { silent: true })
     ])
 
     if (!profileResponse?.ok || !settingsResponse?.ok) {
@@ -123,7 +123,7 @@ export default function CanteenSettingsQrPage() {
     const optimizedFile = await optimizeProductImageForUpload(file)
     const body = new FormData()
     body.append('file', optimizedFile || file)
-    return api(`/api/canteen/settings/qr/${kind}?branchId=${encodeURIComponent(branchId)}`, {
+    return api(`/api/magaza/settings/qr/${kind}?branchId=${encodeURIComponent(branchId)}`, {
       method: 'POST',
       body,
       silent: true
@@ -131,7 +131,7 @@ export default function CanteenSettingsQrPage() {
   }
 
   const removeQrMedia = async (kind, branchId) => (
-    api(`/api/canteen/settings/qr/${kind}?branchId=${encodeURIComponent(branchId)}`, {
+    api(`/api/magaza/settings/qr/${kind}?branchId=${encodeURIComponent(branchId)}`, {
       method: 'DELETE',
       silent: true
     })
@@ -146,7 +146,7 @@ export default function CanteenSettingsQrPage() {
 
     setSaving(true)
     setMessage('')
-    const response = await api(`/api/canteen/settings/qr?branchId=${encodeURIComponent(saveBranchId)}`, {
+    const response = await api(`/api/magaza/settings/qr?branchId=${encodeURIComponent(saveBranchId)}`, {
       method: 'PUT',
       data: {
         qrTitle: settings.qrTitle,
@@ -210,7 +210,7 @@ export default function CanteenSettingsQrPage() {
       return
     }
 
-    const response = await api(`/api/canteen/settings/qr?branchId=${encodeURIComponent(saveBranchId)}`, {
+    const response = await api(`/api/magaza/settings/qr?branchId=${encodeURIComponent(saveBranchId)}`, {
       method: 'PUT',
       data: {
         qrTitle: settings.qrTitle,

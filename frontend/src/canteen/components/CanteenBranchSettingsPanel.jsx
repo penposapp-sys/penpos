@@ -8,8 +8,8 @@ export default function CanteenBranchSettingsPanel() {
 
   const load = async () => {
     setLoading(true)
-    const s = await api('/api/canteen/settings', { silent: true })
-    const p = await api('/api/canteen/payment-settings', { silent: true })
+    const s = await api('/api/magaza/settings', { silent: true })
+    const p = await api('/api/magaza/payment-settings', { silent: true })
     setSettings(s?.settings || null)
     setPayment(p?.settings || null)
     setLoading(false)
@@ -20,12 +20,12 @@ export default function CanteenBranchSettingsPanel() {
   }, [])
 
   const updateSettings = async (patch) => {
-    const res = await api('/api/canteen/settings', { method: 'PUT', data: patch })
+    const res = await api('/api/magaza/settings', { method: 'PUT', data: patch })
     if (res?.ok) setSettings(res.settings)
   }
 
   const updatePayment = async (patch) => {
-    const res = await api('/api/canteen/payment-settings', { method: 'PUT', data: patch })
+    const res = await api('/api/magaza/payment-settings', { method: 'PUT', data: patch })
     if (res?.ok) setPayment(res.settings)
   }
 

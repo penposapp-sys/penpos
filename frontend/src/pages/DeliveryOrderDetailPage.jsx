@@ -897,7 +897,7 @@ export default function DeliveryOrderDetailPage() {
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/close`, { method: 'PUT', signal, silent: true }))
     if (res) toast.success('Sipariş kapatıldı')
     if (isMobilePortrait) {
-      nav('/kermes/app/delivery')
+      nav('/restoran/app/delivery')
       return
     }
     await reloadOrder().catch(() => null)
@@ -1384,7 +1384,7 @@ export default function DeliveryOrderDetailPage() {
                 const oid = getOrderId(o) || o.id
                 if (!oid) return
                 if (isMobilePortrait) {
-                  nav(`/kermes/app/delivery/${oid}`)
+                  nav(`/restoran/app/delivery/${oid}`)
                   return
                 }
                 setSelectedId(oid)
@@ -1453,7 +1453,7 @@ export default function DeliveryOrderDetailPage() {
           <>
             {isMobilePortrait && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <button className="btn" type="button" onClick={() => nav('/kermes/app/delivery')}>
+                <button className="btn" type="button" onClick={() => nav('/restoran/app/delivery')}>
                   Listeye Dön
                 </button>
                 <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'right' }}>
@@ -1463,7 +1463,7 @@ export default function DeliveryOrderDetailPage() {
             )}
             <div className="delivery-detail-header-card" style={{ borderBottom: '1px solid var(--border)' }}>
               <div className="delivery-detail-info-row">
-                <button className="btn delivery-detail-btn" type="button" onClick={() => nav('/kermes/app/delivery')}>
+                <button className="btn delivery-detail-btn" type="button" onClick={() => nav('/restoran/app/delivery')}>
                   Paket Siparislere Don
                 </button>
                 {isPendingOnlineApproval ? (

@@ -29,7 +29,7 @@ export default function SignIn({ portal }) {
     setError('')
     try {
       await login({ identifier, password, portal, rememberMe })
-      nav(isRestaurant ? '/kermes' : '/', { replace: true })
+      nav(isRestaurant ? '/restoran' : '/', { replace: true })
     } catch (err) {
       setError(getFriendlyLoginError(err, {
         wrongPortalMessage: 'Bu hesap bu giris ekrani icin uygun degil.'

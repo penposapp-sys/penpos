@@ -25,7 +25,7 @@ export default function CanteenStaffPage() {
   const load = async (options = {}) => {
     const background = options?.background === true
     if (!background) setLoading(true)
-    const res = await api('/api/canteen/staff', { silent: true, skipBranchHeader: true })
+    const res = await api('/api/magaza/staff', { silent: true, skipBranchHeader: true })
     setItems(Array.isArray(res?.staff) ? res.staff : [])
     if (!background) setLoading(false)
   }
@@ -44,7 +44,7 @@ export default function CanteenStaffPage() {
 
   const create = async (e) => {
     e.preventDefault()
-    const res = await api('/api/canteen/staff', {
+    const res = await api('/api/magaza/staff', {
       method: 'POST',
       data: { name, username, email, password, permissions },
       skipBranchHeader: true
@@ -61,7 +61,7 @@ export default function CanteenStaffPage() {
 
   const remove = async (id) => {
     if (!window.confirm('Personeli devre dışı bırakmak istiyor musun?')) return
-    const res = await api(`/api/canteen/staff/${id}`, { method: 'DELETE', skipBranchHeader: true })
+    const res = await api(`/api/magaza/staff/${id}`, { method: 'DELETE', skipBranchHeader: true })
     if (res?.ok) load()
   }
 

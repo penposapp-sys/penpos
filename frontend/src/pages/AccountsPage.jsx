@@ -181,7 +181,7 @@ export default function AccountsPage() {
       setCreateForm({ name: '', phone: '', note: '' })
       setCreateError('')
       await loadList({ search: q })
-      if (newId) nav(`/kermes/app/accounts/${newId}`)
+      if (newId) nav(`/restoran/app/accounts/${newId}`)
     } catch (err) {
       const msg = err?.message || 'Islem basarisiz'
       setCreateError(msg)
@@ -329,7 +329,7 @@ export default function AccountsPage() {
           <div
             key={String(account?.id || account?._id)}
             className="card"
-            onClick={() => nav(`/kermes/app/accounts/${account.id || account._id}`)}
+            onClick={() => nav(`/restoran/app/accounts/${account.id || account._id}`)}
             style={{
               cursor: 'pointer',
               display: 'grid',
@@ -398,7 +398,7 @@ export default function AccountsPage() {
               return (
                 <tr
                   key={String(account?.id || account?._id)}
-                  onClick={() => nav(`/kermes/app/accounts/${account.id || account._id}`)}
+                  onClick={() => nav(`/restoran/app/accounts/${account.id || account._id}`)}
                   style={{ cursor: 'pointer' }}
                 >
                   <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', fontWeight: 800 }}>{account?.name || 'Cari'}</td>
@@ -433,7 +433,7 @@ export default function AccountsPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {user?.role === 'tenant_admin' && (
-                <button className="btn" onClick={() => { window.location.href = '/kermes/settings/system' }}>
+                <button className="btn" onClick={() => { window.location.href = '/restoran/settings/system' }}>
                   Sistem Ayarlari
                 </button>
               )}

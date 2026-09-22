@@ -21,13 +21,13 @@ export function resolveThemeScope(pathname = '') {
     return 'platform'
   }
   if (
-    path.startsWith('/canteen') ||
-    path.startsWith('/login/kantin')
+    path.startsWith('/magaza') ||
+    path.startsWith('/login/magaza')
   ) {
     return 'canteen'
   }
   if (
-    path.startsWith('/kermes') ||
+    path.startsWith('/restoran') ||
     path.startsWith('/login/restoran')
   ) {
     return 'kermes'

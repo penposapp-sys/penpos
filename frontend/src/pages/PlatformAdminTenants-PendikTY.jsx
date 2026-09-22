@@ -96,7 +96,7 @@ export default function PlatformAdminTenants({ system = 'kermes' }) {
     setFormLoading(true)
     setFormError('')
     try {
-      const target = pagePlanType === 'canteen' ? '/api/platform/tenants/canteen' : '/api/platform/tenants/kermes'
+      const target = pagePlanType === 'canteen' ? '/api/platform/tenants/magaza' : '/api/platform/tenants/restoran'
       await api(target, { method: 'POST', body: JSON.stringify({ ...form }), portalOverride: 'platform' })
       setModalOpen(false)
       await load()

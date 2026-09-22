@@ -88,8 +88,8 @@ const EXIT_ROUTES = new Set([
   '/login/platform',
   '/platform-login',
   '/login/restoran',
-  '/login/kantin',
-  '/canteen/login',
+  '/login/magaza',
+  '/magaza/login',
 ])
 
 const isNativeApp = () => {
@@ -103,24 +103,24 @@ const isNativeApp = () => {
 const resolveBackFallbackPath = (pathname) => {
   const path = String(pathname || '')
 
-  if (path.startsWith('/kermes/app/pos/orders/')) return '/kermes/app/pos'
-  if (path.startsWith('/kermes/app/walkin/')) return '/kermes/app/walkin'
-  if (path.startsWith('/kermes/app/delivery/')) return '/kermes/app/delivery'
-  if (path.startsWith('/kermes/app/package-courier')) return '/kermes'
-  if (path.startsWith('/kermes/app/pos')) return '/kermes'
-  if (path.startsWith('/kermes/app/walkin')) return '/kermes'
-  if (path.startsWith('/kermes/app/delivery')) return '/kermes'
-  if (path.startsWith('/kermes/app/')) return '/kermes'
-  if (path.startsWith('/kermes/settings')) return '/kermes'
+  if (path.startsWith('/restoran/app/pos/orders/')) return '/restoran/app/pos'
+  if (path.startsWith('/restoran/app/walkin/')) return '/restoran/app/walkin'
+  if (path.startsWith('/restoran/app/delivery/')) return '/restoran/app/delivery'
+  if (path.startsWith('/restoran/app/package-courier')) return '/restoran'
+  if (path.startsWith('/restoran/app/pos')) return '/restoran'
+  if (path.startsWith('/restoran/app/walkin')) return '/restoran'
+  if (path.startsWith('/restoran/app/delivery')) return '/restoran'
+  if (path.startsWith('/restoran/app/')) return '/restoran'
+  if (path.startsWith('/restoran/settings')) return '/restoran'
 
-  if (path.startsWith('/canteen/cariler/')) return '/canteen/cariler'
-  if (path.startsWith('/canteen/yapilan-satislar/')) return '/canteen/yapilan-satislar'
-  if (path.startsWith('/canteen/ayarlar/') && path !== '/canteen/ayarlar') return '/canteen/ayarlar'
-  if (path.startsWith('/canteen/qr-siparisleri/') && path !== '/canteen/qr-siparisleri') return '/canteen/qr-siparisleri'
-  if (path.startsWith('/canteen/stok/') && path !== '/canteen/stok') return '/canteen/stok'
-  if (path.startsWith('/canteen/raporlar/') && path !== '/canteen/raporlar') return '/canteen/raporlar'
+  if (path.startsWith('/magaza/cariler/')) return '/magaza/cariler'
+  if (path.startsWith('/magaza/yapilan-satislar/')) return '/magaza/yapilan-satislar'
+  if (path.startsWith('/magaza/ayarlar/') && path !== '/magaza/ayarlar') return '/magaza/ayarlar'
+  if (path.startsWith('/magaza/qr-siparisleri/') && path !== '/magaza/qr-siparisleri') return '/magaza/qr-siparisleri'
+  if (path.startsWith('/magaza/stok/') && path !== '/magaza/stok') return '/magaza/stok'
+  if (path.startsWith('/magaza/raporlar/') && path !== '/magaza/raporlar') return '/magaza/raporlar'
 
-  if (path.startsWith('/platform')) return '/platform/kermes-tenants'
+  if (path.startsWith('/platform')) return '/platform/restoran-tenants'
   if (path.startsWith('/superadmin')) return '/superadmin/tenants'
 
   return null
@@ -153,8 +153,8 @@ const resolveHomePath = (user) => {
   if (!user) return null
   if (user.role === 'superadmin') return '/superadmin/tenants'
   if (user.role === 'platform_admin') return '/platform'
-  if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/canteen'
-  return '/kermes'
+  if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/magaza'
+  return '/restoran'
 }
 
 function CapacitorBackButtonHandler() {
@@ -265,7 +265,7 @@ function CapacitorBackButtonHandler() {
 const getDefaultRoute = (user, tenantCtx) => {
   if (!user) return null
   if (user.role === 'superadmin') return '/superadmin/tenants'
-  if (user.role === 'platform_admin') return '/platform/kermes-tenants'
+  if (user.role === 'platform_admin') return '/platform/restoran-tenants'
 
   const perms = Array.isArray(user.permissions) ? user.permissions : []
   const isExpired = isSubscriptionExpired(tenantCtx)
@@ -277,18 +277,18 @@ const getDefaultRoute = (user, tenantCtx) => {
       : getSubscriptionProfilePath(user.systemType)
   }
 
-  if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/canteen/kasa'
+  if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/magaza/kasa'
 
-  if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/kermes/app/dashboard'
-  if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/kermes/app/tables'
-  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) return '/kermes/app/kitchen'
-  if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) return '/kermes/app/walkin'
-  if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) return '/kermes/app/delivery'
-  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('package_courier_page_view') || perms.includes('package_orders_view'))) return '/kermes/app/package-courier'
-  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) return '/kermes/app/reports/sales'
-  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) return '/kermes/app/accounts'
-  if (canSettings) return '/kermes/settings'
-  if (user.role === 'tenant_admin' || perms.includes('audit_view')) return '/kermes/app/audit'
+  if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/restoran/app/dashboard'
+  if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/restoran/app/tables'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) return '/restoran/app/kitchen'
+  if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) return '/restoran/app/walkin'
+  if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) return '/restoran/app/delivery'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('package_courier_page_view') || perms.includes('package_orders_view'))) return '/restoran/app/package-courier'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('closed_tables_page_view'))) return '/restoran/app/reports/sales'
+  if (!isExpired && (user.role === 'tenant_admin' || perms.includes('view_accounts') || perms.includes('manage_accounts'))) return '/restoran/app/accounts'
+  if (canSettings) return '/restoran/settings'
+  if (user.role === 'tenant_admin' || perms.includes('audit_view')) return '/restoran/app/audit'
   return null
 }
 
@@ -332,7 +332,7 @@ export default function App() {
         <Route path="/platform/login" element={<Navigate to="/platform-login" replace />} />
         <Route path="/login/platform" element={<Navigate to="/platform-login" replace />} />
         <Route path="/login/restoran" element={<SignIn portal="restaurant" />} />
-        <Route path="/login/kantin" element={<Navigate to="/canteen/login" replace />} />
+        <Route path="/login/magaza" element={<Navigate to="/magaza/login" replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -345,9 +345,9 @@ export default function App() {
         <Route path="/qr/:slug" element={<CanteenQrPricePage />} />
         <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
-        <Route path="/canteen/login" element={<CanteenLogin />} />
-        <Route path="/canteen" element={<CanteenLayout />}>
-          <Route index element={<Navigate to="/canteen/kasa" replace />} />
+        <Route path="/magaza/login" element={<CanteenLogin />} />
+        <Route path="/magaza" element={<CanteenLayout />}>
+          <Route index element={<Navigate to="/magaza/kasa" replace />} />
           <Route path="kasa" element={<CanteenCashierPage />} />
           <Route path="qr-siparisleri" element={<CanteenQrOrdersPage />} />
           <Route path="cariler" element={<CanteenCustomersPage />} />
@@ -358,9 +358,9 @@ export default function App() {
           <Route path="print-station" element={<CanteenPrintStationPage />} />
           <Route path="ayarlar" element={<CanteenSettingsLayout />}>
             <Route path="website" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="canteen" allowExpired><RestaurantWebsiteSettingsPage systemType="canteen" /></ProtectedRoute>} />
-            <Route path="me" element={<Navigate to="/canteen/ayarlar/sistem" replace />} />
+            <Route path="me" element={<Navigate to="/magaza/ayarlar/sistem" replace />} />
             <Route path="sistem" element={<CanteenSettingsSystemPage />} />
-            <Route path="subeler" element={<Navigate to="/canteen/ayarlar/sistem" replace />} />
+            <Route path="subeler" element={<Navigate to="/magaza/ayarlar/sistem" replace />} />
             <Route path="personel" element={<CanteenSettingsStaffPage />} />
             <Route path="urunler" element={<CanteenSettingsProductsPage />} />
             <Route path="qr" element={<CanteenSettingsQrPage />} />
@@ -373,10 +373,10 @@ export default function App() {
         </Route>
 
         <Route path="/" element={<Layout />}>
-          <Route path="platform-admin" element={<Navigate to="/platform/kermes-tenants" replace />} />
-          <Route path="platform" element={<Navigate to="/platform/kermes-tenants" replace />} />
-          <Route path="platform/kermes-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="kermes" system="kermes" /></ProtectedRoute>} />
-          <Route path="platform/canteen-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="canteen" system="canteen" /></ProtectedRoute>} />
+          <Route path="platform-admin" element={<Navigate to="/platform/restoran-tenants" replace />} />
+          <Route path="platform" element={<Navigate to="/platform/restoran-tenants" replace />} />
+          <Route path="platform/restoran-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="kermes" system="kermes" /></ProtectedRoute>} />
+          <Route path="platform/magaza-tenants" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminTenants key="canteen" system="canteen" /></ProtectedRoute>} />
           <Route path="platform/plans" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminPlans /></ProtectedRoute>} />
           <Route path="platform/billing-requests" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminMembershipRequests /></ProtectedRoute>} />
           <Route path="platform/payments" element={<Navigate to="/platform/billing-requests" replace />} />
@@ -385,13 +385,13 @@ export default function App() {
           <Route path="superadmin/website-settings" element={<ProtectedRoute roles={['superadmin']}><SuperadminWebsiteSettings /></ProtectedRoute>} />
         </Route>
 
-        <Route path="/platform/tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
-        <Route path="/platform-admin/kermes-tenants" element={<Navigate to="/platform/kermes-tenants" replace />} />
+        <Route path="/platform/tenants" element={<Navigate to="/platform/restoran-tenants" replace />} />
+        <Route path="/platform-admin/restoran-tenants" element={<Navigate to="/platform/restoran-tenants" replace />} />
         <Route path="/platform-admin/plans" element={<Navigate to="/platform/plans" replace />} />
         <Route path="/platform-admin/billing-requests" element={<Navigate to="/platform/billing-requests" replace />} />
         <Route path="/platform-admin/payments" element={<Navigate to="/platform/billing-requests" replace />} />
 
-        <Route path="/kermes" element={<Layout />}>
+        <Route path="/restoran" element={<Layout />}>
           <Route index element={<KermesIndexRedirect />} />
           <Route path="app/dashboard" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><Dashboard /></ProtectedRoute>} />
           <Route path="app/tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><TablesPage /></ProtectedRoute>} />
@@ -412,12 +412,12 @@ export default function App() {
           <Route path="app/pos" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access']} system="kermes"><PosPage /></ProtectedRoute>} />
           <Route path="app/pos/orders/:id/receipt" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access']} system="kermes"><ReceiptPage /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes" allowExpired><SettingsPage /></ProtectedRoute>}>
-            <Route path="me" element={<Navigate to="/kermes/settings/system" replace />} />
+            <Route path="me" element={<Navigate to="/restoran/settings/system" replace />} />
             <Route path="system" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes"><SettingsSystemContent /></ProtectedRoute>} />
-            <Route path="branches" element={<Navigate to="/kermes/settings/system" replace />} />
+            <Route path="branches" element={<Navigate to="/restoran/settings/system" replace />} />
             <Route path="staff" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><StaffPage systemType="kermes" /></ProtectedRoute>} />
-            <Route path="catalog" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
-            <Route path="catalog/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
+            <Route path="catalog" element={<Navigate to="/restoran/settings/catalog/items" replace />} />
+            <Route path="catalog/categories" element={<Navigate to="/restoran/settings/catalog/items" replace />} />
             <Route path="catalog/items" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><MenuItemsPage /></ProtectedRoute>} />
             <Route path="catalog/items/:itemId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><ProductItemSettingsPage /></ProtectedRoute>} />
             <Route path="tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsTablesContent /></ProtectedRoute>} />
@@ -428,18 +428,18 @@ export default function App() {
             <Route path="qr" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><QrMenuSettingsPage /></ProtectedRoute>} />
             <Route path="online-sales" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><OnlineSalesSettingsPage /></ProtectedRoute>} />
             <Route path="website" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes" allowExpired><RestaurantWebsiteSettingsPage /></ProtectedRoute>} />
-            <Route path="menü" element={<Navigate to="/kermes/settings/catalog" replace />} />
-            <Route path="menu/categories" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
-            <Route path="menu/items" element={<Navigate to="/kermes/settings/catalog/items" replace />} />
-            <Route path="qr-menü" element={<Navigate to="/kermes/settings/qr" replace />} />
+            <Route path="menü" element={<Navigate to="/restoran/settings/catalog" replace />} />
+            <Route path="menu/categories" element={<Navigate to="/restoran/settings/catalog/items" replace />} />
+            <Route path="menu/items" element={<Navigate to="/restoran/settings/catalog/items" replace />} />
+            <Route path="qr-menü" element={<Navigate to="/restoran/settings/qr" replace />} />
           </Route>
           <Route path="print-station" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><PrintStationPage system="kermes" /></ProtectedRoute>} />
           <Route path="*" element={<KermesIndexRedirect />} />
         </Route>
 
-        <Route path="/app/settings/*" element={<Navigate to="/kermes/settings/system" replace />} />
-        <Route path="/app/*" element={<Navigate to="/kermes" replace />} />
-        <Route path="/accounts" element={<Navigate to="/kermes/app/accounts" replace />} />
+        <Route path="/app/settings/*" element={<Navigate to="/restoran/settings/system" replace />} />
+        <Route path="/app/*" element={<Navigate to="/restoran" replace />} />
+        <Route path="/accounts" element={<Navigate to="/restoran/app/accounts" replace />} />
         <Route path="*" element={<NotFound />} />
         </Routes>
       </BusinessSettingsProvider>

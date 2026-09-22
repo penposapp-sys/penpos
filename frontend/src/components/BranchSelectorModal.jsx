@@ -137,7 +137,7 @@ export default function BranchSelectorModal() {
             Çıkış Yap
           </button>
           {user?.role === 'tenant_admin' && (
-            <button className="btn" onClick={() => { window.location.href = '/kermes/settings/branches' }}>
+            <button className="btn" onClick={() => { window.location.href = '/restoran/settings/branches' }}>
               Şube Ayarları
             </button>
           )}

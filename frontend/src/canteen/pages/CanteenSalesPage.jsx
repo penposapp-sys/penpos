@@ -181,7 +181,7 @@ export default function CanteenSalesPage() {
       if (allowedBranchIds.length === 0) return
       setLoadingBranches(true)
       try {
-        const res = await api('/api/canteen/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
+        const res = await api('/api/magaza/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen' })
         if (cancelled || !res?.ok) return
         const list = (Array.isArray(res?.branches) ? res.branches : [])
           .map((branch) => ({ id: String(branch?.id || branch?._id || ''), name: String(branch?.name || '') }))
@@ -238,7 +238,7 @@ export default function CanteenSalesPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await api(`/api/canteen/sales/completed?${listParams.toString()}`, {
+      const res = await api(`/api/magaza/sales/completed?${listParams.toString()}`, {
         silent: true,
         skipBranchHeader: true,
         suppressBranchModal: true,
@@ -278,7 +278,7 @@ export default function CanteenSalesPage() {
     try {
       const params = new URLSearchParams()
       if (sale.branchId) params.set('branchId', sale.branchId)
-      const res = await api(`/api/canteen/sales/${sale.id}${params.toString() ? `?${params.toString()}` : ''}`, {
+      const res = await api(`/api/magaza/sales/${sale.id}${params.toString() ? `?${params.toString()}` : ''}`, {
         silent: true,
         skipBranchHeader: true,
         suppressBranchModal: true,
@@ -302,7 +302,7 @@ export default function CanteenSalesPage() {
       const branchId = detailSale.branchId
       const params = new URLSearchParams()
       if (branchId) params.set('branchId', branchId)
-      const res = await api(`/api/canteen/sales/${detailSale.id}${params.toString() ? `?${params.toString()}` : ''}`, {
+      const res = await api(`/api/magaza/sales/${detailSale.id}${params.toString() ? `?${params.toString()}` : ''}`, {
         silent: true,
         skipBranchHeader: true,
         suppressBranchModal: true,
@@ -328,7 +328,7 @@ export default function CanteenSalesPage() {
     try {
       const params = new URLSearchParams()
       if (actionTarget.branchId) params.set('branchId', actionTarget.branchId)
-      const res = await api(`/api/canteen/sales/${actionTarget.id}${params.toString() ? `?${params.toString()}` : ''}`, {
+      const res = await api(`/api/magaza/sales/${actionTarget.id}${params.toString() ? `?${params.toString()}` : ''}`, {
         method: 'DELETE',
         silent: true,
         skipBranchHeader: true,
@@ -351,7 +351,7 @@ export default function CanteenSalesPage() {
     try {
       const params = new URLSearchParams()
       if (actionTarget.branchId) params.set('branchId', actionTarget.branchId)
-      const res = await api(`/api/canteen/sales/${actionTarget.id}/reopen${params.toString() ? `?${params.toString()}` : ''}`, {
+      const res = await api(`/api/magaza/sales/${actionTarget.id}/reopen${params.toString() ? `?${params.toString()}` : ''}`, {
         method: 'POST',
         silent: true,
         skipBranchHeader: true,
@@ -392,7 +392,7 @@ export default function CanteenSalesPage() {
       setReopenConfirmOpen(false)
       setDetailOpen(false)
       await refreshAfterAction()
-      navigate('/canteen/kasa')
+      navigate('/magaza/kasa')
     } catch (err) {
       setError(String(err?.message || 'Geri açılamadı'))
     } finally {

@@ -50,7 +50,7 @@ export default function CanteenSettingsPaymentsPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await api('/api/canteen/payment-settings', { silent: true, cacheMode: 'no-store' })
+      const result = await api('/api/magaza/payment-settings', { silent: true, cacheMode: 'no-store' })
       setMethods(normalizeMethods(result?.settings))
     } catch (err) {
       setError(err?.message || 'Ödeme seçenekleri yüklenemedi.')
@@ -130,7 +130,7 @@ export default function CanteenSettingsPaymentsPage() {
         isDeleted: false,
         sortOrder: index + 1,
       }))
-      const result = await api('/api/canteen/payment-settings', {
+      const result = await api('/api/magaza/payment-settings', {
         method: 'PUT',
         data: {
           paymentMethods: payload,
@@ -143,7 +143,7 @@ export default function CanteenSettingsPaymentsPage() {
       })
       setMethods(normalizeMethods(result?.settings))
       setEditingId('')
-      toast.success('Kantin ödeme seçenekleri kaydedildi')
+      toast.success('Mağaza ödeme seçenekleri kaydedildi')
     } catch (err) {
       setError(err?.message || 'Ödeme seçenekleri kaydedilemedi.')
       toast.error(err?.message || 'Ödeme seçenekleri kaydedilemedi.')
@@ -158,7 +158,7 @@ export default function CanteenSettingsPaymentsPage() {
         <div>
           <div style={{ fontSize: 20, fontWeight: 800 }}>Ödeme Seçenekleri</div>
           <div style={{ color: 'var(--app-text-muted, var(--muted))', marginTop: 4 }}>
-            Kantin kasasında hangi ödeme seçenekleri görünsün buradan yönetebilirsin.
+            Mağaza kasasında hangi ödeme seçenekleri görünsün buradan yönetebilirsin.
           </div>
         </div>
 
