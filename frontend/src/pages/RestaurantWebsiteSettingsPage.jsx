@@ -127,6 +127,7 @@ function ensureWebsiteShape(settings, systemType = 'kermes') {
   const seo = safe.seo && typeof safe.seo === 'object' ? safe.seo : {}
   const theme = safe.theme && typeof safe.theme === 'object' ? safe.theme : {}
   const navigation = safe.navigation && typeof safe.navigation === 'object' ? safe.navigation : {}
+  const normalizedSlug = String(safe.slug || '').trim()
   const gallery = Array.isArray(hero.galleryImages) && hero.galleryImages.length
     ? hero.galleryImages.map((item, index) => ({
         id: item?.id || `gallery-${index + 1}`,
@@ -138,7 +139,7 @@ function ensureWebsiteShape(settings, systemType = 'kermes') {
 
   return {
     ...safe,
-    slug: String(safe.slug || ''),
+    slug: normalizedSlug,
     enabled: safe.enabled !== false,
     published: safe.published === true,
     theme: {
@@ -251,10 +252,10 @@ function ensureWebsiteShape(settings, systemType = 'kermes') {
     },
     integrations: {
       showQrMenu: isStore ? false : integrations.showQrMenu !== false,
-      qrMenuUrl: String(integrations.qrMenuUrl || ''),
+      qrMenuUrl: normalizeWebsiteActionUrl(integrations.qrMenuUrl, 'menu', normalizedSlug),
       showProducts: integrations.showProducts !== false,
       showOnlineOrder: isStore ? integrations.showOnlineOrder !== false : integrations.showOnlineOrder === true,
-      onlineOrderUrl: String(integrations.onlineOrderUrl || ''),
+      onlineOrderUrl: normalizeWebsiteActionUrl(integrations.onlineOrderUrl, 'online', normalizedSlug),
     },
     seo: {
       title: String(seo.title || ''),
@@ -275,6 +276,12 @@ function updateSection(settings, type, updater) {
       return typeof updater === 'function' ? updater(section) : { ...section, ...updater }
     }),
   }
+}
+
+function normalizeWebsiteActionUrl(value, type, slug) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  return new RegExp(`^(?:https?:\\/\\/[^/]+)?\\/?${type}\\/`, 'i').test(raw) ? `/${type}/${slug}` : raw
 }
 
 function buildWebsitePath(slug, systemType = 'kermes') {
@@ -773,7 +780,13 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
           ) : null}
           <label style={{ display: 'grid', gap: 6 }}>
             <span>Online Satis Linki</span>
-            <input className="input" value={settings.integrations.onlineOrderUrl} onChange={(event) => updateIntegration('onlineOrderUrl', event.target.value)} style={inputStyle} placeholder={isStore ? `/qr/${tenant?.slug || ''}` : `/online/${tenant?.slug || ''}`} />
+            <input
+              className="input"
+              value={normalizeWebsiteActionUrl(settings.integrations.onlineOrderUrl, 'online', settings.slug)}
+              onChange={(event) => updateIntegration('onlineOrderUrl', event.target.value)}
+              style={inputStyle}
+              placeholder={isStore ? `/qr/${tenant?.slug || ''}` : `/online/${tenant?.slug || ''}`}
+            />
           </label>
           {!isStore ? (
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800 }}>

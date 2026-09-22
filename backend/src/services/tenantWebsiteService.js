@@ -185,6 +185,13 @@ export const normalizeTenantWebsiteSlug = (value, fallback = 'isletme') => {
 
 const normalizeObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {})
 
+const normalizeWebsiteActionUrl = (value, type, slug) => {
+  const raw = normalizeString(value)
+  if (!raw) return ''
+  if (new RegExp(`^(?:https?:\\/\\/[^/]+)?\\/?${type}\\/`, 'i').test(raw)) return `/${type}/${slug}`
+  return raw
+}
+
 const isCanteenWebsiteSystem = (systemType) => {
   const normalized = String(systemType || '').trim().toLocaleLowerCase('tr-TR')
   return normalized === 'canteen' || normalized === 'kantin'
@@ -343,10 +350,10 @@ export const normalizeTenantWebsiteSettings = (input = {}, tenant = {}) => {
     },
     integrations: {
       showQrMenu: normalizeBoolean(source?.integrations?.showQrMenu, defaults.integrations.showQrMenu),
-      qrMenuUrl: normalizeString(source?.integrations?.qrMenuUrl, defaults.integrations.qrMenuUrl),
+      qrMenuUrl: normalizeWebsiteActionUrl(source?.integrations?.qrMenuUrl || defaults.integrations.qrMenuUrl, 'menu', normalizeTenantWebsiteSlug(source.slug || defaults.slug)),
       showProducts: normalizeBoolean(source?.integrations?.showProducts, defaults.integrations.showProducts),
       showOnlineOrder: normalizeBoolean(source?.integrations?.showOnlineOrder, defaults.integrations.showOnlineOrder),
-      onlineOrderUrl: normalizeString(source?.integrations?.onlineOrderUrl, defaults.integrations.onlineOrderUrl)
+      onlineOrderUrl: normalizeWebsiteActionUrl(source?.integrations?.onlineOrderUrl || defaults.integrations.onlineOrderUrl, 'online', normalizeTenantWebsiteSlug(source.slug || defaults.slug))
     },
     seo: {
       title: normalizeString(source?.seo?.title, defaults.seo.title),
@@ -370,7 +377,11 @@ const getOrCreateTenantWebsiteDoc = async (tenantId, siteType = '') => {
     doc = created?.toObject ? created.toObject() : created
   }
   const normalized = pickWebsiteSettingsForSiteType(doc || {}, tenant, siteType)
-  if (!isStoreSiteType(siteType) && (String(doc?.slug || '') !== normalized.slug || JSON.stringify(doc?.sections || []) !== JSON.stringify(normalized.sections || []))) {
+  if (!isStoreSiteType(siteType) && (
+    String(doc?.slug || '') !== normalized.slug
+    || JSON.stringify(doc?.sections || []) !== JSON.stringify(normalized.sections || [])
+    || JSON.stringify(doc?.integrations || {}) !== JSON.stringify(normalized.integrations || {})
+  )) {
     await TenantWebsiteSettings.updateOne({ tenantId: tenant._id }, { $set: normalized })
   }
   return { tenant, settings: { ...normalized, updatedAt: doc?.updatedAt || null, publishedAt: doc?.publishedAt || null } }

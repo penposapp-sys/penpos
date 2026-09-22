@@ -112,6 +112,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [payload, setPayload] = useState(null)
+  const [mobileGalleryIndex, setMobileGalleryIndex] = useState(0)
 
   useBodyLayoutMode('public-site-layout')
 
@@ -167,10 +168,10 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const publicSiteSlug = String(slug || site.tenant?.slug || '').trim()
   const storedQrMenuUrl = String(integrations?.qrMenuUrl || '').trim()
   const storedOnlineOrderUrl = String(integrations?.onlineOrderUrl || '').trim()
-  const qrMenuUrl = storedQrMenuUrl.startsWith('/menu/')
+  const qrMenuUrl = /^(?:https?:\/\/[^/]+)?\/?menu\//i.test(storedQrMenuUrl)
     ? `/menu/${publicSiteSlug}`
     : (storedQrMenuUrl || (isStore ? '' : `/menu/${publicSiteSlug}`))
-  const onlineOrderUrl = storedOnlineOrderUrl.startsWith('/online/')
+  const onlineOrderUrl = /^(?:https?:\/\/[^/]+)?\/?online\//i.test(storedOnlineOrderUrl)
     ? `/online/${publicSiteSlug}`
     : (storedOnlineOrderUrl || (isStore ? `/qr/${publicSiteSlug}` : `/online/${publicSiteSlug}`))
   const seoTitle = site.settings?.seo?.title || tenantName
@@ -182,6 +183,18 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const resolvedAboutImageUrl = resolveWebsiteImageUrl(site.aboutSection?.settings?.imageUrl) || resolvedHeroGallery[1] || resolvedHeroImage
   const gallerySectionImages = resolvedHeroGallery.slice(1)
   const featuredProducts = site.menuProducts
+
+  useEffect(() => {
+    setMobileGalleryIndex(0)
+  }, [gallerySectionImages.length, slug])
+
+  useEffect(() => {
+    if (!compact || gallerySectionImages.length < 2) return undefined
+    const timer = window.setInterval(() => {
+      setMobileGalleryIndex((current) => (current + 1) % gallerySectionImages.length)
+    }, 4000)
+    return () => window.clearInterval(timer)
+  }, [compact, gallerySectionImages.length])
 
   const rootBg = '#d1d5db'
   const pageSurface = '#e5e7eb'
@@ -440,7 +453,25 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
             </div>
 
             <div style={{ overflow: 'hidden', padding: '4px 0' }}>
-              {gallerySectionImages.length > 1 ? (
+              {compact ? (
+                <div
+                  style={{
+                    width: '100%',
+                    height: 'clamp(180px, 52vw, 280px)',
+                    borderRadius: 18,
+                    overflow: 'hidden',
+                    border: `1px solid ${line}`,
+                    background: pageSurface,
+                    boxShadow: '0 12px 24px rgba(17,24,39,0.05)',
+                  }}
+                >
+                  <img
+                    src={gallerySectionImages[mobileGalleryIndex % gallerySectionImages.length]}
+                    alt={`${tenantName} galeri ${mobileGalleryIndex + 1}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              ) : gallerySectionImages.length > 1 ? (
                 <div
                   style={{
                     display: 'flex',
