@@ -1096,7 +1096,13 @@ export default function UcretPlaniPage() {
     }
 
     try {
-      await actions.addCollection(newCol)
+      const result = await actions.addCollection(newCol)
+      // skipped => kayıt gerçekleşmedi. Başarı mesajı göstermek yanlış olur,
+      // aksi halde kullanıcı kaydedilmediğini sandığı halde "kaydedildi" görür.
+      if (result?.skipped) {
+        toast(result?.message || 'Tahsilat kaydedilemedi (kayıt zaten mevcut veya kayıt sürüyor). Lütfen tekrar deneyin.')
+        return
+      }
       setCollectModalOpen(false)
       toast(Number(collectForm.installmentNo) === 0
         ? '🎉 Peşin işlem tahsilatı başarıyla kaydedildi.'

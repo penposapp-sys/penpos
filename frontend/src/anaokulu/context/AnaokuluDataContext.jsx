@@ -76,18 +76,35 @@ export function AnaokuluDataProvider({ children }) {
     checks: source.checks
   })
 
+  // Bir tahsilatın mükerrer olup olmadığını kontrol eder.
+  //
+  // ÖNEMLİ: Bir taksit birden fazla PARÇALI tahsilatla kapatılabilir
+  // (örn. 20.000 TL taksit → 2.000 TL + 18.000 TL). Bu yüzden mükerrerlik
+  // taksit numarasına göre değil, tahsilatın kendi imzasına göre belirlenir:
+  // aynı öğrenci + aynı kalem + aynı taksit + aynı tarih + aynı tutar.
+  // Aksi halde ikinci parça "mükerrer" sayılıp sessizce atılır ve taksit
+  // hiçbir zaman tamamlanmış görünmez.
   const hasDuplicateCollection = (collections = [], candidate = {}) => {
     if (!candidate || !candidate.studentId || !candidate.item) return false
 
+    const candidateId = candidate.id != null ? String(candidate.id) : ''
     const candidateStudentId = String(candidate.studentId)
     const candidateItem = String(candidate.item || '').trim().toLowerCase()
     const candidateInstallment = Number(candidate.installmentNo)
+    const candidateDate = String(candidate.date || '')
+    const candidateAmount = Number(candidate.amount) || 0
 
     return collections.some((collection) => {
+      // Aynı kaydın tekrar gönderilmesi (çift tıklama vb.) gerçek mükerrerdir.
+      if (candidateId && collection.id != null && String(collection.id) === candidateId) return true
+
       const sameStudent = String(collection.studentId) === candidateStudentId
       const sameItem = String(collection.item || '').trim().toLowerCase() === candidateItem
       const sameInstallment = Number(collection.installmentNo) === candidateInstallment
-      return sameStudent && sameItem && sameInstallment
+      // Parçalı tahsilata izin vermek için tarih ve tutar da imzaya dahil edilir.
+      const sameDate = String(collection.date || '') === candidateDate
+      const sameAmount = Math.abs((Number(collection.amount) || 0) - candidateAmount) < 0.01
+      return sameStudent && sameItem && sameInstallment && sameDate && sameAmount
     })
   }
 
