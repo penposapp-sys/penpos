@@ -285,9 +285,9 @@ function DashboardOverviewPage() {
         <Icon size={isMobile ? 18 : 22} strokeWidth={2.4} />
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: isMobile ? 9 : 11, color: '#64748b', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{label}</div>
         <div style={{ marginTop: 2, fontSize: isMobile ? 15 : 21, lineHeight: 1.15, fontWeight: 850, color: tone.main, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
-        <div style={{ marginTop: 3, fontSize: isMobile ? 8 : 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+        <div style={{ marginTop: 3, fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
       </div>
       {!isMobile && <ChevronRight size={16} color="#94a3b8" />}
     </div>
@@ -300,7 +300,7 @@ function DashboardOverviewPage() {
         <h2 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{title}</h2>
       </div>
       {action && (
-        <button type="button" onClick={onAction} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flex: '0 0 auto', border: 0, background: '#eff6ff', color: '#2563eb', padding: '5px 8px', borderRadius: 7, fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>
+        <button type="button" onClick={onAction} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flex: '0 0 auto', border: 0, background: '#eff6ff', color: '#2563eb', padding: '5px 8px', borderRadius: 7, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
           {action} <ArrowRight size={13} />
         </button>
       )}
@@ -314,7 +314,7 @@ function DashboardOverviewPage() {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 1550, margin: '0 auto', boxSizing: 'border-box', display: 'grid', gap: 10, minWidth: 0, overflowX: 'hidden', padding: '0 4px 8px' }}>
+    <div style={{ width: '100%', maxWidth: 1550, margin: '0 auto', boxSizing: 'border-box', display: 'grid', gap: 10, minWidth: 0, overflowX: 'hidden', padding: '0 4px 8px', fontSize: 12, lineHeight: 1.4, color: '#0f172a' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, padding: '2px 4px 3px' }}>
         <div>
           <h1 style={{ margin: 0, color: '#0f172a', fontSize: 22, fontWeight: 850 }}>Genel Bakış</h1>
@@ -322,9 +322,9 @@ function DashboardOverviewPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: 4, border: '1px solid #e2e8f0', borderRadius: 9, background: '#fff' }}>
           <button type="button" aria-label="Önceki ay" onClick={() => changeMonth(-1)} style={{ border: 0, background: 'transparent', color: '#475569', width: 29, height: 29, display: 'grid', placeItems: 'center', cursor: 'pointer' }}><ChevronLeft size={17} /></button>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#334155', fontSize: 11, fontWeight: 800 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#334155', fontSize: 12, fontWeight: 800 }}>
             <CalendarDays size={14} color="#2563eb" />
-            <select aria-label="Özet ayı" value={selectedPeriod} onChange={event => setSelectedPeriod(event.target.value)} style={{ maxWidth: 132, border: 0, outline: 0, background: 'transparent', color: '#334155', fontSize: 11, fontWeight: 800 }}>
+            <select aria-label="Özet ayı" value={selectedPeriod} onChange={event => setSelectedPeriod(event.target.value)} style={{ maxWidth: 132, border: 0, outline: 0, background: 'transparent', color: '#334155', fontSize: 12, fontWeight: 800 }}>
               {schoolYearPeriods.map(period => <option key={period} value={period}>{monthLabel(period)}</option>)}
             </select>
           </label>
@@ -344,7 +344,7 @@ function DashboardOverviewPage() {
           ].map(action => (
             <button key={action.label} type="button" onClick={() => navigate(action.to, action.state ? { state: action.state } : undefined)} style={{ display: 'flex', alignItems: 'center', textAlign: 'left', gap: 7, width: '100%', minWidth: 0, padding: isMobile ? '8px 7px' : '8px 10px', border: '1px solid transparent', borderRadius: 9, background: action.bg, color: action.color, cursor: 'pointer' }}>
               <span style={{ width: isMobile ? 27 : 32, height: isMobile ? 27 : 32, flex: '0 0 auto', display: 'grid', placeItems: 'center', borderRadius: 8, background: '#fff' }}><action.Icon size={16} /></span>
-              <span style={{ minWidth: 0, overflow: 'hidden' }}><strong style={{ display: 'block', fontSize: 10, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{action.label}</strong><small style={{ display: 'block', marginTop: 2, fontSize: 8, lineHeight: 1.2, color: '#64748b', overflowWrap: 'anywhere' }}>{action.detail}</small></span>
+              <span style={{ minWidth: 0, overflow: 'hidden' }}><strong style={{ display: 'block', fontSize: 12, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{action.label}</strong><small style={{ display: 'block', marginTop: 2, fontSize: 10, lineHeight: 1.2, color: '#64748b', overflowWrap: 'anywhere' }}>{action.detail}</small></span>
             </button>
           ))}
         </div>
@@ -364,7 +364,7 @@ function DashboardOverviewPage() {
             <div style={{ width: 126, height: 126, margin: isMobile ? '0 auto' : 0, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `conic-gradient(#10b981 ${collectionRate}%, #bfdbfe 0 ${Math.min(100, collectionRate + Math.round((100 - collectionRate) * 0.72))}%, #fecaca 0)` }}>
               <div style={{ width: 92, height: 92, borderRadius: '50%', background: '#fff', display: 'grid', alignContent: 'center', justifyItems: 'center' }}>
                 <strong style={{ fontSize: 20, color: '#0f172a' }}>%{collectionRate}</strong>
-                <span style={{ fontSize: 9, color: '#64748b', textAlign: 'center' }}>Tahsilat<br />Oranı</span>
+                <span style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>Tahsilat<br />Oranı</span>
               </div>
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
@@ -389,7 +389,7 @@ function DashboardOverviewPage() {
             ].map(row => (
               <div key={row.label} style={{ minWidth: 0, background: '#f8fafc', borderRadius: 8, padding: '7px 6px', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <row.Icon size={17} color={row.color} />
-                <div style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 13, color: row.color }}>{row.value}</strong><span style={{ display: 'block', fontSize: 8, color: '#64748b' }}>{row.label}</span></div>
+                <div style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 13, color: row.color }}>{row.value}</strong><span style={{ display: 'block', fontSize: 10, color: '#64748b' }}>{row.label}</span></div>
               </div>
             ))}
           </div>
@@ -397,7 +397,7 @@ function DashboardOverviewPage() {
 
         <section style={{ ...panelStyle, padding: 14 }}>
           {panelHeader('Eğitim Dönemi Tahsilat Grafiği', null, null, BarChart3)}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, color: '#64748b', fontSize: 9, marginBottom: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, color: '#64748b', fontSize: 11, marginBottom: 4 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><i style={{ width: 7, height: 7, borderRadius: 2, background: '#10b981' }} />Tahsil Edilen</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><i style={{ width: 7, height: 7, borderRadius: 2, background: '#bfdbfe' }} />Beklenen</span>
           </div>
@@ -412,7 +412,7 @@ function DashboardOverviewPage() {
                     <div title={`Tahsil edilen: ${money(row.collected)}`} style={{ width: '34%', maxWidth: 12, height: collectedHeight, borderRadius: '4px 4px 0 0', background: '#10b981' }} />
                     <div title={`Beklenen: ${money(row.expected)}`} style={{ width: '34%', maxWidth: 12, height: expectedHeight, borderRadius: '4px 4px 0 0', background: selected ? '#7c3aed' : '#bfdbfe' }} />
                   </div>
-                  <span style={{ fontSize: 7, lineHeight: 1.05, whiteSpace: 'pre-line', textAlign: 'center', color: selected ? '#4f46e5' : '#64748b', fontWeight: selected ? 800 : 600 }}>{monthShort(row.period)}</span>
+                  <span style={{ fontSize: 10, lineHeight: 1.05, whiteSpace: 'pre-line', textAlign: 'center', color: selected ? '#4f46e5' : '#64748b', fontWeight: selected ? 800 : 600 }}>{monthShort(row.period)}</span>
                 </div>
               )
             })}
@@ -425,8 +425,8 @@ function DashboardOverviewPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <div style={{ width: 40, height: 40, display: 'grid', placeItems: 'center', flex: '0 0 auto', borderRadius: 9, background: '#ede9fe', color: '#7c3aed' }}><FileText size={21} /></div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 9, color: '#64748b' }}>Bu Ay Faturalar · {monthLabel(selectedPeriod)}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}><strong style={{ fontSize: 17, color: '#312e81' }}>{invoiceCounts.issued} / {invoiceRows.length}</strong><span style={{ fontSize: 9, color: '#64748b' }}>%{invoiceRate}</span></div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Bu Ay Faturalar · {monthLabel(selectedPeriod)}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}><strong style={{ fontSize: 17, color: '#312e81' }}>{invoiceCounts.issued} / {invoiceRows.length}</strong><span style={{ fontSize: 11, color: '#64748b' }}>%{invoiceRate}</span></div>
                 <div style={{ height: 5, marginTop: 4, overflow: 'hidden', borderRadius: 5, background: '#ddd6fe' }}><div style={{ width: `${invoiceRate}%`, height: '100%', background: '#7c3aed', borderRadius: 5 }} /></div>
               </div>
             </div>
@@ -440,23 +440,23 @@ function DashboardOverviewPage() {
               <div key={item.label} style={{ minWidth: 0, padding: '7px 5px', borderRadius: 8, background: item.bg, textAlign: 'center' }}>
                 <item.Icon size={15} color={item.fg} style={{ marginBottom: 2 }} />
                 <strong style={{ display: 'block', fontSize: 14, lineHeight: 1.1, color: item.fg }}>{item.value}</strong>
-                <span style={{ display: 'block', fontSize: 8, color: item.fg }}>{item.label}</span>
-                <span style={{ display: 'block', marginTop: 2, fontSize: 7, fontWeight: 700, color: item.fg }}>{money(invoiceCounts[`${item.key}Amount`] || 0)}</span>
+                <span style={{ display: 'block', fontSize: 10, color: item.fg }}>{item.label}</span>
+                <span style={{ display: 'block', marginTop: 2, fontSize: 10, fontWeight: 700, color: item.fg }}>{money(invoiceCounts[`${item.key}Amount`] || 0)}</span>
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <strong style={{ fontSize: 10, color: '#334155' }}>Son Faturalar</strong>
-            <button type="button" onClick={() => navigate('/anaokulu/faturalar')} style={{ border: 0, background: 'transparent', color: '#2563eb', fontSize: 9, fontWeight: 800, cursor: 'pointer' }}>Tümü →</button>
+            <strong style={{ fontSize: 12, color: '#334155' }}>Son Faturalar</strong>
+            <button type="button" onClick={() => navigate('/anaokulu/faturalar')} style={{ border: 0, background: 'transparent', color: '#2563eb', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>Tümü →</button>
           </div>
           <div style={{ display: 'grid', gap: 2 }}>
             {!isMobile && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(65px,1fr) minmax(60px,1fr) auto auto auto', gap: 5, padding: '4px 2px', color: '#64748b', fontSize: 7, fontWeight: 800 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(65px,1fr) minmax(60px,1fr) auto auto auto', gap: 5, padding: '4px 2px', color: '#64748b', fontSize: 11, fontWeight: 800 }}>
                 <span>Fatura No</span><span>Öğrenci</span><span>Tutar</span><span>Tarih</span><span>Durum</span>
               </div>
             )}
             {recentInvoices.length === 0 ? (
-              <div style={{ padding: '14px 6px', color: '#94a3b8', textAlign: 'center', fontSize: 10 }}>Bu ay fatura kaydı yok.</div>
+              <div style={{ padding: '14px 6px', color: '#94a3b8', textAlign: 'center', fontSize: 12 }}>Bu ay fatura kaydı yok.</div>
             ) : recentInvoices.map((invoice, index) => {
               const student = getStudent(state, invoice.studentId)
               const workflow = getInvoiceWorkflow(invoice)
@@ -466,7 +466,7 @@ function DashboardOverviewPage() {
                   <div key={invoice.uuid || invoice._id || `${invoice.no}-${index}`} style={{ display: 'grid', gap: 5, padding: 8, border: '1px solid #f1f5f9', borderRadius: 8, fontSize: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                       <strong style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#334155' }}>{invoice.no || invoice.invoiceNo || '—'}</strong>
-                      <span style={{ flex: '0 0 auto', background: tone.bg, color: tone.color, borderRadius: 5, padding: '3px 6px', fontSize: 9, fontWeight: 800 }}>{invoiceStatusLabel(invoice)}</span>
+                      <span style={{ flex: '0 0 auto', background: tone.bg, color: tone.color, borderRadius: 5, padding: '3px 6px', fontSize: 11, fontWeight: 800 }}>{invoiceStatusLabel(invoice)}</span>
                     </div>
                     <span style={{ color: '#64748b', overflowWrap: 'anywhere' }}>{student?.name || invoice.buyer || '—'}</span>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, color: '#64748b' }}>
@@ -476,7 +476,7 @@ function DashboardOverviewPage() {
                 )
               }
               return (
-                <div key={invoice.uuid || invoice._id || `${invoice.no}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(65px,1fr) minmax(60px,1fr) auto auto auto', alignItems: 'center', gap: 5, padding: '5px 2px', borderBottom: '1px solid #f1f5f9', fontSize: 8 }}>
+                <div key={invoice.uuid || invoice._id || `${invoice.no}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(65px,1fr) minmax(60px,1fr) auto auto auto', alignItems: 'center', gap: 5, padding: '5px 2px', borderBottom: '1px solid #f1f5f9', fontSize: 11 }}>
                   <span style={{ color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{invoice.no || invoice.invoiceNo || '—'}</span>
                   <span style={{ color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{student?.name || invoice.buyer || '—'}</span>
                   <strong style={{ color: '#0f172a', whiteSpace: 'nowrap' }}>{money(invoice.total)}</strong>
@@ -514,17 +514,17 @@ function DashboardOverviewPage() {
             <div>
               <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead><tr style={{ background: '#f8fafc' }}>
-                  {['Öğrenci', 'Kalem', 'Tutar', 'Vade', 'Gün', ''].map(label => <th key={label} style={{ textAlign: 'left', padding: '7px 8px', color: '#64748b', fontSize: 9, fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>{label}</th>)}
+                  {['Öğrenci', 'Kalem', 'Tutar', 'Vade', 'Gün', ''].map(label => <th key={label} style={{ textAlign: 'left', padding: '7px 8px', color: '#64748b', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>{label}</th>)}
                 </tr></thead>
                 <tbody>
                   {unpaidRows.length === 0 ? <tr><td colSpan={6} style={{ padding: 22, textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>Seçili ay için tahsil edilmeyen taksit yok.</td></tr> : unpaidRows.map(row => (
                     <tr key={`${row.studentId}-${row.planName}-${row.installmentNo}`}>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: 9, fontWeight: 700, overflowWrap: 'anywhere' }}>{row.student.name}</td>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b', fontSize: 9, overflowWrap: 'anywhere' }}>{row.planName}</td>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#dc2626', fontSize: 9, fontWeight: 800 }}>{money(row.remaining)}</td>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: 9 }}>{trDate(row.dueDate)}</td>
-                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: row.daysOverdue > 0 ? '#dc2626' : '#64748b', fontSize: 9, fontWeight: 700 }}>{row.daysOverdue > 0 ? `${row.daysOverdue} gün` : '—'}</td>
-                      <td style={{ padding: '5px 7px', borderBottom: '1px solid #f1f5f9' }}><button type="button" onClick={() => navigateToCollection(row)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 0, borderRadius: 6, padding: '5px 7px', background: '#fee2e2', color: '#b91c1c', fontSize: 8, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}><CreditCard size={12} />Tahsil Et</button></td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, overflowWrap: 'anywhere' }}>{row.student.name}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' }}>{row.planName}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#dc2626', fontSize: 12, fontWeight: 800 }}>{money(row.remaining)}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: 12 }}>{trDate(row.dueDate)}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: row.daysOverdue > 0 ? '#dc2626' : '#64748b', fontSize: 12, fontWeight: 700 }}>{row.daysOverdue > 0 ? `${row.daysOverdue} gün` : '—'}</td>
+                      <td style={{ padding: '5px 7px', borderBottom: '1px solid #f1f5f9' }}><button type="button" onClick={() => navigateToCollection(row)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 0, borderRadius: 6, padding: '5px 7px', background: '#fee2e2', color: '#b91c1c', fontSize: 11, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}><CreditCard size={12} />Tahsil Et</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -539,11 +539,11 @@ function DashboardOverviewPage() {
             <div style={{ display: 'grid', gap: 6 }}>
               {pastMonthRows.map(row => (
                 <div key={row.period} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: '7px 10px', padding: 9, border: '1px solid #eef2f7', borderRadius: 8, minWidth: 0 }}>
-                  <strong style={{ color: '#334155', fontSize: 11 }}>{periodName(row.period)}</strong>
-                  <span style={{ justifySelf: 'end', padding: '3px 7px', borderRadius: 20, background: row.rate >= 70 ? '#dcfce7' : '#fef3c7', color: row.rate >= 70 ? '#15803d' : '#b45309', fontSize: 9, fontWeight: 800 }}>%{row.rate}</span>
-                  <span style={{ color: '#64748b', fontSize: 10 }}>Beklenen <strong style={{ color: '#475569' }}>{money(row.expected)}</strong></span>
-                  <span style={{ justifySelf: 'end', color: '#059669', fontSize: 10 }}>Tahsil <strong>{money(row.collected)}</strong></span>
-                  <span style={{ gridColumn: '1 / -1', color: '#dc2626', fontSize: 10 }}>Kalan <strong>{money(row.remaining)}</strong></span>
+                  <strong style={{ color: '#334155', fontSize: 12 }}>{periodName(row.period)}</strong>
+                  <span style={{ justifySelf: 'end', padding: '3px 7px', borderRadius: 20, background: row.rate >= 70 ? '#dcfce7' : '#fef3c7', color: row.rate >= 70 ? '#15803d' : '#b45309', fontSize: 10, fontWeight: 800 }}>%{row.rate}</span>
+                  <span style={{ color: '#64748b', fontSize: 11 }}>Beklenen <strong style={{ color: '#475569' }}>{money(row.expected)}</strong></span>
+                  <span style={{ justifySelf: 'end', color: '#059669', fontSize: 11 }}>Tahsil <strong>{money(row.collected)}</strong></span>
+                  <span style={{ gridColumn: '1 / -1', color: '#dc2626', fontSize: 11 }}>Kalan <strong>{money(row.remaining)}</strong></span>
                 </div>
               ))}
             </div>
@@ -551,16 +551,16 @@ function DashboardOverviewPage() {
             <div>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead><tr style={{ background: '#f8fafc' }}>
-                {['Ay', 'Beklenen', 'Tahsil Edilen', 'Kalan', 'Oran'].map(label => <th key={label} style={{ textAlign: label === 'Ay' ? 'left' : 'right', padding: '8px 7px', color: '#64748b', fontSize: 9, fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>{label}</th>)}
+                {['Ay', 'Beklenen', 'Tahsil Edilen', 'Kalan', 'Oran'].map(label => <th key={label} style={{ textAlign: label === 'Ay' ? 'left' : 'right', padding: '8px 7px', color: '#64748b', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>{label}</th>)}
               </tr></thead>
               <tbody>
                 {pastMonthRows.map(row => (
                   <tr key={row.period}>
-                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>{periodName(row.period)}</td>
-                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#475569', fontSize: 9, whiteSpace: 'nowrap' }}>{money(row.expected)}</td>
-                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#059669', fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap' }}>{money(row.collected)}</td>
-                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: row.remaining > 0 ? '#dc2626' : '#64748b', fontSize: 9, whiteSpace: 'nowrap' }}>{money(row.remaining)}</td>
-                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}><span style={{ display: 'inline-block', minWidth: 34, textAlign: 'center', padding: '3px 5px', borderRadius: 20, background: row.rate >= 70 ? '#dcfce7' : '#fef3c7', color: row.rate >= 70 ? '#15803d' : '#b45309', fontSize: 8, fontWeight: 800 }}>%{row.rate}</span></td>
+                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{periodName(row.period)}</td>
+                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' }}>{money(row.expected)}</td>
+                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#059669', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{money(row.collected)}</td>
+                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: row.remaining > 0 ? '#dc2626' : '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>{money(row.remaining)}</td>
+                    <td style={{ padding: '8px 7px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}><span style={{ display: 'inline-block', minWidth: 34, textAlign: 'center', padding: '3px 5px', borderRadius: 20, background: row.rate >= 70 ? '#dcfce7' : '#fef3c7', color: row.rate >= 70 ? '#15803d' : '#b45309', fontSize: 10, fontWeight: 800 }}>%{row.rate}</span></td>
                   </tr>
                 ))}
               </tbody>

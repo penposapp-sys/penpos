@@ -28,8 +28,51 @@ try {
     }
   }
 
+  if ((Resolve-Path $sourceExtension).Path -eq (Resolve-Path $targetExtension).Path) {
+    throw 'Chrome extension kaynak ve hedef klasor ayni olamaz; gecici extraction klasoru kullanilmali.'
+  }
+
   New-Item -ItemType Directory -Force -Path $targetExtension | Out-Null
   Copy-Item -Path (Join-Path $sourceExtension '*') -Destination $targetExtension -Recurse -Force
+
+  $manifestPath = Join-Path $targetExtension 'manifest.json'
+  if (-not (Test-Path $manifestPath)) {
+    throw 'Chrome extension manifest.json bulunamadi.'
+  }
+
+  $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+  $requiredFiles = @()
+
+  if ($manifest.background -and $manifest.background.service_worker) {
+    $requiredFiles += $manifest.background.service_worker
+  }
+  if ($manifest.action -and $manifest.action.default_popup) {
+    $requiredFiles += $manifest.action.default_popup
+  }
+  foreach ($entry in @($manifest.content_scripts)) {
+    foreach ($script in @($entry.js)) {
+      $requiredFiles += $script
+    }
+  }
+  if ($manifest.web_accessible_resources) {
+    foreach ($resource in @($manifest.web_accessible_resources)) {
+      if ($resource -is [string]) {
+        $requiredFiles += $resource
+      } elseif ($resource -is [System.Collections.IEnumerable]) {
+        foreach ($item in $resource) {
+          if ($item -is [string]) { $requiredFiles += $item }
+        }
+      }
+    }
+  }
+
+  $requiredFiles = @($requiredFiles | Where-Object { $_ } | Select-Object -Unique)
+  foreach ($relativeFile in $requiredFiles) {
+    $finalPath = Join-Path $targetExtension $relativeFile
+    if (-not (Test-Path $finalPath)) {
+      throw "Chrome extension manifest runtime dosyasi eksik: $relativeFile"
+    }
+  }
 
   $uninstaller = @'
 $ErrorActionPreference = 'Stop'

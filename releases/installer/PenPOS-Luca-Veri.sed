@@ -5,9 +5,9 @@ SEDVersion=3
 [Options]
 PackagePurpose=InstallApp
 ShowInstallProgramWindow=0
-HideExtractAnimation=0
-UseLongFileName=0
-InsideCompressed=0
+HideExtractAnimation=1
+UseLongFileName=1
+InsideCompressed=1
 CAB_FixedSize=0
 CAB_ResvCodeSigning=0
 RebootMode=N
@@ -18,7 +18,8 @@ TargetName=%TargetName%
 FriendlyName=%FriendlyName%
 AppLaunched=%AppLaunched%
 PostInstallCmd=%PostInstallCmd%
-SourceFiles=SourceFiles
+PostInstallCmd=<None>
+SourceFiles="SourceFiles"
 Strings="Strings"
 AdminQuietInstCmd=%AdminQuietInstCmd%
 UserQuietInstCmd=%UserQuietInstCmd%
@@ -27,29 +28,26 @@ UserQuietInstCmd=%UserQuietInstCmd%
 InstallPrompt=
 DisplayLicense=
 FinishMessage=
-TargetName=C:\Users\faruk\OneDrive\Belgeler\PenPos System\penpos dosyalar\PenPos\releases\installer\PenPOS Luca Veri Setup.exe
-FriendlyName=PenPOS Luca Veri
-AppLaunched=powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1
-File0="background.js"
-File1="content.js"
-File2="manifest.json"
-File3="popup.css"
-File4="popup.html"
-File5="popup.js"
+TargetName="__TARGET_NAME__"
+FriendlyName="PenPOS Luca Veri"
+AppLaunched="powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1"
+File0="chrome-extension\background.js"
+File1="chrome-extension\content.js"
+File2="chrome-extension\manifest.json"
+File3="chrome-extension\popup.html"
+File4="chrome-extension\popup.js"
+File5="chrome-extension\popup.css"
 File6="install.ps1"
-PostInstallCmd=<None>
 AdminQuietInstCmd=
 UserQuietInstCmd=
 
 [SourceFiles]
-SourceFiles0=C:\Users\faruk\OneDrive\Belgeler\PenPos System\penpos dosyalar\PenPos\chrome-extension\
-SourceFiles1=C:\Users\faruk\OneDrive\Belgeler\PenPos System\penpos dosyalar\PenPos\releases\installer\
+SourceFiles0=__STAGED_ROOT__
 [SourceFiles0]
-%FILE0%=
-%FILE1%=
-%FILE2%=
-%FILE3%=
-%FILE4%=
-%FILE5%=
-[SourceFiles1]
-%FILE6%=
+%File0%
+%File1%
+%File2%
+%File3%
+%File4%
+%File5%
+%File6%

@@ -1,4 +1,4 @@
-﻿const USE_LOCAL_API = true;
+﻿const USE_LOCAL_API = false;
 const DEFAULT_API_BASE = USE_LOCAL_API ? "http://localhost:4000" : "https://penpos.cloud";
 
 const PENDING_KEY = "penposLucaPendingTask";
@@ -236,6 +236,69 @@ async function closeLucaTab(tabId) {
     console.info(
       "[PenPOS Luca Bridge] Luca sekmesi kapatılamadı (muhtemelen zaten kapalı):",
       error?.message || error
+    );
+
+    return false;
+  }
+}
+
+// Extension görevini backend'de "error" durumuna alır.
+//
+// Bu çağrı OLMAZSA görev `extension_claimed` aşamasında kalır: frontend her
+// yoklamada status:'running' görür ve "Faturaları Kontrol Et" butonu
+// "Chrome Extension görevi devraldı…" metninde KALICI kilitlenir. Hata
+// yalnızca Luca sekmesinin konsolunda görünür, kullanıcı PenPOS'ta hiçbir
+// şey öğrenemez. İki yerde de (content.js istisnası VE submit reddi)
+// çağrılmalıdır.
+async function failCheckTask(jobId, resultToken, error) {
+  const id = String(jobId || "").trim();
+  const token = String(resultToken || "").trim();
+
+  if (!id) return false;
+
+  try {
+    const device = await getDevice();
+    const apiBase =
+      device?.apiBase ||
+      (device ? await getApiBase() : "http://localhost:4000");
+    const response = await fetch(
+      `${apiBase}/api/anaokulu/fail-luca/${encodeURIComponent(id)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(device?.deviceToken
+            ? { Authorization: `Bearer ${device.deviceToken}` }
+            : {})
+        },
+        body: JSON.stringify({
+          resultToken: token,
+          error: String(error || "Luca görevi başarısız oldu.")
+        })
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data?.ok) {
+      console.error(
+        "[PenPOS Luca Bridge] Görev hatası backend'e bildirilemedi:",
+        data?.error || response.status
+      );
+
+      return false;
+    }
+
+    console.warn(
+      "[PenPOS Luca Bridge] Görev hatası backend'e bildirildi:",
+      error
+    );
+
+    return true;
+  } catch (err) {
+    console.error(
+      "[PenPOS Luca Bridge] Görev hatası bildirimi başarısız:",
+      err?.message || err
     );
 
     return false;
@@ -1201,7 +1264,7 @@ chrome.runtime.onMessage.addListener(
                 shouldClearFilters
               ],
 
-              func: (ids, wantedLength, clearFilters) => {
+              func: (ids, wantedLength, shouldClearFilters) => {
                 const $ =
                   window.jQuery;
 
@@ -1609,6 +1672,12 @@ chrome.runtime.onMessage.addListener(
           console.error(
             "[PenPOS Luca Bridge] Fatura gönderme hatası:",
             err
+          );
+
+          await failCheckTask(
+            task?.jobId || message.jobId,
+            message.resultToken || task?.lucaTask?.resultToken,
+            err?.message || "Luca faturaları PenPOS'a gönderilemedi."
           );
 
           // Kontrol (arşiv) görevi burada da bitmiyor: kilit bırakılırsa

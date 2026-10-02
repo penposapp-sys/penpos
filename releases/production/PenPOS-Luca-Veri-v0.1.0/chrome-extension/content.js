@@ -842,6 +842,62 @@ const LUCA_PERIOD_MONTHS = {
     return getPageInvoices()
   }
 
+  async function waitForFreshArchiveResults(startSearch) {
+    const table = document.querySelector("#OutgoingArchiveTable")
+    if (!table) {
+      throw new Error("Luca arşiv tablosu bulunamadı.")
+    }
+
+    return new Promise((resolve, reject) => {
+      const started = Date.now()
+      let changed = false
+      let lastChangeAt = started
+      const observer = new MutationObserver(() => {
+        changed = true
+        lastChangeAt = Date.now()
+      })
+
+      observer.observe(table, {
+        attributes: true,
+        childList: true,
+        characterData: true,
+        subtree: true
+      })
+
+      const finish = (error) => {
+        observer.disconnect()
+        if (error) reject(error)
+        else resolve()
+      }
+
+      if (!startSearch()) {
+        finish(new Error("Luca Ara butonuna basılamadı."))
+        return
+      }
+
+      const check = () => {
+        if (isTableProcessing()) {
+          changed = true
+          lastChangeAt = Date.now()
+        }
+
+        if (changed && !isTableProcessing() && Date.now() - lastChangeAt >= 1000) {
+          finish()
+          return
+        }
+
+        if (Date.now() - started >= 20000) {
+          finish(new Error("Luca arşiv sonuçları yenilenmedi; eski sonuçlar kullanılmadı."))
+          return
+        }
+
+        setTimeout(check, 200)
+      }
+
+      check()
+    })
+  }
+
   async function setPageLength() {
     const selects =
       Array.from(
@@ -1264,16 +1320,7 @@ const LUCA_PERIOD_MONTHS = {
 
     await sleep(500)
 
-    const clicked =
-      clickAra()
-
-    if (!clicked) {
-      throw new Error(
-        "Luca Ara butonuna basılamadı."
-      )
-    }
-
-    await sleep(1500)
+    await waitForFreshArchiveResults(clickAra)
 
     await setPageLength()
 
@@ -4671,8 +4718,8 @@ const LUCA_PERIOD_MONTHS = {
   // hedef satır seçili olmalı). Doğrulama başarısızsa HİÇBİR şey
   // gönderilmez ve çağıran taraf kalemleri tek tek denemeye döner.
   async function sendLucaStagingBatch(targets) {
-    if (targets.length < 2) {
-      throw new Error('Toplu gönderim en az iki kalem gerektirir.')
+    if (!targets.length) {
+      throw new Error('Luca taslak listesinde gönderilebilir fatura bulunamadı.')
     }
 
     await clearAllLucaStagingSelection()
@@ -4734,9 +4781,8 @@ const LUCA_PERIOD_MONTHS = {
   }
 
   // FATURAYI ONAYLA / TOPLU FATURA ONAYLA
-  // TEK onayda kalemler tek tek; TOPLU onayda önce TEK "Gönder" denenir ve
-  // olmazsa kalemler tek tek işlenir. Başarısız olan "sent" YAZILMAZ, gerçek
-  // Luca hata mesajıyla PenPOS'a gider ve satır yeniden denenebilir kalır.
+  // TEK onayda bir fatura, TOPLU onayda seçili bulunan faturalar tek
+  // "Gönder" çağrısıyla işlenir. Başarısız olan "sent" YAZILMAZ.
   async function runSendTask(task) {
     const items = Array.isArray(task.items) ? task.items : []
 
@@ -4781,22 +4827,34 @@ const LUCA_PERIOD_MONTHS = {
     // onayda liste tek sayfaya getirilip satır numaradan okunur.
     const bulk = pending.length > 1
 
-    // TOPLU ONAY hızlı yolu: tüm kalemler TEK "Gönder" ile gönderilir.
-    // Satırlardan biri bulunamazsa veya Luca reddederse kalemler aşağıdaki
-    // TEK TEK döngüye düşer; hiçbir kalem doğrulanmadan "gönderilmiş"
-    // sayılmaz.
+    // Toplu onayda bulunan satırlar TEK bir gönderimde işlenir. Eksik satır
+    // ve toplu işlem hataları raporlanır; hiçbir zaman tekli gönderime düşmez.
     const sentByBatch = new Set()
+    const failedByBatch = new Map()
 
     if (bulk) {
+      let batch = null
       try {
-        const batch = await planLucaStagingBatch(pending)
+        batch = await planLucaStagingBatch(pending)
+      } catch (error) {
+        const message = error?.message || 'Luca toplu taslak listesi okunamadı.'
+        for (const item of pending) failedByBatch.set(item.sourceKey, message)
+      }
 
-        if (batch.missing.length) {
-          console.warn(
-            '[PenPOS Luca Bridge] Toplu gönderim yapılmadı, eksik taslak satırı var; kalemler tek tek denenecek:',
-            batch.missing.join(', ')
-          )
-        } else {
+      if (batch) {
+        const foundKeys = new Set(batch.targets.map(target => target.item.sourceKey))
+        for (const item of pending) {
+          if (foundKeys.has(item.sourceKey)) continue
+          const invoiceNo = String(item.invoiceNo || item.no || '').trim()
+          const message = invoiceNo
+            ? `Luca taslak listesinde "${invoiceNo}" bulunamadı; toplu gönderime alınmadı.`
+            : 'Onaylanacak taslağın fatura numarası bulunamadı; toplu gönderime alınmadı.'
+          failedByBatch.set(item.sourceKey, message)
+          console.warn('[PenPOS Luca Bridge] Toplu onay için Luca taslağı bulunamadı:', message)
+        }
+
+        if (batch.targets.length) {
+          try {
           await sendLucaStagingBatch(batch.targets)
 
           for (const target of batch.targets) {
@@ -4808,12 +4866,14 @@ const LUCA_PERIOD_MONTHS = {
             batch.targets.length,
             'fatura'
           )
+          } catch (error) {
+            const message = error?.message || 'Luca toplu gönderimi başarısız.'
+            for (const target of batch.targets) {
+              failedByBatch.set(target.item.sourceKey, message)
+            }
+            console.warn('[PenPOS Luca Bridge] Toplu gönderim başarısız:', message)
+          }
         }
-      } catch (error) {
-        console.warn(
-          '[PenPOS Luca Bridge] Toplu gönderim başarısız, kalemler tek tek denenecek:',
-          error?.message || error
-        )
       }
     }
 
@@ -4829,6 +4889,13 @@ const LUCA_PERIOD_MONTHS = {
 
         result = { ...item, status: 'sent', invoiceNo }
         record = { sourceKey: item.sourceKey, status: 'sent', invoiceNo, error: '' }
+      } else if (bulk) {
+        const message = failedByBatch.get(item.sourceKey) || 'Luca toplu onay sonucu alınamadı.'
+        const { invoiceNo: _ignoredInvoiceNo, ...rest } = item
+        result = { ...rest, status: 'failed', error: message }
+        record = { sourceKey: item.sourceKey, status: 'failed', invoiceNo: '', error: message }
+        failures.push(message)
+        console.warn('[PenPOS Luca Bridge] Luca toplu onay satırı başarısız:', message)
       } else {
         try {
           const invoiceNo = await sendSingleLucaStagingInvoice(item, { bulk })
