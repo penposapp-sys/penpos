@@ -12,9 +12,31 @@ async function getApiBase() {
   return DEFAULT_API_BASE;
 }
 
+function getDeviceApiBase(device) {
+  if (!USE_LOCAL_API) return DEFAULT_API_BASE;
+
+  const storedApiBase = String(device?.apiBase || '').replace(/\/+$/, '');
+  if (storedApiBase) {
+    try {
+      const hostname = new URL(storedApiBase).hostname.toLowerCase();
+      if (!USE_LOCAL_API && ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(hostname)) {
+        return DEFAULT_API_BASE;
+      }
+    } catch {}
+    return storedApiBase;
+  }
+  return DEFAULT_API_BASE;
+}
+
 async function getDevice() {
   const data = await chrome.storage.local.get(DEVICE_KEY);
-  return data?.[DEVICE_KEY] || null;
+  const device = data?.[DEVICE_KEY] || null;
+  if (device && !USE_LOCAL_API && device.apiBase !== DEFAULT_API_BASE) {
+    const normalized = { ...device, apiBase: DEFAULT_API_BASE };
+    await setDevice(normalized);
+    return normalized;
+  }
+  return device;
 }
 
 async function setDevice(device) {
@@ -258,9 +280,7 @@ async function failCheckTask(jobId, resultToken, error) {
 
   try {
     const device = await getDevice();
-    const apiBase =
-      device?.apiBase ||
-      (device ? await getApiBase() : "http://localhost:4000");
+    const apiBase = getDeviceApiBase(device);
     const response = await fetch(
       `${apiBase}/api/anaokulu/fail-luca/${encodeURIComponent(id)}`,
       {
@@ -307,7 +327,7 @@ async function failCheckTask(jobId, resultToken, error) {
 
 async function claimTask(jobId, extensionToken) {
   const device = await getDevice();
-  const apiBase = device?.apiBase || (device ? await getApiBase() : "http://localhost:4000");
+  const apiBase = getDeviceApiBase(device);
   const response = await fetch(
     `${apiBase}/api/anaokulu/claim-luca/${encodeURIComponent(jobId)}`,
     {
@@ -385,7 +405,7 @@ async function claimTaskOnce(task) {
 
 async function submitInvoices(jobId, resultToken, invoices) {
   const device = await getDevice();
-  const apiBase = device?.apiBase || (device ? await getApiBase() : "http://localhost:4000");
+  const apiBase = getDeviceApiBase(device);
   const response = await fetch(
     `${apiBase}/api/anaokulu/submit-luca/${encodeURIComponent(jobId)}`,
     {
@@ -415,7 +435,7 @@ async function submitInvoices(jobId, resultToken, invoices) {
 
 async function claimInvoiceCreateTask(jobId, extensionToken) {
   const device = await getDevice();
-  const apiBase = device?.apiBase || await getApiBase();
+  const apiBase = getDeviceApiBase(device);
   const response = await fetch(`${apiBase}/api/anaokulu/luca-create/jobs/${encodeURIComponent(jobId)}/claim`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -428,7 +448,7 @@ async function claimInvoiceCreateTask(jobId, extensionToken) {
 
 async function submitInvoiceCreateResult(jobId, resultToken, results) {
   const device = await getDevice();
-  const apiBase = device?.apiBase || await getApiBase();
+  const apiBase = getDeviceApiBase(device);
   const response = await fetch(`${apiBase}/api/anaokulu/luca-create/jobs/${encodeURIComponent(jobId)}/result`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -479,7 +499,7 @@ async function registerDevice(accessToken, deviceName, apiBaseValue) {
 async function heartbeatDevice() {
   const device = await getDevice();
   if (!device?.deviceToken) return { ok: false, error: "Bağlı cihaz yok" };
-  const apiBase = device.apiBase || await getApiBase();
+  const apiBase = getDeviceApiBase(device);
   const response = await fetch(`${apiBase}/api/anaokulu/luca-device/heartbeat`, {
     method: "POST",
     headers: { Authorization: `Bearer ${device.deviceToken}` }
@@ -502,7 +522,7 @@ async function pollDeviceTasks() {
 
   const pending = await getPendingTask();
   if (pending) return;
-  const apiBase = device.apiBase || await getApiBase();
+  const apiBase = getDeviceApiBase(device);
   const response = await fetch(`${apiBase}/api/anaokulu/luca-device/tasks`, {
     headers: { Authorization: `Bearer ${device.deviceToken}` }
   });
@@ -887,12 +907,7 @@ chrome.runtime.onMessage.addListener(
 
           // Luca sekmesi ARKA PLANDA açılır: kullanıcı PenPOS'ta çalışmaya
           // devam eder, görev bitince sekme otomatik kapanır.
-          const tab =
-            await chrome.tabs.create({
-              url:
-                "https://turmobefatura.luca.com.tr/Account/Login",
-              active: false
-            });
+          const tab = await chrome.tabs.create({ url: "about:blank", active: false });
 
           const task = {
             jobId,
@@ -908,9 +923,15 @@ chrome.runtime.onMessage.addListener(
             heartbeatAt: Date.now()
           };
 
-          await setPendingTask(
-            task
-          );
+          try {
+            await setPendingTask(task);
+            await chrome.tabs.update(tab.id, {
+              url: "https://turmobefatura.luca.com.tr/Account/Login"
+            });
+          } catch (error) {
+            await releaseLucaTaskLock(jobId, "Luca sekmesi başlatılamadı");
+            throw error;
+          }
 
           console.log(
             "[PenPOS Luca Bridge] Luca sekmesi arka planda açıldı.",

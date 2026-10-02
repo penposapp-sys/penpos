@@ -5247,8 +5247,9 @@ const LUCA_PERIOD_MONTHS = {
       })
       .then(response => {
         if (!response?.ok) {
-          console.log(
-            "[PenPOS Luca Bridge] Bekleyen Luca görevi yok."
+          console.error(
+            "[PenPOS Luca Bridge] Luca görevi claim edilemedi:",
+            response?.error || "Backend bekleyen Luca görevi döndürmedi."
           )
 
           return

@@ -828,6 +828,9 @@ const toastSticky = (m, duration = 0) => {
     if (status === 'verified') {
       return <button {...common} onClick={() => setDetailInv({ invoice: row.invoice, row })} style={{ ...common.style, background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>Faturayı Gör</button>
     }
+    if (String(row.invoice?.no || row.invoiceNo || '').trim()) {
+      return <button {...common} onClick={() => setDetailInv({ invoice: row.invoice, row })} style={{ ...common.style, background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>Faturayı Gör</button>
+    }
     return <button {...common} onClick={() => startInvoiceJob([row], 'create')} style={{ ...common.style, background: '#0284c7', color: '#fff' }}>Fatura Kes</button>
   }
 
