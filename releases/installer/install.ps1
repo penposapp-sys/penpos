@@ -28,11 +28,12 @@ try {
     }
   }
 
+  New-Item -ItemType Directory -Force -Path $targetExtension | Out-Null
+
   if ((Resolve-Path $sourceExtension).Path -eq (Resolve-Path $targetExtension).Path) {
     throw 'Chrome extension kaynak ve hedef klasor ayni olamaz; gecici extraction klasoru kullanilmali.'
   }
 
-  New-Item -ItemType Directory -Force -Path $targetExtension | Out-Null
   Copy-Item -Path (Join-Path $sourceExtension '*') -Destination $targetExtension -Recurse -Force
 
   $manifestPath = Join-Path $targetExtension 'manifest.json'
