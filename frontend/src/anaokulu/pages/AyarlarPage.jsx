@@ -19,6 +19,8 @@ const InputCls = {
   fontSize: 13, outline: 'none', width: '100%'
 }
 
+const INVOICE_ITEM_OPTIONS = ['EĞİTİM', 'KIRTASİYE', 'YEMEK', 'SERVİS', 'ATÖLYE']
+
 const LabelCls = {
   fontSize: 12, color: '#475569', fontWeight: 600,
   display: 'block', marginBottom: 6
@@ -69,9 +71,9 @@ export default function AyarlarPage() {
 
   const [form, setForm] = useState({
     school: '',
-    vat: 10,
     yearStart: DEFAULT_YEAR_START,
-    matchBy: 'tax'
+    invoiceMatchBy: 'tax',
+    invoiceCustomerMatchBy: 'student'
   })
   // Kullanıcı formu aktif düzenliyorsa backend güncellemesi override etmesin
   const [formUserEdited, setFormUserEdited] = useState(false)
@@ -86,7 +88,7 @@ export default function AyarlarPage() {
 
   // Ücret kalemleri state
   const [feeCategories, setFeeCategories] = useState([])
-  const [newFee, setNewFee] = useState({ name: '', defaultPrice: 0, invoiced: true })
+  const [newFee, setNewFee] = useState({ name: '', invoiceItem: '', defaultPrice: 0, invoiced: true, vatRate: 0 })
 
   // Luca e-Fatura Ayarları state — backend yüklenince useEffect ile senkronize edilir
   const [lucaSettings, setLucaSettings] = useState({ tckn: '', password: '' })
@@ -170,7 +172,6 @@ export default function AyarlarPage() {
     if (result?.ok === false || result?.success === false) {
       throw new Error(result?.message || 'Ödeme türleri kaydedilemedi.')
     }
-
     const saved = Array.isArray(result?.paymentMethods) ? result.paymentMethods : Array.isArray(result?.methods) ? result.methods : normalized
     setPaymentMethods(saved.filter((method) => method && method.isDeleted !== true))
     return saved
@@ -186,9 +187,9 @@ export default function AyarlarPage() {
     if (!formUserEdited) {
       setForm({
         school: settings.school || settings.okulAdi || '',
-        vat: Number(settings.vat ?? settings.vergiOrani ?? 10),
         yearStart: settings.yearStart || settings.donem || currentYs || DEFAULT_YEAR_START,
-        matchBy: settings.matchBy || 'tax'
+        invoiceMatchBy: settings.invoiceMatchBy || settings.matchBy || 'tax',
+        invoiceCustomerMatchBy: settings.invoiceCustomerMatchBy || settings.matchBy || 'student'
       })
     }
 
@@ -238,11 +239,11 @@ export default function AyarlarPage() {
     const next = {
       school: String(form.school || '').trim() || 'Anaokulu',
       okulAdi: String(form.school || '').trim() || 'Anaokulu',
-      vat: Number(form.vat) || 0,
-      vergiOrani: Number(form.vat) || 0,
       yearStart: form.yearStart || DEFAULT_YEAR_START,
       donem: form.yearStart || DEFAULT_YEAR_START,
-      matchBy: form.matchBy || 'tax',
+      matchBy: form.invoiceMatchBy || 'tax',
+      invoiceMatchBy: form.invoiceMatchBy || 'tax',
+      invoiceCustomerMatchBy: form.invoiceCustomerMatchBy || 'student',
       feeCategories,
       discounts,
       lockedDates,
@@ -341,12 +342,14 @@ export default function AyarlarPage() {
       {
         id: genId(),
         name: newFee.name.trim(),
+        invoiceItem: newFee.invoiceItem || '',
         defaultPrice: Number(newFee.defaultPrice) || 0,
-        invoiced: newFee.invoiced !== false
+        invoiced: newFee.invoiced !== false,
+        vatRate: Number(newFee.vatRate) || 0
       }
     ]
     setFeeCategories(updated)
-    setNewFee({ name: '', defaultPrice: 0, invoiced: true })
+    setNewFee({ name: '', invoiceItem: '', defaultPrice: 0, vatRate: 0, invoiced: true })
     actions.updateSettings({ ...s, feeCategories: updated })
     toast('Ücret kalemi eklendi.')
   }
@@ -362,7 +365,7 @@ export default function AyarlarPage() {
     const updated = feeCategories.map(f => {
       if (f.id !== id) return f
       let finalVal = val
-      if (field === 'defaultPrice') finalVal = Number(val) || 0
+      if (field === 'defaultPrice' || field === 'vatRate') finalVal = Number(val) || 0
       if (field === 'invoiced') finalVal = val === '1' || val === true
       return { ...f, [field]: finalVal }
     })
@@ -781,11 +784,6 @@ export default function AyarlarPage() {
                 value={form.school} onChange={e => upd('school', e.target.value)} />
             </div>
             <div style={FieldCls}>
-              <label style={LabelCls}>Varsayılan KDV (%)</label>
-              <input style={InputCls} type="number" min="0" max="100" step="0.1"
-                value={form.vat} onChange={e => upd('vat', Number(e.target.value) || 0)} />
-            </div>
-            <div style={FieldCls}>
               <label style={LabelCls}>Eğitim Yılı Başlangıcı</label>
               <select style={InputCls} value={form.yearStart}
                 onChange={e => upd('yearStart', e.target.value)}>
@@ -796,11 +794,20 @@ export default function AyarlarPage() {
             </div>
             <div style={FieldCls}>
               <label style={LabelCls}>Fatura Eşleştirme Kriteri</label>
-              <select style={InputCls} value={form.matchBy}
-                onChange={e => upd('matchBy', e.target.value)}>
-                <option value="student">Öğrenci Adı (Önerilen - Faturalar Öğrenciye Kesiliyorsa)</option>
-                <option value="tax">TCKN / VKN Öncelikli (Bulunamazsa Veli Adı)</option>
-                <option value="parent">Yalnızca Veli Adı</option>
+              <select style={InputCls} value={form.invoiceMatchBy}
+                onChange={e => upd('invoiceMatchBy', e.target.value)}>
+                <option value="student">Öğrenci Adı</option>
+                <option value="tax">TC Kimlik No</option>
+                <option value="student_tax">Öğrenci Adı + TC Kimlik No</option>
+              </select>
+            </div>
+            <div style={FieldCls}>
+              <label style={LabelCls}>Fatura Kesme Müşteri Eşleştirme Kriteri</label>
+              <select style={InputCls} value={form.invoiceCustomerMatchBy}
+                onChange={e => upd('invoiceCustomerMatchBy', e.target.value)}>
+                <option value="student">Öğrenci Adı</option>
+                <option value="tax">TC Kimlik No</option>
+                <option value="student_tax">Öğrenci Adı + TC Kimlik No</option>
               </select>
             </div>
           </div>
@@ -960,6 +967,14 @@ export default function AyarlarPage() {
                     <input style={{ ...InputCls, width: '100%' }} value={fc.name}
                       onChange={e => updateFeeCategory(fc.id, 'name', e.target.value)} />
                   </div>
+                  <div>
+                    <label style={LabelCls}>Fatura Kalemi</label>
+                    <select style={{ ...InputCls, width: '100%' }} disabled={fc.invoiced === false}
+                      value={fc.invoiceItem || ''} onChange={e => updateFeeCategory(fc.id, 'invoiceItem', e.target.value)}>
+                      <option value="">Seçiniz</option>
+                      {INVOICE_ITEM_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <div>
                       <label style={LabelCls}>Varsayılan Fiyat (₺)</label>
@@ -977,6 +992,13 @@ export default function AyarlarPage() {
                         <option value="0">⚪ Faturasız</option>
                       </select>
                     </div>
+                    <div>
+                      <label style={LabelCls}>KDV Oranı (%)</label>
+                      <input style={{ ...InputCls, width: '100%' }} type="number" min="0" max="100" step="0.01"
+                        disabled={fc.invoiced === false}
+                        value={fc.vatRate ?? 0}
+                        onChange={e => updateFeeCategory(fc.id, 'vatRate', e.target.value)} />
+                    </div>
                   </div>
                   <button onClick={() => removeFeeCategory(fc.id)} style={{
                     ...Btn, background: '#fee2e2', color: '#991b1b', padding: '7px 12px', justifyContent: 'center'
@@ -990,14 +1012,15 @@ export default function AyarlarPage() {
                 <thead>
                   <tr>
                     <th style={th}>Kalem Adı</th>
+                    <th style={{ ...th, width: 150 }}>Fatura Kalemi</th>
                     <th style={{ ...th, width: 180 }}>Varsayılan Fiyat (₺)</th>
-                    <th style={{ ...th, width: 200 }}>Fatura Durumu</th>
+                    <th style={{ ...th, width: 200 }}>Fatura Durumu / KDV (%)</th>
                     <th style={{ ...th, width: 80, textAlign: 'center' }}>İşlem</th>
                   </tr>
                 </thead>
                 <tbody>
                   {feeCategories.length === 0 ? (
-                    <tr><td colSpan={4} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
+                    <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '24px 12px' }}>
                       Henüz ücret kalemi eklenmedi.
                     </td></tr>
                   ) : feeCategories.map(fc => (
@@ -1007,18 +1030,31 @@ export default function AyarlarPage() {
                           onChange={e => updateFeeCategory(fc.id, 'name', e.target.value)} />
                       </td>
                       <td style={td}>
+                        <select style={{ ...InputCls, width: '100%' }} disabled={fc.invoiced === false}
+                          value={fc.invoiceItem || ''} onChange={e => updateFeeCategory(fc.id, 'invoiceItem', e.target.value)}>
+                          <option value="">Seçiniz</option>
+                          {INVOICE_ITEM_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </td>
+                      <td style={td}>
                         <input style={{ ...InputCls, width: '100%' }} type="number" step="0.01" value={fc.defaultPrice}
                           onChange={e => updateFeeCategory(fc.id, 'defaultPrice', e.target.value)} />
                       </td>
                       <td style={td}>
-                        <select
-                          style={{ ...InputCls, width: '100%', fontWeight: 700 }}
-                          value={fc.invoiced !== false ? '1' : '0'}
-                          onChange={e => updateFeeCategory(fc.id, 'invoiced', e.target.value)}
-                        >
-                          <option value="1">🟢 Faturalı</option>
-                          <option value="0">⚪ Faturasız</option>
-                        </select>
+                        <div style={{ display: 'grid', gap: 6 }}>
+                          <select
+                            style={{ ...InputCls, width: '100%', fontWeight: 700 }}
+                            value={fc.invoiced !== false ? '1' : '0'}
+                            onChange={e => updateFeeCategory(fc.id, 'invoiced', e.target.value)}
+                          >
+                            <option value="1">🟢 Faturalı</option>
+                            <option value="0">⚪ Faturasız</option>
+                          </select>
+                          <input style={{ ...InputCls, width: '100%' }} type="number" min="0" max="100" step="0.01"
+                            disabled={fc.invoiced === false}
+                            value={fc.vatRate ?? 0}
+                            onChange={e => updateFeeCategory(fc.id, 'vatRate', e.target.value)} />
+                        </div>
                       </td>
                       <td style={{ ...td, textAlign: 'center' }}>
                         <button onClick={() => removeFeeCategory(fc.id)} style={{
@@ -1036,7 +1072,7 @@ export default function AyarlarPage() {
           <div style={{
             display: isMobile ? 'flex' : 'grid',
             flexDirection: isMobile ? 'column' : undefined,
-            gridTemplateColumns: isMobile ? undefined : '1fr 150px 180px auto',
+            gridTemplateColumns: isMobile ? undefined : '1fr 150px 150px 180px 120px auto',
             gap: 10,
             alignItems: isMobile ? 'stretch' : 'flex-end',
             padding: '14px', background: '#f8fafc', borderRadius: 10
@@ -1062,6 +1098,21 @@ export default function AyarlarPage() {
                   <option value="1">🟢 Faturalı</option>
                   <option value="0">⚪ Faturasız</option>
                 </select>
+              </div>
+              <div>
+                <label style={LabelCls}>Fatura Kalemi</label>
+                <select style={InputCls} disabled={newFee.invoiced === false} value={newFee.invoiceItem || ''}
+                  onChange={e => setNewFee({ ...newFee, invoiceItem: e.target.value })}>
+                  <option value="">Seçiniz</option>
+                  {INVOICE_ITEM_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={LabelCls}>KDV Oranı (%)</label>
+                <input style={InputCls} type="number" min="0" max="100" step="0.01"
+                  disabled={newFee.invoiced === false}
+                  value={newFee.vatRate ?? 0}
+                  onChange={e => setNewFee({ ...newFee, vatRate: Number(e.target.value) || 0 })} />
               </div>
             </div>
             <button onClick={addFeeCategory} style={{

@@ -10,7 +10,9 @@
   ],
   "host_permissions": [
     "https://turmobefatura.luca.com.tr/*",
-    "https://penpos.cloud/*"
+    "https://penpos.cloud/*",
+    "http://localhost:5173/*",
+    "http://localhost:4000/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,12 +24,13 @@
     {
       "matches": [
         "https://turmobefatura.luca.com.tr/*",
-        "https://penpos.cloud/*"
+        "https://penpos.cloud/*",
+        "http://localhost:5173/*"
       ],
       "js": [
         "content.js"
       ],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ]
 }

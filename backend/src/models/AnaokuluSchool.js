@@ -4,12 +4,13 @@ const anaokuluFeeCategorySchema = new mongoose.Schema(
   {
     id: { type: String, default: '' },
     name: { type: String, required: true },
+    invoiceItem: { type: String, default: '' },
     defaultPrice: { type: Number, default: 0 },
-    invoiced: { type: Boolean, default: true }
+    invoiced: { type: Boolean, default: true },
+    vatRate: { type: Number, default: 0, min: 0, max: 100 }
   },
   { _id: false, strict: false }
 )
-
 const anaokuluDiscountSchema = new mongoose.Schema(
   {
     id: { type: String, default: '' },
@@ -38,6 +39,8 @@ const anaokuluSettingSchema = new mongoose.Schema(
     vat: { type: Number, default: 10 },
     yearStart: { type: String, default: '' },
     matchBy: { type: String, default: 'tax' },
+    invoiceMatchBy: { type: String, default: '' },
+    invoiceCustomerMatchBy: { type: String, default: '' },
     feeCategories: { type: [anaokuluFeeCategorySchema], default: [] },
     discounts: { type: [anaokuluDiscountSchema], default: [] },
     luca: { type: anaokuluLucaSchema, default: () => ({}) },
@@ -79,6 +82,10 @@ const anaokuluStudentSchema = new mongoose.Schema(
         new mongoose.Schema(
           {
             name: { type: String, default: '' },
+            feeCategoryId: { type: String, default: '' },
+            invoiceItem: { type: String, default: '' },
+            vatRate: { type: Number, default: 0 },
+            invoiced: { type: Boolean, default: true },
             total: { type: Number, default: 0 },
             basePrice: { type: Number, default: 0 },
             discountId: { type: String, default: '' },
@@ -101,6 +108,14 @@ const anaokuluStudentSchema = new mongoose.Schema(
               default: []
             },
             installments: { type: Number, default: 1 },
+            installmentSchedule: {
+              type: [{
+                no: { type: Number, required: true },
+                dueDate: { type: String, required: true },
+                amount: { type: Number, required: true, min: 0 }
+              }],
+              default: []
+            },
             downPayment: { type: Number, default: 0 },
             start: { type: String, default: '' },
             skippedInstallments: { type: Array, default: [] }
@@ -134,6 +149,13 @@ const anaokuluCollectionSchema = new mongoose.Schema(
 const anaokuluInvoiceSchema = new mongoose.Schema(
   {
     uuid: { type: String, default: '' },
+    sourceKey: { type: String, default: '' },
+    lifecycleStatus: { type: String, default: '' },
+    // Luca işlemi başarısız olduğunda saklanan GERÇEK hata metni. Faturalar
+    // sayfasında satırın üstünde "bilgilerini kontrol ediniz" notu olarak
+    // gösterilir; yenilemede kaybolmaması gerekir.
+    lucaError: { type: String, default: '' },
+    lucaErrorAt: { type: Number, default: 0 },
     no: { type: String, default: '' },
     date: { type: String, default: '' },
     period: { type: String, default: '' },

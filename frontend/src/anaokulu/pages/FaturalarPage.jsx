@@ -5,7 +5,7 @@ import { api } from '../../lib/apiClient.js'
 import { getAuthToken } from '../../lib/authStorage.js'
 import { resolveApiOrigin } from '../../lib/runtimeApi.js'
 import {
-  money, trDate, periodsOfYear, getYearStart, periodName, round2,
+  money, trDate, periodsOfYear, getYearStart, periodName, round2, getLucaInvoiceDate,
   getMonthlyInvoicableInstallments
 } from '../utils/calculations.js'
 
@@ -57,6 +57,7 @@ export default function FaturalarPage() {
   const [detailInv, setDetailInv] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [toastMsg, setToastMsg] = useState(null) // { msg, sticky }
+  const [invoiceOps, setInvoiceOps] = useState({})
 
   // Luca giriş ayarları formu
   const [lucaForm, setLucaForm] = useState({
@@ -68,8 +69,338 @@ export default function FaturalarPage() {
     setToastMsg({ msg: m, sticky: false })
     setTimeout(() => setToastMsg(null), 3200)
   }
-  const toastSticky = (m) => {
+  // `duration` verilirse bildirim o kadar saniye sonra kendiliğinden kapanır.
+// Kontrol sonucu 3 satırı "Fatura Kes"e döndürmüş olabilir; bu bildirim
+// eyleme yönlendirdiği için kullanıcı okuyup kapatana kadar açık kalmalı.
+const toastSticky = (m, duration = 0) => {
     setToastMsg({ msg: m, sticky: true })
+    if (duration > 0) {
+      setTimeout(() => setToastMsg(null), duration)
+    }
+  }
+
+  // Extension köprüsü geri bildirimi: görev bildirimi background'a
+  // ulaşamazsa (Extension yok/pasif ya da site izni yok) sayfa yoklama
+  // döngüsünde sessizce takılmak yerine hemen bilgi verir. Başarı
+  // durumunda bildirim yoktur; akış yoklama (poll) ile sürer.
+  useEffect(() => {
+    const onBridgeResponse = (event) => {
+      const data = event?.data
+      if (!data || data.source !== 'penpos-luca-bridge-response') return
+      if (data.ok !== false) return
+      toastSticky(`❌ Luca Extension görevi alamadı: ${data.error || 'bilinmeyen hata'} Sayfayı yenileyip Extension'ın yüklü ve etkin olduğunu doğrulayın, sonra tekrar deneyin.`)
+    }
+    window.addEventListener('message', onBridgeResponse)
+    return () => window.removeEventListener('message', onBridgeResponse)
+  }, [])
+
+  const getRowWorkflowStatus = (row) => (
+    invoiceOps[row.sourceKey]?.status
+    || row.invoice?.lifecycleStatus
+    || row.invoiceWorkflowStatus
+    || 'pending'
+  )
+
+  // Luca işlemi başarısız olduğunda hata metni SATIRIN ÜSTÜNE yazılır.
+  // Tek öğrencinin neden kesilemediğini tablo içinde okuyabilmek gerekir;
+  // genel toast'ta kalırsa kullanıcı hangi satır olduğunu bilemez.
+  const getRowWorkflowError = (row) => {
+    // Önce bu oturumdaki hata (anlık), yoksa backend'de SAKLANAN hata
+    // (yenilemeden sonra da görünür).
+    const live = String(invoiceOps[row.sourceKey]?.error || '').trim()
+
+    if (live) return live
+
+    const stored = String(
+      state?.settings?.lucaErrors?.[row.sourceKey]?.message || ''
+    ).trim()
+
+    return stored
+  }
+
+  // Hata metnini kısa ve eylem gösterecek biçime çevirir. Gerçek Luca
+  // mesajı korunur; gereksiz tekrarlar atılır.
+  const formatRowWorkflowError = (error) => {
+    if (!error) return ''
+
+    const compact = error
+      .replace(/\s+/g, ' ')
+      .replace(/^Luca (fatura kaydetme hatası|işlemi başarısız\.?)\s*[:\-]?\s*/i, '')
+      .trim()
+
+    if (/alıcı vergi\/kimlik numarası/i.test(compact)) {
+      return "Luca'da bu öğrencinin alıcı kaydı eksik veya hatalı (vergi/kimlik numarası geçersiz). Öğrenci bilgilerini ve Luca'daki müşteri kaydını kontrol ediniz."
+    }
+
+    if (/müşteri kaydı zamanında tamamlanamadı/i.test(compact)) {
+      return "Luca'da bu öğrenci için müşteri kaydı oluşturulamadı. Öğrenci bilgilerini kontrol ediniz."
+    }
+
+    if (compact.length > 220) {
+      return `${compact.slice(0, 217)}…`
+    }
+
+    return compact
+  }
+
+  const buildLucaInvoiceItem = (row) => {
+    const customerMatchBy = state?.settings?.invoiceCustomerMatchBy || state?.settings?.matchBy || 'student'
+    // Yeni Luca müşterisi adres bilgisi: öğrencinin sistemde kayıtlı adresi
+    // (serbest metin) ve Anaokulu/Firma "Fatura Ayarları"ndaki İl/İlçe/Vergi
+    // Dairesi (AnaokuluSchool.settings.invoiceSettings). Sabit değer yazılmaz;
+    // extension adresi gerçek Luca dropdown'larından seçer.
+    const invoiceSettings = state?.settings?.invoiceSettings || {}
+    return ({
+    sourceKey: row.sourceKey,
+    studentId: row.studentId,
+    installmentNo: row.installmentNo,
+    period: row.period,
+    planName: row.planName,
+    // GÖNDERİMDE aranacak taslak fatura numarası. Backend numarayı kayıttan
+    // okumaya çalışır ama kayıt bozulmuş/eksikse frontend'in bildirdiği
+    // numara kullanılır. Numara hiç gelmezse görev reddedilir; bu sayede
+    // "Faturayı Onayla" her zaman Luca'yı açar ve GERÇEKTEN kontrol eder
+    // (önceden yalnızca uyarı verip duruyordu).
+    invoiceNo: row.invoiceNo || row.invoice?.no || '',
+    invoiceItem: row.invoiceItem || '',
+    productName: row.invoiceItem || '',
+    recipientName: row.parent,
+    studentName: row.studentName,
+    taxId: row.tax,
+    customerMatchBy: customerMatchBy,
+    customerSearchValue: customerMatchBy === 'tax' ? row.tax : row.studentName,
+    studentAddress: row.student?.address || row.address || '',
+    firmCity: invoiceSettings.city || '',
+    firmDistrict: invoiceSettings.district || '',
+    firmTaxOffice: invoiceSettings.taxOffice || '',
+    invoiceDate: getLucaInvoiceDate(row.period),
+    // Vade Tarihi gönderilMEZ: Luca'da #LastPaymentDate boş bırakılır
+    // (row.dueDate iletilirse Luca'ya vade yazılır). Extension alanı
+    // boşaltıp kaydetme öncesi boş olduğunu doğrular.
+    scenarioId: '1',
+    invoiceType: '1',
+    recipientType: '2',
+    currencyCode: 'TRY',
+    measureUnit: '67',
+    quantity: 1,
+    unitPrice: row.amount,
+    vatRate: row.vatRate,
+    vatAmount: row.vatAmount,
+    amount: row.amount,
+    notes: `${row.planName} - ${row.installmentNo}. taksit`
+    })
+  }
+
+  const startInvoiceJob = async (rows, action = 'create') => {
+    // Luca kimliği YOKSA Extension otomatik girişi boş kimlikle dener,
+    // giriş başarısız olur ve görev backend'de oluşmuş görünmesine rağmen
+    // Luca tarafında hiçbir şey başlamaz (sessiz takılma). startLucaCheck
+    // ile aynı kapı burada da tutulur.
+    const hasLucaCredentials = Boolean(lucaSettings.tckn || lucaSettings.username || lucaSettings.customerNo) && Boolean(lucaSettings.password)
+    if (!hasLucaCredentials) {
+      setLucaForm({
+        tckn: lucaSettings.tckn || lucaSettings.username || lucaSettings.customerNo || '',
+        password: lucaSettings.password || ''
+      })
+      setLucaModalOpen(true)
+      toast('⚠️ Luca işlemi için lütfen önce TCKN ve Şifre girin (Luca Ayarları).')
+      return
+    }
+    const candidates = rows.filter(row => {
+      const status = getRowWorkflowStatus(row)
+      if (action === 'send') {
+        // YALNIZCA onay bekleyen taslaklar gönderilir. Gönderilmiş
+        // (sent/checking/verified) satırlar tekrar gönderilmez.
+        if (status !== 'draft_created' && status !== 'awaiting_approval') return false
+        // Luca listesinde aranacak fatura numarası olmadan gönderim
+        // yapılamaz; numarasız taslak göreve alınmaz.
+        return !!String(row.invoiceNo || row.invoice?.no || '').trim()
+      }
+      const customerMatchBy = state?.settings?.invoiceCustomerMatchBy || state?.settings?.matchBy || 'student'
+      if (['tax', 'student_tax'].includes(customerMatchBy) && !String(row.tax || '').replace(/\D/g, '')) return false
+      if (!row.invoiceItem) return false
+      // 'draft_missing' da yeniden denenebilir durumdur: Luca'daki taslak
+      // silinmiş, kullanıcı aynı satır için yeni taslak kesmelidir.
+      return !row.invoice && ['pending', 'failed', 'cancelled', 'draft_missing'].includes(status)
+    })
+    const skippedCount = rows.length - candidates.length
+    const draftCount = rows.filter(row => ['draft_created', 'awaiting_approval'].includes(getRowWorkflowStatus(row))).length
+    if (!candidates.length) {
+      toast(action === 'send'
+        ? 'Onay bekleyen Luca taslağı bulunamadı. Önce "Fatura Kes" ile taslak oluşturun.'
+        : 'İşleme alınacak uygun fatura bulunamadı.')
+      return
+    }
+
+    const initialStatus = action === 'send' ? 'awaiting_approval' : 'creating'
+    setInvoiceOps(previous => Object.fromEntries([
+      ...Object.entries(previous),
+      ...candidates.map(row => [row.sourceKey, { status: initialStatus, action }])
+    ]))
+
+    try {
+      const response = await api('/api/anaokulu/luca-create/jobs', {
+        method: 'POST',
+        data: { action, items: candidates.map(buildLucaInvoiceItem) },
+        portalOverride: 'anaokulu'
+      })
+      if (!response?.ok || !response.jobId) {
+        // Backend iş AÇAMADIYSA nedeni `skipped` listesindedir (jobId:null,
+        // error YOK). Genel "başlatılamadı" mesajı gerçek nedeni gizliyordu:
+        // kullanıcı neden akışın başlamadığını anlayamıyordu.
+        const skipped = Array.isArray(response?.skipped) ? response.skipped : []
+        const onlyWaiting = skipped.length > 0 && skipped.every(item => item?.status === 'job_running')
+        if (onlyWaiting) {
+          // Bekleyen görev var: satırlar "failed"a ÇEVRİLMEZ ("Fatura Kes"e
+          // düşmek yanlış yönlendirir; kayıt hâlâ duruyor). Mesaj KISA ve
+          // EYLEM GÖSTERİR; kullanıcı kendiliğinden çaresiz bırakılmaz.
+          toastSticky('⏳ Bu satır için hâlâ çalışan bir Luca görevi var. Chrome açık mı? Luca sekmesi görünüyor mu? 1-2 dakika sonra tekrar deneyin; hâlâ olursa Luca sekmesini kapatıp tekrar deneyin.')
+          return
+        }
+        // `skipped` bir HATA değil: satır zaten faturalanmış/gönderilmiş
+        // olabilir. Kullanıcı "Luca işlemi başlatılamadı: Bu satır zaten
+        // verified aşamasında" görüp akışın bozuk olduğunu sanıyordu.
+        // Duruma göre ÖZET verilir.
+        const summarizeSkipped = (list) => {
+          const labels = {
+            verified: 'zaten gönderilip doğrulandı',
+            sent: 'zaten gönderildi',
+            checking: 'gönderim kontrol ediliyor',
+            draft_created: 'taslak oluşturulmuş, onay bekliyor',
+            awaiting_approval: 'onay bekliyor',
+            creating: 'taslak oluşturuluyor',
+            draft_missing: 'Luca taslağı yok',
+            job_running: 'çalışan görevi var',
+            unmatched: 'öğrenci bilgisi eşleşmedi'
+          }
+          const counts = new Map()
+
+          for (const entry of list) {
+            const key = String(entry?.status || 'other')
+            counts.set(key, (counts.get(key) || 0) + 1)
+          }
+          return [...counts.entries()]
+            .map(([key, count]) => `${count} satır ${labels[key] || key}`)
+            .join(', ')
+        }
+        // Hata DEĞİL: bilgi. Satırlar "failed"a çevrilmez, kullanıcıya
+        // yalnızca ne olduğu açıklanır.
+        setInvoiceOps(previous => Object.fromEntries([
+          ...Object.entries(previous),
+          ...candidates.map(row => [row.sourceKey, { status: getRowWorkflowStatus(row), action }])
+        ]))
+        toastSticky(
+          response?.error ||
+          (skipped.length
+            ? `ℹ️ İşlem yapılmadı: ${summarizeSkipped(skipped)}.`
+            : 'İşleme alınacak uygun fatura bulunamadı.')
+        )
+        return
+      }
+
+      window.postMessage({
+        source: 'penpos-luca-bridge',
+        type: action === 'send' ? 'PENPOS_LUCA_SEND_START' : 'PENPOS_LUCA_CREATE_START',
+        jobId: response.jobId,
+        extensionToken: response.extensionToken
+      }, window.location.origin)
+
+      // Görev başladı ama bazı satırlar atlandı (örn. zaten faturalanmış).
+      // Bu bir hata DEĞİLDİR; kullanıcı bilgilendirilir.
+      if (response.skipped?.length) {
+        console.info('[Luca] Atlanan satırlar:', response.skipped)
+      }
+
+      const poll = async () => {
+        const status = await api(`/api/anaokulu/check-luca/${response.jobId}`, {
+          portalOverride: 'anaokulu',
+          cacheMode: 'no-cache',
+          cacheTtlMs: 0
+        })
+        if (status?.status === 'done') {
+          const finalResults = Array.isArray(status.results) ? status.results : []
+          const failedResults = finalResults.filter(result => ['failed', 'cancelled'].includes(result.status))
+          // "Luca'da taslak artık yok" ayrı bir sonuçtur: gönderilmedi ama hata
+          // da değil. PenPOS kaydı temizlendiği için satır "Fatura Kes"e döner.
+          const missingDraftResults = finalResults.filter(result => result.status === 'draft_missing')
+          setInvoiceOps(previous => {
+            const next = { ...previous }
+            finalResults.forEach(result => {
+              next[result.sourceKey] = {
+                status: result.status || (action === 'send' ? 'sent' : 'draft_created'),
+                action,
+                error: result.error
+              }
+            })
+            return next
+          })
+          await actions.reload()
+          // Gerçek Luca hata metni kullanıcıya gösterilir; başarısız satırlar
+          // yeniden denenebilir kalır (faturaya başarı bilgisi yazılmaz).
+          const retryHint = action === 'send'
+            ? 'Aynı satıra yeniden "Faturayı Onayla" deneyin.'
+            : 'Aynı satıra yeniden "Fatura Kes" deneyin.'
+          if (missingDraftResults.length && !failedResults.length) {
+            toastSticky(`⚠️ ${missingDraftResults.length} Luca taslağı artık yok (Luca'da silinmiş veya taşınmış). Bu satırlar "Fatura Kes"e döndü; yeni taslak oluşturabilirsiniz.`)
+          } else if (missingDraftResults.length) {
+            toastSticky(`⚠️ ${missingDraftResults.length} Luca taslağı artık yok (silinmiş/taşınmış), ${failedResults.length} fatura gönderilemedi. Taslağı olmayan satırlar "Fatura Kes"e döndü. ${retryHint}`)
+          } else if (failedResults.length && failedResults.length === finalResults.length) {
+            toastSticky(`Luca işlemi başarısız: ${failedResults[0].error || (action === 'send' ? 'Fatura gönderilemedi.' : 'Fatura oluşturulamadı.')} ${retryHint}`)
+          } else if (failedResults.length) {
+            toastSticky(`Luca tamamlandı: ${finalResults.length - failedResults.length} işlendi, ${failedResults.length} başarısız. İlk hata: ${failedResults[0].error || 'bilinmiyor'}. ${retryHint}`)
+          } else if (action === 'send') {
+            toastSticky(`✅ Bitti: ${finalResults.length} fatura Luca'ya gönderildi.`)
+          } else {
+            toastSticky(`✅ Bitti: ${finalResults.length} taslak oluşturuldu, ${skippedCount} zaten işlendi, ${draftCount} taslaktı. "Faturayı Onayla" ile göndermek için onaylayabilirsiniz.`)
+          }
+          return
+        }
+        if (status?.status === 'error') throw new Error(status.error || 'Luca işlemi başarısız.')
+        // Uzun toplu işlerde (32 öğrenci gibi) kullanıcı ilerlemeyi görsün:
+        // biten kalemler anında satıra yansır, toast ilerlemeyi gösterir.
+        // Önceden hiçbir geri bildirim yoktu; iş bitene kadar ekran donuyordu.
+        if (Array.isArray(status?.results) && status.results.length) {
+          const doneKeys = new Set(
+            status.results.map(result => String(result.sourceKey || '')).filter(Boolean)
+          )
+          if (doneKeys.size) {
+            setInvoiceOps(previous => {
+              const next = { ...previous }
+              candidates.forEach(row => {
+                if (!doneKeys.has(row.sourceKey)) return
+                const result = status.results.find(item => item.sourceKey === row.sourceKey)
+                next[row.sourceKey] = {
+                  status: result?.status || (action === 'send' ? 'sent' : 'draft_created'),
+                  action,
+                  error: result?.error
+                }
+              })
+              return next
+            })
+          }
+        }
+        window.setTimeout(() => poll().catch(error => {
+          setInvoiceOps(previous => ({
+            ...previous,
+            ...Object.fromEntries(candidates.map(row => [row.sourceKey, { status: 'failed', error: error.message }]))
+          }))
+          toastSticky(`Luca işlemi hatası: ${error.message}`)
+        }), 1500)
+      }
+      poll().catch(error => {
+        setInvoiceOps(previous => ({
+          ...previous,
+          ...Object.fromEntries(candidates.map(row => [row.sourceKey, { status: 'failed', error: error.message }]))
+        }))
+        toastSticky(`Luca işlemi hatası: ${error.message}`)
+      })
+    } catch (error) {
+      setInvoiceOps(previous => ({
+        ...previous,
+        ...Object.fromEntries(candidates.map(row => [row.sourceKey, { status: 'failed', error: error.message }]))
+      }))
+      toastSticky(`Luca işlemi başlatılamadı: ${error.message}`)
+    }
   }
 
   const openInvoicePdf = async (invoice) => {
@@ -199,6 +530,18 @@ export default function FaturalarPage() {
       list: filtered,
       totalCount: rawRows.length,
       filteredCount: filtered.length,
+      // "Toplu Fatura Onayla" yalnızca TASLAK satırları gönderir.
+      // Gönderilmiş (sent/checking/verified) veya hiç kesilmemiş satırlar
+      // kapsam dışıdır. Fatura numarası olmayan taslak da gönderilemez
+      // (Luca listesinde aranacak numara yoktur).
+      pendingApprovalCount: filtered.filter(r =>
+        ['draft_created', 'awaiting_approval'].includes(
+          invoiceOps[r.sourceKey]?.status
+          || r.invoiceWorkflowStatus
+          || r.invoice?.lifecycleStatus
+          || 'pending'
+        ) && !!String(r.invoiceNo || r.invoice?.no || '').trim()
+      ).length,
       totalPlanned,
       totalPaid,
       totalRemaining,
@@ -211,7 +554,10 @@ export default function FaturalarPage() {
       diffItems,
       totalDiffAmount
     }
-  }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId, sortKey, sortDir])
+    // invoiceOps: PenPOS tarafında henüz kaydedilmemiş, anlık durum
+    // değişiklikleri (ör. "Fatura Kes" -> "Hazırlanıyor") düğme sayısını da
+    // günceller.
+  }, [rawRows, q, invoiceFilter, collectionFilter, selectedSchoolId, sortKey, sortDir, invoiceOps])
 
   const formatDeviceLastSeen = (value) => {
     if (!value) return 'Az önce'
@@ -223,7 +569,7 @@ export default function FaturalarPage() {
     return `${Math.floor(seconds / 60)} dk önce`
   }
 
-  const startLucaCheck = async () => {
+  const startLucaCheck = async (targetRow = null) => {
     const hasCredentials = Boolean(lucaSettings.tckn || lucaSettings.username || lucaSettings.customerNo) && Boolean(lucaSettings.password)
     if (!hasCredentials) {
       setLucaForm({
@@ -244,7 +590,7 @@ export default function FaturalarPage() {
       // 1. Adım: Job başlat (anında döner, 504 olmaz)
       const startRes = await api('/api/anaokulu/check-luca', {
         method: 'POST',
-        data: { period },
+        data: { period, targetInvoiceNo: targetRow?.invoiceNo || '' },
         portalOverride: 'anaokulu'
       })
 
@@ -277,7 +623,11 @@ export default function FaturalarPage() {
           source: 'penpos-luca-bridge',
           type: 'PENPOS_LUCA_START',
           jobId,
-          extensionToken
+          extensionToken,
+          // Dönem İKİNCİ kanaldan da taşınır (birincisi backend görevi).
+          // Tek kanal kopunca content.js "Geçersiz dönem: undefined" deyip
+          // TARİH FİLTRESİZ tüm arşivi tarıyordu (494 fatura).
+          period
         },
         window.location.origin
       )
@@ -297,7 +647,9 @@ export default function FaturalarPage() {
 
         try {
           const statusRes = await api(`/api/anaokulu/check-luca/${jobId}`, {
-            portalOverride: 'anaokulu'
+            portalOverride: 'anaokulu',
+            cacheMode: 'no-cache',
+            cacheTtlMs: 0
           })
 
           if (statusRes?.status === 'running') {
@@ -322,7 +674,44 @@ export default function FaturalarPage() {
               invoices: statusRes.invoices || state.invoices,
               checks: statusRes.checks || state.checks
             })
-            toastSticky(`✅ TÜRMOB Luca kontrolü tamamlandı! ${statusRes.found || 0} fatura bulundu, ${statusRes.matched || 0} öğrenci ile eşleştirildi.`)
+            const checkedSourceKeys = new Set([
+              ...(Array.isArray(statusRes.checkedSourceKeys) ? statusRes.checkedSourceKeys : []),
+              ...(Array.isArray(statusRes.resetRows) ? statusRes.resetRows.map(row => row?.sourceKey) : [])
+            ].map(key => String(key || '').trim()).filter(Boolean))
+            if (checkedSourceKeys.size) {
+              setInvoiceOps(previous => {
+                const next = { ...previous }
+                checkedSourceKeys.forEach(key => { delete next[key] })
+                return next
+              })
+            }
+            await actions.reload()
+
+            // Luca'da olmayan faturalar: backend bu kayıtları sildi, satırlar
+            // "Fatura Kes"e döndü. Kullanıcı hangi faturaların sıfırlandığını
+            // ve ne yapması gerektiğini görmeli.
+            const resetCount = Number(statusRes.reset || 0)
+
+            if (resetCount > 0) {
+              const resetRows = Array.isArray(statusRes.resetRows) ? statusRes.resetRows : []
+              const numbers = resetRows
+                .map(row => String(row?.no || '').trim())
+                .filter(Boolean)
+                .slice(0, 10)
+                .join(', ')
+
+              toastSticky(
+                `⚠️ TÜRMOB Luca kontrolü tamamlandı: ${statusRes.found || 0} fatura bulundu, ` +
+                `${statusRes.matched || 0} öğrenci ile eşleştirildi. ` +
+                `${resetCount} fatura Luca'da BULUNAMADI (${numbers}${resetRows.length > 10 ? '…' : ''}) — ` +
+                `bu kayıtlar temizlendi, ilgili satırlar "Fatura Kes"e döndü. ` +
+                `Bu öğrenciler için "Toplu Fatura Kes" ile yeniden fatura oluşturabilirsiniz.`,
+                14000
+              )
+            } else {
+              toastSticky(`✅ TÜRMOB Luca kontrolü tamamlandı! ${statusRes.found || 0} fatura bulundu, ${statusRes.matched || 0} öğrenci ile eşleştirildi.`)
+            }
+
             setLucaRunning(false)
             setLucaStep('')
             return
@@ -400,6 +789,48 @@ export default function FaturalarPage() {
     toast('✓ TÜRMOB Luca e-Fatura giriş bilgileri kaydedildi.')
   }
 
+  // Satır düğmesi durum makinesi:
+  //   yok                      -> "Fatura Kes"        (taslak kes, GÖNDERME)
+  //   draft_created/awaiting_approval -> "Faturayı Onayla" (taslağı gönder)
+  //   sent/checking            -> "Faturaları Kontrol Et" + (gönderildiyse) "Faturayı Gör"
+  //   verified                 -> "Faturayı Gör"
+  const renderInvoiceAction = (row) => {
+    const status = getRowWorkflowStatus(row)
+    const common = { type: 'button', style: { ...Btn, padding: '5px 9px', fontSize: 11, borderRadius: 7 } }
+    if (status === 'creating') return <button {...common} disabled style={{ ...common.style, background: '#e2e8f0', color: '#64748b', cursor: 'wait' }}>Hazırlanıyor...</button>
+    // 'draft_missing': Luca'daki taslak artık yok. Kalıcı hata DEĞİLDİR ve
+    // "Faturayı Onayla" da doğru değildir - gönderilecek numara yok. Satır
+    // yeniden "Fatura Kes"e döner (aynı oturumda bile).
+    if (status === 'draft_missing') {
+      return (
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          <button {...common} onClick={() => startInvoiceJob([row], 'create')} style={{ ...common.style, background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }} title="Luca'daki taslak silinmiş; yeni taslak oluşturulacak.">Yeni Fatura Kes</button>
+        </div>
+      )
+    }
+    if (status === 'awaiting_approval' || status === 'draft_created') {
+      return <button {...common} onClick={() => startInvoiceJob([row], 'send')} style={{ ...common.style, background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>Faturayı Onayla</button>
+    }
+    if (status === 'sent' || status === 'checking') {
+      // Gönderim tamamlanmış satırda hem kontrol hem de (varsa) görüntüleme
+      // düğmesi bulunur. "Faturayı Gör" YALNIZCA gönderilmiş faturada
+      // (kayıt varsa) görünür; taslakta/taslaksız satırda gösterilmez.
+      const sent = !!row.invoice?.no
+      return (
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          <button {...common} onClick={() => startLucaCheck(row)} style={{ ...common.style, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd' }}>Faturaları Kontrol Et</button>
+          {sent && (
+            <button {...common} onClick={() => setDetailInv({ invoice: row.invoice, row })} style={{ ...common.style, background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>Faturayı Gör</button>
+          )}
+        </div>
+      )
+    }
+    if (status === 'verified') {
+      return <button {...common} onClick={() => setDetailInv({ invoice: row.invoice, row })} style={{ ...common.style, background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>Faturayı Gör</button>
+    }
+    return <button {...common} onClick={() => startInvoiceJob([row], 'create')} style={{ ...common.style, background: '#0284c7', color: '#fff' }}>Fatura Kes</button>
+  }
+
   const panel = {
     background: '#fff', borderRadius: 14, border: '1px solid #e6ebf3',
     boxShadow: '0 1px 2px rgba(15,23,42,0.04)', overflow: 'hidden'
@@ -459,6 +890,32 @@ export default function FaturalarPage() {
             }}
           >
             ⚙️ Luca Ayarları
+          </button>
+          <button
+            onClick={() => startInvoiceJob(processedData.list, 'create')}
+            disabled={lucaRunning}
+            style={{ ...Btn, background: '#0f766e', color: '#fff', opacity: lucaRunning ? 0.65 : 1 }}
+          >
+            Toplu Fatura Kes ({processedData.filteredCount})
+          </button>
+          {/* TOPLU FATURA ONAYLA
+              Yalnızca "draft_created / awaiting_approval" satırları alınır
+              (startInvoiceJob filtresi). Gönderilmiş/kontrollü satırlar
+              dışarıda kalır. Hiç taslak yoksa düğme pasif görünür. */}
+          <button
+            onClick={() => startInvoiceJob(processedData.list, 'send')}
+            disabled={lucaRunning || processedData.pendingApprovalCount === 0}
+            title={processedData.pendingApprovalCount === 0 ? 'Onay bekleyen Luca taslağı yok.' : `${processedData.pendingApprovalCount} taslak fatura gönderilecek.`}
+            style={{
+              ...Btn,
+              background: processedData.pendingApprovalCount === 0 ? '#f1f5f9' : '#b45309',
+              color: processedData.pendingApprovalCount === 0 ? '#94a3b8' : '#fff',
+              border: '1px solid #d97706',
+              opacity: lucaRunning ? 0.65 : 1,
+              cursor: lucaRunning || processedData.pendingApprovalCount === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Toplu Fatura Onayla ({processedData.pendingApprovalCount})
           </button>
           <button
             onClick={runCheckInvoices}
@@ -728,6 +1185,8 @@ export default function FaturalarPage() {
                 const isBilled = row.invoiceStatus === 'billed'
                 const isPaid = row.collectionStatus === 'paid'
                 const isPartial = row.collectionStatus === 'partial'
+                // Bu satırın Luca hatası (varsa) kartın üstünde görünür.
+                const rowWorkflowNote = formatRowWorkflowError(getRowWorkflowError(row))
 
                 return (
                   <div
@@ -837,6 +1296,20 @@ export default function FaturalarPage() {
                       </span>
                     </div>
 
+                    {/* Luca hata notu: HANGİ satır neden kesilemedi? */}
+                    {rowWorkflowNote && (
+                      <div style={{
+                        display: 'flex', gap: 7, alignItems: 'flex-start',
+                        padding: '7px 10px', borderRadius: 8,
+                        background: '#fef2f2', border: '1px solid #fecaca'
+                      }}>
+                        <span style={{ fontSize: 13, lineHeight: 1.3 }}>⚠️</span>
+                        <span style={{ fontSize: 11, lineHeight: 1.45, color: '#991b1b', fontWeight: 600 }}>
+                          {rowWorkflowNote}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Satır 3: 3'lü Finansal Kutu */}
                     <div style={{
                       display: 'grid',
@@ -883,21 +1356,7 @@ export default function FaturalarPage() {
                         )}
                       </div>
 
-                      {isBilled && (
-                        <button
-                          type="button"
-                          onClick={() => setDetailInv({ invoice: row.invoice, row })}
-                          style={{
-                            ...Btn,
-                            background: row.hasDiff ? '#fff7ed' : '#f1f5f9',
-                            color: row.hasDiff ? '#c2410c' : '#0f172a',
-                            border: row.hasDiff ? '1px solid #fed7aa' : '1px solid #cbd5e1',
-                            padding: '5px 10px', fontSize: 11, fontWeight: 700, borderRadius: 7
-                          }}
-                        >
-                          🔍 Fatura Detay {row.hasDiff ? '⚠️' : ''}
-                        </button>
-                      )}
+                      {renderInvoiceAction(row)}
                     </div>
                   </div>
                 )
@@ -995,6 +1454,8 @@ export default function FaturalarPage() {
                   const isBilled = row.invoiceStatus === 'billed'
                   const isPaid = row.collectionStatus === 'paid'
                   const isPartial = row.collectionStatus === 'partial'
+                  // Bu satırın Luca hatası (varsa) "Fatura Durumu" altında.
+                  const rowWorkflowNote = formatRowWorkflowError(getRowWorkflowError(row))
 
                   return (
                     <tr key={row.id || `${row.studentId}-${row.planName}-${row.installmentNo}-${row.dueDate}`} style={{
@@ -1043,13 +1504,29 @@ export default function FaturalarPage() {
                             )}
                           </div>
                         ) : (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
-                            background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
-                          }}>
-                            🔴 Kesilmedi
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                              background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca'
+                            }}>
+                              🔴 Kesilmedi
+                            </span>
+                            {/* Luca hata notu: bu satır neden kesilemedi? */}
+                            {rowWorkflowNote && (
+                              <span
+                                title={rowWorkflowNote}
+                                style={{
+                                  fontSize: 10, fontWeight: 700, color: '#991b1b',
+                                  background: '#fef2f2', border: '1px solid #fecaca',
+                                  padding: '3px 7px', borderRadius: 6,
+                                  maxWidth: 320, lineHeight: 1.4
+                                }}
+                              >
+                                ⚠️ {rowWorkflowNote}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
 
@@ -1169,22 +1646,7 @@ export default function FaturalarPage() {
 
                       {/* İşlem */}
                       <td style={{ ...td, textAlign: 'center' }}>
-                        {isBilled ? (
-                          <button
-                            onClick={() => setDetailInv({ invoice: row.invoice, row })}
-                            style={{
-                              ...Btn,
-                              background: row.hasDiff ? '#fff7ed' : '#f1f5f9',
-                              color: row.hasDiff ? '#c2410c' : '#0f172a',
-                              border: row.hasDiff ? '1px solid #fed7aa' : 'none',
-                              padding: '4px 8px', fontSize: 11, fontWeight: 700
-                            }}
-                          >
-                            🔍 Fatura Detay {row.hasDiff ? '⚠️' : ''}
-                          </button>
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
-                        )}
+                        {renderInvoiceAction(row)}
                       </td>
                     </tr>
                   )

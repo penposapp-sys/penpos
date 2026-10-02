@@ -11,7 +11,6 @@ const initialState = {
   error: null,
   settings: {
     okulAdi: '',
-    vergiOrani: 10,
     donem: '',
     yearStart: '',
     matchBy: 'tax',
@@ -24,6 +23,190 @@ const initialState = {
   collections: [],
   invoices: [],
   checks: []
+}
+
+const normalizeLabel = (value) => String(value || '').trim().toLowerCase()
+const toAmount = (value) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
+}
+const sameAmount = (a, b) => Math.abs(a - b) < 0.01
+// Tekil eşleşme şart: aday sayısı tam olarak 1 değilse bu kural kullanılmaz.
+const onlyOne = (list = []) => (list.length === 1 ? list[0] : null)
+
+// Eski planın fiyat adayları: ham fiyat (basePrice) ve sözleşme tutarı (total).
+// Eski kayıtlarda basePrice boş olabilir, bu yüzden ikisi de dikkate alınır.
+const planPriceCandidates = (item = {}) => {
+  const values = []
+  const base = toAmount(item.basePrice)
+  if (base > 0) values.push(base)
+  const total = toAmount(item.total)
+  if (total > 0) values.push(total)
+  return values
+}
+
+// Bir ücret kaleminin hangi ücret kategorisine ait olduğunu bulur.
+// Sıra: 1) kayıtlı kategori id'si  2) ad  3) fatura kalemi adı
+//       4) ad + fiyat birlikte  5) fiyat (yalnızca tek aday varsa)
+// Her kural TEKİL aday üretmelidir; tekil değilse sıradaki kural denenir.
+// Hiçbir kural tekil eşleşme bulamazsa null döner ve hiçbir şey değiştirilmez.
+const findFeeCategory = (categories = [], item = {}) => {
+  const itemCategoryId = String(item.feeCategoryId || item.categoryId || '').trim()
+  if (itemCategoryId) {
+    const byId = onlyOne(categories.filter(c => String(c.id || '').trim() === itemCategoryId))
+    if (byId) return byId
+  }
+
+  const label = normalizeLabel(item.name)
+  if (label) {
+    const byName = onlyOne(categories.filter(c => normalizeLabel(c.name) === label))
+    if (byName) return byName
+
+    const byInvoiceItem = onlyOne(categories.filter(c => normalizeLabel(c.invoiceItem) === label))
+    if (byInvoiceItem) return byInvoiceItem
+  }
+
+  const prices = planPriceCandidates(item)
+  if (prices.length > 0) {
+    const priceMatches = (c) => prices.some(p => sameAmount(toAmount(c.defaultPrice), p))
+
+    // 4) ad + fiyat birlikte
+    if (label) {
+      const byNameAndPrice = onlyOne(categories.filter(c =>
+        (normalizeLabel(c.name) === label || normalizeLabel(c.invoiceItem) === label) && priceMatches(c)
+      ))
+      if (byNameAndPrice) return byNameAndPrice
+    }
+
+    // 5) fiyat tek başına: yalnızca tam olarak bir kategori fiyatla eşleşiyorsa
+    const byPriceOnly = onlyOne(categories.filter(priceMatches))
+    if (byPriceOnly) return byPriceOnly
+  }
+
+  return null
+}
+
+// Eski öğrenci ücret planlarını güncel ücret kategorilerine bağlar ve plan adını
+// gerçek fatura kalemine dönüştürür (örn. "2026-2027" -> "EĞİTİM").
+//
+// DİKKAT: Fiyat, taksit sayısı, peşinat, tahsilat ve bakiye değerlerine dokunulmaz.
+//
+// ÖNEMLİ: Plan adı yalnızca bir etiket değil, tahsilatların (collections[].item)
+// ve faturaların (invoices[].planName) eşleştirme anahtarıdır. Sadece öğrenci
+// planı yeniden adlandırılırsa daha önce tahsil edilmiş tutarlar eşleşmez ve
+// ekranda bakiye/borç yanlış hesaplanır. Bu yüzden yeniden adlandırılan eski plan
+// adına ait mevcut tahsilat ve fatura kayıtları da yeni plana taşınır; böylece
+// tutarlar birebir korunur ve backend doğrulaması da tutarlı kalır.
+//
+// ÖNEMLİ 2: Anahtar yalnızca eski ad değil, "öğrenciNo::eskiAd" şeklindedir; çünkü
+// aynı eski ad farklı fiyatlarla farklı kalemlere karşılık gelebilir
+// (örn. "2026-2027" + 20.000 -> EĞİTİM, "2026-2027" + 2.000 -> YEMEK).
+// Bir öğrencinin aynı eski adı iki farklı kaleme giderse (çakışma) o kayıtların
+// hiçbiri değiştirilmez: tahsilatlar yalnızca öğrenciNo + kalem adıyla tutulduğu
+// için hangisinin hangi plana ait olduğu ayırt edilemez ve bakiye bozulur.
+const migrateFeeCategories = (students = [], collections = [], invoices = [], feeCategories = []) => {
+  const studentList = Array.isArray(students) ? students : []
+  const collectionList = Array.isArray(collections) ? collections : []
+  const invoiceList = Array.isArray(invoices) ? invoices : []
+  const categories = Array.isArray(feeCategories) ? feeCategories : []
+
+  if (categories.length === 0) {
+    return { students: studentList, collections: collectionList, invoices: invoiceList, changed: false }
+  }
+
+  // Geçiş 1: eşleşmeleri hesapla (henüz hiçbir veri değiştirilmez)
+  const decisions = studentList.map(student => {
+    const studentId = String(student.id || student._id || '')
+    return (student.items || []).map(item => {
+      const category = findFeeCategory(categories, item)
+      if (!category) return null
+
+      const nextName = String(category.invoiceItem || category.name || item.name || '').trim()
+      if (!nextName) return null
+
+      const from = normalizeLabel(item.name)
+      const to = normalizeLabel(nextName)
+      // Ad değişmiyorsa yalnızca kategori alanlarının tamamlanması gerekir;
+      // yeniden adlandırma (ve dolayısıyla tahsilat taşıma) gerekmez.
+      if (!from || !to) return null
+
+      return { key: `${studentId}::${from}`, from, to, nextName, category }
+    })
+  })
+
+  // Çakışan anahtarları tespit et: aynı öğrenci + aynı eski ad -> farklı yeni ad
+  // Haritada normalize (küçük harf) ad değil, yazılacak GERÇEK ad tutulur;
+  // aksi halde tahsilat/faturalara bozuk bir ad yazılır.
+  const resolved = new Map()
+  decisions.flat().filter(Boolean).forEach(decision => {
+    if (!resolved.has(decision.key)) {
+      resolved.set(decision.key, { to: decision.to, nextName: decision.nextName })
+    } else if (resolved.get(decision.key).to !== decision.to) {
+      resolved.set(decision.key, null)
+    }
+  })
+  const renames = new Map()
+  resolved.forEach((value, key) => { if (value) renames.set(key, value.nextName) })
+
+  // Geçiş 2: yalnızca çakışmayan eşleşmeleri uygula
+  const migratedStudents = studentList.map((student, studentIndex) => ({
+    ...student,
+    items: (student.items || []).map((item, itemIndex) => {
+      const decision = decisions[studentIndex][itemIndex]
+      if (!decision) return item
+      // Çakışan anahtarda hiçbir değişiklik yapılmaz.
+      if (normalizeLabel(renames.get(decision.key) || '') !== decision.to) return item
+
+      const { category, nextName } = decision
+      return {
+        ...item,
+        name: nextName,
+        feeCategoryId: String(item.feeCategoryId || item.categoryId || category.id || ''),
+        invoiceItem: String(category.invoiceItem || item.invoiceItem || ''),
+        vatRate: Number(category.vatRate ?? item.vatRate ?? 0),
+        invoiced: category.invoiced !== false
+      }
+    })
+  }))
+
+  // Öğrenci numarası taşımayan tek kayıtlar için: tüm eşleşmeler aynı kaleme
+  // gidiyorsa güvenle taşınabilir, aksi halde dokunulmaz.
+  const onlyNewName = renames.size > 1 && new Set(renames.values()).size === 1
+    ? [...renames.values()][0]
+    : null
+
+  const resolveNext = (studentId, label) => {
+    const from = normalizeLabel(label)
+    if (!from) return null
+    const key = `${studentId}::${from}`
+    if (renames.has(key)) {
+      const next = renames.get(key)
+      return normalizeLabel(next) !== from ? next : null
+    }
+    if (!studentId && onlyNewName && normalizeLabel(onlyNewName) !== from) return onlyNewName
+    return null
+  }
+
+  const migratedCollections = renames.size === 0
+    ? collectionList
+    : collectionList.map(collection => {
+      const next = resolveNext(String(collection.studentId || ''), collection.item)
+      return next ? { ...collection, item: next } : collection
+    })
+
+  const migratedInvoices = renames.size === 0
+    ? invoiceList
+    : invoiceList.map(invoice => {
+      const next = resolveNext(String(invoice.studentId || ''), invoice.planName)
+      return next ? { ...invoice, planName: next } : invoice
+    })
+
+  const changed =
+    JSON.stringify(migratedStudents) !== JSON.stringify(studentList) ||
+    JSON.stringify(migratedCollections) !== JSON.stringify(collectionList) ||
+    JSON.stringify(migratedInvoices) !== JSON.stringify(invoiceList)
+
+  return { students: migratedStudents, collections: migratedCollections, invoices: migratedInvoices, changed }
 }
 
 function reducer(state, action) {
@@ -78,34 +261,32 @@ export function AnaokuluDataProvider({ children }) {
 
   // Bir tahsilatın mükerrer olup olmadığını kontrol eder.
   //
-  // ÖNEMLİ: Bir taksit birden fazla PARÇALI tahsilatla kapatılabilir
+  // ÖNEMLİ 1: Bir taksit birden fazla PARÇALI tahsilatla kapatılabilir
   // (örn. 20.000 TL taksit → 2.000 TL + 18.000 TL). Bu yüzden mükerrerlik
-  // taksit numarasına göre değil, tahsilatın kendi imzasına göre belirlenir:
-  // aynı öğrenci + aynı kalem + aynı taksit + aynı tarih + aynı tutar.
-  // Aksi halde ikinci parça "mükerrer" sayılıp sessizce atılır ve taksit
-  // hiçbir zaman tamamlanmış görünmez.
+  // taksit numarasına göre belirlenmez.
+  //
+  // ÖNEMLİ 2: Aynı öğrenciye aynı taksit için AYNI GÜN ve AYNI TUTARLA birden
+  // fazla ayrı ödeme yapılabilir (örn. sabah 2.000 TL + akşam 2.000 TL).
+  // Bunlar meşru ve birbirinden bağımsız ödemelerdir; her biri ayrı kayıt
+  // olarak saklanmalı ve bakiyeye ayrı ayrı yansımalıdır. Bu yüzden
+  // "aynı öğrenci + kalem + taksit + tarih + tutar" imzası mükerrerlik ölçütü
+  // olarak KULLANILAMAZ; o imza meşru iki kaydı da eleyip sessizce atar ve
+  // bakiye eksik hesaplanır.
+  //
+  // Gerçek mükerrerlik yalnızca aynı kaydın iki kez gönderilmesidir
+  // (çift tıklama). Bunun için kayıt kimliği (id) tek ölçüttür. Eşzamanlı
+  // ikinci gönderim ayrıca saveToBackend içindeki saveInFlightRef ile
+  // yakalanır.
   const hasDuplicateCollection = (collections = [], candidate = {}) => {
     if (!candidate || !candidate.studentId || !candidate.item) return false
 
     const candidateId = candidate.id != null ? String(candidate.id) : ''
-    const candidateStudentId = String(candidate.studentId)
-    const candidateItem = String(candidate.item || '').trim().toLowerCase()
-    const candidateInstallment = Number(candidate.installmentNo)
-    const candidateDate = String(candidate.date || '')
-    const candidateAmount = Number(candidate.amount) || 0
+    if (!candidateId) return false
 
-    return collections.some((collection) => {
-      // Aynı kaydın tekrar gönderilmesi (çift tıklama vb.) gerçek mükerrerdir.
-      if (candidateId && collection.id != null && String(collection.id) === candidateId) return true
-
-      const sameStudent = String(collection.studentId) === candidateStudentId
-      const sameItem = String(collection.item || '').trim().toLowerCase() === candidateItem
-      const sameInstallment = Number(collection.installmentNo) === candidateInstallment
-      // Parçalı tahsilata izin vermek için tarih ve tutar da imzaya dahil edilir.
-      const sameDate = String(collection.date || '') === candidateDate
-      const sameAmount = Math.abs((Number(collection.amount) || 0) - candidateAmount) < 0.01
-      return sameStudent && sameItem && sameInstallment && sameDate && sameAmount
-    })
+    // Yalnızca aynı kayıt kimliği = aynı kaydın tekrar gönderilmesi.
+    return collections.some((collection) =>
+      collection.id != null && String(collection.id) === candidateId
+    )
   }
 
   const buildReqConfig = (extra = {}, tenantId) => {
@@ -224,14 +405,17 @@ export function AnaokuluDataProvider({ children }) {
         })
 
         const merged = mergeAnaokuluResponses(results)
+        const mergedFeeCategories = firstSettings.feeCategories || []
+        // Admin paneli salt okunur; migration burada yalnızca görüntüyü düzeltir.
+        const migration = migrateFeeCategories(merged.students, merged.collections, merged.invoices, mergedFeeCategories)
 
         dispatch({
           type: 'LOAD',
           payload: {
             settings: firstSettings,
-            students: merged.students,
-            collections: merged.collections,
-            invoices: merged.invoices,
+            students: migration.students,
+            collections: migration.collections,
+            invoices: migration.invoices,
             checks: merged.checks
           }
         })
@@ -243,6 +427,10 @@ export function AnaokuluDataProvider({ children }) {
     try {
       const res = await api('/api/anaokulu/', buildReqConfig({ silent: true, suppressAuthRedirect: true }))
       if (res?.ok !== false && res) {
+        const rawStudents = res.students || []
+        const rawCollections = res.collections || []
+        const rawInvoices = res.invoices || []
+        const migration = migrateFeeCategories(rawStudents, rawCollections, rawInvoices, res.settings?.feeCategories || [])
         const loadedState = {
           settings: {
             ...initialState.settings,
@@ -259,13 +447,21 @@ export function AnaokuluDataProvider({ children }) {
               ...(res.settings?.luca || {})
             }
           },
-          students: res.students || [],
-          collections: res.collections || [],
-          invoices: res.invoices || [],
+          students: migration.students,
+          collections: migration.collections,
+          invoices: migration.invoices,
           checks: res.checks || []
         }
 
-        lastPersistedSnapshotRef.current = snapshotSchoolState(loadedState)
+        // Migration bir şeyi değiştirdiyse, "son kaydedilen" anlık görüntüyü ham
+        // veriye eşitle ki otomatik kayıt (autosave) migration'ı kalıcı olarak yazsın.
+        // Hiçbir şey değişmediyse snapshot'ı yüklenen haline eşitleriz; aksi halde
+        // her açılışta gereksiz bir PUT isteği atılırdı.
+        lastPersistedSnapshotRef.current = snapshotSchoolState(
+          migration.changed
+            ? { ...loadedState, students: rawStudents, collections: rawCollections, invoices: rawInvoices }
+            : loadedState
+        )
 
         dispatch({
           type: 'LOAD',
@@ -348,10 +544,11 @@ export function AnaokuluDataProvider({ children }) {
       }
 
       if (hasDuplicateCollection(state.collections, payload)) {
-        return { ok: true, skipped: true, message: 'Aynı taksit zaten kayıtlı.' }
+        return { ok: true, skipped: true, message: 'Bu tahsilat kaydı zaten kayıtlı.' }
       }
 
       const nextState = { ...state, collections: [...state.collections, payload] }
+      dispatch({ type: 'COLLECTION_ADD', payload })
       suppressAutoSaveRef.current = true
       const res = await saveToBackend(nextState)
       suppressAutoSaveRef.current = false
@@ -361,7 +558,7 @@ export function AnaokuluDataProvider({ children }) {
         throw new Error(res?.message || 'Tahsilat kaydedilemedi.')
       }
 
-      dispatch({ type: 'COLLECTION_ADD', payload })
+      await loadFromBackend()
       dispatch({ type: 'SET_ERROR', payload: null })
       return res
     },
@@ -392,13 +589,14 @@ export function AnaokuluDataProvider({ children }) {
             : collection
         )
       }
+      dispatch({ type: 'COLLECTION_UPDATE', payload: c })
       const res = await saveToBackend(nextState)
       if (res?.ok === false) {
         dispatch({ type: 'SET_ERROR', payload: res?.message || 'Tahsilat güncellenemedi.' })
         throw new Error(res?.message || 'Tahsilat güncellenemedi.')
       }
 
-      dispatch({ type: 'COLLECTION_UPDATE', payload: c })
+      await loadFromBackend()
       dispatch({ type: 'SET_ERROR', payload: null })
       return res
     },

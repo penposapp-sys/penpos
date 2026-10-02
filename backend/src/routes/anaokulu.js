@@ -14,6 +14,10 @@ import {
   checkLucaJobStatus,
   claimLucaExtensionTask,
   submitLucaExtensionInvoices,
+  failLucaExtensionTask,
+  createLucaInvoiceJob,
+  claimLucaInvoiceCreateTask,
+  submitLucaInvoiceCreateResult,
   registerLucaDevice,
   heartbeatLucaDevice,
   getLucaDeviceStatus,
@@ -67,6 +71,18 @@ router.post(
   '/submit-luca/:jobId',
   submitLucaExtensionInvoices
 )
+
+// Extension görevi başarısız olduğunda görevi "error" durumuna alır.
+// Bu olmadan "Faturaları Kontrol Et" butonu "Chrome Extension görevi
+// devraldı…" metninde kalıcı kilitleniyordu.
+router.post(
+  '/fail-luca/:jobId',
+  failLucaExtensionTask
+)
+
+router.post('/luca-create/jobs', requireAuth, tenantGuard, createLucaInvoiceJob)
+router.post('/luca-create/jobs/:jobId/claim', claimLucaInvoiceCreateTask)
+router.post('/luca-create/jobs/:jobId/result', submitLucaInvoiceCreateResult)
 
 // Extension cihaz tokenı ile çalışan endpointler JWT tenant middleware'inden bağımsızdır.
 router.post('/luca-device/heartbeat', requireLucaDevice, heartbeatLucaDevice)

@@ -39,6 +39,75 @@ export function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
 }
 
+function rawSkipDeduction(skip, originalAmount) {
+  const amount = Number(skip?.deductedAmount)
+  if (Number.isFinite(amount)) return Math.max(0, amount)
+  return (skip?.period || 'full') === 'full' ? originalAmount : round2(originalAmount / 2)
+}
+
+export function getPlanGrossTotal(plan = {}) {
+  const total = round2(plan.total)
+  const count = Math.max(1, Number(plan.installments) || 1)
+  const fallbackAmount = round2(total / count)
+  const legacyDeductions = (Array.isArray(plan.skippedInstallments) ? plan.skippedInstallments : [])
+    .filter(skip => skip?.deductionOnly !== true)
+    .reduce((sum, skip) => {
+      const originalAmount = Number(skip?.originalAmount) > 0 ? Number(skip.originalAmount) : fallbackAmount
+      return sum + Math.min(originalAmount, rawSkipDeduction(skip, originalAmount))
+    }, 0)
+  return round2(total + legacyDeductions)
+}
+
+export function getPlanInstallmentSchedule(plan = {}, fallbackStart = plan.start) {
+  const count = Math.max(1, Number(plan.installments) || 1)
+  const storedSchedule = Array.isArray(plan.installmentSchedule) ? plan.installmentSchedule : []
+  if (storedSchedule.length === count) {
+    return storedSchedule.map((installment, index) => ({
+      no: index + 1,
+      dueDate: String(installment?.dueDate || ''),
+      amount: round2(installment?.amount)
+    }))
+  }
+
+  const total = getPlanGrossTotal(plan)
+  const evenAmount = round2(total / count)
+  const start = fallbackStart
+    ? (fallbackStart.length === 7 ? `${fallbackStart}-15` : fallbackStart)
+    : `${DEFAULT_YEAR_START}-15`
+  let assigned = 0
+
+  return Array.from({ length: count }, (_, index) => {
+    const amount = index === count - 1 ? round2(total - assigned) : evenAmount
+    assigned = round2(assigned + amount)
+    return {
+      no: index + 1,
+      dueDate: addMonthsToDate(start, index),
+      amount
+    }
+  })
+}
+
+export function getPlanInstallmentAmount(plan = {}, installmentNo) {
+  const installment = getPlanInstallmentSchedule(plan).find(item => item.no === Number(installmentNo))
+  if (!installment) return 0
+  const skip = (Array.isArray(plan.skippedInstallments) ? plan.skippedInstallments : [])
+    .find(item => Number(item?.no) === Number(installmentNo))
+  if (!skip) return installment.amount
+  return round2(Math.max(0, installment.amount - Math.min(installment.amount, rawSkipDeduction(skip, installment.amount))))
+}
+
+export function getPlanAttendanceDeduction(plan = {}) {
+  const schedule = getPlanInstallmentSchedule(plan)
+  return round2((Array.isArray(plan.skippedInstallments) ? plan.skippedInstallments : []).reduce((sum, skip) => {
+    const installment = schedule.find(item => item.no === Number(skip?.no))
+    return sum + (installment ? Math.min(installment.amount, rawSkipDeduction(skip, installment.amount)) : 0)
+  }, 0))
+}
+
+export function getPlanNetTotal(plan = {}) {
+  return round2(Math.max(0, getPlanGrossTotal(plan) - getPlanAttendanceDeduction(plan)))
+}
+
 export function hash(str) {
   let h = 0
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0
@@ -54,6 +123,38 @@ export function money(n) {
 export function trDate(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('tr-TR')
+}
+
+export function getLucaInvoiceDate(period, today = new Date()) {
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const todayValue = [
+    todayDate.getFullYear(),
+    String(todayDate.getMonth() + 1).padStart(2, '0'),
+    String(todayDate.getDate()).padStart(2, '0')
+  ].join('-')
+  const match = String(period || '').match(/^(\d{4})-(\d{2})$/)
+  if (!match) return todayValue
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return todayValue
+
+  const currentPeriod = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}`
+  if (period === currentPeriod || period > currentPeriod) return todayValue
+
+  const monthEnd = new Date(year, month, 0)
+  const daysSinceMonthEnd = (
+    Date.UTC(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()) -
+    Date.UTC(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate())
+  ) / 86400000
+
+  if (daysSinceMonthEnd > 7) return todayValue
+
+  return [
+    monthEnd.getFullYear(),
+    String(monthEnd.getMonth() + 1).padStart(2, '0'),
+    String(monthEnd.getDate()).padStart(2, '0')
+  ].join('-')
 }
 
 export function addMonthsToDate(dateStr, n) {
@@ -98,6 +199,9 @@ export function getStudent(state, id) {
 }
 
 export function itemMonths(it, yearStart = DEFAULT_YEAR_START) {
+  if (Array.isArray(it?.installmentSchedule) && it.installmentSchedule.length > 0) {
+    return it.installmentSchedule.map(installment => String(installment?.dueDate || '').slice(0, 7)).filter(Boolean)
+  }
   const a = []
   const start = it.start || yearStart
   for (let i = 0; i < it.installments; i++) a.push(addMonths(start, i))
@@ -110,9 +214,9 @@ export function expectedFor(state, sid, period) {
   const ys = getYearStart(state)
   let t = 0
   ;(s.items || []).forEach(it => {
-    itemMonths(it, ys).forEach(m => {
-      if (m === period) {
-        t += Number(it.total || 0) / Math.max(1, Number(it.installments) || 1)
+    getPlanInstallmentSchedule(it, it.start || `${ys}-15`).forEach(installment => {
+      if (installment.dueDate.slice(0, 7) === period) {
+        t += getPlanInstallmentAmount(it, installment.no)
       }
     })
   })
@@ -122,7 +226,7 @@ export function expectedFor(state, sid, period) {
 export function expectedTotalFor(state, sid) {
   const s = getStudent(state, sid)
   if (!s) return 0
-  return round2((s.items || []).reduce((a, i) => a + i.total, 0))
+  return round2((s.items || []).reduce((a, item) => a + getPlanNetTotal(item), 0))
 }
 
 export function collectedFor(state, sid, period) {
@@ -138,60 +242,6 @@ export function collectedAll(state, sid) {
 
 export function balanceFor(state, sid) {
   return round2(expectedTotalFor(state, sid) - collectedAll(state, sid))
-}
-
-// Reporting-only financial projection. It follows the fee screen's source data:
-// item.total is the discounted net plan and collections are the payment source.
-export function financialSummaryForStudent(state, sid, today = new Date().toISOString().slice(0, 10)) {
-  const student = getStudent(state, sid)
-  if (!student) return { gross: 0, discount: 0, net: 0, downPayment: 0, installmentPaid: 0, paid: 0, remaining: 0, overdue: 0, lastDueDate: '', plans: [] }
-
-  const studentCollections = (state?.collections || []).filter(c => String(c.studentId) === String(student.id))
-  const plans = (student.items || []).map((item) => {
-    const net = round2(Number(item.total) || 0)
-    const gross = round2(Number(item.basePrice || item.grossAmount || net) || net)
-    const discount = round2(Math.max(0, gross - net))
-    const planCollections = studentCollections.filter(c => String(c.item || '').trim().toLowerCase() === String(item.name || '').trim().toLowerCase())
-    const downPaymentPaid = round2(planCollections.filter(c => Number(c.installmentNo) === 0).reduce((sum, c) => sum + Number(c.amount || 0), 0))
-    const directInstallmentPaid = round2(planCollections.filter(c => Number(c.installmentNo) !== 0).reduce((sum, c) => sum + Number(c.amount || 0), 0))
-    const count = Math.max(1, Number(item.installments) || 1)
-    const installmentAmount = round2(net / count)
-    const downPaymentCredits = Array.from({ length: count }, (_, index) => {
-      if (!downPaymentPaid) return 0
-      if (index === count - 1) return round2(downPaymentPaid - round2(Math.floor((downPaymentPaid / count) * 100) / 100 * (count - 1)))
-      return round2(Math.floor((downPaymentPaid / count) * 100) / 100)
-    })
-    const directByInstallment = new Map()
-    planCollections.filter(c => Number(c.installmentNo) > 0).forEach(c => {
-      const no = Number(c.installmentNo)
-      directByInstallment.set(no, round2((directByInstallment.get(no) || 0) + Number(c.amount || 0)))
-    })
-    let unassignedPool = round2(planCollections.filter(c => !Number.isInteger(Number(c.installmentNo)) || Number(c.installmentNo) > count).reduce((sum, c) => sum + Number(c.amount || 0), 0))
-    let overdue = 0
-    let lastDueDate = ''
-    for (let index = 0; index < count; index += 1) {
-      const start = item.start || getYearStart(state)
-      const dueDate = addMonthsToDate(start.length === 7 ? `${start}-15` : start, index)
-      lastDueDate = dueDate
-      const directPaid = round2(directByInstallment.get(index + 1) || 0)
-      const downPaymentPaidForInstallment = round2(downPaymentCredits[index] || 0)
-      const unassignedPaid = Math.min(unassignedPool, Math.max(0, round2(installmentAmount - directPaid - downPaymentPaidForInstallment)))
-      unassignedPool = round2(unassignedPool - unassignedPaid)
-      const paidForInstallment = Math.min(installmentAmount, round2(directPaid + downPaymentPaidForInstallment + unassignedPaid))
-      if (dueDate < today) overdue += Math.max(0, round2(installmentAmount - paidForInstallment))
-    }
-    return { name: item.name || '', gross, discount, net, downPayment: downPaymentPaid || round2(Number(item.downPayment) || 0), installmentPaid: directInstallmentPaid, paid: round2(downPaymentPaid + directInstallmentPaid), overdue: round2(overdue), lastDueDate }
-  })
-  const totals = plans.reduce((sum, plan) => ({
-    gross: sum.gross + plan.gross,
-    discount: sum.discount + plan.discount,
-    net: sum.net + plan.net,
-    downPayment: sum.downPayment + plan.downPayment,
-    installmentPaid: sum.installmentPaid + plan.installmentPaid,
-    paid: sum.paid + plan.paid,
-    overdue: sum.overdue + plan.overdue
-  }), { gross: 0, discount: 0, net: 0, downPayment: 0, installmentPaid: 0, paid: 0, overdue: 0 })
-  return { ...totals, remaining: round2(Math.max(0, totals.net - totals.paid)), lastDueDate: plans[plans.length - 1]?.lastDueDate || '', plans }
 }
 
 export function expectedAllActive(state) {
@@ -244,6 +294,40 @@ export function makeInvoice(state, s, period, total, forceDiff) {
   }
 }
 
+const normLabel = (value) => String(value || '').trim().toLowerCase()
+
+// Bir öğrenci ücret planını, ayarlardaki ücret kategorisiyle eşleştirir.
+// Sıra: kayıtlı kategori id'si -> ad -> fatura kalemi adı.
+// NOT: Eski planların adı gerçek fatura kalemine dönüştürüldüğü için (örn. "EĞİTİM")
+// yalnızca kategori adına bakmak eşleşmeyi kaçırır ve "faturalı değil" kontrolü
+// sessizce devre dışı kalır. Bu yüzden üç alana da bakılır.
+export function findPlanFeeCategory(feeCategories = [], plan = {}) {
+  const list = Array.isArray(feeCategories) ? feeCategories : []
+  if (list.length === 0) return null
+
+  const planCategoryId = String(plan.feeCategoryId || plan.categoryId || '')
+  if (planCategoryId) {
+    const byId = list.find(fc => String(fc.id) === planCategoryId)
+    if (byId) return byId
+  }
+
+  const name = normLabel(plan.name)
+  if (!name) return null
+  return list.find(fc => normLabel(fc.name) === name) ||
+    list.find(fc => normLabel(fc.invoiceItem) === name) ||
+    null
+}
+
+// Bir etiket (tahsilat kalemi / fatura kalemi adı) ile ücret kategorisini eşleştirir.
+export function findFeeCategoryByLabel(feeCategories = [], label = '') {
+  const list = Array.isArray(feeCategories) ? feeCategories : []
+  const key = normLabel(label)
+  if (!key || list.length === 0) return null
+  return list.find(fc => normLabel(fc.name) === key) ||
+    list.find(fc => normLabel(fc.invoiceItem) === key) ||
+    null
+}
+
 // Bir tahsilatın faturalı / KDV'ye tabi olup olmadığını kontrol eder:
 // 1. Öğrenci faturalı olmalı (student.invoiced !== false)
 // 2. Kalem / plan faturalı olmalı (plan.invoiced !== false ve feeCategory.invoiced !== false)
@@ -254,13 +338,15 @@ export function isCollectionInvoiced(state, col, studentObj) {
   const itemName = (col?.item || col?.planName || '').trim().toLowerCase()
   if (!itemName) return s.invoiced !== false
 
-  // Öğrenciye atanmış plan kontrolü
-  const studentPlan = (s.items || []).find(it => (it.name || '').trim().toLowerCase() === itemName)
+  // Öğrenciye atanmış plan kontrolü (ad veya fatura kalemi adı eşleşebilir)
+  const studentPlan = (s.items || []).find(it =>
+    normLabel(it.name) === itemName || normLabel(it.invoiceItem) === itemName
+  )
   if (studentPlan && studentPlan.invoiced === false) return false
 
   // Ayarlar altındaki genel ücret kategorisi kontrolü
   const feeCategories = state?.settings?.feeCategories || []
-  const feeCat = feeCategories.find(fc => (fc.name || '').trim().toLowerCase() === itemName)
+  const feeCat = findFeeCategoryByLabel(feeCategories, col?.item || col?.planName)
   if (feeCat && feeCat.invoiced === false) return false
 
   return true
@@ -322,18 +408,29 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
       const planKey = plan?.id || plan?._id || `${(plan?.name || 'plan').replace(/\s+/g, '-').toLowerCase()}-${planIdx}`
       // 2. Ücret kalemi kontrolü: Plan ve genel kategori faturalı olmalı
       if (plan.invoiced === false) return
-      const feeCat = feeCategories.find(fc => (fc.name || '').trim().toLowerCase() === (plan.name || '').trim().toLowerCase())
+      const feeCat = findPlanFeeCategory(feeCategories, plan)
       if (feeCat && feeCat.invoiced === false) return
 
+      // Luca fatura görevi bu satırdan beslenir (FaturalarPage -> buildLucaInvoiceItem).
+      // Fatura kalemi ve KDV oranı ücret KATEGORİSİNDEN gelir, global ayardan değil:
+      //   fatura kalemi : ücret kategorisinin invoiceItem'i -> planda kayıtlı invoiceItem -> kategori adı
+      //   KDV oranı     : ücret kategorisinin kendi vatRate'i
+      // Kategori oranı tanımlı değilse (null / boş / 0) mevcut davranışı bozmamak için
+      // eski global orana düşülür. Kategoride oran varsa global KDV KESİNLİKLE kullanılmaz.
+      const planInvoiceItem = String(
+        feeCat?.invoiceItem || plan.invoiceItem || feeCat?.name || ''
+      ).trim()
+      const categoryVatRate = Number(feeCat?.vatRate)
+      const effectiveVatRate = Number.isFinite(categoryVatRate) && categoryVatRate > 0
+        ? categoryVatRate
+        : vatRate
+
       const count = Math.max(1, Number(plan.installments) || 1)
-      const totalSkipped = Array.isArray(plan.skippedInstallments)
-        ? plan.skippedInstallments.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
-        : 0
-      const contractTotal = round2(Number(plan.contractTotal || plan.originalTotal) || (Number(plan.total) + totalSkipped))
-      const standardPerInstallment = round2(contractTotal / count)
+      const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
       const startDate = plan.start
         ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
         : `${defaultYearStart}-15`
+      const schedule = getPlanInstallmentSchedule(plan, startDate)
 
       // Devamsızlık / skipped installments kontrolü
       const skippedSet = {}
@@ -362,10 +459,13 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
         }
       })
       let unassignedPool = unassignedCols.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+      const downPaymentPaid = round2((explicitCols[0] || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0))
+      const downPaymentCredit = round2(downPaymentPaid / count)
 
       for (let i = 0; i < count; i++) {
         const installmentNo = i + 1
-        const dueDate = addMonthsToDate(startDate, i)
+        const scheduledInstallment = schedule[i]
+        const dueDate = scheduledInstallment.dueDate
         const installmentPeriod = dueDate.slice(0, 7)
 
         // Dönem filtresi: Eğer spesifik bir ay seçildiyse sadece o ayın taksitleri gelir
@@ -373,21 +473,12 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
           continue
         }
 
-        // Tutar hesaplama (Devamsızlık sadece ilgili ayın taksit tutarını düşürür)
-        let installmentAmount = standardPerInstallment
+        // Tutar hesaplama (Devamsızlık kontrolü)
+        let installmentAmount = getPlanInstallmentAmount(plan, installmentNo)
         let isSkipped = false
         const skipInfo = skippedSet[installmentNo]
         if (skipInfo) {
-          const isFull = (skipInfo.period || 'full') === 'full'
-          const deductedAmount = Number(skipInfo.deductedAmount) != null
-            ? Number(skipInfo.deductedAmount)
-            : (isFull ? standardPerInstallment : round2(standardPerInstallment / 2))
-          if (isFull || deductedAmount >= standardPerInstallment) {
-            installmentAmount = 0
-            isSkipped = true
-          } else {
-            installmentAmount = round2(Math.max(0, standardPerInstallment - deductedAmount))
-          }
+          isSkipped = true
         }
 
         // Eğer taksit devamsızlıkla tamamen sıfırlandıysa (0 TL) listelemeyebiliriz
@@ -395,32 +486,42 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
           continue
         }
 
-        // Tahsilat eşleştirme (Peşinat ayrıdır, taksitlere paylaştırılmaz)
+        // Tahsilat eşleştirme
         const directMatches = explicitCols[installmentNo] || []
-        let paid = 0
+        let paid = downPaymentCredit
         let collectionDates = []
         let paymentMethods = []
 
         if (directMatches.length > 0) {
-          const directTotal = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-          paid = round2(directTotal)
+          paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
           collectionDates = directMatches.map(c => c.date).filter(Boolean)
-          paymentMethods = directMatches.map(c => c.payment).filter(Boolean)
+          paymentMethods = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', ...directMatches.map(c => c.payment).filter(Boolean)].filter(Boolean)
         } else if (unassignedPool > 0) {
-          const availableSpace = round2(Math.max(0, installmentAmount - paid))
-          const applied = Math.min(unassignedPool, availableSpace)
-          paid = round2(applied)
-          unassignedPool = round2(unassignedPool - applied)
+          if (unassignedPool >= installmentAmount) {
+            paid = installmentAmount
+            unassignedPool = round2(unassignedPool - installmentAmount)
+          } else {
+            paid = unassignedPool
+            unassignedPool = 0
+          }
         }
 
-        paid = round2(Math.min(paid, installmentAmount))
+        paid = round2(paid)
         const remaining = round2(Math.max(0, installmentAmount - paid))
         const isPaid = paid >= installmentAmount && installmentAmount > 0
         const isPartial = paid > 0 && paid < installmentAmount
         const collectionStatus = isPaid ? 'paid' : (isPartial ? 'partial' : 'unpaid')
 
-        // Fatura eşleştirme
+        // Fatura eşleştirme.
+        // Başarısız/iptal edilen Luca görevleri fatura sayılmaz; aksi halde
+        // satır "Kesildi" görünür ve yeniden "Fatura Kes" ile denenemez hale gelir.
+        // 'draft_missing' de fatura sayılmaz: Luca'daki taslak artık yok, yani
+        // ortada gönderilecek/görüntülenecek bir fatura yok. Sayılırsa satır
+        // kalıcı olarak "Faturayı Onayla" durumunda kalır ve toparlanamaz.
+        const isUsableInvoice = (iv) => !['failed', 'cancelled', 'draft_missing'].includes(String(iv?.lifecycleStatus || '').toLowerCase())
+
         const inv = invoices.find(iv =>
+          isUsableInvoice(iv) &&
           String(iv.studentId) === String(student.id || student._id) &&
           (
             Number(iv.installmentNo) === installmentNo ||
@@ -432,7 +533,7 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
         const invoiceStatus = inv ? 'billed' : 'unbilled'
 
         // Matrah ve KDV
-        const baseAmount = round2(installmentAmount / (1 + vatRate / 100))
+        const baseAmount = round2(installmentAmount / (1 + effectiveVatRate / 100))
         const vatAmount = round2(installmentAmount - baseAmount)
         const invoiceTotal = inv ? round2(Number(inv.total) || 0) : 0
         const diff = inv ? round2(invoiceTotal - installmentAmount) : 0
@@ -442,6 +543,14 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
 
         result.push({
           id: `${student.id || student._id}-${planKey}-${installmentNo}-${installmentPeriod}`,
+          // Backend'in beklediği kaynak anahtarı (createInvoiceSourceKey).
+          // Öğrenci + ücret planı + taksit no + dönem. Fatura eşleştirmesinin
+          // tekil anahtarıdır; aynen bu biçimde üretilmelidir.
+          sourceKey: `${student.id || student._id}:${plan.name || 'Genel'}:${installmentNo}:${installmentPeriod}`,
+          // Luca'ya gönderilecek fatura kalemi ve KDV (global settings.vat DEĞİL).
+          invoiceItem: planInvoiceItem,
+          feeCategoryId: feeCat?.id || plan.feeCategoryId || '',
+          vatRate: effectiveVatRate,
           student,
           studentId: student.id || student._id,
           schoolName: student._schoolName || '',
@@ -471,7 +580,6 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
           hasDiff,
           isUnderInvoiced,
           isOverInvoiced,
-          vatRate,
           baseAmount,
           vatAmount
         })
@@ -520,11 +628,14 @@ export function planTableFor(state, s) {
   const ps = periodsOfYear(ys)
   const items = s.items || []
   const rows = items.map(it => {
-    const mm = itemMonths(it, ys)
-    const per = it.total / it.installments
+    const schedule = getPlanInstallmentSchedule(it, it.start || `${ys}-15`)
+    const per = round2(getPlanGrossTotal(it) / Math.max(1, Number(it.installments) || 1))
     return {
       item: it,
-      months: ps.map(p => mm.includes(p) ? per : null),
+      months: ps.map(period => {
+        const installment = schedule.find(row => row.dueDate.slice(0, 7) === period)
+        return installment ? getPlanInstallmentAmount(it, installment.no) : null
+      }),
       perMonth: per
     }
   })
@@ -672,14 +783,11 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
       const allInstallments = []
       items.forEach(plan => {
         const count = Math.max(1, Number(plan.installments) || 1)
-        const totalSkipped = Array.isArray(plan.skippedInstallments)
-          ? plan.skippedInstallments.reduce((sum, s) => sum + (Number(s.deductedAmount) || 0), 0)
-          : 0
-        const contractTotal = round2(Number(plan.contractTotal || plan.originalTotal) || (Number(plan.total) + totalSkipped))
-        const perInstallment = round2(contractTotal / count)
+        const downPayment = round2(Math.max(0, Number(plan.downPayment) || 0))
         const startDate = plan.start
           ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
           : `${defaultYearStart}-15`
+        const schedule = getPlanInstallmentSchedule(plan, startDate)
 
         const skippedSet = {}
         if (Array.isArray(plan.skippedInstallments)) {
@@ -688,19 +796,10 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
 
         for (let i = 0; i < count; i++) {
           const installmentNo = i + 1
-          const dueDate = addMonthsToDate(startDate, i)
+          const dueDate = schedule[i].dueDate
           const installmentPeriod = dueDate.slice(0, 7)
 
-          let instAmt = perInstallment
-          const skipInfo = skippedSet[installmentNo]
-          if (skipInfo) {
-            const isFull = (skipInfo.period || 'full') === 'full'
-            const deducted = Number(skipInfo.deductedAmount) != null
-              ? Number(skipInfo.deductedAmount)
-              : (isFull ? perInstallment : round2(perInstallment / 2))
-            if (isFull || deducted >= perInstallment) instAmt = 0
-            else instAmt = round2(Math.max(0, perInstallment - deducted))
-          }
+          const instAmt = getPlanInstallmentAmount(plan, installmentNo)
 
           if (instAmt > 0) {
             allInstallments.push({
@@ -741,7 +840,8 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
 
       const installmentDebts = allInstallments.map(inst => {
         const key = `${(inst.planName || '').trim().toLowerCase()}_${inst.installmentNo}`
-        let paid = round2(explicitCols[key] || 0)
+        const downPaymentCredit = round2((explicitCols[`${(inst.planName || '').trim().toLowerCase()}_0`] || 0) / Math.max(1, Number(items.find(item => item.name === inst.planName)?.installments) || 1))
+        let paid = round2((explicitCols[key] || 0) + downPaymentCredit)
         let debt = round2(Math.max(0, inst.amount - paid))
 
         if (debt > 0 && unassignedPool > 0) {
@@ -847,60 +947,118 @@ export function calculateSchoolsDebtReport(schools = [], selectedYear = '2026') 
   }
 }
 
-// Reporting-only monthly matrix. The fee/collection screens remain untouched.
-export function calculateSchoolsDebtMatrix(schools = [], selectedYear = '2026', reportDate = new Date().toISOString().slice(0, 10)) {
-  const year = String(selectedYear)
-  const months = MONTHS_TR.map(month => ({ ...month, period: `${year}-${month.key}` }))
-  const schoolReports = schools.map((school) => {
-    const schoolId = String(school.id || school._id || '')
-    const schoolName = school.name || school.detail?.settings?.school || 'İsimsiz Okul'
-    const students = school.detail?.students || []
-    const collections = school.detail?.collections || []
-    const rows = students.map((student) => {
-      const monthly = Object.fromEntries(months.map(month => [month.period, { amount: 0, overdue: false }]))
-      const studentCollections = collections.filter(collection => String(collection.studentId) === String(student.id))
-      let annualTotal = 0
-      ;(student.items || []).forEach((item) => {
-        const net = round2(Number(item.total) || 0)
-        const count = Math.max(1, Number(item.installments) || 1)
-        const installmentAmount = round2(net / count)
-        const itemName = String(item.name || '').trim().toLowerCase()
-        const itemCollections = studentCollections.filter(collection => {
-          const collectionItem = String(collection.item || '').trim().toLowerCase()
-          return collectionItem === itemName || (!collectionItem && (student.items || []).length <= 1)
-        })
-        const downPayment = round2(itemCollections.filter(collection => Number(collection.installmentNo) === 0).reduce((sum, collection) => sum + Number(collection.amount || 0), 0))
-        const direct = new Map()
-        let unassigned = round2(itemCollections.filter(collection => !Number.isInteger(Number(collection.installmentNo)) || Number(collection.installmentNo) > count).reduce((sum, collection) => sum + Number(collection.amount || 0), 0))
-        itemCollections.filter(collection => Number(collection.installmentNo) > 0 && Number(collection.installmentNo) <= count).forEach((collection) => {
-          const no = Number(collection.installmentNo)
-          direct.set(no, round2((direct.get(no) || 0) + Number(collection.amount || 0)))
-        })
-        const baseShare = downPayment ? Math.floor((downPayment / count) * 100) / 100 : 0
-        let distributed = 0
-        for (let index = 0; index < count; index += 1) {
-          const downShare = index === count - 1 ? round2(downPayment - distributed) : round2(baseShare)
-          distributed = round2(distributed + (index === count - 1 ? 0 : downShare))
-          const start = item.start || school.detail?.settings?.yearStart || `${year}-09`
-          const dueDate = addMonthsToDate(start.length === 7 ? `${start}-15` : start, index)
-          const period = dueDate.slice(0, 7)
-          const directPaid = round2(direct.get(index + 1) || 0)
-          const unassignedPaid = Math.min(unassigned, Math.max(0, round2(installmentAmount - directPaid - downShare)))
-          unassigned = round2(unassigned - unassignedPaid)
-          const remaining = round2(Math.max(0, installmentAmount - Math.min(installmentAmount, directPaid + downShare + unassignedPaid)))
-          if (monthly[period]) {
-            monthly[period].amount = round2(monthly[period].amount + remaining)
-            monthly[period].overdueAmount = round2((monthly[period].overdueAmount || 0) + (dueDate < reportDate ? remaining : 0))
-            monthly[period].overdue = monthly[period].overdue || (dueDate < reportDate && remaining > 0)
-          }
-        }
-      })
-      annualTotal = round2(Object.values(monthly).reduce((sum, month) => sum + month.amount, 0))
-      return { schoolId, schoolName, studentId: student.id || student._id, studentName: student.name || '—', studentClass: student.class || '—', monthly, annualTotal }
+// Öğrencinin finansal özetini hesaplar: net plan, indirim, peşinat, tahsilat, kalan, vadesi geçmiş
+export function financialSummaryForStudent(state, sid) {
+  const student = getStudent(state, sid)
+  if (!student) return { gross: 0, net: 0, discount: 0, downPayment: 0, installmentPaid: 0, paid: 0, remaining: 0, overdue: 0 }
+
+  const items = student.items || []
+  const totalPlan = round2(items.reduce((a, item) => a + getPlanGrossTotal(item), 0))
+  const discount = round2(items.reduce((sum, item) => {
+    const basePrice = Number(item.basePrice) || 0
+    const planTotal = getPlanGrossTotal(item)
+    const storedDiscount = (item.discounts || []).reduce((discountSum, entry) => discountSum + (Number(entry.amount) || 0), 0)
+    return sum + Math.max(0, basePrice > 0 ? basePrice - planTotal : Number(item.discount) || storedDiscount)
+  }, 0))
+  const gross = round2(totalPlan + discount)
+  const downPayment = round2(items.reduce((a, i) => a + Math.max(0, Number(i.downPayment) || 0), 0))
+  const attendanceDeduction = round2(items.reduce((sum, item) => sum + getPlanAttendanceDeduction(item), 0))
+  const net = round2(Math.max(0, totalPlan - attendanceDeduction))
+  const paid = collectedAll(state, sid)
+  const installmentPaid = round2((state?.collections || []).filter(collection =>
+    String(collection.studentId) === String(sid) && Number(collection.installmentNo) !== 0
+  ).reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0))
+  const remaining = round2(Math.max(0, net - paid))
+
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  let overdue = 0
+
+  items.forEach(plan => {
+    const schedule = getPlanInstallmentSchedule(plan, plan.start || `${getYearStart(state)}-15`)
+    const count = Math.max(1, Number(plan.installments) || 1)
+    const planCollections = (state?.collections || []).filter(collection =>
+      String(collection.studentId) === String(sid) &&
+      (!collection.item || collection.item.trim().toLowerCase() === String(plan.name || '').trim().toLowerCase())
+    )
+    const explicitCollections = new Map()
+    const legacyCollections = []
+    planCollections.forEach(collection => {
+      const installmentNo = Number(collection.installmentNo)
+      if (Number.isInteger(installmentNo) && installmentNo >= 0 && installmentNo <= count) {
+        explicitCollections.set(installmentNo, round2((explicitCollections.get(installmentNo) || 0) + (Number(collection.amount) || 0)))
+      } else {
+        legacyCollections.push(Number(collection.amount) || 0)
+      }
     })
-    return { schoolId, schoolName, students: rows, totalDebt: round2(rows.reduce((sum, row) => sum + row.annualTotal, 0)), overdue: round2(rows.reduce((sum, row) => sum + Object.values(row.monthly).reduce((inner, month) => inner + (month.overdueAmount || 0), 0), 0)) }
+    let legacyPool = round2(legacyCollections.reduce((sum, amount) => sum + amount, 0))
+    const downPaymentCredit = round2((explicitCollections.get(0) || 0) / count)
+
+    schedule.forEach(installment => {
+      if (installment.dueDate >= todayStr) return
+      const amount = getPlanInstallmentAmount(plan, installment.no)
+      const directPaid = explicitCollections.get(installment.no)
+      let paid = directPaid == null ? downPaymentCredit : directPaid
+      if (directPaid == null && legacyPool > 0) {
+        const legacyPaid = Math.min(amount, legacyPool)
+        paid = round2(paid + legacyPaid)
+        legacyPool = round2(legacyPool - legacyPaid)
+      }
+      overdue = round2(overdue + Math.max(0, amount - paid))
+    })
   })
-  return { year, months, schools: schoolReports, totalStudents: schoolReports.reduce((sum, school) => sum + school.students.length, 0), totalDebt: round2(schoolReports.reduce((sum, school) => sum + school.totalDebt, 0)), totalOverdue: round2(schoolReports.reduce((sum, school) => sum + school.overdue, 0)) }
+
+  return { gross, net, discount, downPayment, installmentPaid, paid, remaining, overdue }
+}
+
+// TopluAlacakRaporu sayfası için öğrenci bazında ay ay borç matrisi üretir.
+// calculateSchoolsDebtReport hesamasını kullanır, çıktıyı sayfanın beklediği şemaya dönüştürür.
+export function calculateSchoolsDebtMatrix(schools = [], selectedYear = '2026') {
+  const report = calculateSchoolsDebtReport(schools, selectedYear)
+  const today = new Date()
+
+  const months = report.months.map(m => ({ period: m.period, name: m.name, short: m.short }))
+
+  const isPeriodOverdue = (period) => {
+    const [y, m] = period.split('-').map(Number)
+    const lastDay = new Date(y, m, 0).getDate()
+    const periodEnd = new Date(y, m - 1, lastDay)
+    return periodEnd < today
+  }
+
+  const matrixSchools = report.schools.map(school => ({
+    ...school,
+    students: school.students.map(student => {
+      const monthly = {}
+      months.forEach(m => {
+        const amount = student.monthlyDebts[m.period] || 0
+        monthly[m.period] = { amount, overdue: amount > 0 && isPeriodOverdue(m.period) }
+      })
+      return {
+        schoolId: school.schoolId,
+        schoolName: school.schoolName,
+        studentId: student.studentId,
+        studentName: student.studentName,
+        studentClass: student.studentClass,
+        monthly,
+        annualTotal: student.totalDebt
+      }
+    })
+  }))
+
+  const totalOverdue = matrixSchools.reduce((sum, school) =>
+    sum + school.students.reduce((sum2, student) =>
+      sum2 + months.reduce((sum3, m) =>
+        sum3 + (student.monthly[m.period].overdue ? student.monthly[m.period].amount : 0), 0), 0), 0)
+
+  return {
+    year: report.year,
+    months,
+    schools: matrixSchools,
+    totalStudents: report.totalStudentsCount,
+    totalDebt: report.grandDebt,
+    totalOverdue
+  }
 }
 
 // Raporu profesyonel ay ay matris Excel (.xls) formatında indirir

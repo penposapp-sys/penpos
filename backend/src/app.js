@@ -45,7 +45,14 @@ export const createServer = () => {
   const __dirname = path.dirname(__filename)
   const isProd = process.env.NODE_ENV === 'production'
   const corsOrigin = isProd ? process.env.CORS_ORIGIN : undefined
-  const lucaExtensionOrigin = 'chrome-extension://gmoinhialbehjedebjmbfkfoaipgbbbn'
+  // NOT: Tek bir extension ID'sine pinleme YAPILMAZ. Paketlenmemis
+  // (unpacked) her yuklemede Chrome FARKLI bir extension ID uretir; sabit
+  // ID, kopya yenilenince tum extension->backend cagrilarini CORS ile
+  // oldurur ("TypeError: Failed to fetch" ve hicbir gorev devralinamaz).
+  // Gercek kimlik dogrulama zaten token'larla yapilir (extensionToken,
+  // deviceToken); origin burada yalnizca sema duzeyinde zin verir.
+  const isLucaExtensionOrigin = (origin) =>
+    typeof origin === 'string' && origin.startsWith('chrome-extension://')
   if (!isProd) {
     app.set('etag', false)
   }
@@ -65,7 +72,7 @@ export const createServer = () => {
     const opts = corsOrigin
       ? {
           origin: (origin, cb) => {
-            if (!origin || origin === corsOrigin || origin === lucaExtensionOrigin) return cb(null, true)
+            if (!origin || origin === corsOrigin || isLucaExtensionOrigin(origin)) return cb(null, true)
             return cb(null, false)
           },
           credentials: true,
@@ -88,8 +95,7 @@ export const createServer = () => {
       'http://127.0.0.1:5173',
       'http://127.0.0.1:5174',
       'http://192.168.1.233:5173',
-      'http://192.168.1.233:5174',
-      lucaExtensionOrigin
+      'http://192.168.1.233:5174'
     ])
     const privateLanRegexes = [
       /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:5173$/,
@@ -103,6 +109,7 @@ export const createServer = () => {
       origin: (origin, cb) => {
         if (!origin) return cb(null, true)
         if (allowlist.has(origin)) return cb(null, true)
+        if (isLucaExtensionOrigin(origin)) return cb(null, true)
         if (privateLanRegexes.some((regex) => regex.test(origin))) return cb(null, true)
         return cb(null, false)
       },
