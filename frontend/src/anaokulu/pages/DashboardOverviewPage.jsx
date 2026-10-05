@@ -18,12 +18,12 @@ import {
   Receipt,
   UserPlus,
   Users,
-  Wallet
+  Wallet,
+  X
 } from 'lucide-react'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
   addMonths,
-  expectedFor,
   getDashboardStats,
   getYearStart,
   getMonthlyInvoicableInstallments,
@@ -32,6 +32,7 @@ import {
   getInstallmentPaid,
   getStudent,
   money,
+  planTableFor,
   periodName,
   round2,
   trDate
@@ -83,6 +84,14 @@ function getMonthInstallmentRows(state, period) {
         ? (plan.start.length === 7 ? `${plan.start}-15` : plan.start)
         : `${defaultYearStart}-15`
       const schedule = getPlanInstallmentSchedule(plan, startDate)
+      const scheduleTotal = round2(schedule.reduce((sum, installment) => sum + installment.amount, 0))
+      const recordedDiscount = round2((Array.isArray(plan.discounts) ? plan.discounts : [])
+        .reduce((sum, discount) => sum + (Number(discount.amount) || 0), 0))
+      const totalDiscount = round2(Math.max(
+        0,
+        (Number(plan.basePrice) || 0) - (Number(plan.total) || 0),
+        recordedDiscount
+      ))
       const planCollections = collections.filter(collection =>
         String(collection.studentId) === String(student.id || student._id) &&
         (!collection.item || collection.item.trim().toLocaleLowerCase('tr-TR') === String(plan.name || '').trim().toLocaleLowerCase('tr-TR'))
@@ -112,6 +121,11 @@ function getMonthInstallmentRows(state, period) {
       schedule.forEach(installment => {
         if (installment.dueDate.slice(0, 7) !== period) return
         const amount = getPlanInstallmentAmount(plan, installment.no)
+        const scheduledAmount = round2(installment.amount)
+        const discount = scheduleTotal > 0
+          ? round2(totalDiscount * scheduledAmount / scheduleTotal)
+          : 0
+        const attendanceDeduction = round2(Math.max(0, scheduledAmount - amount))
         const isSkipped = (plan.skippedInstallments || []).some(skip => Number(skip?.no) === Number(installment.no))
 
         const directMatches = explicitCollections.get(installment.no) || []
@@ -137,7 +151,12 @@ function getMonthInstallmentRows(state, period) {
           installmentNo: installment.no,
           dueDate: installment.dueDate,
           amount,
+          discount,
+          attendanceDeduction,
           paid: round2(paid),
+          downPaymentApplied: downPaymentCredit,
+          unassignedApplied: installmentPayment.unassignedApplied,
+          directPaid: round2(directPaid || 0),
           remaining,
           isSkipped,
           daysOverdue,
@@ -150,17 +169,73 @@ function getMonthInstallmentRows(state, period) {
   return rows.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || String(a.student.name || '').localeCompare(String(b.student.name || ''), 'tr'))
 }
 
+function getMonthlyStudentRows(state, period) {
+  const collections = state?.collections || []
+  const defaultYearStart = getYearStart(state)
+
+  return (state?.students || []).map(student => {
+    const planTable = planTableFor(state, student)
+    const monthIndex = planTable.periods.indexOf(period)
+    if (monthIndex < 0) return null
+
+    const installments = planTable.rows.flatMap((planRow, planIndex) => {
+      if (planRow.months[monthIndex] == null) return []
+      const schedule = getPlanInstallmentSchedule(
+        planRow.item,
+        planRow.item.start || `${defaultYearStart}-15`
+      )
+      const installment = schedule.find(item => item.dueDate.slice(0, 7) === period)
+      if (!installment) return []
+
+      const scheduleTotal = round2(schedule.reduce((sum, item) => sum + item.amount, 0))
+      const recordedDiscount = round2((Array.isArray(planRow.item.discounts) ? planRow.item.discounts : [])
+        .reduce((sum, discount) => sum + (Number(discount.amount) || 0), 0))
+      const totalDiscount = round2(Math.max(
+        0,
+        (Number(planRow.item.basePrice) || 0) - (Number(planRow.item.total) || 0),
+        recordedDiscount
+      ))
+      const amount = round2(planRow.months[monthIndex])
+
+      return [{
+        plan: planRow.item,
+        planIndex: (student.items || []).indexOf(planRow.item),
+        planName: planRow.item.name || '—',
+        installmentNo: installment.no,
+        dueDate: installment.dueDate,
+        amount,
+        discount: scheduleTotal > 0 ? round2(totalDiscount * installment.amount / scheduleTotal) : 0,
+        attendanceDeduction: round2(Math.max(0, installment.amount - amount))
+      }]
+    })
+    const studentCollections = collections.filter(collection =>
+      String(collection.studentId) === String(student.id) &&
+      String(collection.date || '').slice(0, 7) === period
+    )
+
+    return {
+      student,
+      studentId: student.id || student._id,
+      installments,
+      amount: round2(planTable.monthTotals[monthIndex]),
+      paid: round2(planTable.monthCollected[monthIndex]),
+      remaining: round2(planTable.monthRemaining[monthIndex]),
+      collections: studentCollections
+    }
+  }).filter(Boolean)
+}
+
 function DashboardOverviewPage() {
   const navigate = useNavigate()
   const { state } = useAnaokuluData()
   const students = state?.students || []
-  const collections = state?.collections || []
   const invoices = state?.invoices || []
   const dashboardStats = getDashboardStats(state)
   const schoolYearStart = getYearStart(state)
   const schoolYearPeriods = useMemo(() => Array.from({ length: 12 }, (_, index) => addMonths(schoolYearStart, index)), [schoolYearStart])
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200)
   const [selectedPeriod, setSelectedPeriod] = useState(dashboardStats.currentPeriod)
+  const [detailsType, setDetailsType] = useState(null)
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth)
@@ -182,21 +257,12 @@ function DashboardOverviewPage() {
   const isMobile = windowWidth <= 768
   const isTablet = windowWidth < 1120
   const activeStudents = useMemo(() => students.filter(student => student.active !== false), [students])
-  const activeStudentIds = useMemo(() => new Set(activeStudents.map(student => String(student.id || student._id))), [activeStudents])
-
-  const monthExpected = useMemo(() => round2(activeStudents.reduce(
-    (sum, student) => sum + expectedFor(state, student.id || student._id, selectedPeriod),
-    0
-  )), [activeStudents, selectedPeriod, state])
-
-  const monthCollected = useMemo(() => round2(collections.reduce((sum, collection) => {
-    if (!activeStudentIds.has(String(collection.studentId)) || String(collection.date || '').slice(0, 7) !== selectedPeriod) return sum
-    return sum + (Number(collection.amount) || 0)
-  }, 0)), [activeStudentIds, collections, selectedPeriod])
-
-  const monthUncollected = round2(Math.max(0, monthExpected - monthCollected))
-  const collectionRate = monthExpected > 0 ? Math.min(100, Math.round(monthCollected / monthExpected * 100)) : 0
   const installmentRows = useMemo(() => getMonthInstallmentRows(state, selectedPeriod), [state, selectedPeriod])
+  const monthlyStudentRows = useMemo(() => getMonthlyStudentRows(state, selectedPeriod), [state, selectedPeriod])
+
+  const monthExpected = useMemo(() => round2(monthlyStudentRows.reduce((sum, row) => sum + row.amount, 0)), [monthlyStudentRows])
+  const monthCollected = useMemo(() => round2(monthlyStudentRows.reduce((sum, row) => sum + row.paid, 0)), [monthlyStudentRows])
+  const collectionRate = monthExpected > 0 ? Math.min(100, Math.round(monthCollected / monthExpected * 100)) : 0
   const invoiceRows = useMemo(() => getMonthlyInvoicableInstallments(state, selectedPeriod), [state, selectedPeriod])
   const invoiceCounts = useMemo(() => invoiceRows.reduce((counts, row) => {
     const workflow = getInvoiceWorkflow(row.invoice)
@@ -212,41 +278,58 @@ function DashboardOverviewPage() {
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
     .slice(0, 5), [invoices, selectedPeriod])
 
-  const activeCollectionsByPeriod = useMemo(() => {
-    const totals = new Map()
-    collections.forEach(collection => {
-      const period = String(collection.date || '').slice(0, 7)
-      if (period.length !== 7 || !activeStudentIds.has(String(collection.studentId))) return
-      totals.set(period, round2((totals.get(period) || 0) + (Number(collection.amount) || 0)))
-    })
-    return totals
-  }, [activeStudentIds, collections])
-
   const chartPeriods = schoolYearPeriods
-  const chartRows = useMemo(() => chartPeriods.map(period => ({
-    period,
-    expected: round2(activeStudents.reduce((sum, student) => sum + expectedFor(state, student.id || student._id, period), 0)),
-    collected: activeCollectionsByPeriod.get(period) || 0
-  })), [activeCollectionsByPeriod, activeStudents, chartPeriods, state])
+  const chartRows = useMemo(() => chartPeriods.map(period => {
+    const rows = period === selectedPeriod ? monthlyStudentRows : getMonthlyStudentRows(state, period)
+    return {
+      period,
+      expected: round2(rows.reduce((sum, row) => sum + row.amount, 0)),
+      collected: round2(rows.reduce((sum, row) => sum + row.paid, 0))
+    }
+  }), [chartPeriods, monthlyStudentRows, selectedPeriod, state])
   const chartMax = Math.max(1, ...chartRows.flatMap(row => [row.expected, row.collected]))
 
   const pastPeriods = useMemo(() => Array.from({ length: 5 }, (_, index) => addMonths(selectedPeriod, -(index + 1))), [selectedPeriod])
   const pastMonthRows = useMemo(() => pastPeriods.map(period => {
-    const expected = round2(activeStudents.reduce((sum, student) => sum + expectedFor(state, student.id || student._id, period), 0))
-    const collected = activeCollectionsByPeriod.get(period) || 0
+    const rows = getMonthlyStudentRows(state, period)
+    const expected = round2(rows.reduce((sum, row) => sum + row.amount, 0))
+    const collected = round2(rows.reduce((sum, row) => sum + row.paid, 0))
     return {
       period,
       expected,
       collected,
-      remaining: round2(Math.max(0, expected - collected)),
+      remaining: round2(rows.reduce((sum, row) => sum + row.remaining, 0)),
       rate: expected > 0 ? Math.min(100, Math.round(collected / expected * 100)) : 0
     }
-  }), [activeCollectionsByPeriod, activeStudents, pastPeriods, state])
+  }), [pastPeriods, state])
 
   const allMonthInstallments = installmentRows
-  const unpaidRows = allMonthInstallments.filter(row => row.remaining > 0).slice(0, 5)
+  const installmentDetailRows = useMemo(() => allMonthInstallments.map(row => {
+    const remaining = round2(row.amount - row.paid)
+    const status = remaining < 0
+      ? 'Fazla tahsilat / mahsup'
+      : remaining === 0
+        ? 'Tamamlandı'
+        : row.paid > 0
+          ? 'Kısmi tahsil edildi'
+          : 'Tahsil edilmedi'
+    return {
+      ...row,
+      remaining,
+      status,
+      studentName: row.student.name || '—',
+      feeItem: row.planName || '—',
+      installmentAmount: row.amount,
+      collectedAmount: row.paid,
+      discountAmount: row.discount,
+      detailKey: `${row.studentId}-${row.planIndex}-${row.installmentNo}-${row.dueDate}`
+    }
+  }), [allMonthInstallments])
+  const allUnpaidInstallments = installmentDetailRows.filter(row => row.remaining > 0)
+  const monthUncollected = round2(allUnpaidInstallments.reduce((sum, row) => sum + row.remaining, 0))
+  const unpaidRows = allUnpaidInstallments.slice(0, 5)
   const totalMonthInstallments = allMonthInstallments.length
-  const paidMonthInstallments = allMonthInstallments.filter(row => row.remaining <= 0).length
+  const paidMonthInstallments = installmentDetailRows.filter(row => row.remaining <= 0).length
   const remainingMonthInstallments = totalMonthInstallments - paidMonthInstallments
 
   const changeMonth = (amount) => setSelectedPeriod(current => {
@@ -274,8 +357,10 @@ function DashboardOverviewPage() {
     }
   })
 
-  const card = (label, value, sub, Icon, tone) => (
-    <div style={{ ...panelStyle, padding: isMobile ? '10px 11px' : '14px 16px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+  const card = (label, value, sub, Icon, tone, onClick) => {
+    const Card = onClick ? 'button' : 'div'
+    return (
+    <Card type={onClick ? 'button' : undefined} onClick={onClick} style={{ ...panelStyle, width: '100%', boxSizing: 'border-box', padding: isMobile ? '10px 11px' : '14px 16px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, textAlign: 'left', cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{ width: isMobile ? 36 : 46, height: isMobile ? 36 : 46, flex: '0 0 auto', borderRadius: 11, display: 'grid', placeItems: 'center', background: tone.soft, color: tone.main }}>
         <Icon size={isMobile ? 18 : 22} strokeWidth={2.4} />
       </div>
@@ -285,8 +370,9 @@ function DashboardOverviewPage() {
         <div style={{ marginTop: 3, fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
       </div>
       {!isMobile && <ChevronRight size={16} color="#94a3b8" />}
-    </div>
-  )
+    </Card>
+    )
+  }
 
   const panelHeader = (title, action, onAction, Icon) => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
@@ -307,6 +393,33 @@ function DashboardOverviewPage() {
     pending: { bg: '#fef3c7', color: '#b45309', label: 'Bekliyor' },
     unissued: { bg: '#fee2e2', color: '#b91c1c', label: 'Kesilmedi' }
   }
+
+  const financialDetails = detailsType === 'expected'
+    ? {
+        title: `${monthLabel(selectedPeriod)} Beklenen`,
+        description: 'Öğrenci Detayı > Plan aylık tablosuyla aynı öğrenci ve taksit tutarlarıdır.',
+        rows: installmentDetailRows.filter(row => row.amount > 0),
+        total: round2(installmentDetailRows
+          .filter(row => row.amount > 0)
+          .reduce((sum, row) => sum + row.remaining, 0))
+      }
+    : detailsType === 'collected'
+      ? {
+          title: `${monthLabel(selectedPeriod)} Tahsil Edilen`,
+          description: 'Öğrenci Detayı > Plan kaynağındaki gibi, seçili ayda kaydedilen tahsilatların öğrenci bazındaki toplamıdır.',
+          rows: installmentDetailRows.filter(row => row.paid > 0 || row.remaining < 0),
+          total: round2(installmentDetailRows
+            .filter(row => row.paid > 0 || row.remaining < 0)
+            .reduce((sum, row) => sum + row.remaining, 0))
+        }
+      : detailsType === 'uncollected'
+        ? {
+            title: `${monthLabel(selectedPeriod)} Tahsil Edilmeyen`,
+            description: 'Öğrenci Detayı > Plan aylık “Kalan” hesabıdır. Fazla tahsilat bulunan öğrenci ayları negatif bakiye olarak toplama dahil edilir.',
+            rows: allUnpaidInstallments,
+            total: monthUncollected
+          }
+        : null
 
   return (
     <div style={{ width: '100%', maxWidth: 1550, margin: '0 auto', boxSizing: 'border-box', display: 'grid', gap: 10, minWidth: 0, overflowX: 'hidden', padding: '0 4px 8px', fontSize: 12, lineHeight: 1.4, color: '#0f172a' }}>
@@ -347,9 +460,9 @@ function DashboardOverviewPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 380 ? 'minmax(0, 1fr)' : windowWidth < 980 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 8, minWidth: 0 }}>
         {card('Toplam Öğrenci', students.length, `${activeStudents.length} aktif · ${students.length - activeStudents.length} pasif`, Users, { main: '#0f172a', soft: '#eff6ff' })}
-        {card(`${monthLabel(selectedPeriod)} Tahsilat`, money(monthCollected), `${collectionRate}% tahsilat oranı`, Wallet, { main: '#059669', soft: '#dcfce7' })}
-        {card(`${monthLabel(selectedPeriod)} Beklenen`, money(monthExpected), `${totalMonthInstallments} taksit`, Hourglass, { main: '#7c3aed', soft: '#f3e8ff' })}
-        {card(`${monthLabel(selectedPeriod)} Tahsil Edilmeyen`, money(monthUncollected), `${unpaidRows.length} açık taksit gösteriliyor`, CircleAlert, { main: '#dc2626', soft: '#fee2e2' })}
+        {card(`${monthLabel(selectedPeriod)} Tahsil Edilen`, money(monthCollected), `${collectionRate}% tahsilat oranı`, Wallet, { main: '#059669', soft: '#dcfce7' }, () => setDetailsType('collected'))}
+        {card(`${monthLabel(selectedPeriod)} Beklenen`, money(monthExpected), `${monthlyStudentRows.reduce((count, row) => count + row.installments.length, 0)} taksit`, Hourglass, { main: '#7c3aed', soft: '#f3e8ff' }, () => setDetailsType('expected'))}
+        {card(`${monthLabel(selectedPeriod)} Tahsil Edilmeyen`, money(monthUncollected), `${allUnpaidInstallments.length} açık taksit`, CircleAlert, { main: '#dc2626', soft: '#fee2e2' }, () => setDetailsType('uncollected'))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : isTablet ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1.08fr) minmax(0, 1fr) minmax(290px, 0.92fr)', gap: 8, alignItems: 'stretch' }}>
@@ -564,6 +677,96 @@ function DashboardOverviewPage() {
           )}
         </section>
       </div>
+
+      {financialDetails && (
+        <div
+          role="presentation"
+          onClick={() => setDetailsType(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: 14, background: 'rgba(15,23,42,0.48)' }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-financial-details-title"
+            onClick={event => event.stopPropagation()}
+            style={{ width: 'min(1200px, 100%)', maxHeight: 'min(88vh, 900px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', borderRadius: 14, boxShadow: '0 20px 60px rgba(15,23,42,0.25)' }}
+          >
+            <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '16px 18px', borderBottom: '1px solid #e2e8f0' }}>
+              <div>
+                <h2 id="dashboard-financial-details-title" style={{ margin: 0, color: '#0f172a', fontSize: 17, fontWeight: 850 }}>{financialDetails.title}</h2>
+                <p style={{ margin: '5px 0 0', color: '#64748b', fontSize: 12 }}>{financialDetails.description}</p>
+              </div>
+              <button type="button" aria-label="Detay penceresini kapat" onClick={() => setDetailsType(null)} style={{ display: 'grid', placeItems: 'center', flex: '0 0 auto', width: 32, height: 32, border: 0, borderRadius: 8, background: '#f1f5f9', color: '#475569', cursor: 'pointer' }}>
+                <X size={17} />
+              </button>
+            </header>
+            <div style={{ overflow: 'auto', padding: '0 14px 14px' }}>
+              <table style={{ width: '100%', minWidth: 970, borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f8fafc' }}>
+                  <tr>
+                    {['Öğrenci', 'Ücret kalemi', 'Taksit no / vade', 'Taksit tutarı', 'Tahsil edilen (ay)', 'İndirim / devamsızlık', 'Kalan', 'Durum', ''].map(label => (
+                      <th key={label} style={{ padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: label.startsWith('Taksit tutarı') || label.startsWith('Tahsil edilen') || label === 'Kalan' ? 'right' : 'left', whiteSpace: 'nowrap' }}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {financialDetails.rows.length === 0 ? (
+                    <tr><td colSpan={9} style={{ padding: 26, textAlign: 'center', color: '#64748b' }}>Bu ay için gösterilecek taksit kaydı yok.</td></tr>
+                  ) : financialDetails.rows.map(row => {
+                    const appliedDiscounts = [
+                      row.discount > 0 ? `İndirim ${money(row.discount)}` : '',
+                      row.attendanceDeduction > 0 ? `Devamsızlık ${money(row.attendanceDeduction)}` : ''
+                    ].filter(Boolean).join(' · ') || '—'
+                    const paymentBreakdown = [
+                      row.downPaymentApplied > 0 ? `Peşinat payı ${money(row.downPaymentApplied)}` : '',
+                      row.directPaid > 0 ? `Bu taksit ${money(row.directPaid)}` : '',
+                      row.unassignedApplied > 0 ? `Legacy tahsilat ${money(row.unassignedApplied)}` : ''
+                    ].filter(Boolean).join(' · ')
+                    return (
+                      <tr
+                        key={row.detailKey}
+                        tabIndex={0}
+                        role="button"
+                        onClick={() => navigateToCollection(row)}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            navigateToCollection(row)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontWeight: 750 }}>{row.student.name || '—'}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569' }}>{row.planName || '—'}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', whiteSpace: 'nowrap' }}>#{row.installmentNo} · {trDate(row.dueDate)}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(row.amount)}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <strong>{money(row.paid)}</strong>
+                          {paymentBreakdown && <small style={{ display: 'block', maxWidth: 240, marginTop: 2, color: '#64748b', whiteSpace: 'normal' }}>{paymentBreakdown}</small>}
+                        </td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{appliedDiscounts}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: row.remaining > 0 ? '#dc2626' : row.remaining < 0 ? '#2563eb' : '#475569', fontWeight: 750, whiteSpace: 'nowrap' }}>{money(row.remaining)}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: row.remaining > 0 ? (row.paid > 0 ? '#b45309' : '#dc2626') : row.remaining < 0 ? '#2563eb' : '#15803d', whiteSpace: 'nowrap' }}>{row.status}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#2563eb', fontWeight: 750, whiteSpace: 'nowrap' }}>Detaya git →</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: '#f8fafc', fontWeight: 850 }}>
+                    <td colSpan={3} style={{ padding: '11px 8px', textAlign: 'right', color: '#334155' }}>Toplam ({financialDetails.rows.length} taksit)</td>
+                    <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.amount, 0)))}</td>
+                    <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.paid, 0)))}</td>
+                    <td style={{ padding: '11px 8px' }}>—</td>
+                    <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.remaining, 0)))}</td>
+                    <td colSpan={2} style={{ padding: '11px 8px', color: '#334155' }}>Kart toplamı: {money(financialDetails.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        </div>
+      )}
 
     </div>
   )
