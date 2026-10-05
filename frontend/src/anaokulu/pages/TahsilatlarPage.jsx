@@ -288,6 +288,16 @@ export default function TahsilatlarPage() {
     return { count: filtered.length, total: round2(total), vat: round2(vat), net: round2(total - vat) }
   }, [filtered, state])
 
+  const paymentTotals = useMemo(() => {
+    const grouped = new Map()
+    filtered.forEach((collection) => {
+      const payment = normalizePaymentName(collection.payment) || '—'
+      grouped.set(payment, (grouped.get(payment) || 0) + Number(collection.amount || 0))
+    })
+    return Array.from(grouped, ([payment, total]) => ({ payment, total: round2(total) }))
+      .sort((a, b) => a.payment.localeCompare(b.payment, 'tr'))
+  }, [filtered])
+
   const payBadge = (type) => {
     const normalized = normalizePaymentKey(type)
     const baseKey = normalized.includes('nakit') ? 'cash'
@@ -574,25 +584,42 @@ export default function TahsilatlarPage() {
                 )
               })}
             </tbody>
-            {filtered.length > 0 && (
-              <tfoot>
-                <tr style={{ background: '#f8fafc' }}>
-                  <td colSpan={5} style={{ ...S.td, fontWeight: 700, color: '#475569', fontSize: 12 }}>
-                    TOPLAM ({totals.count} kayıt)
-                  </td>
-                  <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#6366f1' }}>
-                    {money(totals.total)}
-                  </td>
-                  <td style={{ ...S.td, textAlign: 'right', fontWeight: 800, color: '#f59e0b' }}>
-                    {money(totals.vat)}
-                  </td>
-                  <td colSpan={2} style={S.td} />
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>
+      {filtered.length > 0 && (
+        <section aria-label="Tahsilat özetleri" style={{ marginTop: 18 }}>
+          <h3 style={{ margin: '0 0 12px', color: '#334155', fontSize: 15, fontWeight: 800, letterSpacing: '0.04em' }}>
+            ÖDEME TÜRLERİ TOPLAMI
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+            {paymentTotals.map(({ payment, total }) => (
+              <div key={payment} style={{
+                padding: '16px 18px', borderRadius: 14, background: '#fff',
+                border: '1px solid #dbe3ef', boxShadow: '0 2px 8px rgba(15,23,42,0.05)'
+              }}>
+                <div style={{ color: '#475569', fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{payment}</div>
+                <div style={{ color: '#0f172a', fontSize: 22, lineHeight: 1.2, fontWeight: 800 }}>{money(total)}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16,
+            flexWrap: 'wrap', marginTop: 14, padding: '18px 20px', borderRadius: 14,
+            background: 'linear-gradient(135deg,#eef2ff,#f8fafc)', border: '2px solid #c7d2fe',
+            boxShadow: '0 4px 12px rgba(79,70,229,0.1)'
+          }}>
+            <div>
+              <div style={{ color: '#3730a3', fontSize: 12, fontWeight: 800, letterSpacing: '0.05em' }}>GENEL TOPLAM</div>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 600, marginTop: 4 }}>{totals.count} kayıt</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 20, flexWrap: 'wrap' }}>
+              <div style={{ color: '#4338ca', fontSize: 25, fontWeight: 900 }}>{money(totals.total)}</div>
+              <div style={{ color: '#b45309', fontSize: 13, fontWeight: 700 }}>KDV: {money(totals.vat)}</div>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

@@ -6,7 +6,8 @@ import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
   money, expectedTotalFor, collectedAll, getStudent,
   periodName, periodsOfYear, getYearStart, planTableFor, round2, isCollectionInvoiced,
-  findPlanFeeCategory, getPlanGrossTotal, getPlanInstallmentSchedule, getPlanInstallmentAmount
+  findPlanFeeCategory, getPlanGrossTotal, getPlanInstallmentSchedule, getPlanInstallmentAmount,
+  getInstallmentPaid
 } from '../utils/calculations.js'
 
 const Btn = {
@@ -664,24 +665,21 @@ export default function UcretPlaniPage() {
 
         // Kısmi (Yarım Ay / Gün bazlı) devamsızlık: kalan tutar veli tarafından ödenir!
         const directMatches = explicitCols[installmentNo] || []
-        let paid = downPaymentCredit
+        const directPaid = directMatches.length > 0
+          ? directMatches.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
+          : null
+        const installmentPayment = getInstallmentPaid(effectiveAmount, downPaymentCredit, directPaid, unassignedPool)
+        const paid = installmentPayment.paid
         let collectionDate = ''
         let paymentMethod = ''
         let matchedCollections = []
 
         if (directMatches.length > 0) {
-          paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
           collectionDate = directMatches[0].date || ''
           paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
           matchedCollections = directMatches
         } else if (unassignedPool > 0) {
-          if (unassignedPool >= effectiveAmount) {
-            paid = effectiveAmount
-            unassignedPool = round2(unassignedPool - effectiveAmount)
-          } else {
-            paid = unassignedPool
-            unassignedPool = 0
-          }
+          unassignedPool = round2(unassignedPool - installmentPayment.unassignedApplied)
           collectionDate = unassignedCols[0]?.date || ''
           paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
           matchedCollections = unassignedCols
@@ -729,27 +727,24 @@ export default function UcretPlaniPage() {
 
       const directMatches = explicitCols[installmentNo] || []
       const installmentAmount = scheduledInstallment.amount
-      let paid = downPaymentCredit
+      const directPaid = directMatches.length > 0
+        ? directMatches.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
+        : null
+      const installmentPayment = getInstallmentPaid(installmentAmount, downPaymentCredit, directPaid, unassignedPool)
+      const paid = installmentPayment.paid
       let collectionDate = ''
       let paymentMethod = ''
       let matchedCollections = []
 
       // 1. Direct match by installmentNo (PRIMARY & STRICT)
       if (directMatches.length > 0) {
-        paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
         collectionDate = directMatches[0].date || ''
         paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', directMatches.map(c => c.payment).filter(Boolean).join(' / ')].filter(Boolean).join(' / ') || 'Nakit'
         matchedCollections = directMatches
       }
       // 2. Only unassigned legacy collections can fill unassigned slots (NO double-counting!)
       else if (unassignedPool > 0) {
-        if (unassignedPool >= installmentAmount) {
-          paid = installmentAmount
-          unassignedPool = round2(unassignedPool - installmentAmount)
-        } else {
-          paid = unassignedPool
-          unassignedPool = 0
-        }
+        unassignedPool = round2(unassignedPool - installmentPayment.unassignedApplied)
         collectionDate = unassignedCols[0]?.date || ''
         paymentMethod = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', unassignedCols[0]?.payment].filter(Boolean).join(' / ') || 'Nakit'
         matchedCollections = unassignedCols
@@ -855,18 +850,12 @@ export default function UcretPlaniPage() {
           const installmentAmount = getPlanInstallmentAmount(plan, installmentNo)
 
           const directMatches = explicitCols[installmentNo] || []
-          let paid = downPaymentCredit
-          if (directMatches.length > 0) {
-            paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
-          } else if (unassignedPool > 0) {
-            if (unassignedPool >= installmentAmount) {
-              paid = installmentAmount
-              unassignedPool = round2(unassignedPool - installmentAmount)
-            } else {
-              paid = unassignedPool
-              unassignedPool = 0
-            }
-          }
+          const directPaid = directMatches.length > 0
+            ? directMatches.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
+            : null
+          const installmentPayment = getInstallmentPaid(installmentAmount, downPaymentCredit, directPaid, unassignedPool)
+          const paid = installmentPayment.paid
+          unassignedPool = round2(unassignedPool - installmentPayment.unassignedApplied)
 
           const remaining = round2(Math.max(0, installmentAmount - paid))
           const isPaid = remaining <= 0

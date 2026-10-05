@@ -29,6 +29,7 @@ import {
   getMonthlyInvoicableInstallments,
   getPlanInstallmentAmount,
   getPlanInstallmentSchedule,
+  getInstallmentPaid,
   getStudent,
   money,
   periodName,
@@ -114,18 +115,12 @@ function getMonthInstallmentRows(state, period) {
         const isSkipped = (plan.skippedInstallments || []).some(skip => Number(skip?.no) === Number(installment.no))
 
         const directMatches = explicitCollections.get(installment.no) || []
-        let paid = downPaymentCredit
-        if (directMatches.length > 0) {
-          paid = directMatches.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
-        } else if (unassignedPool > 0) {
-          if (unassignedPool >= amount) {
-            paid = amount
-            unassignedPool = round2(unassignedPool - amount)
-          } else {
-            paid = unassignedPool
-            unassignedPool = 0
-          }
-        }
+        const directPaid = directMatches.length > 0
+          ? directMatches.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
+          : null
+        const installmentPayment = getInstallmentPaid(amount, downPaymentCredit, directPaid, unassignedPool)
+        const paid = installmentPayment.paid
+        unassignedPool = round2(unassignedPool - installmentPayment.unassignedApplied)
 
         const remaining = round2(Math.max(0, amount - paid))
 

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import {
   expectedFor,
   expectedTotalFor,
+  getInstallmentPaid,
   getLucaInvoiceDate,
+  getMonthlyInvoicableInstallments,
   getPlanInstallmentAmount,
   getPlanInstallmentSchedule,
   getPlanNetTotal
@@ -65,4 +67,36 @@ test('legacy attendance reductions can be undone without changing other installm
   assert.equal(getPlanInstallmentAmount(legacyPlan, 1), 4000)
   assert.equal(getPlanInstallmentAmount({ ...legacyPlan, total: 20000, skippedInstallments: [] }, 1), 5000)
   assert.equal(getPlanInstallmentAmount({ ...legacyPlan, total: 20000, skippedInstallments: [] }, 2), 5000)
+})
+
+test('down payment is split across installments without changing installment amounts', () => {
+  const plan = {
+    name: 'Eğitim',
+    total: 220000,
+    downPayment: 10000,
+    installments: 10,
+    start: '2026-09-15'
+  }
+  const rows = getMonthlyInvoicableInstallments({
+    settings: { yearStart: '2026-09' },
+    students: [{ id: 1, active: true, items: [plan] }],
+    collections: [{ id: 1, studentId: 1, item: 'Eğitim', amount: 10000, installmentNo: 0 }]
+  })
+
+  assert.equal(rows.length, 10)
+  assert.deepEqual(rows.map(row => row.amount), Array(10).fill(22000))
+  assert.deepEqual(rows.map(row => row.paid), Array(10).fill(1000))
+  assert.deepEqual(rows.map(row => row.remaining), Array(10).fill(21000))
+})
+
+test('down payment credit is preserved with direct and legacy partial collections', () => {
+  const direct = getInstallmentPaid(22000, 1000, 3500)
+  const legacy = getInstallmentPaid(22000, 1000, null, 3500)
+
+  assert.deepEqual(direct, { paid: 4500, unassignedApplied: 0 })
+  assert.deepEqual(legacy, { paid: 4500, unassignedApplied: 3500 })
+  assert.deepEqual(getInstallmentPaid(22000, 1000, null, 25000), {
+    paid: 22000,
+    unassignedApplied: 21000
+  })
 })

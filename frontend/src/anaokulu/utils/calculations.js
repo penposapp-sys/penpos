@@ -104,6 +104,23 @@ export function getPlanAttendanceDeduction(plan = {}) {
   }, 0))
 }
 
+export function getInstallmentPaid(installmentAmount, downPaymentCredit, directCollectionAmount, unassignedPool = 0) {
+  const downPaymentPaid = round2(downPaymentCredit)
+  if (directCollectionAmount != null) {
+    return {
+      paid: round2(downPaymentPaid + (Number(directCollectionAmount) || 0)),
+      unassignedApplied: 0
+    }
+  }
+
+  const remainingBeforeUnassigned = Math.max(0, round2(installmentAmount - downPaymentPaid))
+  const unassignedApplied = round2(Math.min(remainingBeforeUnassigned, Math.max(0, Number(unassignedPool) || 0)))
+  return {
+    paid: round2(downPaymentPaid + unassignedApplied),
+    unassignedApplied
+  }
+}
+
 export function getPlanNetTotal(plan = {}) {
   return round2(Math.max(0, getPlanGrossTotal(plan) - getPlanAttendanceDeduction(plan)))
 }
@@ -488,25 +505,21 @@ export function getMonthlyInvoicableInstallments(state, period = 'all') {
 
         // Tahsilat eşleştirme
         const directMatches = explicitCols[installmentNo] || []
-        let paid = downPaymentCredit
+        const directPaid = directMatches.length > 0
+          ? directMatches.reduce((sum, collection) => sum + (Number(collection.amount) || 0), 0)
+          : null
+        const installmentPayment = getInstallmentPaid(installmentAmount, downPaymentCredit, directPaid, unassignedPool)
+        const paid = installmentPayment.paid
         let collectionDates = []
         let paymentMethods = []
 
         if (directMatches.length > 0) {
-          paid = directMatches.reduce((s, c) => s + (Number(c.amount) || 0), 0)
           collectionDates = directMatches.map(c => c.date).filter(Boolean)
           paymentMethods = [downPaymentPaid > 0 ? 'Peşin İşlem' : '', ...directMatches.map(c => c.payment).filter(Boolean)].filter(Boolean)
         } else if (unassignedPool > 0) {
-          if (unassignedPool >= installmentAmount) {
-            paid = installmentAmount
-            unassignedPool = round2(unassignedPool - installmentAmount)
-          } else {
-            paid = unassignedPool
-            unassignedPool = 0
-          }
+          unassignedPool = round2(unassignedPool - installmentPayment.unassignedApplied)
         }
 
-        paid = round2(paid)
         const remaining = round2(Math.max(0, installmentAmount - paid))
         const isPaid = paid >= installmentAmount && installmentAmount > 0
         const isPartial = paid > 0 && paid < installmentAmount
@@ -998,12 +1011,9 @@ export function financialSummaryForStudent(state, sid) {
       if (installment.dueDate >= todayStr) return
       const amount = getPlanInstallmentAmount(plan, installment.no)
       const directPaid = explicitCollections.get(installment.no)
-      let paid = directPaid == null ? downPaymentCredit : directPaid
-      if (directPaid == null && legacyPool > 0) {
-        const legacyPaid = Math.min(amount, legacyPool)
-        paid = round2(paid + legacyPaid)
-        legacyPool = round2(legacyPool - legacyPaid)
-      }
+      const installmentPayment = getInstallmentPaid(amount, downPaymentCredit, directPaid, legacyPool)
+      const paid = installmentPayment.paid
+      legacyPool = round2(legacyPool - installmentPayment.unassignedApplied)
       overdue = round2(overdue + Math.max(0, amount - paid))
     })
   })
