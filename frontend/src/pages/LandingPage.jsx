@@ -2031,6 +2031,8 @@ export default function LandingPage() {
         .lp-hero-badge-dot { background: #315c98 !important; }
         .lp-hero-copy h1, .lp-hero-copy h1 span { color: #15243a !important; }
         .lp-hero-copy p { color: #5d6b7e !important; }
+        .lp-mini-brand-box { background: #315c98 !important; }
+        .lp-mini-nav.is-active { background: #eaf0f8 !important; color: #315c98 !important; }
         .lp-hero-primary {
           background: linear-gradient(180deg, #315c98 0%, #203f70 100%) !important;
           color: #fff !important;

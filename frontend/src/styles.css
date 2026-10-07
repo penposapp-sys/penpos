@@ -12848,37 +12848,36 @@ body.tenant-dark-mode,
 }
 
 body.mobile-performance-mode.public-site-layout {
-  --app-bg: #120d0b;
-  --app-shell-bg: #120d0b;
-  --app-surface: #1b1411;
-  --app-surface-soft: #241b17;
-  --app-border: rgba(208, 138, 89, 0.18);
-  --app-text: #fff8ef;
-  --app-text-secondary: rgba(255, 248, 239, 0.76);
-  --app-text-muted: rgba(255, 248, 239, 0.6);
-  --card-bg: transparent;
-  --card-hover: transparent;
-  --border-soft: rgba(208, 138, 89, 0.18);
-  --border-hover: rgba(208, 138, 89, 0.3);
-  --panel: #1b1411;
-  --panelElevated: #241b17;
-  --text: #fff8ef;
-  --text-primary: #fff8ef;
-  --text-secondary: rgba(255, 248, 239, 0.76);
-  --muted: rgba(255, 248, 239, 0.6);
-  --input-bg: rgba(255, 255, 255, 0.08);
-  --button-bg: rgba(255, 255, 255, 0.08);
-  --button-text: #fff8ef;
-  --button-border: rgba(208, 138, 89, 0.18);
+  --app-bg: #f8fafc;
+  --app-shell-bg: #f8fafc;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f1f5f9;
+  --app-border: #dfe6ef;
+  --app-text: #101d36;
+  --app-text-secondary: #475569;
+  --app-text-muted: #64748b;
+  --card-bg: #ffffff;
+  --card-hover: #f8fafc;
+  --border-soft: #dfe6ef;
+  --border-hover: #9bb5d8;
+  --panel: #ffffff;
+  --panelElevated: #f8fafc;
+  --text: #101d36;
+  --text-primary: #101d36;
+  --text-secondary: #475569;
+  --muted: #64748b;
+  --input-bg: #ffffff;
+  --button-bg: #ffffff;
+  --button-text: #101d36;
+  --button-border: #d1dae6;
 }
 
 body.mobile-performance-mode.public-site-layout .public-auth-page--website,
 body.mobile-performance-mode.public-site-layout .lp-page {
   background:
-    radial-gradient(circle at top left, rgba(184,115,75,0.22), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(217,181,111,0.12), transparent 28%),
-    linear-gradient(180deg, #120d0b 0%, #201512 44%, #0b0908 100%) !important;
-  color: #fff8ef !important;
+    radial-gradient(circle at 10% 8%, rgba(49, 92, 152, 0.09), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #eef3f9 100%) !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .public-auth-shell--website,
@@ -12893,25 +12892,25 @@ body.mobile-performance-mode.public-site-layout .lp-video-card,
 body.mobile-performance-mode.public-site-layout .lp-pricing-card,
 body.mobile-performance-mode.public-site-layout .lp-modal,
 body.mobile-performance-mode.public-site-layout .lp-login-card {
-  background: linear-gradient(180deg, rgba(24,18,15,0.94) 0%, rgba(13,10,9,0.99) 100%) !important;
-  border-color: rgba(208, 138, 89, 0.18) !important;
-  color: #fff8ef !important;
-  box-shadow: 0 28px 80px rgba(0,0,0,0.22) !important;
+  background: #ffffff !important;
+  border-color: #dfe6ef !important;
+  color: #101d36 !important;
+  box-shadow: 0 16px 38px rgba(16, 29, 54, 0.08) !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-type-card,
 body.mobile-performance-mode.public-site-layout .public-auth-card--website,
 body.mobile-performance-mode.public-site-layout .lp-tab {
-  background: linear-gradient(180deg, rgba(52,42,36,0.94) 0%, rgba(39,31,27,0.98) 100%) !important;
-  border-color: rgba(208, 138, 89, 0.18) !important;
-  color: #fff8ef !important;
-  box-shadow: none !important;
+  background: #ffffff !important;
+  border-color: #dfe6ef !important;
+  color: #101d36 !important;
+  box-shadow: 0 8px 20px rgba(16, 29, 54, 0.05) !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-type-card.is-active {
-  background: linear-gradient(180deg, rgba(91,70,58,0.98) 0%, rgba(67,50,41,0.99) 100%) !important;
-  border-color: rgba(208, 138, 89, 0.52) !important;
-  color: #fff8ef !important;
+  background: #edf4fd !important;
+  border-color: #315c98 !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-type-card p,
@@ -12923,11 +12922,11 @@ body.mobile-performance-mode.public-site-layout .lp-feature-card p,
 body.mobile-performance-mode.public-site-layout .lp-video-card p,
 body.mobile-performance-mode.public-site-layout .lp-pricing-card p,
 body.mobile-performance-mode.public-site-layout .lp-login-card p {
-  color: rgba(255, 248, 239, 0.76) !important;
+  color: #64748b !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-type-card.is-active p {
-  color: rgba(255, 248, 239, 0.82) !important;
+  color: #475569 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .public-auth-head h1,
@@ -12941,17 +12940,18 @@ body.mobile-performance-mode.public-site-layout .lp-section-title h2,
 body.mobile-performance-mode.public-site-layout .lp-feature-card h3,
 body.mobile-performance-mode.public-site-layout .lp-pricing-head h3,
 body.mobile-performance-mode.public-site-layout .lp-login-card strong {
-  color: #fff8ef !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-type-card.is-active strong,
 body.mobile-performance-mode.public-site-layout .register-type-card.is-active span {
-  color: #fff8ef !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-form .input {
-  background: rgba(255,255,255,0.1) !important;
-  border-color: rgba(208,138,89,0.22) !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .register-form .marketing-btn--ghost,
@@ -12959,19 +12959,20 @@ body.mobile-performance-mode.public-site-layout .lp-hero-secondary,
 body.mobile-performance-mode.public-site-layout .lp-btn--text,
 body.mobile-performance-mode.public-site-layout .lp-mobile-nav button,
 body.mobile-performance-mode.public-site-layout .lp-mobile-nav a {
-  color: #fff8ef !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .lp-soft-card {
-  background: linear-gradient(180deg, rgba(42,33,29,0.96) 0%, rgba(29,22,19,0.99) 100%) !important;
-  border-color: rgba(208, 138, 89, 0.18) !important;
-  color: #fff8ef !important;
+  background: #ffffff !important;
+  border-color: #dfe6ef !important;
+  color: #101d36 !important;
 }
 
 body.mobile-performance-mode.public-site-layout .lp-soft-card--accent,
 body.mobile-performance-mode.public-site-layout .lp-kitchen-card {
-  background: linear-gradient(180deg, rgba(58,47,40,0.96) 0%, rgba(40,31,27,0.98) 100%) !important;
-  color: #fff8ef !important;
+  background: #edf4fd !important;
+  border-color: #d9e5f5 !important;
+  color: #101d36 !important;
 }
 
 html[data-theme="light"].theme-white body.public-site-layout .register-type-card,
@@ -12998,13 +12999,13 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
 
 html[data-theme="light"].theme-white body.public-site-layout .register-type-card.is-active p,
 html[data-theme="light"].theme-white body.public-site-layout button.register-type-card.is-active p {
-  color: rgba(255, 248, 239, 0.82) !important;
+  color: #475569 !important;
 }
 
 html[data-theme="light"].theme-white body.public-site-layout .register-type-card:hover,
 html[data-theme="light"].theme-white body.public-site-layout button.register-type-card:hover:not(:disabled):not([disabled]):not([aria-disabled="true"]) {
   background: var(--public-web-surface-strong) !important;
-  border-color: rgba(208,138,89,0.3) !important;
+  border-color: #9bb5d8 !important;
   color: var(--public-web-text) !important;
   box-shadow: 0 18px 34px rgba(0,0,0,0.18) !important;
 }
