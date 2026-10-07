@@ -5,10 +5,10 @@ import { usePageSeo } from '../hooks/usePageSeo.js'
 
 const pages = {
   'restoran-programi': {
-    title: 'Restoran Programı: Masa, Sipariş ve Yönetim | PenPOS',
-    description: 'PenPOS restoran programıyla masa ve adisyonları, mutfak ve paket servis siparişlerini, ödemeleri, raporları ve işletme web sitenizi yönetin.',
-    heading: 'Restoranın günlük işlerini tek akışta yöneten program',
-    introduction: 'Salon servisi, mutfak, paket siparişler ve tahsilat aynı işletmenin birbirine bağlı parçalarıdır. PenPOS; masa ve adisyon takibini, ürün yönetimini, raporları ve müşteriye açık dijital kanalları bir araya getirir. Ekibiniz siparişi nereden alırsa alsın, işletme içindeki ilgili adımları kendi ekranlarından takip edebilir.',
+    title: 'Restoran Programı | Adisyon ve Sipariş Yönetimi | PenPOS',
+    description: 'PenPOS restoran programı ile masa, adisyon, mutfak ve paket servis siparişlerini yönetin. Restoran otomasyonu, POS ve rapor özelliklerini keşfedin.',
+    heading: 'Restoran Programı ile masa ve sipariş akışınızı yönetin',
+    introduction: 'PenPOS restoran programı; masa ve siparişleri, mutfak hazırlığını, paket servisi, tahsilatı ve raporları aynı operasyon akışında birleştirir. Restoran otomasyon programı arayan ekipler masa ve adisyon durumunu takip eder; adisyon programı işlevleri açık hesabı güncel tutarken restoran POS ekranı masalı ve masasız satışların kaydını destekler.',
     image: { src: '/images/restaurant-preview.png', alt: 'PenPOS restoran ekranında salon masalarının ve masa durumlarının görünümü', caption: 'Masaların ve açık servis durumlarının genel görünümü' },
     highlights: ['Masa, sipariş ve adisyon takibi', 'Mutfak, paket servis ve masasız satış', 'Rapor, cari ve ödeme yönetimi'],
     sections: [
@@ -58,6 +58,7 @@ const pages = {
       image: { src: '/images/qr-preview.png', alt: 'Telefonda açılan restoran QR menüsü ve masadaki QR kod görseli', caption: 'Web sitesi, restoranın dijital menü akışına bağlantı verebilir' }
     },
     faqs: [
+      { question: 'Restoran programı PenPOS ile hangi işleri yönetebilir?', answer: 'PenPOS restoran ekranlarında masa ve adisyon, sipariş ve mutfak akışı, paket servis/kurye, masasız satış, tahsilat, cari, ürün ve kategori, rapor, yazdırma, şube ve personel izinleri bulunur.' },
       { question: 'PenPOS ile hem masalı hem masasız satış yapabilir miyim?', answer: 'Evet. Masa ve adisyon akışına ek olarak walk-in satış ekranı vardır. Bu ekran masasız işlemler içindir; zamanlı ön sipariş veya özel bir gel-al rezervasyon akışı olarak tanımlanmamalıdır.' },
       { question: 'Restoran ürünlerinde stok takibi var mı?', answer: 'Ürün ayarlarında stok miktarı/takibi ve malzeme veya reçete için stoktan düşme ayarları bulunur. Ayrı, hareket ve sayım odaklı bir restoran stok modülü doğrulanmış değildir.' },
       { question: 'Restoranım için PenPOS üzerinden web sitesi yayınlayabilir miyim?', answer: 'Evet. Logo, görseller, ana sayfa metinleri, ürün vitrini ve iletişim bilgilerini düzenleyip PenPOS site adresinizde yayınlayabilirsiniz. Özel alan adı bağlama özelliği doğrulanmamıştır.' }

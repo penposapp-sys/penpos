@@ -2045,6 +2045,19 @@ export default function LandingPage() {
           box-shadow: 0 10px 24px rgba(16,29,54,.06) !important;
         }
         .lp-hero-points { color: #5d6b7e !important; }
+        .lp-hero-seo-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 18px;
+          color: #315c98 !important;
+          font-size: 14px;
+          font-weight: 800;
+          text-decoration: none;
+        }
+        .lp-hero-seo-link svg { width: 16px; height: 16px; }
+        .lp-hero-seo-link:hover { color: #203f70 !important; text-decoration: underline; }
+        .lp-hero-seo-link:focus-visible { outline: 3px solid #9bb4d5; outline-offset: 4px; border-radius: 3px; }
         .lp-point-icon { color: #315c98 !important; }
         .lp-preview-glow { background: rgba(49,92,152,.1) !important; }
         .lp-preview-frame {
@@ -2194,6 +2207,9 @@ export default function LandingPage() {
                   <span key={item}><Icon name="check" className="lp-point-icon" />{item}</span>
                 ))}
               </div>
+              <Link to="/restoran-programi" className="lp-hero-seo-link">
+                Restoran programı özelliklerini inceleyin <Icon name="arrow" className="lp-hero-seo-link-icon" />
+              </Link>
             </div>
 
             <DashboardPreview active={active} setActive={setActive} />
