@@ -111,7 +111,7 @@ export default function CanteenSettingsPaymentsPage() {
 
   const removeMethod = (method) => {
     if (!method) return
-    const confirmed = window.confirm('Bu ödeme seçeneği kaydedildiğinde kantin kasa ekranından kaldırılacak.')
+    const confirmed = window.confirm('Bu ödeme seçeneği kaydedildiğinde mağaza kasa ekranından kaldırılacak.')
     if (!confirmed) return
     setMethods((current) => current.filter((item) => String(item?.id) !== String(method?.id)))
   }

@@ -133,50 +133,6 @@ export default function RegisterPage() {
   return (
     <div className="public-auth-page public-auth-page--website register-page">
       <style>{`
-        .register-page .register-type-grid .register-type-card,
-        .register-page .register-type-grid .register-type-card:hover,
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card,
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card:hover,
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card,
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card:hover {
-          background: linear-gradient(180deg, rgba(52, 42, 36, 0.96) 0%, rgba(39, 31, 27, 0.99) 100%) !important;
-          border: 1px solid rgba(208, 138, 89, 0.18) !important;
-          color: #fff8ef !important;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
-        }
-
-        .register-page .register-type-grid .register-type-card.is-active,
-        .register-page .register-type-grid .register-type-card.is-active:hover,
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card.is-active,
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card.is-active:hover,
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card.is-active,
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card.is-active:hover {
-          background: linear-gradient(180deg, rgba(91, 70, 58, 0.98) 0%, rgba(67, 50, 41, 1) 100%) !important;
-          border: 1px solid rgba(208, 138, 89, 0.56) !important;
-          color: #fff8ef !important;
-          box-shadow: 0 20px 38px rgba(35, 23, 17, 0.34) !important;
-        }
-
-        .register-page .register-type-grid .register-type-card :is(strong, p, span, svg, svg *, i),
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card :is(strong, p, span, svg, svg *, i),
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card :is(strong, p, span, svg, svg *, i) {
-          color: inherit !important;
-          fill: currentColor !important;
-          stroke: currentColor !important;
-        }
-
-        .register-page .register-type-grid .register-type-card p,
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card p,
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card p {
-          color: rgba(255, 248, 239, 0.78) !important;
-        }
-
-        .register-page .register-type-grid .register-type-card.is-active p,
-        html[data-theme="light"].theme-white body.public-site-layout .register-page .register-type-grid .register-type-card.is-active p,
-        body.mobile-performance-mode.public-site-layout .register-page .register-type-grid .register-type-card.is-active p {
-          color: rgba(255, 248, 239, 0.86) !important;
-        }
-
         .register-page .register-type-grid .register-type-card {
           cursor: pointer;
           user-select: none;
@@ -185,6 +141,9 @@ export default function RegisterPage() {
       `}</style>
       <div className="public-auth-shell public-auth-shell--website register-shell">
         <div className="public-auth-head">
+          <Link to="/landing" className="public-auth-brand" aria-label="PenPOS ana sayfa">
+            <img src="/logo-2.png" alt="PenPOS" />
+          </Link>
           <Link to="/" className="muted-link">← Ana sayfaya dön</Link>
           <h1>PenPOS üyeliği oluştur</h1>
           <p>Kayıt tamamlanınca sistem otomatik açılır ve 7 günlük deneme hemen başlar.</p>
@@ -258,7 +217,7 @@ export default function RegisterPage() {
           {error ? <div style={{ color: '#fca5a5', marginTop: 10 }}>{error}</div> : null}
 
           <div className="register-actions">
-            <button className="marketing-btn marketing-btn--primary" type="submit" disabled={loading}>
+            <button className="marketing-btn marketing-btn--primary register-submit" type="submit" disabled={loading}>
               {loading ? 'Kayıt açılıyor...' : 'Üyeliği Oluştur ve Sistemi Aç'}
             </button>
             <Link

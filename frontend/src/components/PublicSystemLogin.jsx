@@ -106,7 +106,7 @@ export default function PublicSystemLogin({
             <div className="system-login__logo-row">
               <div className="system-login__logo-badge">
                 <img
-                  src="/logo-1.png"
+                  src="/logo-2.png"
                   alt={brand || 'PenPOS'}
                   className="system-login__logo-image"
                   onError={(event) => { event.currentTarget.src = '/penpos%20logo.png' }}

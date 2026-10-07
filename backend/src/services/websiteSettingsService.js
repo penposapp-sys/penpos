@@ -10,15 +10,15 @@ const INTERNAL_PATH_PATTERN = /^\/(?!\/)[^\s]*$/
 
 export const getDefaultWebsiteSettings = () => ({
   siteTitle: 'PenPOS',
-  siteDescription: 'Restoran, cafe, kantin ve marketler icin ayri akisli modern bulut otomasyon sistemi.',
+  siteDescription: 'Restoran, kafe, market ve mağaza işletmeleri için ayrı akışlı modern bulut otomasyon sistemi.',
   brandSubtitle: 'Restoran - Magaza - Market',
   headerSystemsLabel: 'Sistemler',
   headerFeaturesLabel: 'Ozellikler',
   headerPricingLabel: 'Fiyat',
   headerTrainingLabel: 'Egitim Videolari',
-  heroTitle: 'Restoran ve kantin sistemlerini ayri ayri yonetin.',
+  heroTitle: 'Restoran ve mağaza operasyonlarını ayrı ayrı yönetin.',
   heroSubtitle: 'YENI NESIL SATIS VE ADISYON YONETIMI',
-  heroDescription: 'PenPOS; restoran-cafe ve kantin-market icin ayri girisleri, ayri ekran akislari olan modern otomasyon yapisidir. Restoran tarafinda QR menu standart olarak dahildir; her isletme istedigi kadar sube acabilir.',
+  heroDescription: 'PenPOS; restoran-kafe ve mağaza-market işletmeleri için ayrı girişleri ve ekran akışları olan modern otomasyon yapısıdır. Restoran tarafında QR menü standart olarak dahildir; her işletme şubelerini tek panelden yönetebilir.',
   heroPointOne: 'QR menu dahil',
   heroPointTwo: 'Sinirsiz sube',
   heroPointThree: 'YouTube egitim videolari',
@@ -29,7 +29,7 @@ export const getDefaultWebsiteSettings = () => ({
   secondaryCtaUrl: '/login',
   restaurantLoginText: 'Restoran Girisi',
   restaurantLoginUrl: '/login/restoran',
-  canteenLoginText: 'Kantin Girisi',
+  canteenLoginText: 'Mağaza Girişi',
   canteenLoginUrl: '/canteen/login',
   platformLoginText: 'Platform Girisi',
   platformLoginUrl: '/platform/login',
@@ -75,7 +75,7 @@ export const getDefaultWebsiteSettings = () => ({
   socialLinkedinUrl: '',
   features: [
     { id: 'feature-1', icon: 'store', title: 'Restoran / Cafe', text: 'Masa, adisyon, mutfak, paket servis, kurye ve QR menu akislari restoran tarafinda birlikte calisir.', sortOrder: 1, active: true },
-    { id: 'feature-2', icon: 'cart', title: 'Kantin / Market', text: 'Barkodlu hizli satis, urun fiyat listesi, stok ve online satis mantigi kantin tarafina uyarlanir.', sortOrder: 2, active: true },
+    { id: 'feature-2', icon: 'cart', title: 'Mağaza / Market', text: 'Barkodlu hızlı satış, ürün fiyat listesi, stok ve online satış araçları mağaza operasyonlarına uyarlanır.', sortOrder: 2, active: true },
     { id: 'feature-3', icon: 'chart', title: 'Canli Raporlar', text: 'Z raporu, odeme tipleri, sube filtreleri ve cari bakiye gibi veriler tek panelde izlenir.', sortOrder: 3, active: true }
   ],
   systemCards: [],
@@ -86,12 +86,12 @@ export const getDefaultWebsiteSettings = () => ({
   trainingVideos: [
     { id: 'video-1', title: 'Uyelik ve Ilk Kurulum', description: 'Ilk hesap acilisi ve panel tanitimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'general', active: true, sortOrder: 1 },
     { id: 'video-2', title: 'Restoran Satis Akisi', description: 'Masa ve adisyon akisinin temel kullanimi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'restaurant', active: true, sortOrder: 2 },
-    { id: 'video-3', title: 'Kantin Barkodlu Satis', description: 'Hizli kasa ve barkodlu satis ornegi.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 3 }
+    { id: 'video-3', title: 'Mağaza Barkodlu Satış', description: 'Hızlı kasa ve barkodlu satış örneği.', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'market', active: true, sortOrder: 3 }
   ],
   integrations: [],
-  seoTitle: 'PenPOS | Restoran ve Kantin Otomasyonu',
-  seoDescription: 'PenPOS ile restoran/cafe ve kantin/market akislari ayri girislerle yonetilir. QR menu dahil, sinirsiz sube ve raporlama hazir.',
-  seoKeywords: 'penpos,pos,restoran otomasyonu,kantin otomasyonu,market otomasyonu,qr menu',
+  seoTitle: 'PenPOS | Restoran ve Market Otomasyonu',
+  seoDescription: 'PenPOS ile restoran, market ve mağaza satışlarınızı adisyon, stok, QR menü ve paket servis araçlarıyla tek panelden yönetin.',
+  seoKeywords: 'PenPOS, POS sistemi, restoran programı, restoran otomasyonu, adisyon programı, market programı, QR menü',
   isPublished: true
 })
 
@@ -153,7 +153,7 @@ export const normalizeWebsiteSettings = (input = {}) => {
   })
   const canteenLoginUrl = normalizeLink(source.canteenLoginUrl ?? source.marketLoginUrl, {
     fallback: defaults.canteenLoginUrl,
-    fieldLabel: 'Kantin giris linki'
+    fieldLabel: 'Mağaza giriş linki'
   })
   const platformLoginUrl = normalizeLink(source.platformLoginUrl, {
     fallback: defaults.platformLoginUrl,
@@ -294,8 +294,26 @@ export const normalizeWebsiteSettings = (input = {}) => {
   }
 }
 
+const cleanWebsiteCopy = (value, key = '') => {
+  if (typeof value === 'string') {
+    if (/(?:id|icon|type|category|url|slug|email|phone)$/i.test(key)) return value
+    return value.replace(/\bkantin\b/gi, (match) => {
+      if (match === match.toUpperCase()) return 'MAĞAZA'
+      return match[0] === match[0].toUpperCase() ? 'Mağaza' : 'mağaza'
+    })
+  }
+  if (Array.isArray(value)) return value.map((item) => cleanWebsiteCopy(item, key))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [
+      childKey,
+      cleanWebsiteCopy(childValue, childKey)
+    ]))
+  }
+  return value
+}
+
 const toPublicShape = (doc) => {
-  const normalized = normalizeWebsiteSettings(doc || {})
+  const normalized = cleanWebsiteCopy(normalizeWebsiteSettings(doc || {}))
   return {
     ...normalized,
     updatedAt: doc?.updatedAt || null

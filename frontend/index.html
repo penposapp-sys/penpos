@@ -3,30 +3,61 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PenPOS | Restoran, Market, Mağaza ve Kantin POS Sistemi</title>
+    <title>PenPOS | Restoran ve Market POS Sistemi</title>
     <meta
       name="description"
-      content="PenPOS ile restoran, market, mağaza ve kantin işletmenizi tek panelden yönetin. Stok takibi, adisyon, hızlı satış, QR menü, paket servis, mutfak yazıcısı ve gelişmiş raporlama sistemi."
+      content="PenPOS ile restoran, market ve mağaza satışlarınızı; adisyon, stok, QR menü ve paket servis araçlarıyla tek panelden yönetin."
     />
-    <meta property="og:title" content="PenPOS | Restoran, Market, Mağaza ve Kantin POS Sistemi" />
-    <meta property="og:description" content="Stok Takibi • QR Menü • Paket Servis • Adisyon • Hızlı Satış • Raporlama" />
+    <meta property="og:title" content="PenPOS | Restoran ve Market POS Sistemi" />
+    <meta property="og:description" content="Restoran, market ve mağaza işletmeleri için satış, adisyon, stok ve raporlama sistemi." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://penpos.cloud" />
-    <meta property="og:image" content="https://penpos.cloud/og-image.jpg" />
+    <meta property="og:image" content="https://penpos.cloud/site-icon-512.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="PenPOS | Restoran, Market, Mağaza ve Kantin POS Sistemi" />
-    <meta name="twitter:description" content="Stok Takibi • QR Menü • Paket Servis • Adisyon • Hızlı Satış • Raporlama" />
-    <meta name="twitter:image" content="https://penpos.cloud/og-image.jpg" />
-    <link rel="icon" href="/favicon.png" />
+    <meta name="twitter:title" content="PenPOS | Restoran ve Market POS Sistemi" />
+    <meta name="twitter:description" content="Restoran, market ve mağaza işletmeleri için satış, adisyon, stok ve raporlama sistemi." />
+    <meta name="twitter:image" content="https://penpos.cloud/site-icon-512.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="canonical" href="https://penpos.cloud/" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/site-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "PenPOS",
-        "url": "https://penpos.cloud",
-        "description": "Restoran, market, mağaza ve kantin işletmeleri için POS sistemi",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web"
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://penpos.cloud/#organization",
+            "name": "PenPOS",
+            "url": "https://penpos.cloud/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://penpos.cloud/site-icon-512.png",
+              "width": 512,
+              "height": 512
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://penpos.cloud/#website",
+            "name": "PenPOS",
+            "url": "https://penpos.cloud/",
+            "publisher": { "@id": "https://penpos.cloud/#organization" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "PenPOS",
+            "url": "https://penpos.cloud/",
+            "image": "https://penpos.cloud/site-icon-512.png",
+            "description": "Restoran, market ve mağaza işletmeleri için satış ve işletme yönetim sistemi.",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "publisher": { "@id": "https://penpos.cloud/#organization" }
+          }
+        ]
       }
     </script>
     <style>

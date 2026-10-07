@@ -28,35 +28,6 @@ export default function LoginSelectionPage() {
   return (
     <div className="public-auth-page public-auth-page--website">
       <style>{`
-        .public-auth-shell--modal .public-auth-grid--selection .public-auth-card,
-        html[data-theme="light"].theme-white body.public-site-layout .public-auth-shell--modal .public-auth-grid--selection .public-auth-card,
-        body.mobile-performance-mode.public-site-layout .public-auth-shell--modal .public-auth-grid--selection .public-auth-card {
-          background: linear-gradient(180deg, rgba(52, 42, 36, 0.96) 0%, rgba(39, 31, 27, 0.99) 100%) !important;
-          border: 1px solid rgba(208, 138, 89, 0.2) !important;
-          color: #fff8ef !important;
-          box-shadow: 0 20px 38px rgba(24, 15, 11, 0.28) !important;
-        }
-
-        .public-auth-shell--modal .public-auth-grid--selection .public-auth-card:hover,
-        html[data-theme="light"].theme-white body.public-site-layout .public-auth-shell--modal .public-auth-grid--selection .public-auth-card:hover,
-        body.mobile-performance-mode.public-site-layout .public-auth-shell--modal .public-auth-grid--selection .public-auth-card:hover {
-          background: linear-gradient(180deg, rgba(60, 47, 40, 0.98) 0%, rgba(44, 34, 29, 1) 100%) !important;
-          border-color: rgba(208, 138, 89, 0.34) !important;
-        }
-
-        .public-auth-shell--modal .public-auth-grid--selection .public-auth-card :is(strong, p, em, span, svg, svg *, i),
-        html[data-theme="light"].theme-white body.public-site-layout .public-auth-shell--modal .public-auth-grid--selection .public-auth-card :is(strong, p, em, span, svg, svg *, i),
-        body.mobile-performance-mode.public-site-layout .public-auth-shell--modal .public-auth-grid--selection .public-auth-card :is(strong, p, em, span, svg, svg *, i) {
-          color: inherit !important;
-          fill: currentColor !important;
-          stroke: currentColor !important;
-        }
-
-        .public-auth-shell--modal .public-auth-grid--selection .public-auth-card p,
-        .public-auth-shell--modal .public-auth-grid--selection .public-auth-card em {
-          color: rgba(255, 248, 239, 0.8) !important;
-        }
-
         .public-auth-shell--modal .public-auth-grid--selection .public-auth-card {
           cursor: pointer;
           user-select: none;
@@ -65,6 +36,9 @@ export default function LoginSelectionPage() {
       `}</style>
       <div className="public-auth-shell public-auth-shell--modal public-auth-shell--website">
         <div className="public-auth-head">
+          <Link to="/landing" className="public-auth-brand" aria-label="PenPOS ana sayfa">
+            <img src="/logo-2.png" alt="PenPOS" />
+          </Link>
           <div className="public-auth-head-row">
             <div className="marketing-trial-badge login-selection-badge">Giris secimi</div>
             <button

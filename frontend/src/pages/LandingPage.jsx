@@ -1,15 +1,25 @@
-﻿import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { api } from '../lib/apiClient.js'
 import { defaultWebsiteSettings } from '../constants/websiteSettings.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
+import { usePageSeo } from '../hooks/usePageSeo.js'
 
 const tabs = [
-  { key: 'restaurant', label: 'Restoran', icon: 'store' },
-  { key: 'canteen', label: 'Mağaza', icon: 'cart' },
-  { key: 'qr', label: 'QR Menü', icon: 'card' },
-  { key: 'reports', label: 'Raporlar', icon: 'chart' }
+  { key: 'restaurant', label: 'Restoran', icon: 'store', path: '/restoran-programi' },
+  { key: 'canteen', label: 'Mağaza', icon: 'cart', path: '/market-programi' },
+  { key: 'qr', label: 'QR Menü', icon: 'card', path: '/qr-menu-programi' },
+  { key: 'reports', label: 'Raporlar', icon: 'chart', path: '/adisyon-programi' }
+]
+
+const systemLinks = [
+  { label: 'Restoran Sistemi', to: '/restoran-programi', description: 'Masa, sipariş ve mutfak yönetimi' },
+  { label: 'Market Sistemi', to: '/market-programi', description: 'Barkodlu kasa ve stok takibi' },
+  { label: 'Adisyon', to: '/adisyon-programi', description: 'Masa hesabı ve sipariş takibi' },
+  { label: 'Paket Servis', to: '/paket-servis-programi', description: 'Teslimat ve kurye siparişleri' },
+  { label: 'QR Menü', to: '/qr-menu-programi', description: 'Telefondan açılan dijital menü' },
+  { label: 'Restoran POS', to: '/restoran-pos', description: 'Restoran satış ve tahsilat akışı' }
 ]
 
 const previewContent = {
@@ -63,7 +73,7 @@ function Icon({ name, className = '' }) {
 function Logo({ settings }) {
   return (
     <a href="#top" className="lp-logo" aria-label="Sayfanın başına dön">
-      <img src="/images/landing-logo.png" alt={settings.siteTitle || 'PenPOS'} className="lp-logo-image" />
+      <img src="/logo-2.png" alt={settings.siteTitle || 'PenPOS'} className="lp-logo-image" />
       <div>
         <div className="lp-logo-subtitle">{settings.brandSubtitle || 'Restoran • Mağaza • Market'}</div>
       </div>
@@ -91,15 +101,65 @@ const openWebsiteLink = (value, navigate) => {
   window.location.assign(target)
 }
 
-function Header({ settings, onOpenSystems, onRegister, onLogin }) {
+function Header({ settings, onRegister, onLogin }) {
   const [open, setOpen] = useState(false)
+  const [systemsOpen, setSystemsOpen] = useState(false)
+  const systemsRef = useRef(null)
+  const mobileSystemsRef = useRef(null)
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event) => {
+      if (
+        !systemsRef.current?.contains(event.target) &&
+        !mobileSystemsRef.current?.contains(event.target)
+      ) {
+        setSystemsOpen(false)
+      }
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setSystemsOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [])
+
+  const closeMenus = () => {
+    setOpen(false)
+    setSystemsOpen(false)
+  }
 
   return (
     <header className="lp-header-shell">
       <div className="lp-header">
         <Logo settings={settings} />
         <nav className="lp-nav">
-          <a href="#sistemler" onClick={onOpenSystems}>{settings.headerSystemsLabel || 'Sistemler'} <Icon name="chevron" className="lp-nav-icon" /></a>
+          <div className="lp-systems-menu" ref={systemsRef}>
+            <button
+              type="button"
+              className="lp-systems-trigger"
+              aria-expanded={systemsOpen}
+              aria-haspopup="true"
+              onClick={() => setSystemsOpen((value) => !value)}
+            >
+              {settings.headerSystemsLabel || 'Sistemler'}
+              <Icon name="chevron" className={`lp-nav-icon${systemsOpen ? ' is-open' : ''}`} />
+            </button>
+            {systemsOpen ? (
+              <div className="lp-systems-dropdown" role="menu" aria-label="PenPOS sistemleri">
+                {systemLinks.map((item) => (
+                  <Link key={item.to} to={item.to} role="menuitem" onClick={() => setSystemsOpen(false)}>
+                    <strong>{item.label}</strong>
+                    <span>{item.description}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <a href="#raporlar" onClick={(event) => scrollToSection(event, 'raporlar')}>{settings.headerFeaturesLabel || 'Ozellikler'} <Icon name="chevron" className="lp-nav-icon" /></a>
           <a href="#fiyat">{settings.headerPricingLabel || 'Fiyat'}</a>
           <a href="#egitim">{settings.headerTrainingLabel || 'Egitim Videolari'}</a>
@@ -126,13 +186,33 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
             {settings.primaryCtaText || '1 Haftalik Ucretsiz Deneme'}
           </a>
         </div>
-        <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü">
+        <button type="button" className="lp-menu-btn" onClick={() => setOpen((value) => !value)} aria-label="Menü" aria-expanded={open}>
           <Icon name={open ? 'x' : 'menu'} className="lp-menu-icon" />
         </button>
       </div>
       {open ? (
         <div className="lp-mobile-nav">
-          <a href="#sistemler" onClick={(event) => { setOpen(false); onOpenSystems?.(event) }}>{settings.headerSystemsLabel || 'Sistemler'}</a>
+          <div className="lp-mobile-systems" ref={mobileSystemsRef}>
+            <button
+              type="button"
+              className="lp-mobile-systems-trigger"
+              aria-expanded={systemsOpen}
+              onClick={() => setSystemsOpen((value) => !value)}
+            >
+              {settings.headerSystemsLabel || 'Sistemler'}
+              <Icon name="chevron" className={`lp-nav-icon${systemsOpen ? ' is-open' : ''}`} />
+            </button>
+            {systemsOpen ? (
+              <div className="lp-mobile-system-links">
+                {systemLinks.map((item) => (
+                  <Link key={item.to} to={item.to} onClick={closeMenus}>
+                    <strong>{item.label}</strong>
+                    <span>{item.description}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <a href="#raporlar" onClick={(event) => { setOpen(false); scrollToSection(event, 'raporlar') }}>{settings.headerFeaturesLabel || 'Ozellikler'}</a>
           <a href="#fiyat" onClick={() => setOpen(false)}>{settings.headerPricingLabel || 'Fiyat'}</a>
           <a href="#egitim" onClick={() => setOpen(false)}>{settings.headerTrainingLabel || 'Egitim Videolari'}</a>
@@ -141,7 +221,7 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
             href={settings.secondaryCtaUrl || '/login'}
             onClick={(event) => {
               event.preventDefault()
-              setOpen(false)
+              closeMenus()
               onLogin?.()
             }}
           >
@@ -152,7 +232,7 @@ function Header({ settings, onOpenSystems, onRegister, onLogin }) {
             href={settings.primaryCtaUrl || '/register'}
             onClick={(event) => {
               event.preventDefault()
-              setOpen(false)
+              closeMenus()
               onRegister?.()
             }}
           >
@@ -278,17 +358,18 @@ function DashboardPreview({ active, setActive }) {
         {tabs.map((tab) => {
           const isActive = active === tab.key
           return (
-            <button
+            <Link
               key={tab.key}
-              type="button"
+              to={tab.path}
               onMouseEnter={() => setActive(tab.key)}
               onFocus={() => setActive(tab.key)}
-              onClick={() => setActive(tab.key)}
               className={`lp-tab ${isActive ? 'is-active' : ''}`}
+              aria-label={`${tab.label} çözümleri`}
+              title={`${tab.label} çözümlerini görüntüle`}
             >
               <Icon name={tab.icon} className="lp-tab-icon" />
               <span>{tab.label}</span>
-            </button>
+            </Link>
           )
         })}
       </div>
@@ -349,10 +430,12 @@ export default function LandingPage() {
   })()
 
   useBodyLayoutMode('public-site-layout')
-
-  useEffect(() => {
-    document.title = settings?.seoTitle || settings?.siteTitle || 'PenPOS'
-  }, [settings?.seoTitle, settings?.siteTitle])
+  usePageSeo({
+    title: settings?.seoTitle || 'PenPOS | Restoran ve Market POS Sistemi',
+    description: settings?.seoDescription || settings?.siteDescription || 'PenPOS ile restoran, market ve mağaza satışlarınızı; adisyon, stok, QR menü ve paket servis araçlarıyla tek panelden yönetin.',
+    keywords: settings?.seoKeywords,
+    path: '/'
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -369,13 +452,6 @@ export default function LandingPage() {
     load()
     return () => { cancelled = true }
   }, [])
-
-  useEffect(() => {
-    const metaDescription = document.querySelector('meta[name="description"]')
-    if (metaDescription) {
-      metaDescription.setAttribute('content', settings?.seoDescription || settings?.siteDescription || '')
-    }
-  }, [settings?.seoDescription, settings?.siteDescription])
 
   const trainingVideos = useMemo(() => {
     const source = Array.isArray(settings.trainingVideos) && settings.trainingVideos.length ? settings.trainingVideos : defaultWebsiteSettings.trainingVideos
@@ -406,20 +482,20 @@ export default function LandingPage() {
 
   const heroPoints = [settings.heroPointOne, settings.heroPointTwo, settings.heroPointThree].filter(Boolean)
   const pageThemeStyle = {
-    '--lp-bg-start': settings.themeBackgroundStart || '#1c1714',
-    '--lp-bg-end': settings.themeBackgroundEnd || '#000000',
-    '--lp-header-bg': settings.themeHeaderBackground || '#080706',
-    '--lp-surface': settings.themeSurfaceColor || '#11100f',
-    '--lp-accent': settings.themeAccentColor || '#b8734b',
-    '--lp-accent-text': settings.themeAccentTextColor || '#ffffff',
-    '--lp-text': settings.themeTextColor || '#ffffff',
-    '--lp-muted-text': settings.themeMutedTextColor || '#b7ada6',
-    '--lp-border': settings.themeBorderColor || '#6e625a',
-    '--lp-footer-bg': settings.themeFooterBackground || '#000000',
-    '--lp-panel-bg': 'linear-gradient(180deg, rgba(24, 18, 15, 0.94) 0%, rgba(13, 10, 9, 0.99) 100%)',
-    '--lp-panel-strong': 'linear-gradient(180deg, rgba(34, 27, 23, 0.95) 0%, rgba(18, 14, 12, 0.99) 100%)',
-    '--lp-soft-bg': 'linear-gradient(180deg, rgba(42, 33, 29, 0.96) 0%, rgba(29, 22, 19, 0.99) 100%)',
-    '--lp-soft-text': '#fff8ef'
+    '--lp-bg-start': '#f7f9fc',
+    '--lp-bg-end': '#ffffff',
+    '--lp-header-bg': '#ffffff',
+    '--lp-surface': '#ffffff',
+    '--lp-accent': '#315c98',
+    '--lp-accent-text': '#ffffff',
+    '--lp-text': '#15243a',
+    '--lp-muted-text': '#5d6b7e',
+    '--lp-border': '#dfe6ef',
+    '--lp-footer-bg': '#101d36',
+    '--lp-panel-bg': 'linear-gradient(180deg, #ffffff 0%, #f8fafd 100%)',
+    '--lp-panel-strong': 'linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%)',
+    '--lp-soft-bg': 'linear-gradient(180deg, #f3f6fa 0%, #eaf0f7 100%)',
+    '--lp-soft-text': '#15243a'
   }
 
   return (
@@ -427,26 +503,26 @@ export default function LandingPage() {
       <style>{`
         html { scroll-behavior: smooth; }
         .lp-page {
-          --lp-bg-start: #1c1714;
-          --lp-bg-end: #000000;
-          --lp-header-bg: #080706;
-          --lp-surface: #11100f;
-          --lp-accent: #b8734b;
+          --lp-bg-start: #f7f9fc;
+          --lp-bg-end: #ffffff;
+          --lp-header-bg: #ffffff;
+          --lp-surface: #ffffff;
+          --lp-accent: #315c98;
           --lp-accent-text: #ffffff;
-          --lp-text: #ffffff;
-          --lp-muted-text: #b7ada6;
-          --lp-border: #6e625a;
-          --lp-footer-bg: #000000;
-          --lp-panel-bg: linear-gradient(180deg, rgba(24, 18, 15, 0.94) 0%, rgba(13, 10, 9, 0.99) 100%);
-          --lp-panel-strong: linear-gradient(180deg, rgba(34, 27, 23, 0.95) 0%, rgba(18, 14, 12, 0.99) 100%);
-          --lp-soft-bg: linear-gradient(180deg, rgba(42, 33, 29, 0.96) 0%, rgba(29, 22, 19, 0.99) 100%);
-          --lp-soft-text: #fff8ef;
+          --lp-text: #15243a;
+          --lp-muted-text: #5d6b7e;
+          --lp-border: #dfe6ef;
+          --lp-footer-bg: #101d36;
+          --lp-panel-bg: linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
+          --lp-panel-strong: linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
+          --lp-soft-bg: linear-gradient(180deg, #f3f6fa 0%, #eaf0f7 100%);
+          --lp-soft-text: #15243a;
           min-height: 100vh;
           background:
-            radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--lp-accent) 14%, transparent) 0%, transparent 28%),
-            radial-gradient(circle at 10% 16%, rgba(69, 51, 40, 0.26) 0%, transparent 26%),
-            radial-gradient(circle at 90% 18%, rgba(69, 51, 40, 0.18) 0%, transparent 24%),
-            linear-gradient(180deg, var(--lp-bg-start) 0%, color-mix(in srgb, var(--lp-bg-start) 84%, #090807) 42%, var(--lp-bg-end) 100%);
+            radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--lp-accent) 9%, transparent) 0%, transparent 28%),
+            radial-gradient(circle at 10% 16%, rgba(49, 92, 152, 0.06) 0%, transparent 26%),
+            radial-gradient(circle at 90% 18%, rgba(49, 92, 152, 0.05) 0%, transparent 24%),
+            linear-gradient(180deg, var(--lp-bg-start) 0%, #f7f9fc 42%, var(--lp-bg-end) 100%);
           color: var(--lp-text);
         }
         .lp-shell {
@@ -845,7 +921,7 @@ export default function LandingPage() {
         .lp-mock-grid--split {
           background-image:
             linear-gradient(180deg, rgba(8, 7, 6, 0.04), rgba(8, 7, 6, 0.04)),
-            url('/images/magaza-preview-v2.png');
+            url('/images/canteen-preview-v2.png');
         }
         .lp-mock-grid--split > *,
         .lp-mock-grid--reports > * {
@@ -1057,6 +1133,8 @@ export default function LandingPage() {
           border-radius: 24px;
           border: 1px solid rgba(110,98,90,.2);
           background: color-mix(in srgb, var(--lp-header-bg) 68%, rgba(255,255,255,.04));
+          text-decoration: none;
+          cursor: pointer;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -1770,15 +1848,15 @@ export default function LandingPage() {
         body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary,
         body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-secondary,
         body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-download {
-          color: #fff8ef !important;
-          border: 1px solid rgba(208, 138, 89, 0.22) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(49, 92, 152, 0.18) !important;
         }
 
         .lp-page .lp-hero-actions .lp-hero-primary,
         html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary,
         body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-primary {
-          background: linear-gradient(180deg, rgba(38, 143, 116, 0.98) 0%, rgba(23, 117, 96, 1) 100%) !important;
-          box-shadow: 0 18px 44px rgba(23, 117, 96, 0.28) !important;
+          background: linear-gradient(180deg, #315c98 0%, #203f70 100%) !important;
+          box-shadow: 0 18px 44px rgba(32, 63, 112, 0.2) !important;
         }
 
         .lp-page .lp-hero-actions .lp-hero-secondary,
@@ -1787,8 +1865,9 @@ export default function LandingPage() {
         html[data-theme="light"].theme-white body.public-site-layout .lp-page .lp-hero-actions .lp-hero-download,
         body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-secondary,
         body.mobile-performance-mode.public-site-layout .lp-page .lp-hero-actions .lp-hero-download {
-          background: linear-gradient(180deg, rgba(52, 42, 36, 0.96) 0%, rgba(39, 31, 27, 0.99) 100%) !important;
-          box-shadow: 0 16px 34px rgba(24, 15, 11, 0.22) !important;
+          background: linear-gradient(180deg, #ffffff 0%, #f1f5fa 100%) !important;
+          color: #15243a !important;
+          box-shadow: 0 16px 34px rgba(16, 29, 54, 0.1) !important;
         }
 
         .lp-page .lp-hero-actions .lp-hero-primary:hover,
@@ -1797,15 +1876,272 @@ export default function LandingPage() {
           filter: brightness(1.04);
         }
       `}</style>
+      <style>{`
+        .lp-page { background: #f7f9fc !important; color: #15243a !important; }
+        .lp-page .lp-header-shell {
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 50 !important;
+          background: rgba(255,255,255,.94) !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          box-shadow: 0 8px 24px rgba(16,29,54,.04);
+        }
+        .lp-logo-image { border-radius: 7px; }
+        .lp-logo-subtitle { color: #64748b !important; }
+        .lp-nav { color: #263750 !important; }
+        .lp-nav a:hover, .lp-btn--text:hover { color: #315c98 !important; }
+        .lp-nav .lp-systems-menu { position: relative; }
+        .lp-systems-trigger, .lp-mobile-systems-trigger {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 9px 12px;
+          border: 1px solid transparent;
+          border-radius: 10px;
+          background: transparent;
+          color: #263750;
+          font: inherit;
+          cursor: pointer;
+          transition: background .18s ease, border-color .18s ease, color .18s ease;
+        }
+        .lp-systems-trigger:hover, .lp-systems-trigger[aria-expanded="true"],
+        .lp-mobile-systems-trigger:hover, .lp-mobile-systems-trigger[aria-expanded="true"] {
+          border-color: #dce5f1;
+          background: #f1f5fa;
+          color: #203f70;
+        }
+        .lp-systems-trigger .lp-nav-icon, .lp-mobile-systems-trigger .lp-nav-icon {
+          transition: transform .18s ease;
+        }
+        .lp-systems-trigger .lp-nav-icon.is-open, .lp-mobile-systems-trigger .lp-nav-icon.is-open {
+          transform: rotate(180deg);
+        }
+        .lp-systems-dropdown {
+          position: absolute;
+          top: calc(100% + 14px);
+          left: 50%;
+          z-index: 80;
+          width: 340px;
+          padding: 8px;
+          display: grid;
+          gap: 3px;
+          transform: translateX(-50%);
+          border: 1px solid #e1e8f1;
+          border-radius: 16px;
+          background: #fff;
+          box-shadow: 0 22px 55px rgba(16,29,54,.16);
+          white-space: normal;
+        }
+        .lp-systems-dropdown::before {
+          position: absolute;
+          top: -7px;
+          left: calc(50% - 7px);
+          width: 12px;
+          height: 12px;
+          content: "";
+          transform: rotate(45deg);
+          border-top: 1px solid #e1e8f1;
+          border-left: 1px solid #e1e8f1;
+          background: #fff;
+        }
+        .lp-systems-dropdown a, .lp-mobile-system-links a {
+          position: relative;
+          display: grid !important;
+          gap: 3px !important;
+          padding: 11px 12px;
+          border-radius: 10px;
+          color: #15243a !important;
+          text-decoration: none;
+          transition: background .16s ease, color .16s ease;
+        }
+        .lp-systems-dropdown a:hover, .lp-mobile-system-links a:hover {
+          background: #f1f5fa;
+          color: #203f70 !important;
+        }
+        .lp-systems-dropdown strong, .lp-mobile-system-links strong {
+          font-size: 14px;
+          font-weight: 800;
+        }
+        .lp-systems-dropdown span, .lp-mobile-system-links span {
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 500;
+        }
+        .lp-header-actions .lp-btn--text { color: #334155 !important; }
+        .lp-header-actions .lp-btn--primary {
+          background: #101d36 !important;
+          color: #fff !important;
+          box-shadow: 0 10px 24px rgba(16,29,54,.16) !important;
+        }
+        .lp-header-actions .lp-btn--primary:hover { background: #315c98 !important; }
+        .lp-menu-btn {
+          background: #edf2f8 !important;
+          color: #15243a !important;
+          border: 1px solid #dce5f1 !important;
+        }
+        .lp-mobile-nav {
+          border-color: #e2e8f0 !important;
+          background: rgba(255,255,255,.98) !important;
+          box-shadow: 0 18px 36px rgba(16,29,54,.1);
+        }
+        .lp-mobile-nav > a, .lp-mobile-nav .lp-direct-link-cta {
+          color: #263750 !important;
+        }
+        .lp-mobile-nav > a:not(.lp-btn) {
+          min-height: 38px;
+          display: flex;
+          align-items: center;
+        }
+        .lp-mobile-nav .lp-mobile-systems-trigger {
+          width: 100%;
+          min-height: 42px;
+          justify-content: space-between;
+          color: #15243a;
+          font-size: 15px;
+          font-weight: 750;
+        }
+        .lp-mobile-system-links {
+          margin-top: 6px;
+          padding: 6px;
+          display: grid;
+          gap: 2px;
+          border: 1px solid #e2e8f0;
+          border-radius: 13px;
+          background: #f8fafd;
+        }
+        .lp-mobile-system-links a { padding: 10px !important; }
+        .lp-mobile-nav .lp-btn--primary {
+          background: #101d36 !important;
+          color: #fff !important;
+        }
+        .lp-main { position: relative; z-index: 1; background: transparent !important; }
+        .lp-hero-left-glow, .lp-hero-right-glow {
+          background: rgba(49,92,152,.09) !important;
+        }
+        .lp-hero-inner {
+          border-color: #e2e8f0 !important;
+          background: linear-gradient(145deg, #ffffff 0%, #f4f7fb 100%) !important;
+          box-shadow: 0 28px 80px rgba(16,29,54,.08) !important;
+        }
+        .lp-hero-badge {
+          background: #eaf0f8 !important;
+          color: #315c98 !important;
+        }
+        .lp-hero-badge-dot { background: #315c98 !important; }
+        .lp-hero-copy h1, .lp-hero-copy h1 span { color: #15243a !important; }
+        .lp-hero-copy p { color: #5d6b7e !important; }
+        .lp-hero-primary {
+          background: linear-gradient(180deg, #315c98 0%, #203f70 100%) !important;
+          color: #fff !important;
+          box-shadow: 0 14px 30px rgba(32,63,112,.2) !important;
+        }
+        .lp-hero-secondary, .lp-hero-download {
+          border: 1px solid #dfe6ef !important;
+          background: #fff !important;
+          color: #20324d !important;
+          box-shadow: 0 10px 24px rgba(16,29,54,.06) !important;
+        }
+        .lp-hero-points { color: #5d6b7e !important; }
+        .lp-point-icon { color: #315c98 !important; }
+        .lp-preview-glow { background: rgba(49,92,152,.1) !important; }
+        .lp-preview-frame {
+          border-color: #dfe6ef !important;
+          background: #edf2f8 !important;
+          box-shadow: 0 30px 80px rgba(16,29,54,.12) !important;
+        }
+        .lp-preview-inner {
+          border-color: #e2e8f0 !important;
+          background: #fff !important;
+        }
+        .lp-tab {
+          border-color: #dfe6ef !important;
+          background: #fff !important;
+          color: #52637a !important;
+          box-shadow: 0 8px 20px rgba(16,29,54,.06);
+        }
+        .lp-tab:hover { border-color: #9bb4d5 !important; color: #203f70 !important; }
+        .lp-tab.is-active {
+          border-color: #315c98 !important;
+          background: #eaf0f8 !important;
+          color: #203f70 !important;
+          box-shadow: 0 10px 28px rgba(49,92,152,.15) !important;
+        }
+        .lp-section-title h2, .lp-operation-main h3, .lp-operation-card h3,
+        .lp-feature-card h3, .lp-video-card strong, .lp-pricing-head h3, .lp-pricing-price {
+          color: #15243a !important;
+        }
+        .lp-section-title p, .lp-feature-card p, .lp-operation-card--accent p,
+        .lp-video-card p, .lp-pricing-card p { color: #5d6b7e !important; }
+        .lp-section-eyebrow, .lp-operation-label, .lp-branch-number,
+        .lp-pricing-check, .lp-feature-icon, .lp-video-icon-box {
+          color: #315c98 !important;
+        }
+        .lp-feature-card, .lp-operation-main, .lp-operation-card,
+        .lp-video-card, .lp-pricing-card {
+          border-color: #e2e8f0 !important;
+          background: #fff !important;
+          box-shadow: 0 12px 32px rgba(16,29,54,.055) !important;
+        }
+        .lp-feature-card:hover, .lp-video-card:hover, .lp-pricing-card:hover {
+          border-color: #b9cbe2 !important;
+          background: #fff !important;
+          box-shadow: 0 22px 44px rgba(16,29,54,.1) !important;
+        }
+        .lp-feature-icon, .lp-video-icon-box {
+          border: 1px solid #dce6f2;
+          background: #edf3fa !important;
+        }
+        .lp-operation-item, .lp-operation-mini-grid div {
+          border-color: #e2e8f0 !important;
+          background: #f5f8fc !important;
+          box-shadow: none !important;
+        }
+        .lp-operation-copy strong, .lp-operation-mini-grid strong { color: #15243a !important; }
+        .lp-operation-copy div, .lp-operation-mini-grid span { color: #64748b !important; }
+        .lp-operation-time { color: #64748b !important; }
+        .lp-operation-dot { background: #315c98 !important; }
+        .lp-operation-card--accent { border-color: #d7e2f0 !important; background: #edf3fa !important; }
+        .lp-pricing-band {
+          border-color: #e2e8f0 !important;
+          background: #f1f5fa !important;
+        }
+        .lp-pricing-head span, .lp-pricing-btn.is-highlight {
+          background: #315c98 !important;
+          color: #fff !important;
+        }
+        .lp-pricing-btn:not(.is-highlight) {
+          border: 1px solid #dfe6ef;
+          background: #f5f8fc !important;
+          color: #20324d !important;
+        }
+        .lp-pricing-list div { color: #52637a !important; }
+        .lp-footer {
+          border-color: #263a5a !important;
+          background: #101d36 !important;
+        }
+        .lp-footer-contact-links a {
+          border-color: rgba(255,255,255,.18) !important;
+          background: rgba(255,255,255,.07) !important;
+        }
+        .lp-footer-contact-links a:hover {
+          border-color: #9bb4d5 !important;
+          background: rgba(155,180,213,.16) !important;
+        }
+        @media (max-width: 900px) {
+          .lp-mobile-nav { padding: 14px !important; }
+        }
+        @media (max-width: 600px) {
+          .lp-systems-dropdown { left: 0; width: min(340px, calc(100vw - 36px)); transform: none; }
+          .lp-systems-dropdown::before { left: 36px; }
+          .lp-tab { color: #52637a !important; }
+        }
+      `}</style>
 
       <Header
         settings={settings}
         onRegister={() => openWebsiteLink(settings.primaryCtaUrl || '/register', nav)}
         onLogin={() => openWebsiteLink(settings.secondaryCtaUrl || '/login', nav)}
-        onOpenSystems={(event) => {
-          setActive('restaurant')
-          scrollToSection(event, 'sistemler')
-        }}
       />
 
       <main className="lp-main">
@@ -1998,6 +2334,18 @@ export default function LandingPage() {
               {settings.socialXUrl ? <a href={settings.socialXUrl}>X</a> : null}
               {settings.socialYoutubeUrl ? <a href={settings.socialYoutubeUrl}>YouTube</a> : null}
               {settings.socialLinkedinUrl ? <a href={settings.socialLinkedinUrl}>LinkedIn</a> : null}
+            </div>
+          </div>
+          <div className="lp-footer-contact">
+            <div className="lp-footer-contact-title">PenPOS çözümleri</div>
+            <div className="lp-footer-contact-links">
+              <Link to="/restoran-programi">Restoran Programı</Link>
+              <Link to="/restoran-otomasyon-programi">Restoran Otomasyon Programı</Link>
+              <Link to="/adisyon-programi">Adisyon Programı</Link>
+              <Link to="/restoran-pos">Restoran POS</Link>
+              <Link to="/qr-menu-programi">QR Menü</Link>
+              <Link to="/paket-servis-programi">Paket Servis Programı</Link>
+              <Link to="/market-programi">Market Programı</Link>
             </div>
           </div>
           <div className="lp-footer-copy">{settings.footerText || '© 2026 PenPOS. Restoran, mağaza ve market otomasyon sistemi.'}</div>

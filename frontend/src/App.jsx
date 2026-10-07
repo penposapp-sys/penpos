@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import SignIn from './pages/SignIn.jsx'
 import PlatformLogin from './pages/PlatformLogin.jsx'
 import LandingPage from './pages/LandingPage.jsx'
+import SeoLandingPage from './pages/SeoLandingPage.jsx'
 import LoginSelectionPage from './pages/LoginSelectionPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
@@ -375,6 +376,13 @@ export default function App() {
         <Toast />
         <Routes>
         <Route path="/" element={<RootEntryRoute />} />
+        <Route path="/restoran-programi" element={<SeoLandingPage page="restoran-programi" />} />
+        <Route path="/restoran-otomasyon-programi" element={<SeoLandingPage page="restoran-otomasyon-programi" />} />
+        <Route path="/adisyon-programi" element={<SeoLandingPage page="adisyon-programi" />} />
+        <Route path="/restoran-pos" element={<SeoLandingPage page="restoran-pos" />} />
+        <Route path="/qr-menu-programi" element={<SeoLandingPage page="qr-menu-programi" />} />
+        <Route path="/paket-servis-programi" element={<SeoLandingPage page="paket-servis-programi" />} />
+        <Route path="/market-programi" element={<SeoLandingPage page="market-programi" />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<LoginSelectionPage />} />
         <Route path="/platform-login" element={<PlatformLogin />} />
@@ -397,8 +405,8 @@ export default function App() {
         <Route path="/wepmagaza/:slug" element={<RestaurantWebsitePage siteType="store" />} />
         <Route path="/website/:slug" element={<RestaurantWebsitePage />} />
         <Route path="/qr/:slug" element={<CanteenQrPricePage />} />
-        <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/qr-menu" element={<DigitalMenuPage />} />
+        <Route path="/digital-menu" element={<DigitalMenuPage />} />
         <Route path="/magaza/login" element={<CanteenLogin />} />
 
         <Route path="/anaokulu" element={<AnaokuluDataProvider><ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu"><AnaokuluLayout /></ProtectedRoute></AnaokuluDataProvider>}>

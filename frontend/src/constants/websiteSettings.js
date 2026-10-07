@@ -11,7 +11,7 @@ export const defaultWebsiteSettings = {
   heroPointOne: 'QR menu dahil',
   heroPointTwo: 'Sinirsiz sube',
   heroPointThree: 'YouTube egitim videolari',
-  heroDescription: 'PenPOS; restoran-cafe ve magaza-market icin ayri girisleri, ayri ekran akislarÄ± olan modern otomasyon yapisidir. Restoran tarafinda QR menu standart olarak dahildir; her isletme istedigi kadar sube acabilir.',
+  heroDescription: 'PenPOS; restoran-cafe ve mağaza-market için ayrı girişleri, ayrı ekran akışları olan modern otomasyon yapısıdır. Restoran tarafında QR menü standart olarak dahildir; her işletme istediği kadar şube açabilir.',
   trialDays: 7,
   primaryCtaText: '1 Haftalik Ucretsiz Deneme',
   primaryCtaUrl: '/register',
@@ -80,8 +80,8 @@ export const defaultWebsiteSettings = {
   ],
   integrations: [],
   seoTitle: 'PenPOS | Restoran ve Mağaza Otomasyonu',
-  seoDescription: 'PenPOS ile restoran/cafe ve kantin/market akislarÄ± ayri girislerle yonetilir. QR menu dahil, sinirsiz sube ve raporlama hazir.',
-  seoKeywords: 'penpos,pos,restoran otomasyonu,kantin otomasyonu,market otomasyonu,qr menu',
+  seoDescription: 'PenPOS ile restoran, market ve mağaza satışlarınızı; adisyon, stok, QR menü ve paket servis araçlarıyla tek panelden yönetin.',
+  seoKeywords: 'PenPOS, POS sistemi, restoran programı, restoran otomasyonu, adisyon programı, market programı, QR menü',
   isPublished: true,
   updatedAt: null
 }
