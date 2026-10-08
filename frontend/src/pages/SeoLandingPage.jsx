@@ -11,9 +11,24 @@ const pages = {
     introduction: 'PenPOS restoran programı; masa ve siparişleri, mutfak hazırlığını, paket servisi, tahsilatı ve raporları aynı operasyon akışında birleştirir. Restoran otomasyon programı arayan ekipler masa ve adisyon durumunu takip eder; adisyon programı işlevleri açık hesabı güncel tutarken restoran POS ekranı masalı ve masasız satışların kaydını destekler.',
     image: { src: '/images/restaurant-preview.png', alt: 'PenPOS restoran ekranında salon masalarının ve masa durumlarının görünümü', caption: 'Masaların ve açık servis durumlarının genel görünümü' },
     highlights: ['Masa, sipariş ve adisyon takibi', 'Mutfak, paket servis ve masasız satış', 'Rapor, cari ve ödeme yönetimi'],
+    overview: {
+      heading: 'Restoran programı nedir, ne işe yarar?',
+      text: 'Restoran programı, günlük servis sırasında oluşan masa, sipariş, hazırlık ve tahsilat kayıtlarını işletmenin takip edebileceği ekranlarda bir araya getirir. PenPOS’ta ekip masalı siparişi adisyona ekleyip mutfak akışına aktarabilir; paket servis, QR Menü, ödeme ve raporları da kendi ilgili ekranlarından yönetebilir.'
+    },
+    requirements: {
+      heading: 'Restoran otomasyon programında hangi özellikler olmalı?',
+      introduction: 'İhtiyaçlar işletmeye göre değişir. PenPOS’un doğrulanmış restoran akışlarında aşağıdaki işlevler bulunur:',
+      items: [
+        'Masa durumları, adisyon ve siparişleri mutfak ekranında takip etme',
+        'Paket servis ve kurye siparişlerini, masaya bağlı olmayan walk-in satıştan ayrı yönetme',
+        'QR Menü ile ürün ve kategorileri müşterinin telefonunda sunma',
+        'Ürün/kategori kayıtlarını ve mevcut stok alanlarını, tahsilat ve cari hareketlerini, satış raporlarını takip etme',
+        'Yazdırma ayarları, şube seçimi ve personel izinlerini kullanma'
+      ]
+    },
     sections: [
       {
-        heading: 'Salondaki masalardan mutfağa sipariş akışı',
+        heading: 'Adisyon programı ile masa, mutfak ve sipariş yönetimi',
         introduction: 'Masa ekranı ve adisyon, servis ekibinin aynı masa ve sipariş bilgisi üzerinde çalışmasını sağlar.',
         features: [
           { heading: 'Masa ve adisyon', text: 'Masaların durumunu görüntüleyin, siparişleri ilgili masanın adisyonuna ekleyin ve servis sürerken hesabı güncel tutun.', benefit: 'Açık masaları ve hesap içeriğini tek yerden takip etmek kolaylaşır.' },
@@ -22,11 +37,11 @@ const pages = {
         ]
       },
       {
-        heading: 'Paket servis ve masasız satış için ayrı akışlar',
-        introduction: 'Restoran servisi yalnızca masada başlamaz. PenPOS, paket siparişleri ve masasız satış için de ayrı ekranlar sunar.',
+        heading: 'Paket servis, QR Menü ve gel-al beklentisi',
+        introduction: 'Restoran servisi masada, teslimat siparişinde veya tezgâhtan başlayan masasız satışta ilerleyebilir. PenPOS bu akışları ilgili ekranlarda sunar; walk-in satış, özel rezervasyonlu veya zaman seçmeli bir gel-al sipariş modülü anlamına gelmez.',
         features: [
           { heading: 'Paket siparişi ve kurye', text: 'Paket servis ekranında siparişleri, teslimat durumunu ve kurye akışını izleyin; mutfak hazırlığıyla eşgüdümlü çalışın.', benefit: 'Teslim edilecek siparişlerin salon adisyonları arasında kaybolma riski azalır.' },
-          { heading: 'Masasız satış', text: 'Walk-in satış ekranından bir masaya bağlamadan satış oluşturun. Bu, tezgahtan doğrudan satış gibi masasız işlemler için kullanılabilir.', benefit: 'Her satış için masa açmadan sipariş ve ödeme adımlarını tamamlayabilirsiniz.' },
+          { heading: 'Masasız satış ve gel-al ayrımı', text: 'Walk-in satış ekranından masaya bağlamadan satış oluşturun. Bu ekran tezgahtan doğrudan satış içindir; ayrı bir online gel-al rezervasyon akışı olarak sunulmaz.', benefit: 'Masa açmadan yapılan satışları salon adisyonlarından ayrı kaydedebilirsiniz.' },
           { heading: 'QR Menü ve online satış', text: 'Misafirler menüye QR kodla ulaşabilir. İşletme ayarlarına göre online satış bağlantısını da site veya ilgili satış akışında sunabilirsiniz.', benefit: 'Dijital menü ve online sipariş bağlantıları restoran operasyonuyla birlikte yönetilir.' }
         ]
       },
@@ -63,7 +78,14 @@ const pages = {
       { question: 'Restoran ürünlerinde stok takibi var mı?', answer: 'Ürün ayarlarında stok miktarı/takibi ve malzeme veya reçete için stoktan düşme ayarları bulunur. Ayrı, hareket ve sayım odaklı bir restoran stok modülü doğrulanmış değildir.' },
       { question: 'Restoranım için PenPOS üzerinden web sitesi yayınlayabilir miyim?', answer: 'Evet. Logo, görseller, ana sayfa metinleri, ürün vitrini ve iletişim bilgilerini düzenleyip PenPOS site adresinizde yayınlayabilirsiniz. Özel alan adı bağlama özelliği doğrulanmamıştır.' }
     ],
-    related: ['restoran-otomasyon-programi', 'adisyon-programi', 'restoran-pos', 'paket-servis-programi', 'qr-menu-programi']
+    related: ['restoran-otomasyon-programi', 'adisyon-programi', 'restoran-pos', 'paket-servis-programi', 'qr-menu-programi'],
+    relatedLabels: {
+      'restoran-otomasyon-programi': 'Restoran programı ve otomasyon akışı',
+      'adisyon-programi': 'Restoran programında adisyon ve masa takibi',
+      'restoran-pos': 'Restoran programında POS ve tahsilat',
+      'paket-servis-programi': 'Restoran programında paket servis ve kurye',
+      'qr-menu-programi': 'Restoran programında QR Menü kullanımı'
+    }
   },
   'restoran-otomasyon-programi': {
     title: 'Restoran Otomasyon Programı ve Sipariş Akışı | PenPOS',
@@ -124,7 +146,8 @@ const pages = {
       { question: 'Otomasyon stokları otomatik olarak düşürüyor mu?', answer: 'Ürün ayarlarında miktar/stok takibi ve malzeme/reçete stoktan düşme seçenekleri görülüyor. Bunlar tek başına tüm restoran satışlarında otomatik düşümü veya ayrı bir stok yönetim modülünü kanıtlamaz.' },
       { question: 'Restoran web sitesi bu sisteme bağlı mı?', answer: 'Evet. Site ürün vitrini katalog verisini kullanabilir; QR Menü ve online satışa yönlendiren bağlantılar yapılandırılabilir.' }
     ],
-    related: ['restoran-programi', 'adisyon-programi', 'paket-servis-programi', 'market-programi']
+    related: ['restoran-programi', 'adisyon-programi', 'paket-servis-programi', 'market-programi'],
+    relatedLabels: { 'restoran-programi': 'Restoran programında masa ve sipariş yönetimi' }
   },
   'adisyon-programi': {
     title: 'Adisyon Programı: Masa ve Hesap Takibi | PenPOS',
@@ -183,7 +206,8 @@ const pages = {
       { question: 'Masa açmadan satış alabilir miyim?', answer: 'Walk-in satış ekranı masaya bağlı olmayan satış için mevcut. Kodda ayrı bir zamanlı gel-al rezervasyon akışı doğrulanmadı.' },
       { question: 'Adisyon ve cari hesap aynı şey mi?', answer: 'Masa adisyonu servis siparişini/hesabını takip eder; cari ekranları müşteri hesapları ve tahsilat hareketleri için ayrı akış sunar.' }
     ],
-    related: ['restoran-programi', 'restoran-pos', 'restoran-otomasyon-programi', 'paket-servis-programi']
+    related: ['restoran-programi', 'restoran-pos', 'restoran-otomasyon-programi', 'paket-servis-programi'],
+    relatedLabels: { 'restoran-programi': 'Restoran programı: masa, adisyon ve mutfak akışı' }
   },
   'restoran-pos': {
     title: 'Restoran POS Sistemi: Sipariş ve Tahsilat | PenPOS',
@@ -242,7 +266,8 @@ const pages = {
       { question: 'Barkod okuyucu restoran POS’ta destekleniyor mu?', answer: 'Ürün kartlarında barkodla ilgili alan bulunabilir; ancak restoran POS için çalışan barkod okuyucu satış akışı doğrulanmadı.' },
       { question: 'Restoran POS satışları raporlanıyor mu?', answer: 'Evet. Restoran rapor ekranlarında satış ve ilgili işletme özetleri bulunur.' }
     ],
-    related: ['adisyon-programi', 'restoran-programi', 'paket-servis-programi', 'qr-menu-programi']
+    related: ['adisyon-programi', 'restoran-programi', 'paket-servis-programi', 'qr-menu-programi'],
+    relatedLabels: { 'restoran-programi': 'Restoran programı ile POS ve satış süreçleri' }
   },
   'qr-menu-programi': {
     title: 'QR Menü Programı: Dijital Restoran Menüsü | PenPOS',
@@ -301,7 +326,8 @@ const pages = {
       { question: 'QR menü görüntülemek siparişi otomatik olarak mutfağa iletir mi?', answer: 'Menü görüntüleme ve online satış ayrı ayarlanabilir. Restoran siparişi POS/adisyon ve mutfak ekranlarında yönetilir; her menü görüntülemesi sipariş oluşturmaz.' },
       { question: 'QR Menü bağlantısı web sitesinde yer alabilir mi?', answer: 'Evet. Restoran web sitesi ayarlarında QR Menü butonu ve bağlantısı yapılandırılabilir.' }
     ],
-    related: ['restoran-programi', 'restoran-pos', 'adisyon-programi', 'restoran-otomasyon-programi']
+    related: ['restoran-programi', 'restoran-pos', 'adisyon-programi', 'restoran-otomasyon-programi'],
+    relatedLabels: { 'restoran-programi': 'Restoran programında QR Menü ve sipariş yönetimi' }
   },
   'paket-servis-programi': {
     title: 'Paket Servis Programı: Sipariş ve Kurye Takibi | PenPOS',
@@ -360,7 +386,8 @@ const pages = {
       { question: 'PenPOS özel zamanlı gel-al rezervasyonu sunuyor mu?', answer: 'Kodda walk-in masasız satış ve paket teslimat akışları var; özel zaman seçmeli pickup/gel-al rezervasyon iş akışı doğrulanmadı.' },
       { question: 'Paket siparişler mutfakla birlikte takip edilebilir mi?', answer: 'Restoran uygulamasında hem mutfak hem paket sipariş/kurye ekranları bulunuyor; sipariş hazırlığı ve teslimat bu ekranlarda izlenebilir.' }
     ],
-    related: ['restoran-programi', 'restoran-pos', 'adisyon-programi', 'qr-menu-programi']
+    related: ['restoran-programi', 'restoran-pos', 'adisyon-programi', 'qr-menu-programi'],
+    relatedLabels: { 'restoran-programi': 'Restoran programında paket servis ve mutfak akışı' }
   },
   'market-programi': {
     title: 'Market Programı: Barkodlu Kasa ve Stok Yönetimi | PenPOS',
@@ -560,6 +587,13 @@ export default function SeoLandingPage({ page }) {
       </header>
 
       <div className="seo-landing-content">
+        {page === 'restoran-programi' ? (
+          <nav className="seo-landing-breadcrumb" aria-label="Sayfa yolu">
+            <Link to="/landing">Ana sayfa</Link>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Restoran Programı</span>
+          </nav>
+        ) : null}
         <section className="seo-landing-hero">
           <div className="seo-landing-hero-copy">
             <p className="seo-landing-eyebrow">PenPOS işletme yönetim sistemi</p>
@@ -581,6 +615,23 @@ export default function SeoLandingPage({ page }) {
         <ul className="seo-landing-highlights">
           {content.highlights.map((highlight) => <li key={highlight}><span aria-hidden="true">✓</span>{highlight}</li>)}
         </ul>
+
+        {content.overview ? (
+          <section className="seo-landing-content-section seo-landing-overview">
+            <h2>{content.overview.heading}</h2>
+            <p className="seo-landing-section-intro">{content.overview.text}</p>
+          </section>
+        ) : null}
+
+        {content.requirements ? (
+          <section className="seo-landing-content-section seo-landing-requirements">
+            <h2>{content.requirements.heading}</h2>
+            <p className="seo-landing-section-intro">{content.requirements.introduction}</p>
+            <ul className="seo-landing-check-list">
+              {content.requirements.items.map((item) => <li key={item}><span aria-hidden="true">✓</span>{item}</li>)}
+            </ul>
+          </section>
+        ) : null}
 
         {content.sections.map((section, index) => (
           <section className="seo-landing-content-section" key={section.heading}>
@@ -613,7 +664,7 @@ export default function SeoLandingPage({ page }) {
           <div className="seo-landing-related-links">
             {content.related.map((slug) => {
               const related = relatedPages.find((item) => item.path === slug)
-              return related ? <Link to={`/${related.path}`} key={related.path}>{related.label}</Link> : null
+              return related ? <Link to={`/${related.path}`} key={related.path}>{content.relatedLabels?.[slug] || related.label}</Link> : null
             })}
           </div>
         </section>

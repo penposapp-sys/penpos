@@ -13878,6 +13878,31 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
   margin: 0 auto;
 }
 
+.seo-landing-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding-top: 22px;
+  color: var(--seo-muted);
+  font-size: 13px;
+}
+
+.seo-landing-breadcrumb a {
+  color: var(--seo-blue);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.seo-landing-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.seo-landing-breadcrumb [aria-current="page"] {
+  color: var(--seo-navy);
+  font-weight: 700;
+}
+
 .seo-landing-hero {
   padding: 76px 0 48px;
   display: grid;
@@ -14010,6 +14035,8 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
 }
 
 .seo-landing-section-heading h2,
+.seo-landing-overview h2,
+.seo-landing-requirements h2,
 .seo-landing-workflow h2,
 .seo-landing-website h2,
 .seo-landing-faq > h2,
@@ -14028,6 +14055,23 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
   color: var(--seo-muted);
   font-size: 16px;
   line-height: 1.75;
+}
+
+.seo-landing-requirements .seo-landing-check-list {
+  max-width: 900px;
+}
+
+.seo-landing-requirements .seo-landing-check-list li {
+  color: var(--seo-text);
+  font-size: 15px;
+}
+
+.seo-landing-requirements .seo-landing-check-list li > span {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  background: var(--seo-blue);
 }
 
 .seo-landing-feature-grid {
@@ -14389,6 +14433,11 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
 
   .seo-landing-content {
     width: min(100% - 40px, 1080px);
+  }
+
+  .seo-landing-breadcrumb {
+    padding-top: 18px;
+    font-size: 12px;
   }
 
   .seo-landing-hero {

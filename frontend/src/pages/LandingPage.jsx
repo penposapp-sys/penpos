@@ -2208,7 +2208,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <Link to="/restoran-programi" className="lp-hero-seo-link">
-                Restoran programı özelliklerini inceleyin <Icon name="arrow" className="lp-hero-seo-link-icon" />
+                Restoran programı: masa ve adisyon yönetimini keşfedin <Icon name="arrow" className="lp-hero-seo-link-icon" />
               </Link>
             </div>
 
