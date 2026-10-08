@@ -1525,7 +1525,7 @@ export default function CanteenSettingsProductsPage() {
                 file={imageFile}
                 error={imageError}
                 disabled={!canManage}
-                descriptionText="Yuklenen gorsel satis ekranlarinda bu urun icin gosterilir."
+                descriptionText="Yüklenen görsel satış ekranlarında bu ürün için gösterilir."
                 onFileChange={(nextFile, validationMessage) => {
                   setImageError(validationMessage || '')
                   setImageFile(validationMessage ? null : nextFile)
@@ -1640,7 +1640,7 @@ export default function CanteenSettingsProductsPage() {
               error={editImageError}
               compact
               disabled={!canManage}
-              descriptionText="Yuklenen gorsel satis ekranlarinda bu urun icin gosterilir."
+              descriptionText="Yüklenen görsel satış ekranlarında bu ürün için gösterilir."
               onFileChange={(nextFile, validationMessage) => {
                 setEditImageError(validationMessage || '')
                 setEditImageFile(validationMessage ? null : nextFile)
@@ -1731,7 +1731,7 @@ export default function CanteenSettingsProductsPage() {
               compact
               disabled={!canManage || categorySaving}
               helperText="JPG, PNG veya WEBP. Maksimum 5 MB, kategori kartı için optimize edilerek saklanır."
-              descriptionText="Yuklenen gorsel satis ekranlarinda bu kategori icin gosterilir."
+              descriptionText="Yüklenen görsel satış ekranlarında bu kategori için gösterilir."
               onFileChange={(nextFile, validationMessage) => {
                 setCategoryImageError(validationMessage || '')
                 setCategoryImageFile(validationMessage ? null : nextFile)

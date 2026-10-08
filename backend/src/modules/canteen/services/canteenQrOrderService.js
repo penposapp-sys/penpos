@@ -544,12 +544,13 @@ export const updateQrOrderPayment = async (tenantId, branchId, actorUserId, orde
 
   if (status === 'paid' && requestedMethod && !PAYMENT_METHODS.has(requestedMethod)) {
     const resolvedMethod = await resolveCanteenPaymentMethodSelection(tenantId, requestedMethod)
+    const resolvedMethodType = String(resolvedMethod?.methodType || 'other').trim() || 'other'
     method = 'already_paid'
     paymentDetails = {
       paymentMethodLabel: String(resolvedMethod?.methodLabel || resolvedMethod?.methodName || '').trim(),
       paymentMethodName: String(resolvedMethod?.methodName || resolvedMethod?.methodLabel || '').trim(),
       paymentMethodBucket: String(resolvedMethod?.methodBucket || 'other').trim() || 'other',
-      paymentMethodType: String(resolvedMethod?.methodType || 'other').trim() || 'other',
+      paymentMethodType: resolvedMethodType === 'pos' ? 'card' : resolvedMethodType,
     }
   } else if (status === 'cari') {
     method = 'cari'

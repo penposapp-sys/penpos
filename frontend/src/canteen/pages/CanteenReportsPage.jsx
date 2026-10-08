@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 import { buildBranchQueryParams } from '../../lib/branchQuery.js'
+import { resolveApiBase } from '../../lib/runtimeApi.js'
 import { paymentLabel } from '../utils/paymentLabels.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
 import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
@@ -162,7 +163,7 @@ function ReportFilter({ period, setPeriod, rangeStart, setRangeStart, rangeEnd, 
           disabled={loading || exporting}
           style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--button-text)', padding: '10px 16px', fontWeight: 900 }}
         >
-          {exporting ? 'Haz?rlan?yor' : 'Excel Aktar'}
+          {exporting ? 'Hazırlanıyor' : 'Excel Aktar'}
         </button>
         {period === 'range' ? (
           <>
@@ -209,11 +210,11 @@ function ReportFilterCompact({
   compact = false
 }) {
   const tabs = [
-    { key: 'today', label: 'Bugun' },
+    { key: 'today', label: 'Bugün' },
     { key: 'week', label: 'Bu Hafta' },
     { key: 'month', label: 'Bu Ay' },
-    { key: 'year', label: 'Bu Yil' },
-    { key: 'range', label: 'Aralik' }
+    { key: 'year', label: 'Bu Yıl' },
+    { key: 'range', label: 'Aralık' }
   ]
   const controlHeight = 30
 
@@ -253,14 +254,14 @@ function ReportFilterCompact({
             branchOptions={branchOptions}
             selectedBranches={selectedBranches}
             setSelectedBranches={setSelectedBranches}
-            title="Sube Sec"
+            title="Şube Seç"
             compact
             hideSummary
           />
           <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 12, fontWeight: 600, alignSelf: 'center', whiteSpace: 'nowrap' }}>Mağaza rapor dönemi filtresi</div>
 
           <label style={{ display: 'grid', gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Baslangic</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Başlangıç</span>
             <input
               type="date"
               className="input"
@@ -274,7 +275,7 @@ function ReportFilterCompact({
           </label>
 
           <label style={{ display: 'grid', gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bitis</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bitiş</span>
             <input
               type="date"
               className="input"
@@ -291,10 +292,10 @@ function ReportFilterCompact({
             type="button"
             className="btn button-light"
             onClick={onExport}
-            disabled={loading || exporting}
+            disabled={loading || exporting || (period === 'range' && !!rangeStart && !!rangeEnd && rangeStart > rangeEnd)}
             style={{ minHeight: controlHeight, height: controlHeight, borderRadius: 14, background: 'var(--app-surface)', color: 'var(--button-text)', padding: '0 12px', fontWeight: 900, fontSize: 12, alignSelf: 'end', whiteSpace: 'nowrap' }}
           >
-            {exporting ? 'Hazirlaniyor' : 'Excel Aktar'}
+            {exporting ? 'Hazırlanıyor' : 'Excel Aktar'}
           </button>
         </div>
       </div>
@@ -586,13 +587,17 @@ export default function CanteenReportsPage() {
 
   const downloadAllExcel = async () => {
     if (!canExport) return
+    if (period === 'range' && start && end && start > end) {
+      setError('Başlangıç tarihi bitiş tarihinden büyük olamaz.')
+      return
+    }
     setExporting(true)
     setError('')
     try {
       const token = (() => {
         try { return String(getAuthToken('token_canteen') || '') } catch { return '' }
       })()
-      const url = `/api/magaza/reports/export?${qs}`
+      const url = `${resolveApiBase()}/api/canteen/reports/export?${qs}`
       const res = await fetch(url, {
         method: 'GET',
         headers: {
@@ -610,6 +615,9 @@ export default function CanteenReportsPage() {
         return
       }
       const blob = await res.blob()
+      if (blob.type === 'text/html') {
+        throw new Error('Rapor servisi Excel dosyası yerine HTML yanıtı döndürdü')
+      }
       const cd = res.headers.get('content-disposition') || ''
       const m = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(cd)
       const filename = decodeURIComponent(m?.[1] || m?.[2] || 'raporlar.xlsx')
@@ -623,8 +631,8 @@ export default function CanteenReportsPage() {
       setTimeout(() => {
         try { URL.revokeObjectURL(objectUrl) } catch {}
       }, 2000)
-    } catch {
-      setError('İşlem başarısız')
+    } catch (err) {
+      setError(normalizeApiMessage(err?.message, 'Rapor dosyası hazırlanamadı'))
     } finally {
       setExporting(false)
     }
@@ -632,6 +640,14 @@ export default function CanteenReportsPage() {
 
   const load = async (options = {}) => {
     const background = options?.background === true
+    if (period === 'range' && start && end && start > end) {
+      setError('Başlangıç tarihi bitiş tarihinden büyük olamaz.')
+      setSummary(null)
+      setProducts([])
+      setCustomers([])
+      setLoading(false)
+      return
+    }
     if (!background) setLoading(true)
     if (!background) setError('')
     const s = await api(`/api/magaza/reports/summary?${qs}`, { silent: true })
@@ -770,7 +786,7 @@ export default function CanteenReportsPage() {
           disabled={loading || exporting}
           style={{ borderRadius: 18, background: 'var(--app-surface)', color: 'var(--app-text)', padding: '14px 18px', fontWeight: 900 }}
         >
-          {exporting ? 'Haz?rlan?yor' : 'Excel Aktar'}
+          {exporting ? 'Hazırlanıyor' : 'Excel Aktar'}
         </button>
       </div>
       {(loading || exporting) ? <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>{exporting ? 'Rapor dosyas? haz?rlan?yor...' : 'Rapor verileri sistemden y?kleniyor...'}</div> : null}

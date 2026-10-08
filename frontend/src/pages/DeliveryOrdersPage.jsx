@@ -27,14 +27,14 @@ const statusColors = {
 }
 
 const statusLabels = {
-  cancel_pending: 'Iptal Onayi Bekliyor',
+  cancel_pending: 'İptal Onayı Bekliyor',
   approval_pending: 'Onay Bekliyor',
   pending: 'Bekliyor',
-  accepted: 'Onaylandi',
-  preparing: 'Hazirlaniyor',
-  ready: 'Hazir',
+  accepted: 'Onaylandı',
+  preparing: 'Hazırlanıyor',
+  ready: 'Hazır',
   delivered: 'Teslim Edildi',
-  cancelled: 'Iptal'
+  cancelled: 'İptal'
 }
 
 const emptyCreateForm = {
@@ -169,7 +169,7 @@ export default function DeliveryOrdersPage() {
       setOrders((prev) => append ? [...prev, ...nextOrders] : nextOrders)
       setPage(nextPage)
     } catch (err) {
-      toast.error(err?.message || 'Siparisler yuklenemedi')
+      toast.error(err?.message || 'Siparişler yüklenemedi')
     } finally {
       setLoading(false)
     }
@@ -277,7 +277,7 @@ export default function DeliveryOrdersPage() {
 
       if (res?.success === false && res?.status === 403) {
         if (res?.code === 'missing_branch') {
-          const message = res?.message || 'Sube secimi gerekli.'
+          const message = res?.message || 'Şube seçimi gerekli.'
           setCreateOrderError(message)
           toast.error(message)
           return
@@ -288,7 +288,7 @@ export default function DeliveryOrdersPage() {
 
       const fresh = res?.data?.order ?? res?.order ?? null
       if (!fresh) {
-        toast.error('Siparis olusturulamadi')
+        toast.error('Sipariş oluşturulamadı')
         return
       }
 
@@ -336,7 +336,7 @@ export default function DeliveryOrdersPage() {
         silent: true
       })
       if (res?.success === false) {
-        toast.error(res?.message || 'Siparis onaylanamadi')
+        toast.error(res?.message || 'Sipariş onaylanamadı')
         return
       }
 
@@ -344,9 +344,9 @@ export default function DeliveryOrdersPage() {
       if (fresh) {
         setOrders((prev) => prev.map((item) => (String(getOrderId(item) || '') === id ? { ...item, ...fresh } : item)))
       }
-      toast.success('Siparis onaylandi ve hazirlanacaklara gonderildi')
+      toast.success('Sipariş onaylandı ve hazırlanacaklara gönderildi')
     } catch (err) {
-      toast.error(err?.message || 'Siparis onaylanamadi')
+      toast.error(err?.message || 'Sipariş onaylanamadı')
     } finally {
       setApprovingId('')
     }
@@ -366,16 +366,16 @@ export default function DeliveryOrdersPage() {
         silent: true
       })
       if (res?.success === false) {
-        toast.error(res?.message || 'Iptal talebi onaylanamadi')
+        toast.error(res?.message || 'İptal talebi onaylanamadı')
         return
       }
       const fresh = normalizeOrder(res?.order || res?.data?.order || null)
       if (fresh) {
         setOrders((prev) => prev.map((item) => (String(getOrderId(item) || '') === id ? { ...item, ...fresh } : item)))
       }
-      toast.success('Iptal talebi onaylandi')
+      toast.success('İptal talebi onaylandı')
     } catch (err) {
-      toast.error(err?.message || 'Iptal talebi onaylanamadi')
+      toast.error(err?.message || 'İptal talebi onaylanamadı')
     } finally {
       setApprovingId('')
     }
@@ -388,7 +388,7 @@ export default function DeliveryOrdersPage() {
       toast.error('Bu islem icin yetkiniz yok')
       return
     }
-    if (!window.confirm('Bu online siparisi iptal etmek istiyor musunuz?')) return
+    if (!window.confirm('Bu online siparişi iptal etmek istiyor musunuz?')) return
 
     setApprovingId(id)
     try {
@@ -397,14 +397,14 @@ export default function DeliveryOrdersPage() {
         silent: true
       })
       if (res?.success === false) {
-        toast.error(res?.message || 'Siparis iptal edilemedi')
+        toast.error(res?.message || 'Sipariş iptal edilemedi')
         return
       }
       setOrders((prev) => prev.filter((item) => String(getOrderId(item) || '') !== id))
       setTotalCount((prev) => Math.max(0, Number(prev || 0) - 1))
-      toast.success('Online siparis iptal edildi')
+      toast.success('Online sipariş iptal edildi')
     } catch (err) {
-      toast.error(err?.message || 'Siparis iptal edilemedi')
+      toast.error(err?.message || 'Sipariş iptal edilemedi')
     } finally {
       setApprovingId('')
     }
@@ -414,8 +414,8 @@ export default function DeliveryOrdersPage() {
     <div className="delivery-page-shell scrollbar-hidden">
       <div className="delivery-page-header">
         <div>
-          <h1 className="delivery-page-title">Paket Siparisler</h1>
-          <div className="delivery-page-subtitle">{totalCount || 0} siparis</div>
+          <h1 className="delivery-page-title">Paket Siparişler</h1>
+          <div className="delivery-page-subtitle">{totalCount || 0} sipariş</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'end', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canManageDelivery && (
@@ -433,7 +433,7 @@ export default function DeliveryOrdersPage() {
                 setCreateOpen(true)
               }}
             >
-              Yeni Paket Siparisi
+              Yeni Paket Siparişi
             </button>
           )}
         </div>
@@ -442,7 +442,7 @@ export default function DeliveryOrdersPage() {
       <div className="delivery-filter-bar">
         <div className="delivery-filter-group">
           <button className="btn btn--toggle" onClick={() => setTab('active')} aria-pressed={tab === 'active'}>
-            Aktif Siparisler
+            Aktif Siparişler
           </button>
           <button className="btn btn--toggle" onClick={() => setTab('delivered')} aria-pressed={tab === 'delivered'}>
             Teslim Edilenler
@@ -504,8 +504,8 @@ export default function DeliveryOrdersPage() {
               <div className="delivery-card-top">
                 <div>
                   <strong>{order?.customerName || 'Musteri'}</strong>
-                  {order?.orderNo ? <div className="delivery-card-order-no">Siparis {order.orderNo}</div> : null}
-                  {String(order?.orderChannel || '') === 'online' ? <div className="delivery-card-order-no">Online Siparis</div> : null}
+                  {order?.orderNo ? <div className="delivery-card-order-no">Sipariş {order.orderNo}</div> : null}
+                  {String(order?.orderChannel || '') === 'online' ? <div className="delivery-card-order-no">Online Sipariş</div> : null}
                 </div>
                 <span className="page-pill" style={{ color: statusColors[status] }}>{statusLabels[status]}</span>
               </div>
@@ -532,7 +532,7 @@ export default function DeliveryOrdersPage() {
                       approveOnlineOrder(order)
                     }}
                   >
-                    {approvingId === String(id) ? 'Onaylaniyor...' : 'Onayla'}
+                    {approvingId === String(id) ? 'Onaylanıyor...' : 'Onayla'}
                   </button>
                 )}
                 {String(order?.orderChannel || '') === 'online' && status !== 'cancel_pending' && canManageDelivery && (
@@ -546,7 +546,7 @@ export default function DeliveryOrdersPage() {
                       cancelOnlineOrder(order)
                     }}
                   >
-                    {approvingId === String(id) ? 'Isleniyor...' : 'Iptal Et'}
+                    {approvingId === String(id) ? 'İşleniyor...' : 'İptal Et'}
                   </button>
                 )}
                 {status === 'cancel_pending' && canManageDelivery && (
@@ -560,7 +560,7 @@ export default function DeliveryOrdersPage() {
                       approveCancelRequest(order)
                     }}
                   >
-                    {approvingId === String(id) ? 'Onaylaniyor...' : 'Iptal Onayla'}
+                    {approvingId === String(id) ? 'Onaylanıyor...' : 'İptal Onayla'}
                   </button>
                 )}
               </div>
@@ -571,7 +571,7 @@ export default function DeliveryOrdersPage() {
 
       {!loading && orders.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--muted)' }}>
-          Gosterilecek paket siparisi yok.
+          Gösterilecek paket siparişi yok.
         </div>
       )}
 
@@ -583,11 +583,11 @@ export default function DeliveryOrdersPage() {
         </div>
       )}
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Paket Siparisi">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Yeni Paket Siparişi">
         <div style={{ display: 'grid', gap: 10 }}>
           {!!createOrderError && (
             <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
-              <div style={{ fontWeight: 700, color: '#b91c1c' }}>Sube secimi gerekli</div>
+              <div style={{ fontWeight: 700, color: '#b91c1c' }}>Şube seçimi gerekli</div>
               <div style={{ color: 'var(--muted)', marginTop: 4 }}>{createOrderError}</div>
             </div>
           )}
@@ -664,10 +664,10 @@ export default function DeliveryOrdersPage() {
             </div>
           </div>
           <div style={{ display: 'grid', gap: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Odeme durumu</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ödeme durumu</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn--toggle" aria-pressed={createForm.deliveryPaymentStatus === 'already_paid'} onClick={() => setCreateForm({ ...createForm, deliveryPaymentStatus: 'already_paid' })}>Odemesi alindi</button>
-              <button type="button" className="btn btn--toggle" aria-pressed={createForm.deliveryPaymentStatus === 'pay_on_delivery'} onClick={() => setCreateForm({ ...createForm, deliveryPaymentStatus: 'pay_on_delivery', deliveryPaymentMethod: createForm.deliveryPaymentMethod || pickInitialPaymentMethod(payMethods, '') })}>Kapida odeme</button>
+              <button type="button" className="btn btn--toggle" aria-pressed={createForm.deliveryPaymentStatus === 'already_paid'} onClick={() => setCreateForm({ ...createForm, deliveryPaymentStatus: 'already_paid' })}>Ödemesi alındı</button>
+              <button type="button" className="btn btn--toggle" aria-pressed={createForm.deliveryPaymentStatus === 'pay_on_delivery'} onClick={() => setCreateForm({ ...createForm, deliveryPaymentStatus: 'pay_on_delivery', deliveryPaymentMethod: createForm.deliveryPaymentMethod || pickInitialPaymentMethod(payMethods, '') })}>Kapıda ödeme</button>
             </div>
             {createForm.deliveryPaymentStatus === 'pay_on_delivery' && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -683,7 +683,7 @@ export default function DeliveryOrdersPage() {
               </div>
             )}
           </div>
-          <button className="btn" onClick={createOrder} disabled={!String(createForm.customerName || '').trim()}>Olustur</button>
+          <button className="btn" onClick={createOrder} disabled={!String(createForm.customerName || '').trim()}>Oluştur</button>
         </div>
       </Modal>
     </div>

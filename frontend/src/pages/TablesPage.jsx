@@ -102,7 +102,7 @@ export function TablesManagementContent({ embedded = false }) {
       setActiveByTable({})
       setPaidByTable({})
       setWaiterCallsByTable({})
-      setError('Sistem Ayarlari > Yetkili Subeler bolumunden sube secin')
+      setError('Sistem Ayarları > Yetkili Şubeler bölümünden şube seçin')
       return null
     }
 
@@ -351,13 +351,13 @@ export function TablesManagementContent({ embedded = false }) {
       {Array.isArray(allowedBranchIds) && allowed.length === 0 && (
         <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2', marginBottom: 12 }}>
           <div style={{ fontWeight: 800, color: '#b91c1c' }}>
-            Sube yetkisi yok. Ayarlar &gt; Sistem Ayarlari &gt; Yetkili Subeler bolumunden sube secin.
+            Şube yetkisi yok. Ayarlar &gt; Sistem Ayarları &gt; Yetkili Şubeler bölümünden şube seçin.
           </div>
         </div>
       )}
 
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
-      {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>Islem suruyor...</div>}
+      {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>İşlem sürüyor...</div>}
 
       {categories.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -549,7 +549,7 @@ export function TablesManagementContent({ embedded = false }) {
 
         {tables.length === 0 && (
           <div className="card">
-            Masa tanimli degil. Isletme yoneticisi Ayarlar &gt; Masalar uzerinden ekleyebilir.
+            Masa tanımlı değil. İşletme yöneticisi Ayarlar &gt; Masalar üzerinden ekleyebilir.
           </div>
         )}
       </div>
@@ -603,5 +603,4 @@ export function TablesManagementContent({ embedded = false }) {
 export default function TablesPage() {
   return <TablesManagementContent />
 }
-
 

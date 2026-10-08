@@ -17,7 +17,7 @@ export default function CanteenLogin() {
   useBodyLayoutMode('public-site-layout')
 
   useEffect(() => {
-    document.title = 'PenPOS - Magaza Girisi'
+    document.title = 'PenPOS - Mağaza Girişi'
   }, [])
 
   const onSubmit = async (event) => {
@@ -29,7 +29,7 @@ export default function CanteenLogin() {
       nav('/magaza', { replace: true })
     } catch (err) {
       setError(getFriendlyLoginError(err, {
-        wrongPortalMessage: 'Bu hesap magaza giris ekrani icin uygun degil.'
+        wrongPortalMessage: 'Bu hesap mağaza giriş ekranı için uygun değil.'
       }))
     } finally {
       setLoading(false)
@@ -39,17 +39,17 @@ export default function CanteenLogin() {
   return (
     <PublicSystemLogin
       backTo="/login"
-      backLabel="Sistem secimine don"
+      backLabel="Sistem seçimine dön"
       brand="PenPOS"
-      systemLabel="MAGAZA / MARKET YONETIMI"
-      welcomeTitle="Hizli kasa, stok ve cari akislarinizi tek ekranda toplayin."
-      welcomeText="Barkodlu satis, stok hareketleri, cari bakiyeler ve gunluk raporlar ile operasyonu sade ve hizli yonetin."
-      formTitle="Magaza Girisi"
-      formSubtitle="Magaza veya market panelinize giris yapin."
-      identifierLabel="E-posta / Kullanici Adi"
-      identifierPlaceholder="eposta veya kullanici adi"
-      passwordLabel="Sifre"
-      passwordPlaceholder="sifrenizi girin"
+      systemLabel="MAĞAZA / MARKET YÖNETİMİ"
+      welcomeTitle="Hızlı kasa, stok ve cari akışlarınızı tek ekranda toplayın."
+      welcomeText="Barkodlu satış, stok hareketleri, cari bakiyeler ve günlük raporlarla operasyonu sade ve hızlı yönetin."
+      formTitle="Mağaza Girişi"
+      formSubtitle="Mağaza veya market panelinize giriş yapın."
+      identifierLabel="E-posta / Kullanıcı Adı"
+      identifierPlaceholder="E-posta veya kullanıcı adı"
+      passwordLabel="Şifre"
+      passwordPlaceholder="Şifrenizi girin"
       identifier={identifier}
       password={password}
       rememberMe={rememberMe}
@@ -60,20 +60,20 @@ export default function CanteenLogin() {
       error={error}
       loading={loading}
       forgotTo="/forgot-password?portal=canteen"
-      submitLabel="Giris Yap"
-      loadingLabel="Giris yapiliyor..."
+      submitLabel="Giriş Yap"
+      loadingLabel="Giriş yapılıyor..."
       registerTo="/register?type=market"
-      registerLabel="Yeni Isletme Kaydi"
-      registerText="Magaza veya market hesabinizi acin, urunlerinizi ve subelerinizi kolayca yonetin."
-      supportTitle="Magaza destegi"
+      registerLabel="Yeni İşletme Kaydı"
+      registerText="Mağaza veya market hesabınızı açın, ürünlerinizi ve şubelerinizi kolayca yönetin."
+      supportTitle="Mağaza desteği"
       supportItems={[
-        { label: 'Barkodlu Satis', value: 'Hizli kasa' },
+        { label: 'Barkodlu Satış', value: 'Hızlı kasa' },
         { label: 'Stok + Cari', value: 'Tek panel' },
       ]}
       theme="canteen"
-      highlights={['Hizli Kasa', 'Stok Takibi', 'Cari Hesap', 'Sube Yonetimi']}
-      panelQuote="Yogun satis saatlerinde kasayi yavaslatmadan urun, stok ve cari akislarini tek panelden kontrol edin."
-      panelCaption="Magaza paneli"
+      highlights={['Hızlı Kasa', 'Stok Takibi', 'Cari Hesap', 'Şube Yönetimi']}
+      panelQuote="Yoğun satış saatlerinde kasayı yavaşlatmadan ürün, stok ve cari akışlarını tek panelden kontrol edin."
+      panelCaption="Mağaza paneli"
     />
   )
 }

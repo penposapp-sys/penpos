@@ -674,7 +674,7 @@ export default function SettingsPage() {
               label: 'Web Site Ayarları',
               icon: 'business',
               group: 'Dijital',
-              description: 'Bu sayfa henüz hazırlanmadı'
+              description: 'Web sitesi yayın ve görünüm ayarları'
             },
           ]
         : []),
@@ -732,7 +732,7 @@ export default function SettingsPage() {
           label: 'Web Site Ayarları',
           icon: 'business',
           group: 'Dijital',
-          description: 'Bu sayfa henüz hazırlanmadı'
+          description: 'Web sitesi yayın ve görünüm ayarları'
         }]
       })
     }
@@ -1551,9 +1551,9 @@ export const SettingsSystemContent = () => {
           </div>
 
           <div className="card" style={{ borderColor: 'var(--border)' }}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Gorunum Modu</div>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>Görünüm Modu</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-              Bu paneli beyaz mod veya koyu mod olarak kullanin.
+              Bu paneli beyaz veya koyu modda kullanın.
             </div>
             <ThemeSelectionCards
               darkMode={selectedDarkMode}
@@ -2256,8 +2256,6 @@ export const SettingsPaymentsContent = ({ showHeading = true } = {}) => {
     </div>
   )
 }
-
-
 
 
 

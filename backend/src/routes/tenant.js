@@ -21,6 +21,7 @@ import MenuItem from '../models/MenuItem.js'
 import User from '../models/User.js'
 import { error } from '../utils/errors.js'
 import { MAX_IMAGE_UPLOAD_BYTES } from '../utils/imageUpload.js'
+import { recordTenantUsageHeartbeat } from '../services/tenantUsageService.js'
 
 const router = Router()
 const upload = multer({
@@ -35,6 +36,20 @@ const uploadSingleImage = (req, res, next) => {
     return next(error('invalid_upload', 'Gorsel yukleme hatasi.', 400))
   })
 }
+
+router.post('/usage/heartbeat', requireAuth, requireRole(['tenant_admin', 'staff']), async (req, res) => {
+  try {
+    const result = await recordTenantUsageHeartbeat({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      sessionKey: req.body?.sessionKey,
+      event: req.body?.event
+    })
+    res.json(result)
+  } catch (err) {
+    sendError(res, err)
+  }
+})
 
 router.get('/context', requireAuth, tenantGuard, async (req, res) => {
   try {

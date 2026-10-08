@@ -63,21 +63,21 @@ function buildSettingsThemeVars(theme) {
 function getSettingsItems(isExpired) {
   if (isExpired) {
     return [
-      { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-      { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
-      { key: 'plan', path: '/magaza/ayarlar/paket', label: 'Uyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
+      { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Sitesi Ayarları', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Web sitesi yayın ve görünüm ayarları' },
+      { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarları', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, görünüm ve şube yönetimi tek sayfada' },
+      { key: 'plan', path: '/magaza/ayarlar/paket', label: 'Üyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
     ]
   }
 
   return [
-    { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarlari', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, gorunum ve sube yonetimi tek sayfada' },
-    { key: 'products', path: '/magaza/ayarlar/urunler', label: 'Urun Ayarlari', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Urun, kategori, stok ve gorunum duzeni' },
-    { key: 'staff', path: '/magaza/ayarlar/personel', label: 'Personel Ayarlari', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, sifre, yetki ve aktiflik yonetimi' },
-    { key: 'qr', path: '/magaza/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Musteri online siparis sayfasi ve yayin ayarlari' },
-    { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Site Ayarlari', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Bu sayfa henuz hazirlanmadi' },
-    { key: 'printers', path: '/magaza/ayarlar/yazicilar', label: 'Yazici Ayarlari', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fis ve etiket yazicilari' },
-    { key: 'payments', path: '/magaza/ayarlar/odeme', label: 'Odeme Secenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat secenekleri' },
-    { key: 'billing', path: '/magaza/ayarlar/paket', label: 'Paket ve Satin Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanim ve faturalandirma' },
+    { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarları', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, görünüm ve şube yönetimi tek sayfada' },
+    { key: 'products', path: '/magaza/ayarlar/urunler', label: 'Ürün Ayarları', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Ürün, kategori, stok ve görünüm düzeni' },
+    { key: 'staff', path: '/magaza/ayarlar/personel', label: 'Personel Ayarları', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, şifre, yetki ve aktiflik yönetimi' },
+    { key: 'qr', path: '/magaza/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Müşteri online sipariş sayfası ve yayın ayarları' },
+    { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Sitesi Ayarları', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Web sitesi yayın ve görünüm ayarları' },
+    { key: 'printers', path: '/magaza/ayarlar/yazicilar', label: 'Yazıcı Ayarları', icon: 'printers', filterGroup: 'Cihaz', section: 'Cihaz', desc: 'Print Agent, fiş ve etiket yazıcıları' },
+    { key: 'payments', path: '/magaza/ayarlar/odeme', label: 'Ödeme Seçenekleri', icon: 'payments', filterGroup: 'Satış', section: 'Satış', desc: 'Nakit, POS, banka ve cari tahsilat seçenekleri' },
+    { key: 'billing', path: '/magaza/ayarlar/paket', label: 'Paket ve Satın Alma', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket durumu, kullanım ve faturalandırma' },
   ]
 }
 

@@ -14,8 +14,8 @@ const normalizeLabel = (value: unknown) => {
   if (['cash', 'nakit'].includes(key)) return 'Nakit'
   if (['card', 'kart', 'pos'].includes(key)) return 'Kart'
   if (['bank', 'banka', 'eft', 'havale'].includes(key)) return 'Banka'
-  if (['online', 'online odeme', 'online ödeme'].includes(key)) return 'Online Odeme'
-  if (['mealcard', 'meal_card', 'yemek karti', 'yemek kartı'].includes(key)) return 'Yemek Karti'
+  if (['online', 'online odeme', 'online ödeme'].includes(key)) return 'Online Ödeme'
+  if (['mealcard', 'meal_card', 'yemek karti', 'yemek kartı'].includes(key)) return 'Yemek Kartı'
   return String(value || '-')
 }
 
@@ -43,8 +43,8 @@ const buildPaymentTypeRows = (report: ZReportData | null): React.ReactNode[][] =
     const fallbackRows = [
       ['Nakit', Number(summary?.payments?.cash || 0)],
       ['Kart', Number(summary?.payments?.card || 0)],
-      ['Yemek Karti', Number(summary?.payments?.mealCard || 0)],
-      ['Online Odeme', Number(summary?.payments?.online || 0)],
+      ['Yemek Kartı', Number(summary?.payments?.mealCard || 0)],
+      ['Online Ödeme', Number(summary?.payments?.online || 0)],
       ['Veresiye', creditTotal]
     ].filter(([, total]) => total > 0)
 
@@ -153,7 +153,7 @@ function TableBlock({
                     fontSize: compact ? 12 : 13
                   }}
                 >
-                  Bu bolum icin veri bulunamadi.
+                  Bu bölüm için veri bulunamadı.
                 </td>
               </tr>
             )}
@@ -185,11 +185,11 @@ export default function ZReportModal({
   const summaryCards = useMemo(() => {
     if (!report) return []
     return [
-      { label: 'Net Toplam Satis', value: money(report.summary?.netSales || 0) },
-      { label: 'Yapilan Satis', value: money(report.summary?.paidSalesTotal || 0) },
-      { label: 'Veresiye Satis', value: money(report.summary?.payments?.credit || 0) },
+      { label: 'Net Toplam Satış', value: money(report.summary?.netSales || 0) },
+      { label: 'Yapılan Satış', value: money(report.summary?.paidSalesTotal || 0) },
+      { label: 'Veresiye Satış', value: money(report.summary?.payments?.credit || 0) },
       { label: 'Toplam Tahsilat', value: money(report.summary?.cashIn?.total || 0) },
-      { label: 'Yapilan Satis Adedi', value: String(report.summary?.orderCount || 0) }
+      { label: 'Yapılan Satış Adedi', value: String(report.summary?.orderCount || 0) }
     ]
   }, [report])
 
@@ -269,19 +269,19 @@ export default function ZReportModal({
               )}
             </div>
             <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: isMobilePortrait ? 12 : 14, overflowWrap: 'anywhere' }}>
-              Tarih: {report?.date || '-'} · Sube: {report?.branchName || '-'} · Olusturma: {report?.generatedAt ? new Date(report.generatedAt).toLocaleString('tr-TR') : '-'}
+              Tarih: {report?.date || '-'} · Şube: {report?.branchName || '-'} · Oluşturma: {report?.generatedAt ? new Date(report.generatedAt).toLocaleString('tr-TR') : '-'}
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: isMobilePortrait ? '100%' : undefined }}>
             <button className="btn" onClick={() => runAction('print', async () => report && printZReport(report, { system: printSystem }))} disabled={!report || loading || !!busyAction}>
-              {busyAction === 'print' ? 'Hazirlaniyor...' : 'Yazdir'}
+              {busyAction === 'print' ? 'Hazırlanıyor...' : 'Yazdır'}
             </button>
             <button className="btn" onClick={() => runAction('pdf', async () => report && downloadZReportPdf(report))} disabled={!report || loading || !!busyAction}>
-              {busyAction === 'pdf' ? 'Hazirlaniyor...' : 'PDF Indir'}
+              {busyAction === 'pdf' ? 'Hazırlanıyor...' : 'PDF İndir'}
             </button>
             <button className="btn" onClick={() => runAction('excel', async () => report && downloadZReportExcel(report))} disabled={!report || loading || !!busyAction}>
-              {busyAction === 'excel' ? 'Hazirlaniyor...' : 'Excel Indir'}
+              {busyAction === 'excel' ? 'Hazırlanıyor...' : 'Excel İndir'}
             </button>
             <button className="btn" onClick={onClose}>Kapat</button>
           </div>
@@ -314,38 +314,38 @@ export default function ZReportModal({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr)', gap: 12 }}>
               <div style={cardStyle}>
-                <div style={{ fontWeight: 900, color: 'var(--app-text, var(--text))' }}>Ozet Bilgiler</div>
+                <div style={{ fontWeight: 900, color: 'var(--app-text, var(--text))' }}>Özet Bilgiler</div>
                 <div style={{ marginTop: 10, display: 'grid', gap: 8, fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
-                  <div>Toplam urun adedi: <strong>{report.summary?.productCount || 0}</strong></div>
-                  <div>Toplam satis: <strong>{money(report.summary?.netSales || 0)}</strong></div>
-                  <div>Indirim: <strong>{money(report.summary?.discountTotal || 0)}</strong></div>
+                  <div>Toplam ürün adedi: <strong>{report.summary?.productCount || 0}</strong></div>
+                  <div>Toplam satış: <strong>{money(report.summary?.netSales || 0)}</strong></div>
+                  <div>İndirim: <strong>{money(report.summary?.discountTotal || 0)}</strong></div>
                   <div>Kasadaki toplam: <strong>{money(report.summary?.cashIn?.total || 0)}</strong></div>
                   <div>Veresiye / cari: <strong>{money(report.summary?.periodCreditBalance || 0)}</strong></div>
-                  <div>Veresiye tahsilati: <strong>{money(report.summary?.collectionsTotal || 0)}</strong></div>
+                  <div>Veresiye tahsilatı: <strong>{money(report.summary?.collectionsTotal || 0)}</strong></div>
                   <div>Toplam KDV: <strong>{money(totalVat)}</strong></div>
                 </div>
               </div>
             </div>
 
-            <TableBlock title="Odeme Tipleri" columns={['Tip', 'Toplam']} rows={paymentTypeRows} compact={isMobilePortrait} />
+            <TableBlock title="Ödeme Tipleri" columns={['Tip', 'Toplam']} rows={paymentTypeRows} compact={isMobilePortrait} />
 
             <TableBlock
-              title="KDV Dagilimi"
+              title="KDV Dağılımı"
               columns={['Oran', 'Matrah', 'KDV']}
               rows={(report.summary?.vatBreakdown || []).map((row) => [`%${row.rate}`, money(row.amount), money(row.vat)])}
               compact={isMobilePortrait}
             />
 
             <TableBlock
-              title="Personel Satislari"
+              title="Personel Satışları"
               columns={['Personel', 'Adisyon', 'Toplam']}
               rows={(report.staffTotals || []).map((row) => [row.staffName, String(row.orderCount), money(row.total)])}
               compact={isMobilePortrait}
             />
 
             <TableBlock
-              title="Satilan Urunler"
-              columns={['Urun', 'Adet', 'Toplam']}
+              title="Satılan Ürünler"
+              columns={['Ürün', 'Adet', 'Toplam']}
               rows={(report.topProducts || []).map((row) => [row.name, String(row.quantity), money(row.total)])}
               compact={isMobilePortrait}
             />

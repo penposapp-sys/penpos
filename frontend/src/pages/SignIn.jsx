@@ -20,7 +20,7 @@ export default function SignIn({ portal }) {
   const portalName = isRestaurant ? 'Restoran' : 'Giris'
 
   useEffect(() => {
-    document.title = `PenPOS - ${portalName} Girisi`
+    document.title = `PenPOS - ${portalName} Girişi`
   }, [portalName])
 
   const onSubmit = async (event) => {
@@ -32,7 +32,7 @@ export default function SignIn({ portal }) {
       nav(isRestaurant ? '/restoran' : '/', { replace: true })
     } catch (err) {
       setError(getFriendlyLoginError(err, {
-        wrongPortalMessage: 'Bu hesap bu giris ekrani icin uygun degil.'
+        wrongPortalMessage: 'Bu hesap bu giriş ekranı için uygun değil.'
       }))
     } finally {
       setLoading(false)
@@ -42,17 +42,17 @@ export default function SignIn({ portal }) {
   return (
     <PublicSystemLogin
       backTo="/login"
-      backLabel="Sistem secimine don"
+      backLabel="Sistem seçimine dön"
       brand="PenPOS"
-      systemLabel="RESTORAN / CAFE YONETIMI"
-      welcomeTitle="Adisyon, mutfak ve satis akislarinizi tek panelden yonetin."
-      welcomeText="Masa yonetimi, paket servis, raporlar ve personel sureclerini duzenli sekilde yonetin."
-      formTitle="Restoran Girisi"
-      formSubtitle="Uye bilgilerinizle panelinize giris yapin."
-      identifierLabel="E-posta / Kullanici Adi"
-      identifierPlaceholder="eposta veya kullanici adi"
-      passwordLabel="Sifre"
-      passwordPlaceholder="sifrenizi girin"
+      systemLabel="RESTORAN / KAFE YÖNETİMİ"
+      welcomeTitle="Adisyon, mutfak ve satış akışlarınızı tek panelden yönetin."
+      welcomeText="Masa yönetimi, paket servis, raporlar ve personel süreçlerini düzenli şekilde yönetin."
+      formTitle="Restoran Girişi"
+      formSubtitle="Üye bilgilerinizle panelinize giriş yapın."
+      identifierLabel="E-posta / Kullanıcı Adı"
+      identifierPlaceholder="E-posta veya kullanıcı adı"
+      passwordLabel="Şifre"
+      passwordPlaceholder="Şifrenizi girin"
       identifier={identifier}
       password={password}
       rememberMe={rememberMe}
@@ -63,19 +63,19 @@ export default function SignIn({ portal }) {
       error={error}
       loading={loading}
       forgotTo="/forgot-password?portal=restaurant"
-      submitLabel="Giris Yap"
-      loadingLabel="Giris yapiliyor..."
+      submitLabel="Giriş Yap"
+      loadingLabel="Giriş yapılıyor..."
       registerTo="/register?type=restaurant"
-      registerLabel="Simdi Kaydolun"
-      registerText="Yeni restoran hesabinizi olusturun, subenizi ve menunuzu hizlica yayina alin."
-      supportTitle="Restoran destegi"
+      registerLabel="Şimdi Kaydolun"
+      registerText="Yeni restoran hesabınızı oluşturun, şubenizi ve menünüzü hızla yayına alın."
+      supportTitle="Restoran desteği"
       supportItems={[
-        { label: 'Masa + Paket', value: 'Canli operasyon' },
-        { label: 'QR Menu', value: 'Hazir altyapi' },
+        { label: 'Masa + Paket', value: 'Canlı operasyon' },
+        { label: 'QR Menü', value: 'Hazır altyapı' },
       ]}
       theme="restaurant"
-      highlights={['Masa Takibi', 'Mutfak Akisi', 'Paket Servis', 'QR Menu']}
-      panelQuote="Cok subeli yapilarda hizli operasyon, net raporlama ve duzenli siparis akisi icin tek ekrandan kontrol saglayin."
+      highlights={['Masa Takibi', 'Mutfak Akışı', 'Paket Servis', 'QR Menü']}
+      panelQuote="Çok şubeli yapılarda hızlı operasyon, net raporlama ve düzenli sipariş akışı için tek ekrandan kontrol sağlayın."
       panelCaption="Restoran paneli"
     />
   )

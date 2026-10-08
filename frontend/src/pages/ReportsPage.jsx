@@ -59,23 +59,23 @@ const todayYmd = () => {
 }
 
 export const reportDefinitions = [
-  { key: 'salesSummary', title: 'Satis Ozeti', icon: '₺', description: 'Ciro, tahsilat, sipariş adedi ve ortalama sepet.', detailTitle: 'Detayli Satis Ozeti Raporu', metrics: ['Toplam Ciro', 'Net Satis', 'Toplam Tahsilat', 'Ortalama Sepet'], tableColumns: ['Tarih', 'Sipariş', 'Brut Satis', 'İptal', 'Net Satis', 'Tahsilat'] },
-  { key: 'paymentDistribution', title: 'Ödeme Dağılımı', icon: '💳', description: 'Nakit, kart, online ödeme ve açık hesap dağılımı.', detailTitle: 'Detayli Ödeme Dağılımı Raporu', metrics: ['Nakit', 'Kredi Kartı', 'Online', 'Açık Hesap'], tableColumns: ['Saat', 'Ödeme Tipi', 'İşlem Sayisi', 'Tutar', 'Oran'] },
-  { key: 'productPerformance', title: 'Ürün Performansi', icon: '🍽', description: 'En cok satan urunler, adet, ciro ve karlilik.', detailTitle: 'Detayli Ürün Performansi Raporu', metrics: ['Satilan Ürün', 'Toplam Adet', 'Ürün Cirosu', 'Kar Oranı'], tableColumns: ['Ürün', 'Kategori', 'Adet', 'Birim Fiyat', 'Ciro', 'Kar'] },
-  { key: 'categoryRevenue', title: 'Kategori Cirosu', icon: '🧾', description: 'Kategori bazli satis ve ciro karşılaştırması.', detailTitle: 'Detayli Kategori Cirosu Raporu', metrics: ['Kategori Sayisi', 'En Yuksek Kategori', 'Toplam Ciro', 'Pay Oranı'], tableColumns: ['Kategori', 'Ürün Adedi', 'Satis Adedi', 'Ciro', 'Oran'] },
-  { key: 'hourlyDensity', title: 'Saatlik Yoğunluk', icon: '⏱', description: 'Günün saatlerine göre sipariş ve ciro yogunlugu.', detailTitle: 'Detayli Saatlik Yoğunluk Raporu', metrics: ['Yogun Saat', 'Sipariş Adedi', 'Saatlik Ciro', 'Ortalama Sepet'], tableColumns: ['Saat', 'Sipariş', 'Masa', 'Paket', 'Ciro'] },
-  { key: 'waiterPerformance', title: 'Garson Performansi', icon: '🧑', description: 'Garson bazli sipariş, masa, tahsilat ve servis hizi.', detailTitle: 'Detayli Garson Performans Raporu', metrics: ['Garson', 'Masa Sayisi', 'Satis', 'Servis Süresi'], tableColumns: ['Garson', 'Masa', 'Sipariş', 'Ciro', 'Ortalama Süre'] },
-  { key: 'tableTurnover', title: 'Masa Devir Hizi', icon: '🪑', description: 'Masalarin doluluk süresi, kapanis hizi ve kullanim oranı.', detailTitle: 'Detayli Masa Devir Hizi Raporu', metrics: ['Aktif Masa', 'Ortalama Süre', 'Kapanan Masa', 'Doluluk Oranı'], tableColumns: ['Masa', 'Acilis', 'Kapanis', 'Süre', 'Tutar'] },
-  { key: 'openAccount', title: 'Acik Hesap / Cari', icon: '📒', description: 'Cari müşteriler, açık bakiye ve ödeme gecmisi.', detailTitle: 'Detayli Açık Hesap ve Cari Raporu', metrics: ['Açık Bakiye', 'Cari Sayisi', 'Tahsil Edilen', 'Geciken'], tableColumns: ['Cari', 'Son İşlem', 'Borç', 'Tahsilat', 'Kalan'] },
-  { key: 'cancelWaste', title: 'Iptal / Fire', icon: '⚠', description: 'İptal edilen urunler, fire nedenleri ve kayıp tutar.', detailTitle: 'Detayli İptal ve Fire Raporu', metrics: ['İptal Tutari', 'Fire Tutari', 'İptal Adedi', 'Kayıp Oranı'], tableColumns: ['Saat', 'Ürün', 'Adet', 'Neden', 'Tutar', 'Personel'] },
-  { key: 'discounts', title: 'Indirimler', icon: '🏷', description: 'Uygulanan indirimler, kampanyalar ve yetkili kullanıcı.', detailTitle: 'Detayli İndirim Raporu', metrics: ['İndirim Tutari', 'İndirim Adedi', 'Ortalama İndirim', 'Yetkili'], tableColumns: ['Saat', 'Masa/Siparis', 'İndirim', 'Sebep', 'Yetkili'] },
-  { key: 'kitchenPrepTime', title: 'Mutfak Hazırlama Süresi', icon: '🔥', description: 'Urunlerin hazirlanma süresi ve geciken siparisler.', detailTitle: 'Detayli Mutfak Hazırlama Süresi Raporu', metrics: ['Ortalama Süre', 'Geciken Sipariş', 'Hazırlanan', 'Bekleyen'], tableColumns: ['Sipariş', 'Ürün', 'Baslangic', 'Hazır', 'Süre'] },
-  { key: 'deliveryPerformance', title: 'Paket Servis Performansi', icon: '🛵', description: 'Paket sipariş, kurye, teslimat süresi ve durum analizi.', detailTitle: 'Detayli Paket Servis Performans Raporu', metrics: ['Paket Sayisi', 'Yolda', 'Teslim', 'Ortalama Teslimat'], tableColumns: ['Sipariş', 'Müşteri', 'Kurye', 'Durum', 'Süre', 'Tutar'] },
-  { key: 'courierReport', title: 'Kurye Raporu', icon: '🧾', description: 'Kurye bazlı atama, teslimat, tahsilat ve ortalama teslim süresi.', detailTitle: 'Detayli Kurye Raporu', metrics: ['Atanan Sipariş', 'Teslim Edilen', 'Tahsil Edilen', 'Ortalama Teslim'], tableColumns: ['Kurye', 'Atanan Sipariş', 'Teslim Edilen', 'Geri Dönen', 'İptal', 'Toplam Tutar', 'Tahsil Edilen', 'Veresiye', 'Ortalama Teslim Süresi'] },
-  { key: 'taxVat', title: 'KDV / Vergi', icon: '🏛', description: 'KDV oranlari, vergi matrahi ve toplam vergi.', detailTitle: 'Detayli KDV ve Vergi Raporu', metrics: ['Matrah', 'KDV', 'Toplam', 'Fis Sayisi'], tableColumns: ['Tarih', 'KDV Oranı', 'Matrah', 'KDV', 'Toplam'] },
-  { key: 'cashierShift', title: 'Kasa / Vardiya', icon: '🧮', description: 'Vardiya acilis-kapanis, kasa farki ve tahsilat.', detailTitle: 'Detayli Kasa ve Vardiya Raporu', metrics: ['Acilis', 'Kapanis', 'Kasa Farki', 'Tahsilat'], tableColumns: ['Vardiya', 'Kullanıcı', 'Acilis', 'Kapanis', 'Fark'] },
-  { key: 'stockConsumption', title: 'Stok Tuketim', icon: '📦', description: 'Satisa göre dusen stok, kritik stok ve tuketim.', detailTitle: 'Detayli Stok Tuketim Raporu', metrics: ['Tuketilen', 'Kritik Stok', 'Stok Değeri', 'Eksik Ürün'], tableColumns: ['Ürün', 'Baslangic', 'Tuketim', 'Kalan', 'Durum'] },
-  { key: 'customerBehavior', title: 'Müşteri Davranisi', icon: '👥', description: 'Tekrar gelen müşteri, ortalama harcama ve tercih analizi.', detailTitle: 'Detayli Müşteri Davranisi Raporu', metrics: ['Müşteri', 'Tekrar Oranı', 'Ortalama Harcama', 'Favori Ürün'], tableColumns: ['Müşteri', 'Ziyaret', 'Harcama', 'Favori Ürün', 'Son İşlem'] }
+  { key: 'salesSummary', title: 'Satış Özeti', icon: '₺', description: 'Ciro, tahsilat, sipariş adedi ve ortalama sepet.', detailTitle: 'Detaylı Satış Özeti Raporu', metrics: ['Toplam Ciro', 'Net Satış', 'Toplam Tahsilat', 'Ortalama Sepet'], tableColumns: ['Tarih', 'Sipariş', 'Brüt Satış', 'İptal', 'Net Satış', 'Tahsilat'] },
+  { key: 'paymentDistribution', title: 'Ödeme Dağılımı', icon: '💳', description: 'Nakit, kart, online ödeme ve açık hesap dağılımı.', detailTitle: 'Detaylı Ödeme Dağılımı Raporu', metrics: ['Nakit', 'Kredi Kartı', 'Online', 'Açık Hesap'], tableColumns: ['Saat', 'Ödeme Tipi', 'İşlem Sayısı', 'Tutar', 'Oran'] },
+  { key: 'productPerformance', title: 'Ürün Performansı', icon: '🍽', description: 'En çok satan ürünler, adet, ciro ve kârlılık.', detailTitle: 'Detaylı Ürün Performansı Raporu', metrics: ['Satılan Ürün', 'Toplam Adet', 'Ürün Cirosu', 'Kâr Oranı'], tableColumns: ['Ürün', 'Kategori', 'Adet', 'Birim Fiyat', 'Ciro', 'Kâr'] },
+  { key: 'categoryRevenue', title: 'Kategori Cirosu', icon: '🧾', description: 'Kategori bazlı satış ve ciro karşılaştırması.', detailTitle: 'Detaylı Kategori Cirosu Raporu', metrics: ['Kategori Sayısı', 'En Yüksek Kategori', 'Toplam Ciro', 'Pay Oranı'], tableColumns: ['Kategori', 'Ürün Adedi', 'Satış Adedi', 'Ciro', 'Oran'] },
+  { key: 'hourlyDensity', title: 'Saatlik Yoğunluk', icon: '⏱', description: 'Günün saatlerine göre sipariş ve ciro yoğunluğu.', detailTitle: 'Detaylı Saatlik Yoğunluk Raporu', metrics: ['Yoğun Saat', 'Sipariş Adedi', 'Saatlik Ciro', 'Ortalama Sepet'], tableColumns: ['Saat', 'Sipariş', 'Masa', 'Paket', 'Ciro'] },
+  { key: 'waiterPerformance', title: 'Garson Performansı', icon: '🧑', description: 'Garson bazlı sipariş, masa, tahsilat ve servis hızı.', detailTitle: 'Detaylı Garson Performans Raporu', metrics: ['Garson', 'Masa Sayısı', 'Satış', 'Servis Süresi'], tableColumns: ['Garson', 'Masa', 'Sipariş', 'Ciro', 'Ortalama Süre'] },
+  { key: 'tableTurnover', title: 'Masa Devir Hızı', icon: '🪑', description: 'Masaların doluluk süresi, kapanış hızı ve kullanım oranı.', detailTitle: 'Detaylı Masa Devir Hızı Raporu', metrics: ['Aktif Masa', 'Ortalama Süre', 'Kapanan Masa', 'Doluluk Oranı'], tableColumns: ['Masa', 'Açılış', 'Kapanış', 'Süre', 'Tutar'] },
+  { key: 'openAccount', title: 'Açık Hesap / Cari', icon: '📒', description: 'Cari müşteriler, açık bakiye ve ödeme geçmişi.', detailTitle: 'Detaylı Açık Hesap ve Cari Raporu', metrics: ['Açık Bakiye', 'Cari Sayısı', 'Tahsil Edilen', 'Geciken'], tableColumns: ['Cari', 'Son İşlem', 'Borç', 'Tahsilat', 'Kalan'] },
+  { key: 'cancelWaste', title: 'İptal / Fire', icon: '⚠', description: 'İptal edilen ürünler, fire nedenleri ve kayıp tutar.', detailTitle: 'Detaylı İptal ve Fire Raporu', metrics: ['İptal Tutarı', 'Fire Tutarı', 'İptal Adedi', 'Kayıp Oranı'], tableColumns: ['Saat', 'Ürün', 'Adet', 'Neden', 'Tutar', 'Personel'] },
+  { key: 'discounts', title: 'İndirimler', icon: '🏷', description: 'Uygulanan indirimler, kampanyalar ve yetkili kullanıcı.', detailTitle: 'Detaylı İndirim Raporu', metrics: ['İndirim Tutarı', 'İndirim Adedi', 'Ortalama İndirim', 'Yetkili'], tableColumns: ['Saat', 'Masa/Sipariş', 'İndirim', 'Sebep', 'Yetkili'] },
+  { key: 'kitchenPrepTime', title: 'Mutfak Hazırlama Süresi', icon: '🔥', description: 'Ürünlerin hazırlanma süresi ve geciken siparişler.', detailTitle: 'Detaylı Mutfak Hazırlama Süresi Raporu', metrics: ['Ortalama Süre', 'Geciken Sipariş', 'Hazırlanan', 'Bekleyen'], tableColumns: ['Sipariş', 'Ürün', 'Başlangıç', 'Hazır', 'Süre'] },
+  { key: 'deliveryPerformance', title: 'Paket Servis Performansı', icon: '🛵', description: 'Paket siparişi, kurye, teslimat süresi ve durum analizi.', detailTitle: 'Detaylı Paket Servis Performans Raporu', metrics: ['Paket Sayısı', 'Yolda', 'Teslim', 'Ortalama Teslimat'], tableColumns: ['Sipariş', 'Müşteri', 'Kurye', 'Durum', 'Süre', 'Tutar'] },
+  { key: 'courierReport', title: 'Kurye Raporu', icon: '🧾', description: 'Kurye bazlı atama, teslimat, tahsilat ve ortalama teslim süresi.', detailTitle: 'Detaylı Kurye Raporu', metrics: ['Atanan Sipariş', 'Teslim Edilen', 'Tahsil Edilen', 'Ortalama Teslim'], tableColumns: ['Kurye', 'Atanan Sipariş', 'Teslim Edilen', 'Geri Dönen', 'İptal', 'Toplam Tutar', 'Tahsil Edilen', 'Veresiye', 'Ortalama Teslim Süresi'] },
+  { key: 'taxVat', title: 'KDV / Vergi', icon: '🏛', description: 'KDV oranları, vergi matrahı ve toplam vergi.', detailTitle: 'Detaylı KDV ve Vergi Raporu', metrics: ['Matrah', 'KDV', 'Toplam', 'Fiş Sayısı'], tableColumns: ['Tarih', 'KDV Oranı', 'Matrah', 'KDV', 'Toplam'] },
+  { key: 'cashierShift', title: 'Kasa / Vardiya', icon: '🧮', description: 'Vardiya açılış-kapanış, kasa farkı ve tahsilat.', detailTitle: 'Detaylı Kasa ve Vardiya Raporu', metrics: ['Açılış', 'Kapanış', 'Kasa Farkı', 'Tahsilat'], tableColumns: ['Vardiya', 'Kullanıcı', 'Açılış', 'Kapanış', 'Fark'] },
+  { key: 'stockConsumption', title: 'Stok Tüketimi', icon: '📦', description: 'Satışa göre düşen stok, kritik stok ve tüketim.', detailTitle: 'Detaylı Stok Tüketim Raporu', metrics: ['Tüketilen', 'Kritik Stok', 'Stok Değeri', 'Eksik Ürün'], tableColumns: ['Ürün', 'Başlangıç', 'Tüketim', 'Kalan', 'Durum'] },
+  { key: 'customerBehavior', title: 'Müşteri Davranışı', icon: '👥', description: 'Tekrar gelen müşteri, ortalama harcama ve tercih analizi.', detailTitle: 'Detaylı Müşteri Davranışı Raporu', metrics: ['Müşteri', 'Tekrar Oranı', 'Ortalama Harcama', 'Favori Ürün'], tableColumns: ['Müşteri', 'Ziyaret', 'Harcama', 'Favori Ürün', 'Son İşlem'] }
 ]
 
 const toMoney = (v) => {
@@ -204,12 +204,13 @@ export const printProductReportDocument = ({ report, detailData, rangeLabel, bra
   const html = buildProductReportPrintHtml({ report, detailData, rangeLabel, branchesLabel })
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank', 'noopener,noreferrer,width=1100,height=900')
+  const win = window.open(url, '_blank', 'width=1100,height=900')
   if (!win) {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     throw new Error('Yazdırma penceresi açılamadı')
   }
 
+  win.opener = null
   const cleanup = () => window.setTimeout(() => URL.revokeObjectURL(url), 15000)
   if (autoPrint) {
     window.setTimeout(() => {
@@ -351,11 +352,11 @@ function ReportFilter({
   setSelectedBranches
 }) {
   const tabs = [
-    { key: 'today', label: 'Bugun' },
-    { key: 'yesterday', label: 'Dun' },
+    { key: 'today', label: 'Bugün' },
+    { key: 'yesterday', label: 'Dün' },
     { key: 'week', label: 'Bu Hafta' },
     { key: 'month', label: 'Bu Ay' },
-    { key: 'range', label: 'Aralik' }
+    { key: 'range', label: 'Aralık' }
   ]
   return (
     <div style={{ ...CARD_STYLE, padding: 16, display: 'grid', gap: 14 }}>
@@ -384,11 +385,11 @@ function ReportFilter({
         {period === 'range' && (
           <>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Baslangic</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Başlangıç</span>
               <input type="date" className="input" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bitis</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Bitiş</span>
               <input type="date" className="input" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
             </label>
           </>
@@ -404,7 +405,7 @@ function ReportSummary({ summary, isMobilePortrait }) {
       <KpiCard title="Toplam Ciro" value={fmtTl(summary.totalRevenue)} note="Seçili tarih" trend="+0%" tone="green" />
       <KpiCard title="Toplam Sipariş" value={String(summary.orderCount)} note="Adet" trend="+0%" tone="blue" />
       <KpiCard title="Ortalama Sipariş" value={fmtTl(summary.averageOrder, 0)} note="Sepet" trend="+0%" tone="orange" />
-      <KpiCard title="İptal Oranı" value={fmtPct(summary.cancelRate)} note="Gercek veri" trend="+0%" tone="red" />
+      <KpiCard title="İptal Oranı" value={fmtPct(summary.cancelRate)} note="Gerçek veri" trend="+0%" tone="red" />
     </div>
   )
 }
@@ -418,10 +419,10 @@ function ReportHero() {
             Rapor Merkezi
           </div>
           <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.1, fontWeight: 900 }}>
-            Isletmenin tüm performansini tek ekranda analiz et.
+            İşletmenin tüm performansını tek ekranda analiz et.
           </h1>
           <p style={{ margin: '10px 0 0', maxWidth: 720, fontSize: 14, color: '#ffffff', lineHeight: 1.6 }}>
-            Satis, ödeme, ürün, garson, masa, stok ve mutfak performansini ayri raporlar halinde inceleyebilirsin.
+            Satış, ödeme, ürün, garson, masa, stok ve mutfak performansını ayrı raporlar halinde inceleyebilirsin.
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, minWidth: 260 }}>
@@ -429,7 +430,7 @@ function ReportHero() {
             Excel Aktar
           </button>
           <button type="button" className="btn" style={{ borderRadius: 18, background: 'rgba(255,255,255,0.08)', color: '#ffffff', padding: '14px 18px', fontWeight: 900, borderColor: 'rgba(255,255,255,0.14)' }}>
-            PDF Indir
+            PDF İndir
           </button>
         </div>
       </div>
@@ -442,10 +443,10 @@ function ReportSummaryCards({ summary, datasets, isMobilePortrait }) {
   const netSales = Math.max(0, summary.totalRevenue)
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-      <KpiCard title="Net Satis" value={fmtTl(netSales, 0)} note="Seçili dönem" trend="+0%" tone="green" />
+      <KpiCard title="Net Satış" value={fmtTl(netSales, 0)} note="Seçili dönem" trend="+0%" tone="green" />
       <KpiCard title="Sipariş" value={String(summary.orderCount)} note="Toplam adet" trend="+0" tone="blue" />
       <KpiCard title="Ortalama Sepet" value={fmtTl(summary.averageOrder, 0)} note="Sipariş başı" trend="+0%" tone="orange" />
-      <KpiCard title="Fire Oranı" value={fmtPct(fireRate)} note="Gercek veri" trend="+0%" tone="red" />
+      <KpiCard title="Fire Oranı" value={fmtPct(fireRate)} note="Gerçek veri" trend="+0%" tone="red" />
     </div>
   )
 }
@@ -477,9 +478,9 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
   const totalDelivery = hourlyRows.reduce((sum, item) => sum + Number(item.deliveryCount || 0), 0)
   const statCards = [
     { label: 'Toplam Müşteri', value: String(totalCustomers) },
-    { label: 'Yogun Saat', value: peakRow?.label || '-' },
-    { label: 'Masa Siparisi', value: String(totalTables) },
-    { label: 'Paket Siparisi', value: String(totalDelivery) }
+    { label: 'Yoğun Saat', value: peakRow?.label || '-' },
+    { label: 'Masa Siparişi', value: String(totalTables) },
+    { label: 'Paket Siparişi', value: String(totalDelivery) }
   ]
   const chartInnerWidth = Math.max(100, bars.length * 36)
 
@@ -489,7 +490,7 @@ export function MainRevenuePanel({ datasets, period, setPeriod, showModeToggle =
         <div>
           <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Saatlik Müşteri Analizi</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
-            {chartMode === 'week' ? 'Hafta icinde müşteri hareketi ve yoğunluk.' : 'Gün icinde müşteri hareketi ve yoğunluk.'}
+            {chartMode === 'week' ? 'Hafta içinde müşteri hareketi ve yoğunluk.' : 'Gün içinde müşteri hareketi ve yoğunluk.'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -598,8 +599,8 @@ export function PaymentOverviewPanel({ datasets, summary, headerAction = null })
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Ödeme Ozeti</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Tahsilat kanallarina göre dagilim.</p>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: theme.text }}>Ödeme Özeti</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>Tahsilat kanallarına göre dağılım.</p>
         </div>
         {headerAction}
       </div>
@@ -630,12 +631,12 @@ export function TopSellersPanel({ datasets, headerAction = null }) {
   return (
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden', borderColor: theme.border }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900, color: theme.text }}>En Cok Satanlar</h2>
+        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900, color: theme.text }}>En Çok Satanlar</h2>
         {headerAction}
       </div>
       <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
         {rows.length === 0 ? (
-          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Satis verisi bulunamadı.</div>
+          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Satış verisi bulunamadı.</div>
         ) : rows.map((item, index) => (
           <div key={`${item.menuItemId || item.name}-${index}`} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, borderRadius: 18, background: theme.accentSoft, padding: '14px 16px', minWidth: 0 }}>
             <div className="responsive-card-title" style={{ fontWeight: 900, color: theme.text, minWidth: 0 }}>{`${index + 1}. ${String(item.name || '-').toUpperCase('tr-TR')}`}</div>
@@ -659,7 +660,7 @@ export function CategoryRevenuePanel({ datasets, summary, headerAction = null })
       </div>
       <div style={{ marginTop: 22, display: 'grid', gap: 18 }}>
         {rows.length === 0 ? (
-          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Kategori bazli veri bulunamadı.</div>
+          <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Kategori bazlı veri bulunamadı.</div>
         ) : rows.map((item) => (
           <div key={item.name}>
             <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
@@ -704,7 +705,7 @@ function ReportCard({ report, onClick, compact = false }) {
 
       <div style={{ marginTop: 20, borderTop: '1px solid var(--app-border, var(--border))', paddingTop: 16 }}>
         <div className="responsive-card-badge" style={{ fontWeight: 900, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
-          Icerdigi metrikler
+          İçerdiği metrikler
         </div>
 
         <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: compact ? 0 : 62, alignContent: 'flex-start' }}>
@@ -722,11 +723,11 @@ function ReportCard({ report, onClick, compact = false }) {
 
       <div style={{ marginTop: 20, display: 'flex', alignItems: compact ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12, flexDirection: compact ? 'column' : 'row' }}>
         <span className="responsive-card-badge" style={{ fontWeight: 700, color: 'var(--app-text-secondary, var(--text-secondary))', width: compact ? '100%' : 'auto' }}>
-          Detay için ac
+          Detay için aç
         </span>
 
         <span className="responsive-card-badge" style={{ borderRadius: 12, background: 'var(--button-active-bg)', border: '1px solid var(--button-active-bg)', padding: '10px 14px', fontWeight: 900, color: 'var(--button-active-text)', width: compact ? '100%' : 'auto', textAlign: 'center' }}>
-          Ac
+          Aç
         </span>
       </div>
     </button>
@@ -737,9 +738,9 @@ function ReportCatalog({ onSelect, isMobilePortrait }) {
   return (
     <section style={{ display: 'grid', gap: 14 }}>
       <div>
-        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900 }}>Rapor Kutuphanesi</h2>
+        <h2 className="responsive-card-title" style={{ margin: 0, fontWeight: 900 }}>Rapor Kütüphanesi</h2>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
-          Özet panellerin altindan detay raporlara gecis yap.
+          Özet panellerin altından detay raporlara geçiş yap.
         </p>
       </div>
 
@@ -977,7 +978,7 @@ export const buildReportDetailData = (report, datasets, summary) => {
   const metricValuesByKey = {
     salesSummary: {
       'Toplam Ciro': fmtTl(summary.totalRevenue),
-      'Net Satis': fmtTl(summary.totalRevenue),
+      'Net Satış': fmtTl(summary.totalRevenue),
       'Toplam Tahsilat': fmtTl(summary.totalPaid),
       'Ortalama Sepet': fmtTl(summary.averageOrder, 0)
     },
@@ -988,27 +989,27 @@ export const buildReportDetailData = (report, datasets, summary) => {
       'Açık Hesap': fmtTl(sales.byMethod?.account || 0)
     },
     productPerformance: {
-      'Satilan Ürün': String(productWithMeta.length),
+      'Satılan Ürün': String(productWithMeta.length),
       'Toplam Adet': String(productWithMeta.reduce((sum, item) => sum + Number(item.qty || 0), 0)),
       'Ürün Cirosu': fmtTl(productWithMeta.reduce((sum, item) => sum + toMoney(item.revenue || 0), 0)),
-      'Kar Oranı': 'Veri yok'
+      'Kâr Oranı': 'Veri yok'
     },
     categoryRevenue: {
-      'Kategori Sayisi': String(categoryRows.length),
-      'En Yuksek Kategori': categoryRows[0]?.category || 'Veri yok',
+      'Kategori Sayısı': String(categoryRows.length),
+      'En Yüksek Kategori': categoryRows[0]?.category || 'Veri yok',
       'Toplam Ciro': fmtTl(summary.totalRevenue),
       'Pay Oranı': categoryRows[0] ? fmtPct((categoryRows[0].revenue / Math.max(1, summary.totalRevenue)) * 100) : 'Veri yok'
     },
     hourlyDensity: {
-      'Yogun Saat': String(hourlyPeak?.label || 'Veri yok'),
+      'Yoğun Saat': String(hourlyPeak?.label || 'Veri yok'),
       'Sipariş Adedi': String(hourlyPeak?.count || 0),
       'Saatlik Ciro': fmtTl(hourlyPeak?.revenue || 0),
       'Ortalama Sepet': fmtTl(summary.averageOrder, 0)
     },
     waiterPerformance: {
       Garson: 'Sistem verisi yok',
-      'Masa Sayisi': String(activeTables),
-      Satis: fmtTl(summary.totalRevenue),
+      'Masa Sayısı': String(activeTables),
+      Satış: fmtTl(summary.totalRevenue),
       'Servis Süresi': 'Sistem verisi yok'
     },
     tableTurnover: {
@@ -1019,7 +1020,7 @@ export const buildReportDetailData = (report, datasets, summary) => {
     },
     openAccount: {
       'Açık Bakiye': fmtTl(accounts.reduce((sum, item) => sum + toMoney(item.balance || 0), 0)),
-      'Cari Sayisi': String(accounts.length),
+      'Cari Sayısı': String(accounts.length),
       'Tahsil Edilen': fmtTl(summary.totalPaid),
       Geciken: String(accounts.filter((item) => toMoney(item.balance || 0) > 0).length)
     },
@@ -1042,7 +1043,7 @@ export const buildReportDetailData = (report, datasets, summary) => {
       Bekleyen: String(kitchenOrders.filter((item) => String(item.status || '') !== 'completed').length)
     },
     deliveryPerformance: {
-      'Paket Sayisi': String(deliveryOrders.length),
+      'Paket Sayısı': String(deliveryOrders.length),
       Yolda: String(deliveryOrders.filter((item) => String(item.deliveryStatus || '').includes('yolda')).length),
       Teslim: String(deliveryOrders.filter((item) => String(item.deliveryStatus || item.status || '').includes('delivered')).length),
       'Ortalama Teslimat': 'Sistem verisi yok'
@@ -1062,22 +1063,22 @@ export const buildReportDetailData = (report, datasets, summary) => {
         return sum + Math.max(0, revenue - base)
       }, 0)),
       Toplam: fmtTl(summary.totalRevenue),
-      'Fis Sayisi': String(summary.orderCount)
+      'Fiş Sayısı': String(summary.orderCount)
     },
     cashierShift: {
-      Acilis: 'Sistem verisi yok',
-      Kapanis: 'Sistem verisi yok',
+      Açılış: 'Sistem verisi yok',
+      Kapanış: 'Sistem verisi yok',
       'Kasa Farki': 'Sistem verisi yok',
       Tahsilat: fmtTl(summary.totalPaid)
     },
     stockConsumption: {
-      Tuketilen: String(productWithMeta.reduce((sum, item) => sum + Number(item.qty || 0), 0)),
+      Tüketilen: String(productWithMeta.reduce((sum, item) => sum + Number(item.qty || 0), 0)),
       'Kritik Stok': String(productWithMeta.filter((item) => item.stockTrackingEnabled && Number(item.stockQty || 0) <= 10).length),
       'Stok Değeri': fmtTl(productWithMeta.reduce((sum, item) => sum + (Number(item.stockQty || 0) * toMoney(item.price || 0)), 0)),
       'Eksik Ürün': String(productWithMeta.filter((item) => item.stockTrackingEnabled && Number(item.stockQty || 0) <= 0).length)
     },
     customerBehavior: {
-      Musteri: topCustomer?.name || 'Veri yok',
+      Müşteri: topCustomer?.name || 'Veri yok',
       'Tekrar Oranı': customerRows.length > 0 ? fmtPct((customerRows.filter((item) => item.count > 1).length / customerRows.length) * 100) : 'Veri yok',
       'Ortalama Harcama': fmtTl(topCustomer?.spend && topCustomer?.count ? topCustomer.spend / topCustomer.count : 0),
       'Favori Ürün': productWithMeta[0]?.name || 'Veri yok'
@@ -1219,7 +1220,7 @@ export default function ReportsPage() {
         ? { period: 'range', start: rangeStart, end: rangeEnd }
         : buildDateRange(period)
       if (period === 'range' && rangeStart && rangeEnd && rangeStart > rangeEnd) {
-        setError('Baslangic tarihi bitis tarihinden buyuk olamaz')
+        setError('Başlangıç tarihi bitiş tarihinden büyük olamaz')
         setSummary(EMPTY_SUMMARY)
         setDatasets(EMPTY_DATASETS)
         return

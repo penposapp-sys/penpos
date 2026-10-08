@@ -5037,14 +5037,14 @@ html[data-theme="light"].theme-white body.app-shell-active :is(button:active, .b
   min-height: 0;
 }
 .kasaCategoryRail {
-  grid-auto-columns: 92px;
+  grid-auto-columns: 108px;
   gap: 8px;
   padding: 0 0 2px;
   justify-content: start;
   align-items: start;
 }
 .kasaCategoryCard {
-  width: 92px;
+  width: 108px;
   min-height: 98px;
   border-radius: 16px;
   padding: 8px 6px;
@@ -6308,6 +6308,50 @@ html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .ca
 
 .admin-table tbody tr:last-child td {
   border-bottom: 0;
+}
+
+.admin-table tbody .tenant-main-row td {
+  border-bottom: 0;
+  padding-bottom: 5px;
+}
+
+.admin-table tbody .tenant-usage-row {
+  height: auto;
+}
+
+.admin-table tbody .tenant-usage-row td {
+  padding-top: 3px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.tenant-usage-label,
+.tenant-usage-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tenant-usage-label {
+  margin-bottom: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tenant-usage-value {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tenant-usage-secondary {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .admin-cell-ellipsis {
@@ -11966,7 +12010,10 @@ body .system-login.system-login--anaokulu .system-login__support-item b {
 
 .system-login__meta {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .system-login__text-link {
@@ -12145,7 +12192,15 @@ body .system-login.system-login--anaokulu .system-login__support-item b {
 
   .system-login__shell {
     grid-template-columns: 1fr;
+    height: auto;
     min-height: auto;
+    max-height: none;
+  }
+
+  .system-login {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
   }
 
   .system-login__visual {
@@ -12154,6 +12209,11 @@ body .system-login.system-login--anaokulu .system-login__support-item b {
 
   .system-login__visual-inner {
     gap: 24px;
+  }
+
+  .system-login__form-side {
+    align-items: flex-start;
+    overflow: visible;
   }
 
   .marketing-report-shell {

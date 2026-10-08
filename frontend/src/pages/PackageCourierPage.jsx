@@ -9,22 +9,22 @@ import { isCashPaymentMethod, pickInitialPaymentMethod } from '../lib/paymentMet
 import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesEntryDate.js'
 
 const STATUS_OPTIONS = [
-  ['yeni', 'Yeni Siparis'],
-  ['hazirlaniyor', 'Hazirlaniyor'],
-  ['hazir', 'Hazir'],
-  ['kuryeye_atandi', 'Kuryeye Atandi'],
-  ['yola_cikti', 'Yola Cikti'],
+  ['yeni', 'Yeni Sipariş'],
+  ['hazirlaniyor', 'Hazırlanıyor'],
+  ['hazir', 'Hazır'],
+  ['kuryeye_atandi', 'Kuryeye Atandı'],
+  ['yola_cikti', 'Yola Çıktı'],
   ['teslim_edildi', 'Teslim Edildi'],
-  ['iptal_edildi', 'Iptal Edildi'],
-  ['geri_dondu', 'Geri Dondu']
+  ['iptal_edildi', 'İptal Edildi'],
+  ['geri_dondu', 'Geri Döndü']
 ]
 
 const PAYMENT_OPTIONS = [
-  ['odeme_bekliyor', 'Odeme Bekliyor'],
-  ['odeme_alindi', 'Odeme Alindi'],
+  ['odeme_bekliyor', 'Ödeme Bekliyor'],
+  ['odeme_alindi', 'Ödeme Alındı'],
   ['veresiye', 'Veresiye'],
-  ['online_odendi', 'Online Odendi'],
-  ['iade_edildi', 'Iade Edildi']
+  ['online_odendi', 'Online Ödendi'],
+  ['iade_edildi', 'İade Edildi']
 ]
 
 const statusLabelMap = Object.fromEntries(STATUS_OPTIONS)
@@ -103,7 +103,7 @@ const buildProductSummary = (order) => {
   const items = (Array.isArray(order?.items) ? order.items : []).filter((item) => item?.status !== 'cancelled')
   const preview = items.slice(0, 3).map((item) => {
     const qty = Math.max(1, Number(item?.qty || 1))
-    return `${qty}x ${String(item?.nameSnapshot || item?.productName || 'Urun').trim()}`
+    return `${qty}x ${String(item?.nameSnapshot || item?.productName || 'Ürün').trim()}`
   })
   return {
     preview: preview.join(', '),
@@ -124,19 +124,19 @@ const formatDateTime = (value) => {
 
 const formatPaymentState = (order) => {
   if (String(order?.status || '') === 'cancelled' || ['iptal_edildi', 'geri_dondu', 'musteriyi_bulamadi', 'adreste_yok'].includes(String(order?.deliveryStatus || ''))) {
-    return 'Iptal'
+    return 'İptal'
   }
   const balance = Number(order?.balanceDue || 0)
-  if (String(order?.paymentStatus || '') === 'paid' || balance <= 0.01) return 'Odeme Alindi'
-  return balance < Number(order?.netTotal || order?.total || 0) ? 'Kismi Odeme' : 'Odeme Bekliyor'
+  if (String(order?.paymentStatus || '') === 'paid' || balance <= 0.01) return 'Ödeme Alındı'
+  return balance < Number(order?.netTotal || order?.total || 0) ? 'Kısmi Ödeme' : 'Ödeme Bekliyor'
 }
 
 const getPaymentPresentation = (order) => {
   if (String(order?.status || '') === 'cancelled' || ['iptal_edildi', 'geri_dondu', 'musteriyi_bulamadi', 'adreste_yok'].includes(String(order?.deliveryStatus || ''))) {
-    return { key: 'iade_edildi', label: 'Iptal' }
+    return { key: 'iade_edildi', label: 'İptal' }
   }
   if (String(order?.deliveryPaymentStatus || '') === 'odeme_alindi' || String(order?.deliveryPaymentStatus || '') === 'online_odendi') {
-    return { key: 'odeme_alindi', label: 'Odeme Alindi' }
+    return { key: 'odeme_alindi', label: 'Ödeme Alındı' }
   }
   if (String(order?.deliveryPaymentStatus || '') === 'veresiye') {
     return { key: 'veresiye', label: 'Veresiye' }
@@ -144,11 +144,11 @@ const getPaymentPresentation = (order) => {
   const paidTotal = Number(order?.paidTotal || 0)
   const balance = Math.max(0, Number(order?.balanceDue || 0))
   const total = Math.max(0, Number(order?.netTotal || order?.total || 0))
-  if (String(order?.paymentStatus || '') === 'paid') return { key: 'odeme_alindi', label: 'Odeme Alindi' }
+  if (String(order?.paymentStatus || '') === 'paid') return { key: 'odeme_alindi', label: 'Ödeme Alındı' }
   if (String(order?.paymentStatus || '') === 'partial' || (paidTotal > 0.01 && balance > 0.01 && paidTotal < total)) {
-    return { key: 'kismi_odeme', label: 'Kismi Odeme' }
+    return { key: 'kismi_odeme', label: 'Kısmi Ödeme' }
   }
-  return { key: 'odeme_bekliyor', label: 'Odeme Bekliyor' }
+  return { key: 'odeme_bekliyor', label: 'Ödeme Bekliyor' }
 }
 
 export default function PackageCourierPage() {
@@ -227,7 +227,7 @@ export default function PackageCourierPage() {
           : nextOrders
       )
     } catch (err) {
-      toast.error(err.message || 'Paket siparisleri yuklenemedi')
+      toast.error(err.message || 'Paket siparişleri yüklenemedi')
     } finally {
       setLoading(false)
     }
@@ -358,7 +358,7 @@ export default function PackageCourierPage() {
       setDetailOrder(result?.order || null)
       if (!options.silent) setDetailOpen(true)
     } catch (err) {
-      if (!options.silent) toast.error(err.message || 'Siparis detayi alinamadi')
+      if (!options.silent) toast.error(err.message || 'Sipariş detayı alınamadı')
     } finally {
       setDetailLoading(false)
     }
@@ -423,7 +423,7 @@ export default function PackageCourierPage() {
 
   const submitPayment = async () => {
     if (!paymentTarget?.id) {
-      toast.error('Siparis bulunamadi')
+      toast.error('Sipariş bulunamadı')
       return
     }
     if (!canTakePayment) {
@@ -461,8 +461,8 @@ export default function PackageCourierPage() {
 
   const summaryCards = [
     ['Yeni', summary.yeni],
-    ['Hazirlaniyor', summary.hazirlaniyor],
-    ['Hazir', summary.hazir],
+    ['Hazırlanıyor', summary.hazirlaniyor],
+    ['Hazır', summary.hazir],
     ['Yolda', summary.yolda],
     ['Teslim', summary.teslim],
     ['Tutar', money(summary.totalAmount)]
@@ -535,14 +535,14 @@ export default function PackageCourierPage() {
             event.stopPropagation()
             try {
               await api(`/api/pos/package-orders/${order.id}/approve-cancel-request`, { method: 'POST', silent: true })
-              toast.success('Iptal talebi onaylandi')
+              toast.success('İptal talebi onaylandı')
               await refreshData()
             } catch (err) {
-              toast.error(err?.message || 'Iptal talebi onaylanamadi')
+              toast.error(err?.message || 'İptal talebi onaylanamadı')
             }
           }}
         >
-          Iptal Onayla
+          İptal Onayla
         </button>
       )
     }
@@ -599,26 +599,26 @@ export default function PackageCourierPage() {
         <div className="card" style={{ margin: 0, padding: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
           <input className="input" type="date" value={filters.date} onChange={(event) => setFilters((current) => ({ ...current, date: event.target.value }))} style={{ minHeight: 40 }} />
           <select className="input" value={filters.branchId} onChange={(event) => setFilters((current) => ({ ...current, branchId: event.target.value }))} style={{ minHeight: 40 }}>
-            <option value="">Tum Subeler</option>
+            <option value="">Tüm Şubeler</option>
             {branches.map((branch) => (
-              <option key={String(branch?._id || branch?.id || '')} value={String(branch?._id || branch?.id || '')}>{branch?.name || 'Sube'}</option>
+              <option key={String(branch?._id || branch?.id || '')} value={String(branch?._id || branch?.id || '')}>{branch?.name || 'Şube'}</option>
             ))}
           </select>
           <select className="input" value={filters.courierId} onChange={(event) => setFilters((current) => ({ ...current, courierId: event.target.value }))} style={{ minHeight: 40 }}>
-            <option value="">Tum Kuryeler</option>
+            <option value="">Tüm Kuryeler</option>
             {couriers.map((courier) => (
               <option key={courier.id} value={courier.id}>{courier.name}</option>
             ))}
           </select>
           <select className="input" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} style={{ minHeight: 40 }}>
-            <option value="">Tum Durumlar</option>
+            <option value="">Tüm Durumlar</option>
             {STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select className="input" value={filters.paymentStatus} onChange={(event) => setFilters((current) => ({ ...current, paymentStatus: event.target.value }))} style={{ minHeight: 40 }}>
-            <option value="">Tum Odemeler</option>
+            <option value="">Tüm Ödemeler</option>
             {PAYMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <input className="input" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Siparis, musteri, telefon..." style={{ minHeight: 40 }} />
+          <input className="input" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Sipariş, müşteri, telefon..." style={{ minHeight: 40 }} />
         </div>
       ) : null}
 
@@ -631,8 +631,8 @@ export default function PackageCourierPage() {
         ))}
       </div>
 
-      {loading ? <div className="card" style={{ margin: 0 }}>Yukleniyor...</div> : null}
-      {!loading && sortedOrders.length === 0 ? <div className="card" style={{ margin: 0 }}>Filtreye uygun siparis bulunamadi.</div> : null}
+      {loading ? <div className="card" style={{ margin: 0 }}>Yükleniyor...</div> : null}
+      {!loading && sortedOrders.length === 0 ? <div className="card" style={{ margin: 0 }}>Filtreye uygun sipariş bulunamadı.</div> : null}
 
       <div style={{ display: 'grid', gap: 8 }}>
         {sortedOrders.map((order) => {
@@ -679,20 +679,20 @@ export default function PackageCourierPage() {
                       {order.courierName || 'Kurye atanmadi'}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>
-                      Atayan Sube: {order.branchName || '-'}
+                      Atayan Şube: {order.branchName || '-'}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 900, color: 'var(--app-text, var(--text))', fontSize: 17 }}>{money(order.total)}</div>
                     <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>
-                      {String(order?.status || '') === 'cancelled' ? 'Iptal edildi' : `Kalan ${money(order.balanceDue)}`}
+                      {String(order?.status || '') === 'cancelled' ? 'İptal edildi' : `Kalan ${money(order.balanceDue)}`}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gap: 3, fontSize: 12 }}>
                   <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))' }}><strong>Adres:</strong> {canSeeAddress ? shortAddress(order?.deliveryAddress?.addressText || order.customerAddress) : 'Gizli'}</div>
-                  <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))' }}><strong>Urun:</strong> {order.itemsSummary || `${order.itemCount || 0} Urun`}</div>
+                  <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))' }}><strong>Ürün:</strong> {order.itemsSummary || `${order.itemCount || 0} Ürün`}</div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -711,7 +711,7 @@ export default function PackageCourierPage() {
         <div className="card" style={{ margin: 0, padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--app-text, var(--text))' }}>Kurye Ozeti</div>
-            {reportLoading ? <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>Yukleniyor...</div> : null}
+            {reportLoading ? <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>Yükleniyor...</div> : null}
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {reportRows.length === 0 ? <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))' }}>Rapor verisi yok.</div> : null}
@@ -746,12 +746,12 @@ export default function PackageCourierPage() {
       <Modal
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
-        title="Siparis Detayi"
+        title="Sipariş Detayı"
         backdropClose={false}
         dialogStyle={{ width: 'min(880px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 28px)' }}
         bodyStyle={{ paddingTop: 14 }}
       >
-        {detailLoading ? <div>Yukleniyor...</div> : null}
+        {detailLoading ? <div>Yükleniyor...</div> : null}
         {!detailLoading && !detailOrder ? <div>Detay bulunamadi.</div> : null}
         {!detailLoading && detailOrder ? (
           <div style={{ display: 'grid', gap: 12 }}>
@@ -772,7 +772,7 @@ export default function PackageCourierPage() {
                 <div><strong>Telefon:</strong> {canSeePhone ? (detailOrder.customerPhone || '-') : 'Gizli'}</div>
                 <div><strong>Adres:</strong> {canSeeAddress ? (detailOrder?.deliveryAddress?.addressText || detailOrder.customerAddress || '-') : 'Gizli'}</div>
                 <div><strong>Adres Notu:</strong> {canSeeAddress ? (detailOrder?.deliveryAddress?.note || detailOrder.deliveryNote || '-') : 'Gizli'}</div>
-                <div><strong>Siparis Notu:</strong> {detailOrder.note || detailOrder.deliveryNote || '-'}</div>
+                <div><strong>Sipariş Notu:</strong> {detailOrder.note || detailOrder.deliveryNote || '-'}</div>
               </div>
             </div>
 
@@ -788,12 +788,12 @@ export default function PackageCourierPage() {
             </div>
 
             <div className="card" style={{ margin: 0, padding: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))', marginBottom: 8 }}>Urunler</div>
+              <div style={{ fontSize: 12, color: 'var(--app-text-muted, var(--muted))', marginBottom: 8 }}>Ürünler</div>
               <div style={{ display: 'grid', gap: 6 }}>
                 {(Array.isArray(detailOrder.items) ? detailOrder.items : []).map((item, index) => (
                   <div key={`${detailOrder.id}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
                     <div>
-                      <div style={{ fontWeight: 700 }}>{item?.nameSnapshot || item?.productName || 'Urun'}</div>
+                      <div style={{ fontWeight: 700 }}>{item?.nameSnapshot || item?.productName || 'Ürün'}</div>
                       {!!item?.note && <div style={{ color: 'var(--app-text-muted, var(--muted))', fontSize: 12 }}>{item.note}</div>}
                     </div>
                     <div style={{ whiteSpace: 'nowrap', color: 'var(--app-text-secondary, var(--text-secondary))' }}>{item?.qty || 1}x</div>

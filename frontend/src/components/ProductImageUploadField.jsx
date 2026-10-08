@@ -7,7 +7,7 @@ import {
 } from '../lib/productImage.js'
 
 export default function ProductImageUploadField({
-  label = 'Gorsel Yukle',
+  label = 'Görsel Yükle',
   currentImageUrl = '',
   file = null,
   onFileChange,
@@ -15,7 +15,7 @@ export default function ProductImageUploadField({
   onRemoveExisting,
   disabled = false,
   helperText = 'JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, otomatik olarak 800x800 WebP optimize edilir.',
-  descriptionText = 'Yuklenen gorsel ilgili alanda gosterilmek uzere kaydedilir.',
+  descriptionText = 'Yüklenen görsel ilgili alanda gösterilmek üzere kaydedilir.',
   error = '',
   existingSizeLabel = '',
   compact = false,
@@ -138,7 +138,7 @@ export default function ProductImageUploadField({
         <div className="product-image-upload__preview" style={previewStyle}>
           <img
             src={previewSrc}
-            alt="Urun onizleme"
+            alt="Ürün önizleme"
             onError={(event) => {
               if (event.currentTarget.src.endsWith(PRODUCT_PLACEHOLDER_SRC)) return
               setPreviewFailed(true)
@@ -147,23 +147,23 @@ export default function ProductImageUploadField({
           />
         </div>
         <div className="product-image-upload__copy" style={copyStyle}>
-          <strong style={strongStyle}>Dosya sec veya surukle birak</strong>
+          <strong style={strongStyle}>Dosya seç veya sürükleyip bırak</strong>
           <span style={textStyle}>{descriptionText}</span>
         </div>
       </label>
 
       <div className="product-image-upload__actions">
         <label htmlFor={inputId} className="product-secondary-btn" aria-disabled={disabled ? 'true' : 'false'} style={actionStyle}>
-          Dosya Sec
+          Dosya Seç
         </label>
         {file ? (
           <button type="button" className="product-secondary-btn" onClick={() => onClearFile?.()} disabled={disabled} style={actionStyle}>
-            Secimi Temizle
+            Seçimi Temizle
           </button>
         ) : null}
         {!file && currentImageUrl ? (
           <button type="button" className="product-secondary-btn" onClick={() => onRemoveExisting?.()} disabled={disabled || typeof onRemoveExisting !== 'function'} style={actionStyle}>
-            Gorseli Kaldir
+            Görseli Kaldır
           </button>
         ) : null}
       </div>

@@ -30,7 +30,8 @@ const forcePort4000 = (value) => {
 }
 
 const normalizeApiPath = (path) => {
-  const p = String(path || '')
+  const raw = String(path || '')
+  const p = raw.replace(/^\/api\/magaza(?=\/|$)/i, '/api/canteen')
   if (/^https?:\/\//i.test(p)) return p
   if (p.startsWith('/api/')) return p
   if (p === '/api') return '/api'

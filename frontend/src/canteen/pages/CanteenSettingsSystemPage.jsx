@@ -153,7 +153,7 @@ export default function CanteenSettingsSystemPage() {
   const usernameHint = useMemo(() => {
     const value = normalizeUsername(username)
     if (!value || USERNAME_RE.test(value)) return ''
-    return 'Kullanici adi 3-24 karakter olmali ve yalnizca a-z, 0-9, nokta, alt cizgi veya tire icerebilir.'
+    return 'Kullanıcı adı 3-24 karakter olmalı; yalnızca a-z, 0-9, nokta, alt çizgi veya tire içerebilir.'
   }, [username])
 
   const revertThemePreview = () => {
@@ -176,13 +176,13 @@ export default function CanteenSettingsSystemPage() {
       revertThemePreview()
       return
     }
-    setSuccess('Gorunum modu kaydedildi')
+    setSuccess('Görünüm modu kaydedildi')
   }
 
   const saveSystemSettings = async () => {
     const nextAllowed = normalizeBranchIdsList(allowedBranchIds)
     if (nextAllowed.length === 0) {
-      setError('En az bir yetkili sube secmeniz gerekiyor.')
+      setError('En az bir yetkili şube seçmeniz gerekiyor.')
       return
     }
     const patch = {
@@ -191,7 +191,7 @@ export default function CanteenSettingsSystemPage() {
     }
     const saved = await updateSettings(patch)
     if (!saved?.ok) return
-    setSuccess(themeDirty ? 'Gorunum ve sube ayarlari kaydedildi' : 'Sube ayarlari kaydedildi')
+    setSuccess(themeDirty ? 'Görünüm ve şube ayarları kaydedildi' : 'Şube ayarları kaydedildi')
   }
 
   const saveEmail = async (event) => {
@@ -207,7 +207,7 @@ export default function CanteenSettingsSystemPage() {
       if (!res?.ok) {
         const code = res?.code
         if (code === 'duplicate_email') toast.error('Bu e-posta zaten kayitli.')
-        else if (code === 'invalid_credentials') toast.error('Mevcut sifre hatali.')
+        else if (code === 'invalid_credentials') toast.error('Mevcut şifre hatalı.')
         else toast.error(res?.message || 'E-posta guncellenemedi.')
         return
       }
@@ -223,7 +223,7 @@ export default function CanteenSettingsSystemPage() {
     event.preventDefault()
     const value = normalizeUsername(username)
     if (!value || !USERNAME_RE.test(value)) {
-      toast.error('Gecerli bir kullanici adi girin.')
+      toast.error('Geçerli bir kullanıcı adı girin.')
       return
     }
     setAccountSaving(true)
@@ -236,12 +236,12 @@ export default function CanteenSettingsSystemPage() {
       })
       if (!res?.ok) {
         const code = res?.code
-        if (code === 'duplicate_username') toast.error('Bu kullanici adi zaten kayitli.')
-        else if (code === 'invalid_credentials') toast.error('Mevcut sifre hatali.')
-        else toast.error(res?.message || 'Kullanici adi guncellenemedi.')
+        if (code === 'duplicate_username') toast.error('Bu kullanıcı adı zaten kayıtlı.')
+        else if (code === 'invalid_credentials') toast.error('Mevcut şifre hatalı.')
+        else toast.error(res?.message || 'Kullanıcı adı güncellenemedi.')
         return
       }
-      toast.success('Kullanici adi guncellendi.')
+      toast.success('Kullanıcı adı güncellendi.')
       setUsernamePw('')
       await load({ background: true })
     } finally {
@@ -252,11 +252,11 @@ export default function CanteenSettingsSystemPage() {
   const savePassword = async (event) => {
     event.preventDefault()
     if (!pwNext || pwNext.length < 8) {
-      toast.error('Yeni sifre en az 8 karakter olmali.')
+      toast.error('Yeni şifre en az 8 karakter olmalı.')
       return
     }
     if (pwNext !== pwNext2) {
-      toast.error('Yeni sifre alanlari birbiriyle ayni degil.')
+      toast.error('Yeni şifre alanları birbiriyle aynı değil.')
       return
     }
     setAccountSaving(true)
@@ -269,11 +269,11 @@ export default function CanteenSettingsSystemPage() {
       })
       if (!res?.ok) {
         const code = res?.code
-        if (code === 'invalid_credentials') toast.error('Mevcut sifre hatali.')
-        else toast.error(res?.message || 'Sifre guncellenemedi.')
+        if (code === 'invalid_credentials') toast.error('Mevcut şifre hatalı.')
+        else toast.error(res?.message || 'Şifre güncellenemedi.')
         return
       }
-      toast.success('Sifre guncellendi.')
+      toast.success('Şifre güncellendi.')
       setPwCurrent('')
       setPwNext('')
       setPwNext2('')
@@ -302,13 +302,13 @@ export default function CanteenSettingsSystemPage() {
         skipBranchHeader: true,
       })
       if (!res?.ok) {
-        setError(res?.message || 'Sube eklenemedi.')
+        setError(res?.message || 'Şube eklenemedi.')
         return
       }
       setOpenCreate(false)
       setCreateName('')
       setCreateDescription('')
-      setSuccess('Yeni sube olusturuldu.')
+      setSuccess('Yeni şube oluşturuldu.')
       await load({ background: true })
     } finally {
       setBranchSaving(false)
@@ -329,11 +329,11 @@ export default function CanteenSettingsSystemPage() {
         skipBranchHeader: true,
       })
       if (!res?.ok) {
-        setError(res?.message || 'Sube guncellenemedi.')
+        setError(res?.message || 'Şube güncellenemedi.')
         return
       }
       setOpenEdit(false)
-      setSuccess('Sube guncellendi.')
+      setSuccess('Şube güncellendi.')
       await load({ background: true })
     } finally {
       setBranchSaving(false)
@@ -344,7 +344,7 @@ export default function CanteenSettingsSystemPage() {
     const id = String(branch?.id || '')
     if (!id) return
     const nextActive = branch?.isActive === false
-    const confirmed = window.confirm(nextActive ? 'Subeyi aktiflestirmek istiyor musunuz?' : 'Subeyi pasiflestirmek istiyor musunuz?')
+    const confirmed = window.confirm(nextActive ? 'Şubeyi aktifleştirmek istiyor musunuz?' : 'Şubeyi pasifleştirmek istiyor musunuz?')
     if (!confirmed) return
     setBranchSaving(true)
     setError('')
@@ -356,10 +356,10 @@ export default function CanteenSettingsSystemPage() {
         skipBranchHeader: true,
       })
       if (!res?.ok) {
-        setError(res?.message || 'Sube durumu guncellenemedi.')
+        setError(res?.message || 'Şube durumu güncellenemedi.')
         return
       }
-      setSuccess(nextActive ? 'Sube aktif edildi.' : 'Sube pasiflestirildi.')
+      setSuccess(nextActive ? 'Şube aktif edildi.' : 'Şube pasifleştirildi.')
       await load({ background: true })
     } finally {
       setBranchSaving(false)
@@ -369,7 +369,7 @@ export default function CanteenSettingsSystemPage() {
   const removeBranch = async (branch) => {
     const id = String(branch?.id || '')
     if (!id) return
-    const confirmed = window.confirm(`"${branch?.name || 'Bu subeyi'}" silmek istiyor musunuz?`)
+    const confirmed = window.confirm(`"${branch?.name || 'Bu şubeyi'}" silmek istiyor musunuz?`)
     if (!confirmed) return
     setBranchSaving(true)
     setError('')
@@ -380,19 +380,19 @@ export default function CanteenSettingsSystemPage() {
         skipBranchHeader: true,
       })
       if (!res?.ok) {
-        setError(res?.message || 'Sube silinemedi.')
+        setError(res?.message || 'Şube silinemedi.')
         return
       }
       setAllowedBranchIds((current) => (Array.isArray(current) ? current.filter((item) => String(item) !== id) : []))
       setSavedAllowedBranchIds((current) => (Array.isArray(current) ? current.filter((item) => String(item) !== id) : []))
-      setSuccess('Sube silindi.')
+      setSuccess('Şube silindi.')
       await load({ background: true })
     } finally {
       setBranchSaving(false)
     }
   }
 
-  if (!settings) return <div className="card">Yukleniyor...</div>
+  if (!settings) return <div className="card">Yükleniyor...</div>
 
   return (
     <div className="canteen-settings-system-page" style={{ display: 'grid', gap: 16 }}>
@@ -571,13 +571,13 @@ export default function CanteenSettingsSystemPage() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: isMobilePortrait ? 22 : 30, lineHeight: 1.08, fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--app-text)' }}>Sistem Ayarlari</div>
+            <div style={{ fontSize: isMobilePortrait ? 22 : 30, lineHeight: 1.08, fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--app-text)' }}>Sistem Ayarları</div>
             <div style={{ marginTop: 8, maxWidth: 860, color: 'var(--app-text-secondary)', fontWeight: 700, lineHeight: 1.6, fontSize: isMobilePortrait ? 12.5 : 14 }}>
-              Hesap bilgileri, gorunum secimleri ve sube yonetimini tek ekranda yatay kolonlarla yonetin. Yetkili sube secimi, yeni sube olusturma, duzenleme, aktif-pasif ve silme islemleri artik bu sayfada.
+              Hesap bilgileri, görünüm tercihleri ve şube yönetimini tek ekranda yapın. Yetkili şube seçimi, yeni şube oluşturma, düzenleme, aktif/pasif durumu ve silme işlemleri bu sayfada.
             </div>
           </div>
           <button className="btn" type="button" onClick={() => load()} disabled={loading || savingTheme || accountSaving || branchSaving}>
-            {loading ? 'Yukleniyor...' : 'Yenile'}
+            {loading ? 'Yükleniyor...' : 'Yenile'}
           </button>
         </div>
       </div>
@@ -589,8 +589,8 @@ export default function CanteenSettingsSystemPage() {
         <div className="canteen-system-column">
           <div className="card canteen-system-card">
             <div>
-              <h3>Hesap Ayarlari</h3>
-              <p>Kullanici adi, e-posta ve sifre alanlarini tek kolonda daha kompakt yonetin.</p>
+              <h3>Hesap Ayarları</h3>
+              <p>Kullanıcı adı, e-posta ve şifre alanlarını tek kolonda daha kompakt yönetin.</p>
             </div>
 
             <div className="canteen-system-stack">
@@ -600,17 +600,17 @@ export default function CanteenSettingsSystemPage() {
               </div>
 
               <form onSubmit={saveUsername} className="canteen-system-stack">
-                <div style={{ fontWeight: 900 }}>Kullanici Adi</div>
+                <div style={{ fontWeight: 900 }}>Kullanıcı Adı</div>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanici adi</div>
-                  <input className="input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="ornek: magaza1" />
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kullanıcı adı</div>
+                  <input className="input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="örnek: magaza1" />
                 </label>
                 {usernameHint ? <div style={{ fontSize: 12, color: '#b91c1c' }}>{usernameHint}</div> : null}
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut sifre</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut şifre</div>
                   <input className="input" type="password" value={usernamePw} onChange={(event) => setUsernamePw(event.target.value)} />
                 </label>
-                <button className="btn btn--primary" disabled={accountSaving}>Kullanici adini kaydet</button>
+                <button className="btn btn--primary" disabled={accountSaving}>Kullanıcı adını kaydet</button>
               </form>
 
               <form onSubmit={saveEmail} className="canteen-system-stack">
@@ -620,27 +620,27 @@ export default function CanteenSettingsSystemPage() {
                   <input className="input" value={email} onChange={(event) => setEmail(event.target.value)} />
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut sifre</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut şifre</div>
                   <input className="input" type="password" value={emailPw} onChange={(event) => setEmailPw(event.target.value)} />
                 </label>
-                <button className="btn btn--primary" disabled={accountSaving}>E-postayi kaydet</button>
+                <button className="btn btn--primary" disabled={accountSaving}>E-postayı kaydet</button>
               </form>
 
               <form onSubmit={savePassword} className="canteen-system-stack">
-                <div style={{ fontWeight: 900 }}>Sifre Degistir</div>
+                <div style={{ fontWeight: 900 }}>Şifre Değiştir</div>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut sifre</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Mevcut şifre</div>
                   <input className="input" type="password" value={pwCurrent} onChange={(event) => setPwCurrent(event.target.value)} />
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni sifre</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni şifre</div>
                   <input className="input" type="password" value={pwNext} onChange={(event) => setPwNext(event.target.value)} />
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni sifre tekrar</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yeni şifre tekrar</div>
                   <input className="input" type="password" value={pwNext2} onChange={(event) => setPwNext2(event.target.value)} />
                 </label>
-                <button className="btn btn--primary" disabled={accountSaving}>Sifreyi guncelle</button>
+                <button className="btn btn--primary" disabled={accountSaving}>Şifreyi güncelle</button>
               </form>
             </div>
           </div>
@@ -650,11 +650,11 @@ export default function CanteenSettingsSystemPage() {
           <div className="card canteen-system-card">
             <div>
               <h3>Temel Sistem Bilgileri</h3>
-              <p>Fis ve genel satis alanlari bu kolonda kalir.</p>
+              <p>Fiş ve genel satış alanları bu bölümde yer alır.</p>
             </div>
             <div className="canteen-system-inline-grid">
               <label style={{ display: 'grid', gap: 6 }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Varsayilan KDV</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Varsayılan KDV</div>
                 <input
                   className="input"
                   value={String(settings.defaultVatRate ?? 0)}
@@ -664,7 +664,7 @@ export default function CanteenSettingsSystemPage() {
               </label>
               <div />
               <label style={{ display: 'grid', gap: 6 }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fis ust metin</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş üst metni</div>
                 <input
                   className="input"
                   value={String(settings.receiptHeader || '')}
@@ -673,7 +673,7 @@ export default function CanteenSettingsSystemPage() {
                 />
               </label>
               <label style={{ display: 'grid', gap: 6 }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fis alt metin</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Fiş alt metni</div>
                 <input
                   className="input"
                   value={String(settings.receiptFooter || '')}
@@ -686,8 +686,8 @@ export default function CanteenSettingsSystemPage() {
 
           <div className="card canteen-system-card">
             <div>
-              <h3>Gorunum Modu</h3>
-              <p>Bu paneli beyaz mod veya koyu mod olarak kullanin.</p>
+              <h3>Görünüm Modu</h3>
+              <p>Bu paneli açık veya koyu modda kullanın.</p>
             </div>
 
             <ThemeSelectionCards
@@ -708,10 +708,10 @@ export default function CanteenSettingsSystemPage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" type="button" disabled={!isAdmin || loading || savingTheme || !themeDirty} onClick={revertThemePreview}>
-                Vazgec
+                Vazgeç
               </button>
               <button className="btn btn--primary" type="button" disabled={!isAdmin || loading || savingTheme || !themeDirty} onClick={saveThemeSettings}>
-                {savingTheme ? 'Kaydediliyor...' : 'Gorunumu Kaydet'}
+                {savingTheme ? 'Kaydediliyor...' : 'Görünümü Kaydet'}
               </button>
             </div>
           </div>
@@ -721,17 +721,17 @@ export default function CanteenSettingsSystemPage() {
           <div className="card canteen-system-card">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
-                <h3>Yetkili Subeler ve Sube Yonetimi</h3>
-                <p>Sistem erisimi, yeni sube olusturma ve aktif-pasif-duzenle-sil islemleri bu sutunda toplanir.</p>
+                <h3>Yetkili Şubeler ve Şube Yönetimi</h3>
+                <p>Sistem erişimi, şube oluşturma ve şube durumu ile düzenleme/silme işlemleri bu bölümde toplanır.</p>
               </div>
               <button className="btn btn--primary" type="button" onClick={() => setOpenCreate(true)} disabled={!isAdmin || branchSaving}>
-                + Yeni Sube
+                + Yeni Şube
               </button>
             </div>
 
             {Array.isArray(allowedBranchIds) && allowedBranchIds.length === 0 ? (
               <div style={{ borderRadius: 16, padding: 12, border: '1px solid color-mix(in srgb, #f59e0b 35%, var(--app-border))', background: 'color-mix(in srgb, #f59e0b 10%, var(--app-surface))', fontWeight: 700 }}>
-                Henuz yetkili sube secilmedi. En az bir sube secip kaydetmeniz gerekiyor.
+                Henüz yetkili şube seçilmedi. En az bir şube seçip kaydetmeniz gerekiyor.
               </div>
             ) : null}
 
@@ -759,7 +759,7 @@ export default function CanteenSettingsSystemPage() {
                         <div style={{ minWidth: 0, display: 'grid', gap: 4 }}>
                           <div style={{ fontWeight: 900, color: 'var(--app-text)' }}>{branch.name}</div>
                           <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, lineHeight: 1.5 }}>
-                            {String(branch.description || '').trim() || 'Bu sube icin aciklama girilmedi.'}
+                            {String(branch.description || '').trim() || 'Bu şube için açıklama girilmedi.'}
                           </div>
                         </div>
                       </label>
@@ -773,14 +773,14 @@ export default function CanteenSettingsSystemPage() {
                     </div>
 
                     <div className="canteen-branch-row-actions">
-                      <button className="btn" type="button" onClick={() => openEditModal(branch)} disabled={!isAdmin || branchSaving}>Duzenle</button>
+                      <button className="btn" type="button" onClick={() => openEditModal(branch)} disabled={!isAdmin || branchSaving}>Düzenle</button>
                       <button
                         type="button"
                         className={`canteen-branch-status-toggle${branch.isActive === false ? '' : ' is-active'}`}
                         onClick={() => toggleBranchStatus(branch)}
                         disabled={!isAdmin || branchSaving}
                         aria-pressed={branch.isActive !== false}
-                        aria-label={branch.isActive === false ? 'Subeyi aktiflestir' : 'Subeyi pasiflestir'}
+                        aria-label={branch.isActive === false ? 'Şubeyi aktifleştir' : 'Şubeyi pasifleştir'}
                       >
                         <span className="canteen-branch-status-toggle-track" aria-hidden="true" />
                         <span className="canteen-branch-status-toggle-label">
@@ -801,42 +801,42 @@ export default function CanteenSettingsSystemPage() {
                 disabled={!isAdmin || loading || branchSaving || (!branchesDirty && !themeDirty) || !Array.isArray(allowedBranchIds) || allowedBranchIds.length === 0}
                 onClick={saveSystemSettings}
               >
-                Sube Secimlerini Kaydet
+                Şube Seçimlerini Kaydet
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Yeni Sube Olustur">
+      <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Yeni Şube Oluştur">
         <div style={{ display: 'grid', gap: 12 }}>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sube adi</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şube adı</div>
             <input className="input" value={createName} onChange={(event) => setCreateName(event.target.value)} />
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Aciklama</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
             <input className="input" value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} />
           </label>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button className="btn" type="button" onClick={() => setOpenCreate(false)}>Vazgec</button>
+            <button className="btn" type="button" onClick={() => setOpenCreate(false)}>Vazgeç</button>
             <button className="btn btn--primary" type="button" onClick={submitCreate} disabled={!String(createName || '').trim() || branchSaving}>Kaydet</button>
           </div>
         </div>
       </Modal>
 
-      <Modal open={openEdit} onClose={() => setOpenEdit(false)} title="Sube Duzenle">
+      <Modal open={openEdit} onClose={() => setOpenEdit(false)} title="Şube Düzenle">
         <div style={{ display: 'grid', gap: 12 }}>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sube adi</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şube adı</div>
             <input className="input" value={editName} onChange={(event) => setEditName(event.target.value)} />
           </label>
           <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Aciklama</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Açıklama</div>
             <input className="input" value={editDescription} onChange={(event) => setEditDescription(event.target.value)} />
           </label>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button className="btn" type="button" onClick={() => setOpenEdit(false)}>Vazgec</button>
+            <button className="btn" type="button" onClick={() => setOpenEdit(false)}>Vazgeç</button>
             <button className="btn btn--primary" type="button" onClick={submitEdit} disabled={!String(editName || '').trim() || branchSaving}>Kaydet</button>
           </div>
         </div>

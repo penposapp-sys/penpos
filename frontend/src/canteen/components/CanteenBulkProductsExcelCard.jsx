@@ -1,22 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import Modal from '../../components/Modal.jsx'
 import { toast } from '../../lib/toast.js'
-import { getAuthToken } from '../../lib/authStorage.js'
-
-const baseUrl = '/api'
-const tokenKey = 'token_canteen'
-
-const parseFilenameFromDisposition = (value) => {
-  const v = String(value || '')
-  const match = v.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i)
-  const raw = match?.[1] || match?.[2] || ''
-  try {
-    const decoded = decodeURIComponent(raw)
-    return decoded || null
-  } catch {
-    return raw || null
-  }
-}
+import { api, apiDownload } from '../../lib/apiClient.js'
 
 const downloadBlob = (blob, filename) => {
   const url = URL.createObjectURL(blob)
@@ -27,22 +12,6 @@ const downloadBlob = (blob, filename) => {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1500)
-}
-
-const fetchWithAuth = async (path, options = {}, { branchId } = {}) => {
-  const token = getAuthToken(tokenKey)
-  const headers = {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(branchId ? { 'x-branch-id': String(branchId) } : {}),
-    ...(options.headers || {})
-  }
-  const url = /^https?:\/\//i.test(path)
-  ? path
-  : (String(path || '').startsWith('/api/')
-      ? String(path)
-      : `${baseUrl}${String(path || '').startsWith('/') ? '' : '/'}${path}`)
-
-  return fetch(url, { ...options, headers })
 }
 
 export default function CanteenBulkProductsExcelCard({ branchId, onImportDone, compact = false }) {
@@ -57,15 +26,15 @@ export default function CanteenBulkProductsExcelCard({ branchId, onImportDone, c
   const onDownload = async (path, fallbackName) => {
     setBusy(true)
     try {
-      const res = await fetchWithAuth(path, {}, { branchId })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || 'İndirme başarısız')
+      const response = await apiDownload(path, {
+        portalOverride: 'canteen',
+        branchIdOverride: branchId
+      })
+      if (!response.ok || !response.blob) {
+        throw new Error(response.error?.message || 'İndirme başarısız')
       }
-      const cd = res.headers.get('content-disposition')
-      const filename = parseFilenameFromDisposition(cd) || fallbackName
-      const blob = await res.blob()
-      downloadBlob(blob, filename)
+      const filename = response.filename || fallbackName
+      downloadBlob(response.blob, filename)
       toast.success('İndirme başladı')
     } catch (err) {
       toast.error(err.message)
@@ -89,11 +58,16 @@ export default function CanteenBulkProductsExcelCard({ branchId, onImportDone, c
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetchWithAuth(`/api/magaza/products/import?branchId=${encodeURIComponent(bid)}`, { method: 'POST', body: fd }, { branchId: bid })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || data?.success === false) {
-        throw new Error(data.message || 'Yükleme başarısız')
+      const response = await api(`/api/magaza/products/import?branchId=${encodeURIComponent(bid)}`, {
+        method: 'POST',
+        body: fd,
+        portalOverride: 'canteen',
+        silent: true
+      })
+      if (!response.ok || response.success === false) {
+        throw new Error(response.message || 'Yükleme başarısız')
       }
+      const data = response.data || response
       setResult(data)
       setResultOpen(true)
       toast.success(`${data?.created ?? 0} ürün eklendi, ${data?.updated ?? 0} güncellendi, ${data?.failed ?? 0} satır hatalı`)

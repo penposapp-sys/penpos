@@ -10,7 +10,7 @@ export default function LoginSelectionPage() {
   useBodyLayoutMode('public-site-layout')
 
   useEffect(() => {
-    document.title = 'PenPOS - Giris Secimi'
+    document.title = 'PenPOS - Giriş Seçimi'
   }, [])
 
   useEffect(() => {
@@ -40,18 +40,18 @@ export default function LoginSelectionPage() {
             <img src="/logo-2.png" alt="PenPOS" />
           </Link>
           <div className="public-auth-head-row">
-            <div className="marketing-trial-badge login-selection-badge">Giris secimi</div>
+            <div className="marketing-trial-badge login-selection-badge">Giriş seçimi</div>
             <button
               type="button"
               className="public-auth-close public-auth-close--website"
-              aria-label="Ana sayfaya don"
+              aria-label="Ana sayfaya dön"
               onClick={() => nav('/landing', { replace: true })}
             >
               x
             </button>
           </div>
-          <h1>Giris yapmak istediginiz sistemi secin</h1>
-          <p>Mevcut baglantilar korunur. Isletmeniz icin uygun giris ekranina ayni tema ile devam edin.</p>
+          <h1>Giriş yapmak istediğiniz sistemi seçin</h1>
+          <p>Mevcut bağlantılar korunur. İşletmeniz için uygun giriş ekranına aynı tema ile devam edin.</p>
         </div>
 
         <div className="public-auth-grid public-auth-grid--selection">
@@ -63,9 +63,9 @@ export default function LoginSelectionPage() {
             onKeyDown={(event) => handleCardKeyDown(event, '/login/restoran')}
           >
             <span aria-hidden="true">🍽️</span>
-            <strong>Restoran / Cafe Girisi</strong>
-            <p>Masa, adisyon, paket servis, mutfak ve QR menu akisina tek panelden ulasin.</p>
-            <em>Masa takibi, mutfak akisi ve servis operasyonu</em>
+            <strong>Restoran / Kafe Girişi</strong>
+            <p>Masa, adisyon, paket servis, mutfak ve QR menü akışına tek panelden ulaşın.</p>
+            <em>Masa takibi, mutfak akışı ve servis operasyonu</em>
           </div>
 
           <div
@@ -76,9 +76,9 @@ export default function LoginSelectionPage() {
             onKeyDown={(event) => handleCardKeyDown(event, '/magaza/login')}
           >
             <span aria-hidden="true">🛒</span>
-            <strong>Magaza / Market Girisi</strong>
-            <p>Barkodlu hizli satis, stok hareketi ve cari hesap akisina ayni premium ekranla baglanin.</p>
-            <em>Hizli kasa, stok kontrolu ve fiyat listesi yonetimi</em>
+            <strong>Mağaza / Market Girişi</strong>
+            <p>Barkodlu hızlı satış, stok hareketi ve cari hesap akışına aynı arayüzle bağlanın.</p>
+            <em>Hızlı kasa, stok kontrolü ve fiyat listesi yönetimi</em>
           </div>
         </div>
       </div>

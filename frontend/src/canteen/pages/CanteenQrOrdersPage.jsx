@@ -9,32 +9,32 @@ import useCanteenAutoRefresh from '../hooks/useCanteenAutoRefresh.js'
 
 const orderStatusOptions = [
   ['new', 'Yeni'],
-  ['preparing', 'Hazirlaniyor'],
-  ['ready', 'Hazir'],
+  ['preparing', 'Hazırlanıyor'],
+  ['ready', 'Hazır'],
   ['delivered', 'Teslim edildi'],
-  ['cancelled', 'Iptal edildi']
+  ['cancelled', 'İptal edildi']
 ]
 
 const paymentStatusOptions = [
-  ['pending', 'Odeme bekliyor'],
-  ['paid', 'Odendi'],
-  ['unpaid', 'Odenmedi'],
-  ['cari', 'Cariye islendi']
+  ['pending', 'Ödeme bekliyor'],
+  ['paid', 'Ödendi'],
+  ['unpaid', 'Ödenmedi'],
+  ['cari', 'Cariye işlendi']
 ]
 
 const statusMeta = {
-  new: { label: 'Yeni Siparis', bg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#1d4ed8' },
-  preparing: { label: 'Hazirlaniyor', bg: 'linear-gradient(135deg, #ffedd5, #fed7aa)', color: '#c2410c' },
-  ready: { label: 'Hazir', bg: 'linear-gradient(135deg, #ccfbf1, #99f6e4)', color: '#0f766e' },
+  new: { label: 'Yeni Sipariş', bg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#1d4ed8' },
+  preparing: { label: 'Hazırlanıyor', bg: 'linear-gradient(135deg, #ffedd5, #fed7aa)', color: '#c2410c' },
+  ready: { label: 'Hazır', bg: 'linear-gradient(135deg, #ccfbf1, #99f6e4)', color: '#0f766e' },
   delivered: { label: 'Teslim Edildi', bg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)', color: '#15803d' },
-  cancelled: { label: 'Iptal', bg: 'linear-gradient(135deg, #fee2e2, #fecaca)', color: '#b91c1c' }
+  cancelled: { label: 'İptal', bg: 'linear-gradient(135deg, #fee2e2, #fecaca)', color: '#b91c1c' }
 }
 
 const paymentMeta = {
-  unpaid: { label: 'Odenmedi', bg: 'linear-gradient(135deg, #fee2e2, #fecaca)', color: '#b91c1c' },
-  pending: { label: 'Odeme Bekliyor', bg: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#b45309' },
-  paid: { label: 'Odendi', bg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)', color: '#15803d' },
-  cari: { label: 'Caride Kaydi Var', bg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#1d4ed8' }
+  unpaid: { label: 'Ödenmedi', bg: 'linear-gradient(135deg, #fee2e2, #fecaca)', color: '#b91c1c' },
+  pending: { label: 'Ödeme Bekliyor', bg: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#b45309' },
+  paid: { label: 'Ödendi', bg: 'linear-gradient(135deg, #dcfce7, #bbf7d0)', color: '#15803d' },
+  cari: { label: 'Caride Kaydı Var', bg: 'linear-gradient(135deg, #dbeafe, #bfdbfe)', color: '#1d4ed8' }
 }
 
 function formatMoney(value) {
@@ -94,7 +94,7 @@ function paymentMethodLabel(value, order = null) {
   if (method === 'bank') return 'Banka'
   if (method === 'cari') return 'Cari'
   if (method === 'already_paid') return 'Belirtilmedi'
-  if (method === 'pay_on_delivery') return 'Kapida odeme'
+  if (method === 'pay_on_delivery') return 'Kapıda ödeme'
   if (method === 'none' || !method) return 'Belirtilmedi'
   return value
 }
@@ -113,19 +113,19 @@ function buildQrOrderReceiptHtml(order) {
   `).join('')
 
   const customerInfo = [
-    order?.customerName ? `<div><strong>Musteri:</strong> ${escapeHtml(order.customerName)}</div>` : '',
+    order?.customerName ? `<div><strong>Müşteri:</strong> ${escapeHtml(order.customerName)}</div>` : '',
     order?.customerPhone ? `<div><strong>Telefon:</strong> ${escapeHtml(order.customerPhone)}</div>` : '',
     order?.customerLocation ? `<div><strong>Lokasyon:</strong> ${escapeHtml(order.customerLocation)}</div>` : '',
     order?.customerAddress ? `<div><strong>Adres:</strong> ${escapeHtml(order.customerAddress)}</div>` : '',
-    order?.branchName ? `<div><strong>Sube:</strong> ${escapeHtml(order.branchName)}</div>` : ''
+    order?.branchName ? `<div><strong>Şube:</strong> ${escapeHtml(order.branchName)}</div>` : ''
   ].filter(Boolean).join('')
 
   const summaryRows = [
-    ['Siparis No', order?.orderNumber || '-'],
+    ['Sipariş No', order?.orderNumber || '-'],
     ['Tarih', formatDate(order?.createdAt)],
-    ['Siparis Durumu', statusMeta[order?.orderStatus]?.label || String(order?.orderStatus || '-')],
-    ['Odeme Durumu', paymentMeta[order?.paymentStatus]?.label || String(order?.paymentStatus || '-')],
-    ['Odeme Tipi', paymentMethodLabel(order?.paymentMethod, order)]
+    ['Sipariş Durumu', statusMeta[order?.orderStatus]?.label || String(order?.orderStatus || '-')],
+    ['Ödeme Durumu', paymentMeta[order?.paymentStatus]?.label || String(order?.paymentStatus || '-')],
+    ['Ödeme Tipi', paymentMethodLabel(order?.paymentMethod, order)]
   ].map(([label, value]) => `
     <div class="row">
       <span>${escapeHtml(label)}</span>
@@ -138,7 +138,7 @@ function buildQrOrderReceiptHtml(order) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Siparis Fisi - ${escapeHtml(order?.orderNumber || order?.id || '')}</title>
+  <title>Sipariş Fişi - ${escapeHtml(order?.orderNumber || order?.id || '')}</title>
   <style>
     :root {
       color-scheme: light;
@@ -270,8 +270,8 @@ function buildQrOrderReceiptHtml(order) {
 </head>
 <body>
   <div class="page">
-    <div class="title">Siparis Fisi</div>
-    <div class="subtitle">${escapeHtml(order?.branchName || 'QR Siparis')}</div>
+    <div class="title">Sipariş Fişi</div>
+    <div class="subtitle">${escapeHtml(order?.branchName || 'QR Sipariş')}</div>
     <div class="divider"></div>
 
     <div class="meta">${summaryRows}</div>
@@ -279,20 +279,20 @@ function buildQrOrderReceiptHtml(order) {
     ${customerInfo ? `<div class="divider"></div><div class="customer">${customerInfo}</div>` : ''}
 
     <div class="divider"></div>
-    <div class="items">${itemRows || '<div class="item-meta">Urun bulunamadi.</div>'}</div>
+    <div class="items">${itemRows || '<div class="item-meta">Ürün bulunamadı.</div>'}</div>
 
     <div class="divider"></div>
     <div class="totals">
       <div class="row"><span>Ara Toplam</span><strong>${escapeHtml(formatPrintMoney(order?.subtotal ?? order?.total ?? 0))}</strong></div>
-      ${Number(order?.discountTotal || 0) > 0 ? `<div class="row"><span>Indirim${Number(order?.discountPercent || 0) > 0 ? ` (%${escapeHtml(Number(order.discountPercent).toLocaleString('tr-TR'))})` : ''}</span><strong>- ${escapeHtml(formatPrintMoney(order?.discountTotal || 0))}</strong></div>` : ''}
+      ${Number(order?.discountTotal || 0) > 0 ? `<div class="row"><span>İndirim${Number(order?.discountPercent || 0) > 0 ? ` (%${escapeHtml(Number(order.discountPercent).toLocaleString('tr-TR'))})` : ''}</span><strong>- ${escapeHtml(formatPrintMoney(order?.discountTotal || 0))}</strong></div>` : ''}
       <div class="row grand-total"><span>Toplam</span><strong>${escapeHtml(formatPrintMoney(order?.total || 0))}</strong></div>
-      <div class="row"><span>Odeme Kanali</span><strong>${escapeHtml(paymentMethodLabel(order?.paymentMethod, order))}</strong></div>
+      <div class="row"><span>Ödeme Kanalı</span><strong>${escapeHtml(paymentMethodLabel(order?.paymentMethod, order))}</strong></div>
     </div>
 
-    ${order?.customerNote ? `<div class="divider"></div><div class="footer"><div><strong>Musteri Notu:</strong> ${escapeHtml(order.customerNote)}</div></div>` : ''}
+    ${order?.customerNote ? `<div class="divider"></div><div class="footer"><div><strong>Müşteri Notu:</strong> ${escapeHtml(order.customerNote)}</div></div>` : ''}
 
     <div class="actions">
-      <button type="button" onclick="window.print()">Yazdir</button>
+      <button type="button" onclick="window.print()">Yazdır</button>
       <button type="button" class="secondary" onclick="window.close()">Kapat</button>
     </div>
   </div>
@@ -500,42 +500,42 @@ function buildQrOrderReceiptPdfCanvas(order) {
     y += 8
   }
 
-  drawCentered('Siparis Fisi', '900 42px Arial', textColor, 44)
-  drawCentered(order?.branchName || 'QR Siparis', '700 24px Arial', accentColor, 32)
+  drawCentered('Sipariş Fişi', '900 42px Arial', textColor, 44)
+  drawCentered(order?.branchName || 'QR Sipariş', '700 24px Arial', accentColor, 32)
   if (order?.branchName) {
-    drawCentered(`QR Siparis ${order?.orderNumber || order?.id || ''}`, '700 20px Arial', mutedColor, 28)
+    drawCentered(`QR Sipariş ${order?.orderNumber || order?.id || ''}`, '700 20px Arial', mutedColor, 28)
   }
   drawDivider()
 
-  drawLabelValue('Siparis No', order?.orderNumber || order?.id || '-')
+  drawLabelValue('Sipariş No', order?.orderNumber || order?.id || '-')
   drawLabelValue('Tarih', formatDate(order?.createdAt))
-  drawLabelValue('Siparis Durumu', statusMeta[order?.orderStatus]?.label || String(order?.orderStatus || '-'))
-  drawLabelValue('Odeme Durumu', paymentMeta[order?.paymentStatus]?.label || String(order?.paymentStatus || '-'))
-  drawLabelValue('Odeme Tipi', paymentMethodLabel(order?.paymentMethod, order))
+  drawLabelValue('Sipariş Durumu', statusMeta[order?.orderStatus]?.label || String(order?.orderStatus || '-'))
+  drawLabelValue('Ödeme Durumu', paymentMeta[order?.paymentStatus]?.label || String(order?.paymentStatus || '-'))
+  drawLabelValue('Ödeme Tipi', paymentMethodLabel(order?.paymentMethod, order))
 
   const customerLines = [
-    order?.customerName ? `Musteri: ${order.customerName}` : '',
+    order?.customerName ? `Müşteri: ${order.customerName}` : '',
     order?.customerPhone ? `Telefon: ${order.customerPhone}` : '',
     order?.customerLocation ? `Lokasyon: ${order.customerLocation}` : '',
     order?.customerAddress ? `Adres: ${order.customerAddress}` : '',
-    order?.branchName ? `Sube: ${order.branchName}` : ''
+    order?.branchName ? `Şube: ${order.branchName}` : ''
   ].filter(Boolean)
   if (customerLines.length > 0) {
     drawDivider()
-    drawBlock('Musteri Bilgileri', customerLines.join('  |  '))
+    drawBlock('Müşteri Bilgileri', customerLines.join('  |  '))
   }
 
   drawDivider()
   ctx.font = '800 28px Arial'
   ctx.fillStyle = textColor
-  ctx.fillText('Urunler', pagePadding, y)
+  ctx.fillText('Ürünler', pagePadding, y)
   y += 44
 
   const items = Array.isArray(order?.items) ? order.items : []
   if (items.length === 0) {
     ctx.font = '400 24px Arial'
     ctx.fillStyle = mutedColor
-    ctx.fillText('Urun bulunamadi.', pagePadding, y)
+    ctx.fillText('Ürün bulunamadı.', pagePadding, y)
     y += 40
   } else {
     for (const item of items) {
@@ -573,21 +573,21 @@ function buildQrOrderReceiptPdfCanvas(order) {
   drawLabelValue('Ara Toplam', formatPrintMoney(order?.subtotal ?? order?.total ?? 0))
   if (Number(order?.discountTotal || 0) > 0) {
     const discountLabel = Number(order?.discountPercent || 0) > 0
-      ? `Indirim (%${Number(order?.discountPercent || 0).toLocaleString('tr-TR')})`
-      : 'Indirim'
+      ? `İndirim (%${Number(order?.discountPercent || 0).toLocaleString('tr-TR')})`
+      : 'İndirim'
     drawLabelValue(discountLabel, `- ${formatPrintMoney(order?.discountTotal || 0)}`)
   }
   drawLabelValue('Toplam', formatPrintMoney(order?.total || 0))
 
   if (order?.customerNote) {
     drawDivider()
-    drawBlock('Musteri Notu', order.customerNote)
+    drawBlock('Müşteri Notu', order.customerNote)
   }
 
   y += 10
   ctx.font = '700 22px Arial'
   ctx.fillStyle = mutedColor
-  const footerText = 'PenPOS QR Siparis'
+  const footerText = 'PenPOS QR Sipariş'
   const footerMeasure = ctx.measureText(footerText)
   ctx.fillText(footerText, (width - footerMeasure.width) / 2, y)
   y += 36
@@ -627,7 +627,7 @@ function openQrOrderReceiptPrint(order) {
   const win = window.open(url, '_blank', 'noopener,noreferrer,width=480,height=900')
   if (!win) {
     window.setTimeout(() => URL.revokeObjectURL(url), 15000)
-    throw new Error('Yazdirma penceresi acilamadi')
+    throw new Error('Yazdırma penceresi açılamadı')
   }
   window.setTimeout(() => {
     try {
@@ -657,8 +657,8 @@ function mapPaymentTypeToCollectionMethod(type) {
 
 function getNextOrderAction(status) {
   const flow = {
-    new: { nextStatus: 'preparing', label: 'Hazirlamaya Gec' },
-    preparing: { nextStatus: 'ready', label: 'Hazir Olarak Isaretle' },
+    new: { nextStatus: 'preparing', label: 'Hazırlamaya Geç' },
+    preparing: { nextStatus: 'ready', label: 'Hazır Olarak İşaretle' },
     ready: { nextStatus: 'delivered', label: 'Teslim Edildi Yap' }
   }
   return flow[String(status || '')] || null
@@ -668,8 +668,8 @@ function getNextPaymentAction(status, isTransferredToCari) {
   if (isTransferredToCari || String(status || '') === 'cari') return null
 
   const flow = {
-    pending: { nextStatus: 'paid', label: 'Odendi Olarak Isaretle' },
-    unpaid: { nextStatus: 'paid', label: 'Odendi Olarak Isaretle' }
+    pending: { nextStatus: 'paid', label: 'Ödendi Olarak İşaretle' },
+    unpaid: { nextStatus: 'paid', label: 'Ödendi Olarak İşaretle' }
   }
 
   return flow[String(status || '')] || null
@@ -838,7 +838,7 @@ function SearchField({ value, onChange, compact = false, hideLabel = false }) {
           className="input"
           value={value}
           onChange={onChange}
-          placeholder={compact ? 'Ara' : 'Ad, telefon, siparis no'}
+          placeholder={compact ? 'Ara' : 'Ad, telefon, sipariş no'}
           aria-label="Ara"
           style={{ paddingLeft: compact ? 24 : 38, minHeight: compact ? 30 : undefined, fontSize: 13 }}
         />
@@ -956,7 +956,7 @@ export default function CanteenQrOrdersPage() {
     const response = await api(`/api/magaza/qr-orders${queryString ? `?${queryString}` : ''}`, { silent: true })
     if (!response?.ok) {
       setOrders([])
-      setError(response?.message || 'QR siparisleri yuklenemedi.')
+      setError(response?.message || 'QR siparişleri yüklenemedi.')
       if (!background) setLoading(false)
       return
     }
@@ -984,7 +984,7 @@ export default function CanteenQrOrdersPage() {
       ...options
     })
     if (!response?.ok) {
-      setError(response?.message || 'Islem tamamlanamadi.')
+      setError(response?.message || 'İşlem tamamlanamadı.')
       return null
     }
     await load()
@@ -999,6 +999,10 @@ export default function CanteenQrOrdersPage() {
   }
 
   const updatePayment = async (order, paymentStatus, paymentMethod = '') => {
+    if (discountPercentError) {
+      setError(discountPercentError)
+      return
+    }
     await callAction(`/api/magaza/qr-orders/${encodeURIComponent(order.id)}/payment`, {
       method: 'PATCH',
       body: JSON.stringify({ paymentStatus, paymentMethod, discountPercent: selectedDiscountPercent })
@@ -1022,7 +1026,7 @@ export default function CanteenQrOrdersPage() {
       const customerId = String(order?.cariId || order?.customerId || '')
       const collectionMethod = mapPaymentTypeToCollectionMethod(methodType)
       if (!customerId || !collectionMethod) {
-        setError('Cari tahsilati icin gecerli musteri veya odeme yontemi bulunamadi.')
+        setError('Cari tahsilatı için geçerli müşteri veya ödeme yöntemi bulunamadı.')
         return
       }
 
@@ -1046,6 +1050,10 @@ export default function CanteenQrOrdersPage() {
   }
 
   const transferToCari = async (order, createCustomerIfMissing = false) => {
+    if (discountPercentError) {
+      setError(discountPercentError)
+      return
+    }
     const response = await api(`/api/magaza/qr-orders/${encodeURIComponent(order.id)}/transfer-to-cari`, {
       method: 'POST',
       silent: true,
@@ -1057,7 +1065,7 @@ export default function CanteenQrOrdersPage() {
         setCreateCariCandidate(order)
         return
       }
-      setError(response?.message || 'Siparis cariye islenemedi.')
+      setError(response?.message || 'Sipariş cariye işlenemedi.')
       return
     }
     setCreateCariCandidate(null)
@@ -1074,7 +1082,7 @@ export default function CanteenQrOrdersPage() {
     try {
       openQrOrderReceiptPrint(order)
     } catch (err) {
-      setError(err?.message || 'Siparis fisi acilamadi.')
+      setError(err?.message || 'Sipariş fişi açılamadı.')
     }
   }
 
@@ -1082,7 +1090,7 @@ export default function CanteenQrOrdersPage() {
     try {
       downloadQrOrderReceiptPdf(order)
     } catch (err) {
-      setError(err?.message || 'Siparis fisi PDF olarak indirilemedi.')
+      setError(err?.message || 'Sipariş fişi PDF olarak indirilemedi.')
     }
   }
 
@@ -1120,11 +1128,16 @@ export default function CanteenQrOrdersPage() {
     [filteredOrders, selectedOrderId]
   )
   const selectedGrossTotal = useMemo(() => Number(selected?.subtotal ?? selected?.total ?? 0), [selected])
+  const discountInputValue = String(discountDraft || '0').replace(',', '.').trim()
+  const parsedDiscountPercent = Number(discountInputValue === '' ? '0' : discountInputValue)
+  const discountPercentError = !Number.isFinite(parsedDiscountPercent)
+    ? 'İndirim oranı sayı olmalıdır.'
+    : parsedDiscountPercent < 0 || parsedDiscountPercent > 100
+      ? 'İndirim oranı 0 ile 100 arasında olmalıdır.'
+      : ''
   const selectedDiscountPercent = useMemo(() => {
-    const value = Number(String(discountDraft || '0').replace(',', '.'))
-    if (!Number.isFinite(value)) return 0
-    return Math.max(0, Math.min(100, value))
-  }, [discountDraft])
+    return discountPercentError ? 0 : parsedDiscountPercent
+  }, [discountPercentError, parsedDiscountPercent])
   const selectedDiscountTotal = useMemo(
     () => roundMoney((selectedGrossTotal * selectedDiscountPercent) / 100),
     [selectedDiscountPercent, selectedGrossTotal]
@@ -1186,10 +1199,10 @@ export default function CanteenQrOrdersPage() {
       >
         <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'flex-start', gap: isMobile ? 8 : 10, flexWrap: 'wrap' }}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? (isNarrowMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))') : 'repeat(4, minmax(180px, 1fr))', gap: isMobile ? 6 : 10, flex: '1 1 820px', minWidth: 0 }}>
-            <StatCard label="Toplam Siparis" value={stats.totalOrders} tone="dark" compact={isMobile} />
+            <StatCard label="Toplam Sipariş" value={stats.totalOrders} tone="dark" compact={isMobile} />
             <StatCard label="Toplam Tutar" value={formatMoney(stats.totalRevenue)} tone="blue" compact={isMobile} />
-            <StatCard label="Bekleyen Isler" value={stats.waitingOrders} tone="amber" compact={isMobile} />
-            <StatCard label="Cariye Islenen" value={stats.cariOrders} tone="green" compact={isMobile} />
+            <StatCard label="Bekleyen İşler" value={stats.waitingOrders} tone="amber" compact={isMobile} />
+            <StatCard label="Cariye İşlenen" value={stats.cariOrders} tone="green" compact={isMobile} />
           </div>
         </div>
 
@@ -1212,44 +1225,44 @@ export default function CanteenQrOrdersPage() {
             hideLabel
             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
           />
-          <FilterField label="Siparis" compact hideLabel>
+          <FilterField label="Sipariş" compact hideLabel>
             <select
               className="input"
-              aria-label="Siparis Durumu"
+              aria-label="Sipariş Durumu"
               style={{ minHeight: isMobile ? 30 : 40, fontSize: 13, paddingInline: isMobile ? 8 : 12 }}
               value={filters.status}
               onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
             >
-              <option value="">Siparis</option>
+              <option value="">Sipariş</option>
               {orderStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FilterField>
-          <FilterField label="Odeme" compact hideLabel>
+          <FilterField label="Ödeme" compact hideLabel>
             <select
               className="input"
-              aria-label="Odeme Durumu"
+              aria-label="Ödeme Durumu"
               style={{ minHeight: isMobile ? 30 : 40, fontSize: 13, paddingInline: isMobile ? 8 : 12 }}
               value={filters.paymentStatus}
               onChange={(event) => setFilters((current) => ({ ...current, paymentStatus: event.target.value }))}
             >
-              <option value="">Odeme</option>
+              <option value="">Ödeme</option>
               {paymentStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FilterField>
-          <FilterField label="Baslangic" compact hideLabel>
+          <FilterField label="Başlangıç" compact hideLabel>
             <input
               className="input"
-              aria-label="Baslangic"
+              aria-label="Başlangıç"
               style={{ minHeight: isMobile ? 30 : 40, fontSize: 13, paddingInline: isMobile ? 8 : 12 }}
               type="date"
               value={filters.dateStart}
               onChange={(event) => setFilters((current) => ({ ...current, dateStart: event.target.value }))}
             />
           </FilterField>
-          <FilterField label="Bitis" compact hideLabel>
+          <FilterField label="Bitiş" compact hideLabel>
             <input
               className="input"
-              aria-label="Bitis"
+              aria-label="Bitiş"
               style={{ minHeight: isMobile ? 30 : 40, fontSize: 13, paddingInline: isMobile ? 8 : 12 }}
               type="date"
               value={filters.dateEnd}
@@ -1323,8 +1336,8 @@ export default function CanteenQrOrdersPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(108px, 1fr))', gap: isMobile ? 10 : 8 }}>
-                <SummaryField label="Siparis No" value={order.orderNumber} compact={isMobile} />
-                <SummaryField label="Urun Adedi" value={`${itemCount} adet`} compact={isMobile} />
+                <SummaryField label="Sipariş No" value={order.orderNumber} compact={isMobile} />
+                <SummaryField label="Ürün Adedi" value={`${itemCount} adet`} compact={isMobile} />
                 <SummaryField label="Tarih / Saat" value={formatDate(order.createdAt)} compact={isMobile} />
               </div>
 
@@ -1359,7 +1372,7 @@ export default function CanteenQrOrdersPage() {
                     }}
                     style={{ borderRadius: isMobile ? 14 : 14, padding: isMobile ? '10px 12px' : '10px 14px', fontWeight: 900, fontSize: isMobile ? mobileCardScale.button : 13, minHeight: isMobile ? 42 : undefined }}
                   >
-                    Detay Ac
+                    Detay Aç
                   </button>
                   <button
                     className="btn"
@@ -1403,12 +1416,12 @@ export default function CanteenQrOrdersPage() {
               fontSize: 13
             }}
           >
-            Kriterlere uygun QR siparisi bulunamadi.
+            Kriterlere uygun QR siparişi bulunamadı.
           </div>
         ) : null}
       </div>
 
-      <Modal open={!!selected} onClose={() => setSelectedOrderId(null)} title="QR Siparis Detayi">
+      <Modal open={!!selected} onClose={() => setSelectedOrderId(null)} title="QR Sipariş Detayı">
         {selected ? (
           <div style={{ display: 'grid', gap: 14 }}>
             <div
@@ -1434,25 +1447,25 @@ export default function CanteenQrOrdersPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
-                <SummaryField label="Musteri" value={selected.customerName || 'Misafir'} />
+                <SummaryField label="Müşteri" value={selected.customerName || 'Misafir'} />
                 <SummaryField label="Telefon" value={selected.customerPhone} />
-                <SummaryField label="Siparis No" value={selected.orderNumber} />
+                <SummaryField label="Sipariş No" value={selected.orderNumber} />
                 <SummaryField label="Toplam" value={formatMoney(selected.total)} align="right" />
                 <SummaryField label="Lokasyon" value={selected.customerLocation || '-'} />
-                <SummaryField label="Sube" value={selected.branchName || '-'} />
+                <SummaryField label="Şube" value={selected.branchName || '-'} />
               </div>
             </div>
 
-            <SectionBlock title="Musteri Bilgileri">
+            <SectionBlock title="Müşteri Bilgileri">
               <div style={{ display: 'grid', gap: 8 }}>
                 {selected.customerAddress ? <div><strong>Adres:</strong> {selected.customerAddress}</div> : null}
                 {selected.customerEmail ? <div><strong>E-posta:</strong> {selected.customerEmail}</div> : null}
-                {selected.customerNote ? <div><strong>Musteri Notu:</strong> {selected.customerNote}</div> : null}
-                {!selected.customerAddress && !selected.customerEmail && !selected.customerNote ? <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13 }}>Ek musteri bilgisi yok.</div> : null}
+                {selected.customerNote ? <div><strong>Müşteri Notu:</strong> {selected.customerNote}</div> : null}
+                {!selected.customerAddress && !selected.customerEmail && !selected.customerNote ? <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13 }}>Ek müşteri bilgisi yok.</div> : null}
               </div>
             </SectionBlock>
 
-            <SectionBlock title="Siparis Urunleri">
+            <SectionBlock title="Sipariş Ürünleri">
               <div style={{ display: 'grid', gap: 12 }}>
                 {(Array.isArray(selected.items) ? selected.items : []).map((item, index) => (
                   <div
@@ -1477,14 +1490,14 @@ export default function CanteenQrOrdersPage() {
                       <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13, marginTop: 4, fontWeight: 700 }}>
                         {item.quantity} adet • {formatMoney(item.unitPrice)} / birim
                       </div>
-                      {item.note ? <div style={{ marginTop: 8 }}><strong>Urun notu:</strong> {item.note}</div> : null}
+                      {item.note ? <div style={{ marginTop: 8 }}><strong>Ürün notu:</strong> {item.note}</div> : null}
                     </div>
                   </div>
                 ))}
               </div>
             </SectionBlock>
 
-            <SectionBlock title="Bagli Tahsilatlar">
+            <SectionBlock title="Bağlı Tahsilatlar">
               <div style={{ display: 'grid', gap: 8 }}>
                 {(Array.isArray(selected.linkedCollections) ? selected.linkedCollections : []).map((collection) => (
                   <div
@@ -1531,22 +1544,22 @@ export default function CanteenQrOrdersPage() {
                 ))}
                 {(!Array.isArray(selected.linkedCollections) || selected.linkedCollections.length === 0) ? (
                   <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13 }}>
-                    Bu siparise bagli tahsilat kaydi yok.
+                    Bu siparişe bağlı tahsilat kaydı yok.
                   </div>
                 ) : null}
               </div>
             </SectionBlock>
 
-            <SectionBlock title="Hizli Islemler">
+            <SectionBlock title="Hızlı İşlemler">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn" type="button" onClick={() => printOrderReceipt(selected)} style={{ fontSize: 13 }}>Siparis Fisi Yazdir</button>
-                <button className="btn" type="button" onClick={() => downloadOrderReceiptPdf(selected)} style={{ fontSize: 13 }}>Siparis Fisi PDF Indir</button>
-                <button className="btn" type="button" onClick={() => updateStatus(selected, 'cancelled')} style={{ fontSize: 13 }}>Iptal Et</button>
+                <button className="btn" type="button" onClick={() => printOrderReceipt(selected)} style={{ fontSize: 13 }}>Sipariş Fişi Yazdır</button>
+                <button className="btn" type="button" onClick={() => downloadOrderReceiptPdf(selected)} style={{ fontSize: 13 }}>Sipariş Fişi PDF İndir</button>
+                <button className="btn" type="button" onClick={() => updateStatus(selected, 'cancelled')} style={{ fontSize: 13 }}>İptal Et</button>
                 <button className="btn" type="button" onClick={() => removeOrder(selected)} style={{ fontSize: 13 }}>Sil</button>
               </div>
             </SectionBlock>
 
-            <SectionBlock title="Durum Guncelle">
+            <SectionBlock title="Durum Güncelle">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {getNextOrderAction(selected.orderStatus) ? (
                   <button
@@ -1583,7 +1596,7 @@ export default function CanteenQrOrdersPage() {
                         borderColor: 'var(--app-border, var(--border))'
                       }}
                     >
-                      Odeme Al
+                      Ödeme Al
                     </button>
 
                     {paymentPickerOpen ? (
@@ -1600,7 +1613,7 @@ export default function CanteenQrOrdersPage() {
                               fontWeight: 800
                             }}
                           >
-                            {discountPickerOpen ? 'Indirimi Gizle' : `Indirim ${selectedDiscountPercent > 0 ? `%${selectedDiscountPercent}` : ''}`.trim()}
+                            {discountPickerOpen ? 'İndirimi Gizle' : `İndirim ${selectedDiscountPercent > 0 ? `%${selectedDiscountPercent}` : ''}`.trim()}
                           </button>
                         </div>
 
@@ -1618,11 +1631,11 @@ export default function CanteenQrOrdersPage() {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Brut</div>
+                              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Brüt</div>
                               <div style={{ fontWeight: 700 }}>{formatMoney(selectedGrossTotal)}</div>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Indirim (%)</div>
+                              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>İndirim (%)</div>
                               <input
                                 className="input"
                                 type="text"
@@ -1634,8 +1647,9 @@ export default function CanteenQrOrdersPage() {
                                 dir="ltr"
                               />
                             </div>
+                            {discountPercentError ? <div role="alert" style={{ color: 'color-mix(in srgb, #ef4444 78%, var(--app-text, var(--text)))', fontSize: 12 }}>{discountPercentError}</div> : null}
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Indirim Tutari</div>
+                              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>İndirim Tutarı</div>
                               <div style={{ fontWeight: 700 }}>{formatMoney(selectedDiscountTotal)}</div>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
@@ -1652,7 +1666,7 @@ export default function CanteenQrOrdersPage() {
                               className="btn"
                               type="button"
                               onClick={() => handleTakePayment(selected, method)}
-                              disabled={method.type === 'account' && hasCariRecord(selected)}
+                              disabled={!!discountPercentError || (method.type === 'account' && hasCariRecord(selected))}
                               style={{
                                 fontSize: 13,
                                 minHeight: 42,
@@ -1678,14 +1692,14 @@ export default function CanteenQrOrdersPage() {
                 <button
                   className="btn"
                   type="button"
-                  disabled={selected.isTransferredToCari || selected.paymentStatus === 'paid' || selected.orderStatus === 'cancelled'}
+                  disabled={!!discountPercentError || selected.isTransferredToCari || selected.paymentStatus === 'paid' || selected.orderStatus === 'cancelled'}
                   onClick={() => transferToCari(selected, true)}
                   style={{
                     fontSize: 13,
                     minHeight: 42,
                     borderRadius: 14,
                     fontWeight: 900,
-                    opacity: selected.isTransferredToCari || selected.paymentStatus === 'paid' || selected.orderStatus === 'cancelled' ? 0.55 : 1,
+                    opacity: discountPercentError || selected.isTransferredToCari || selected.paymentStatus === 'paid' || selected.orderStatus === 'cancelled' ? 0.55 : 1,
                     background: 'color-mix(in srgb, var(--theme-accent) 16%, var(--app-surface))',
                     borderColor: 'var(--app-border, var(--border))',
                     color: 'var(--theme-accent-text, var(--app-text))'
@@ -1699,11 +1713,11 @@ export default function CanteenQrOrdersPage() {
         ) : null}
       </Modal>
 
-      <Modal open={!!createCariCandidate} onClose={() => setCreateCariCandidate(null)} title="Yeni Cari Olusturulsun Mu?">
+      <Modal open={!!createCariCandidate} onClose={() => setCreateCariCandidate(null)} title="Yeni Cari Oluşturulsun mu?">
         {createCariCandidate ? (
           <div style={{ display: 'grid', gap: 16 }}>
             <div style={{ color: 'var(--app-text-secondary, var(--muted))', lineHeight: 1.55, fontWeight: 700, fontSize: 13 }}>
-              Bu telefon numarasi ile kayitli cari bulunamadi. Isterseniz musteri adi ve telefonu ile yeni cari olusturup siparisi borc olarak isleyebilirim.
+              Bu telefon numarasıyla kayıtlı cari bulunamadı. İsterseniz müşteri adı ve telefonuyla yeni cari oluşturup siparişi borç olarak işleyebilirim.
             </div>
             <div
               className="card"
@@ -1715,22 +1729,22 @@ export default function CanteenQrOrdersPage() {
                 color: 'var(--app-text, var(--text))'
               }}
             >
-              <div><strong>Musteri:</strong> {createCariCandidate.customerName}</div>
+              <div><strong>Müşteri:</strong> {createCariCandidate.customerName}</div>
               <div><strong>Telefon:</strong> {createCariCandidate.customerPhone}</div>
               <div><strong>Tutar:</strong> {formatMoney(String(selected?.id || '') === String(createCariCandidate.id || '') ? selectedNetTotal : createCariCandidate.total)}</div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn" type="button" onClick={() => setCreateCariCandidate(null)}>Vazgec</button>
-              <button className="btn btn--primary" type="button" onClick={() => transferToCari(createCariCandidate, true)}>Cari Olustur ve Kaydet</button>
+              <button className="btn" type="button" onClick={() => setCreateCariCandidate(null)}>Vazgeç</button>
+              <button className="btn btn--primary" type="button" onClick={() => transferToCari(createCariCandidate, true)}>Cari Oluştur ve Kaydet</button>
             </div>
           </div>
         ) : null}
       </Modal>
 
-      <Modal open={collectionDeleteOpen} onClose={() => setCollectionDeleteOpen(false)} title="Tahsilati Sil">
+      <Modal open={collectionDeleteOpen} onClose={() => setCollectionDeleteOpen(false)} title="Tahsilatı Sil">
         <div style={{ display: 'grid', gap: 12 }}>
           <div style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13 }}>
-            Bu tahsilat silindiginde QR siparisin odeme durumu da yeniden hesaplanacak.
+            Bu tahsilat silindiğinde QR siparişin ödeme durumu da yeniden hesaplanacak.
           </div>
           <div
             className="card"
@@ -1742,7 +1756,7 @@ export default function CanteenQrOrdersPage() {
               border: '1px solid var(--app-border, var(--border))'
             }}
           >
-            <div><strong>Yontem:</strong> {collectionDeleteTarget?.methodLabel || '-'}</div>
+            <div><strong>Yöntem:</strong> {collectionDeleteTarget?.methodLabel || '-'}</div>
             <div><strong>Tutar:</strong> {formatMoney(collectionDeleteTarget?.amount || 0)}</div>
           </div>
           <label style={{ display: 'grid', gap: 6 }}>

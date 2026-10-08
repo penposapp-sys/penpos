@@ -68,9 +68,9 @@ export default function SettingsDeliveryPage() {
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="card" style={{ borderColor: 'var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Paket Servis Musterileri</div>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Paket Servis Müşterileri</div>
           <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-            Paket siparislerinde kayitli kisi bilgileri burada tutulur. Isim veya telefonla arayip eski siparislerini gorebilirsin.
+            Paket siparişlerinde kayıtlı kişi bilgileri burada tutulur. İsim veya telefonla arayıp eski siparişlerini görebilirsin.
           </div>
         </div>
         <Link className="btn" to="/restoran/app/delivery">Paket Servise Git</Link>
@@ -78,10 +78,10 @@ export default function SettingsDeliveryPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait || isTablet ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr)', gap: 12 }}>
         <div className="card" style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
-          <input className="input" placeholder="Isim veya telefon ara" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="input" placeholder="İsim veya telefon ara" value={query} onChange={(e) => setQuery(e.target.value)} />
           <div style={{ display: 'grid', gap: 8 }}>
-            {loading && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Yukleniyor...</div>}
-            {!loading && customers.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Kayitli musteri yok.</div>}
+            {loading && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Yükleniyor...</div>}
+            {!loading && customers.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Kayıtlı müşteri yok.</div>}
             {customers.map((customer) => (
               <button
                 key={customer.id}
@@ -99,7 +99,7 @@ export default function SettingsDeliveryPage() {
                 <div style={{ display: 'grid', gap: 2 }}>
                   <div style={{ fontWeight: 700 }}>{customer.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)' }}>{customer.phone || '-'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{customer.orderCount || 0} siparis</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{customer.orderCount || 0} sipariş</div>
                 </div>
               </button>
             ))}
@@ -107,8 +107,8 @@ export default function SettingsDeliveryPage() {
         </div>
 
         <div className="card" style={{ display: 'grid', gap: 12, minWidth: 0 }}>
-          {!selectedId && <div style={{ color: 'var(--muted)' }}>Detay icin musteri sec.</div>}
-          {selectedId && detailLoading && <div style={{ color: 'var(--muted)' }}>Detay yukleniyor...</div>}
+          {!selectedId && <div style={{ color: 'var(--muted)' }}>Detay için müşteri seçin.</div>}
+          {selectedId && detailLoading && <div style={{ color: 'var(--muted)' }}>Detay yükleniyor...</div>}
           {selectedId && !detailLoading && detail?.customer && (
             <>
               <div style={{ display: 'grid', gap: 4 }}>
@@ -119,16 +119,16 @@ export default function SettingsDeliveryPage() {
               </div>
 
               <div style={{ display: 'grid', gap: 8 }}>
-                <div style={{ fontWeight: 800 }}>Eski Paket Siparisleri</div>
-                {(detail.orders || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Gecmis siparis yok.</div>}
+                <div style={{ fontWeight: 800 }}>Eski Paket Siparişleri</div>
+                {(detail.orders || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Geçmiş sipariş yok.</div>}
                 {(detail.orders || []).map((order) => (
                   <div key={order.id} className="card" style={{ borderColor: 'var(--border)', padding: 10, display: 'grid', gap: 4 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                      <div style={{ fontWeight: 700 }}>{order.orderNo ? `Siparis ${order.orderNo}` : order.id.slice(-6)}</div>
+                      <div style={{ fontWeight: 700 }}>{order.orderNo ? `Sipariş ${order.orderNo}` : order.id.slice(-6)}</div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>{order.createdAt ? new Date(order.createdAt).toLocaleString('tr-TR') : '-'}</div>
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--muted)' }}>Durum: {order.deliveryStatus || '-'}</div>
-                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Odeme: {order.paymentStatus || '-'}</div>
+                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ödeme: {order.paymentStatus || '-'}</div>
                     <div style={{ fontWeight: 700 }}>{Number(order.total || 0).toFixed(2)} TL</div>
                     {order.deliveryNote ? <div style={{ fontSize: 13 }}>Not: {order.deliveryNote}</div> : null}
                   </div>

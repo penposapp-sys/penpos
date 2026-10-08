@@ -24,8 +24,8 @@ const normalizeLabel = (value: unknown) => {
   if (['cash', 'nakit'].includes(key)) return 'Nakit'
   if (['card', 'kart', 'pos'].includes(key)) return 'Kart'
   if (['bank', 'banka', 'eft', 'havale'].includes(key)) return 'Banka'
-  if (['online', 'online odeme', 'online ödeme'].includes(key)) return 'Online Odeme'
-  if (['mealcard', 'meal_card', 'yemek karti', 'yemek kartı'].includes(key)) return 'Yemek Karti'
+  if (['online', 'online odeme', 'online ödeme'].includes(key)) return 'Online Ödeme'
+  if (['mealcard', 'meal_card', 'yemek karti', 'yemek kartı'].includes(key)) return 'Yemek Kartı'
   return String(value || '-')
 }
 
@@ -53,8 +53,8 @@ const buildPaymentTypeRows = (report: ZReportData): Array<Array<string>> => {
     const fallbackRows = [
       ['Nakit', Number(summary?.payments?.cash || 0)],
       ['Kart', Number(summary?.payments?.card || 0)],
-      ['Yemek Karti', Number(summary?.payments?.mealCard || 0)],
-      ['Online Odeme', Number(summary?.payments?.online || 0)],
+      ['Yemek Kartı', Number(summary?.payments?.mealCard || 0)],
+      ['Online Ödeme', Number(summary?.payments?.online || 0)],
       ['Veresiye', creditTotal]
     ].filter(([, total]) => total > 0)
 
@@ -86,7 +86,7 @@ const buildTableSection = (title: string, columns: string[], rows: Array<Array<s
         <tbody>
           ${rows.length > 0
             ? rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')
-            : `<tr><td colspan="${columns.length}" class="empty-cell">Bu bolum icin veri bulunamadi.</td></tr>`}
+            : `<tr><td colspan="${columns.length}" class="empty-cell">Bu bölüm için veri bulunamadı.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -100,14 +100,14 @@ const buildFallbackText = (report: ZReportData) => {
     String(report?.businessName || 'PenPOS'),
     '------------------------------------------------',
     `Tarih: ${String(report?.date || '-')}`,
-    `Sube: ${String(report?.branchName || '-')}`,
-    `Olusturma: ${generatedAt}`,
+    `Şube: ${String(report?.branchName || '-')}`,
+    `Oluşturma: ${generatedAt}`,
     '------------------------------------------------',
-    `Net Toplam Satis: ${Number(report?.summary?.netSales || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
-    `Yapilan Satis: ${Number(report?.summary?.paidSalesTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
-    `Veresiye Satis: ${Number(report?.summary?.payments?.credit || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
+    `Net Toplam Satış: ${Number(report?.summary?.netSales || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
+    `Yapılan Satış: ${Number(report?.summary?.paidSalesTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
+    `Veresiye Satış: ${Number(report?.summary?.payments?.credit || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
     `Toplam Tahsilat: ${Number(report?.summary?.cashIn?.total || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
-    `Yapilan Satis Adedi: ${Number(report?.summary?.orderCount || 0).toLocaleString('tr-TR')}`
+    `Yapılan Satış Adedi: ${Number(report?.summary?.orderCount || 0).toLocaleString('tr-TR')}`
   ].join('\n')
 }
 
@@ -227,39 +227,39 @@ export const buildZReportPdfHtml = (report: ZReportData) => {
           <div class="business">${escapeHtml(String(safeReport.businessName || 'PenPOS'))}</div>
         </div>
         <div class="meta">
-          <div class="meta-row"><span>Donem</span><strong>${escapeHtml(String(safeReport.date || '-'))}</strong></div>
-          <div class="meta-row"><span>Sube</span><strong>${escapeHtml(String(safeReport.branchName || '-'))}</strong></div>
-          <div class="meta-row"><span>Olusturma</span><strong>${escapeHtml(generatedAt)}</strong></div>
+          <div class="meta-row"><span>Dönem</span><strong>${escapeHtml(String(safeReport.date || '-'))}</strong></div>
+          <div class="meta-row"><span>Şube</span><strong>${escapeHtml(String(safeReport.branchName || '-'))}</strong></div>
+          <div class="meta-row"><span>Oluşturma</span><strong>${escapeHtml(generatedAt)}</strong></div>
         </div>
       </header>
 
       <section class="summary-grid">
-        <div class="summary-card"><div class="label">Net Toplam Satis</div><div class="value">${escapeHtml(toMoney(safeReport.summary?.netSales || 0))}</div></div>
-        <div class="summary-card"><div class="label">Yapilan Satis</div><div class="value">${escapeHtml(toMoney(safeReport.summary?.paidSalesTotal || 0))}</div></div>
-        <div class="summary-card"><div class="label">Veresiye Satis</div><div class="value">${escapeHtml(toMoney(payments.credit || 0))}</div></div>
+        <div class="summary-card"><div class="label">Net Toplam Satış</div><div class="value">${escapeHtml(toMoney(safeReport.summary?.netSales || 0))}</div></div>
+        <div class="summary-card"><div class="label">Yapılan Satış</div><div class="value">${escapeHtml(toMoney(safeReport.summary?.paidSalesTotal || 0))}</div></div>
+        <div class="summary-card"><div class="label">Veresiye Satış</div><div class="value">${escapeHtml(toMoney(payments.credit || 0))}</div></div>
         <div class="summary-card"><div class="label">Toplam Tahsilat</div><div class="value">${escapeHtml(toMoney(safeReport.summary?.cashIn?.total || 0))}</div></div>
-        <div class="summary-card"><div class="label">Yapilan Satis Adedi</div><div class="value">${escapeHtml(String(safeReport.summary?.orderCount || 0))}</div></div>
+        <div class="summary-card"><div class="label">Yapılan Satış Adedi</div><div class="value">${escapeHtml(String(safeReport.summary?.orderCount || 0))}</div></div>
       </section>
 
       <section class="panel">
-        <div class="section-title">Ozet Bilgiler</div>
+        <div class="section-title">Özet Bilgiler</div>
         <div class="info-list">
           ${buildInfoRows([
-            ['Toplam urun adedi', String(safeReport.summary?.productCount || 0)],
-            ['Toplam satis', toMoney(safeReport.summary?.netSales || 0)],
-            ['Indirim', toMoney(safeReport.summary?.discountTotal || 0)],
+            ['Toplam ürün adedi', String(safeReport.summary?.productCount || 0)],
+            ['Toplam satış', toMoney(safeReport.summary?.netSales || 0)],
+            ['İndirim', toMoney(safeReport.summary?.discountTotal || 0)],
             ['Kasadaki toplam', toMoney(safeReport.summary?.cashIn?.total || 0)],
             ['Veresiye / cari', toMoney(safeReport.summary?.periodCreditBalance || 0)],
-            ['Veresiye tahsilati', toMoney(safeReport.summary?.collectionsTotal || 0)],
+            ['Veresiye tahsilatı', toMoney(safeReport.summary?.collectionsTotal || 0)],
             ['Toplam KDV', toMoney(totalVat)]
           ])}
         </div>
       </section>
 
-      ${buildTableSection('Odeme Tipleri', ['Tip', 'Toplam'], paymentTypeRows)}
-      ${buildTableSection('KDV Dagilimi', ['Oran', 'Matrah', 'KDV'], vatRows)}
-      ${buildTableSection('Personel Satislari', ['Personel', 'Adisyon', 'Toplam'], staffRows)}
-      ${buildTableSection('Satilan Urunler', ['Urun', 'Adet', 'Toplam'], soldProductRows)}
+      ${buildTableSection('Ödeme Tipleri', ['Tip', 'Toplam'], paymentTypeRows)}
+      ${buildTableSection('KDV Dağılımı', ['Oran', 'Matrah', 'KDV'], vatRows)}
+      ${buildTableSection('Personel Satışları', ['Personel', 'Adisyon', 'Toplam'], staffRows)}
+      ${buildTableSection('Satılan Ürünler', ['Ürün', 'Adet', 'Toplam'], soldProductRows)}
     </main>
   </div>
 </body>
@@ -270,8 +270,9 @@ export const openZReportPrintPreview = (report: ZReportData, autoPrint = true) =
   const html = buildZReportPrintHtml(report || ({} as ZReportData))
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank', 'noopener,noreferrer,width=480,height=900')
-  if (!win) throw new Error('Yazdirma penceresi acilamadi')
+  const win = window.open(url, '_blank', 'width=480,height=900')
+  if (!win) throw new Error('Yazdırma penceresi açılamadı')
+  win.opener = null
   if (autoPrint) {
     window.setTimeout(() => {
       try {
@@ -290,8 +291,9 @@ export const openZReportPdfPreview = (report: ZReportData, autoPrint = true) => 
   const html = buildZReportPdfHtml(report || ({} as ZReportData))
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank', 'noopener,noreferrer,width=1100,height=900')
-  if (!win) throw new Error('PDF onizleme penceresi acilamadi')
+  const win = window.open(url, '_blank', 'width=1100,height=900')
+  if (!win) throw new Error('PDF önizleme penceresi açılamadı')
+  win.opener = null
   if (autoPrint) {
     window.setTimeout(() => {
       try {

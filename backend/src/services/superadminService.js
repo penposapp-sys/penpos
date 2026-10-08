@@ -8,6 +8,7 @@ import { createUser } from '../repositories/userRepository.js'
 import { getPlanStatus, getPlanDaysLeft } from './planService.js'
 import { log as auditLog } from './auditService.js'
 import { normalizeSystemType, resolveTenantPackageType, toLegacySystemType } from '../utils/systemType.js'
+import { getTenantUsageMetrics } from './tenantUsageService.js'
 
 const buildPlanDto = async (tenant) => {
   const status = getPlanStatus(tenant)
@@ -61,6 +62,7 @@ export const createTenantService = async ({ name, slug, systemType }, actorUserI
 
 export const listTenantsService = async () => {
   const tenants = await listTenants()
+  const usageByTenant = await getTenantUsageMetrics(tenants.map((tenant) => tenant._id || tenant.id))
   const items = []
   for (const t of tenants) {
     items.push({
@@ -73,6 +75,14 @@ export const listTenantsService = async () => {
       vertical: t.vertical,
       businessType: t.businessType,
       createdAt: t.createdAt,
+      usage: usageByTenant.get(String(t._id || t.id)) || {
+        lastSeenAt: null,
+        lastActiveAt: null,
+        isOnline: false,
+        todayUsageSeconds: 0,
+        weekUsageSeconds: 0,
+        totalUsageSeconds: 0
+      },
       plan: await buildPlanDto(t)
     })
   }

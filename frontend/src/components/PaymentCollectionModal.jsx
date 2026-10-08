@@ -27,7 +27,7 @@ export default function PaymentCollectionModal({
   selectedPaymentIsCash = false,
   changeDue = 0,
   onSubmit,
-  submitLabel = 'Odeme Ekle',
+  submitLabel = 'Ödeme Ekle',
   showDiscount = false,
   discountDraft = '',
   onDiscountDraftChange,
@@ -41,15 +41,15 @@ export default function PaymentCollectionModal({
   const netTotal = Number(order?.netTotal ?? order?.totals?.netTotal ?? grossTotal)
   const paidTotal = Number(order?.paidTotal ?? order?.totals?.paidTotal ?? 0)
   const balanceDue = Math.max(0, Number(order?.balanceDue ?? order?.totals?.balanceDue ?? (netTotal - paidTotal)))
-  const metaLabel = order?.orderNo ? `Siparis ${order.orderNo}` : `Siparis #${String(order?.id || '').slice(-6)}`
+  const metaLabel = order?.orderNo ? `Sipariş ${order.orderNo}` : `Sipariş #${String(order?.id || '').slice(-6)}`
   const discountHistoryLine = discountTotal > 0
     ? {
         kind: 'discount',
         id: `discount:${String(order?.id || order?._id || metaLabel)}`,
         createdAt: order?.updatedAt || order?.createdAt || null,
         amount: discountTotal,
-        label: 'Indirim',
-        note: Number(order?.discountPercent || 0) > 0 ? `%${Number(order.discountPercent || 0)} indirim uygulandi` : '',
+        label: 'İndirim',
+        note: Number(order?.discountPercent || 0) > 0 ? `%${Number(order.discountPercent || 0)} indirim uygulandı` : '',
         accountName: '',
         canDelete: !!(showDiscount && canTakePayment && onDeleteLine)
       }
@@ -61,26 +61,26 @@ export default function PaymentCollectionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Odeme Al"
+      title="Ödeme Al"
       backdropClose={false}
       dialogStyle={{ width: 'min(700px, calc(100vw - 32px))', ...(dialogStyle || {}) }}
       bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}
     >
-      {!order ? <div>Yukleniyor...</div> : (
+      {!order ? <div>Yükleniyor...</div> : (
         <div className="payment-modal-stack">
           <div className="payment-meta-line">
-            {customerLabel} - {order?.customerName || 'Musteri'} - {metaLabel}
+            {customerLabel} - {order?.customerName || 'Müşteri'} - {metaLabel}
           </div>
 
           <div className="payment-panel">
             <div className="payment-panel-body payment-summary-card">
               <div className="payment-summary-row">
-                <div style={{ color: 'var(--muted)' }}>Brut</div>
+                <div style={{ color: 'var(--muted)' }}>Brüt</div>
                 <div style={{ fontWeight: 600 }}>{money(grossTotal)}</div>
               </div>
               {showDiscount ? (
                 <div className="payment-summary-row payment-summary-row--editor">
-                  <div style={{ color: 'var(--muted)' }}>Indirim (%)</div>
+                  <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
                   <div className="payment-summary-actions">
                     <input
                       type="number"
@@ -99,7 +99,7 @@ export default function PaymentCollectionModal({
               ) : null}
               {showDiscount ? (
                 <div className="payment-summary-row">
-                  <div style={{ color: 'var(--muted)' }}>Indirim Tutari</div>
+                  <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
                   <div style={{ fontWeight: 600 }}>{money(discountTotal)}</div>
                 </div>
               ) : null}
@@ -108,7 +108,7 @@ export default function PaymentCollectionModal({
                 <div style={{ fontWeight: 700 }}>{money(netTotal)}</div>
               </div>
               <div className="payment-summary-row">
-                <div style={{ color: 'var(--muted)' }}>Odenen</div>
+                <div style={{ color: 'var(--muted)' }}>Ödenen</div>
                 <div style={{ fontWeight: 600 }}>{money(paidTotal)}</div>
               </div>
               <div className="payment-summary-row">
@@ -121,7 +121,7 @@ export default function PaymentCollectionModal({
           {historyLines.length > 0 ? (
             <div className="payment-panel">
               <div className="payment-panel-body">
-                <div style={{ fontWeight: 600, marginBottom: 2 }}>Onceki Odemeler</div>
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>Önceki Ödemeler</div>
                 <div className="payment-history-list">
                   {historyLines.map((line) => (
                     <div key={`${line.kind}:${line.id}`} className="payment-history-row">
@@ -146,7 +146,7 @@ export default function PaymentCollectionModal({
           <div className="payment-panel">
             <div className="payment-panel-body">
               <div>
-                <div className="payment-field-label">Yontem</div>
+                <div className="payment-field-label">Yöntem</div>
                 <div className="payment-method-grid">
                   {visiblePayMethods.map((method) => {
                     const key = String(method?.key || method?.id || '')
@@ -183,7 +183,7 @@ export default function PaymentCollectionModal({
               </label>
               {selectedPaymentIsCash ? (
                 <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  <div>Parausu</div>
+                  <div>Para üstü</div>
                   <div style={{ fontWeight: 600 }}>{money(changeDue)}</div>
                 </div>
               ) : null}
@@ -193,7 +193,7 @@ export default function PaymentCollectionModal({
                     <SalesEntryDateButton
                       value={paymentDate}
                       onChange={onPaymentDateChange}
-                      title="Odeme tarihini sec"
+                      title="Ödeme tarihini seç"
                       showValue
                     />
                   ) : null}

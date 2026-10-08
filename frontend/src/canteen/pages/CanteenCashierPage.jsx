@@ -697,9 +697,12 @@ export default function CanteenCashierPage() {
   }, [cart, salePreviewLinesByProduct])
   const discountInputValue = String(discountDraft ?? '').replace(',', '.').trim()
   const parsedDiscountPercent = Number(discountInputValue === '' ? '0' : discountInputValue)
-  const discountPercent = Number.isFinite(parsedDiscountPercent)
-    ? Math.max(0, Math.min(100, parsedDiscountPercent))
-    : 0
+  const discountPercentError = !Number.isFinite(parsedDiscountPercent)
+    ? 'İndirim oranı sayı olmalıdır.'
+    : parsedDiscountPercent < 0 || parsedDiscountPercent > 100
+      ? 'İndirim oranı 0 ile 100 arasında olmalıdır.'
+      : ''
+  const discountPercent = discountPercentError ? 0 : parsedDiscountPercent
   const discountTotal = roundMoney((Number(total || 0) * discountPercent) / 100)
   const netTotal = roundMoney(Math.max(0, Number(total || 0) - discountTotal))
 
@@ -1024,6 +1027,10 @@ export default function CanteenCashierPage() {
 
   const completeSale = async () => {
     if (cart.length === 0) return
+    if (discountPercentError) {
+      setError(discountPercentError)
+      return
+    }
     if (paymentMethods.length === 0 || !payMethod) {
       setError('Aktif ödeme yöntemi yok. Mağaza ödeme ayarlarını kontrol edin.')
       return
@@ -1339,6 +1346,7 @@ export default function CanteenCashierPage() {
                   dir="ltr"
                 />
               </div>
+              {discountPercentError ? <div role="alert" style={{ color: 'color-mix(in srgb, #ef4444 78%, var(--app-text, var(--text)))', fontSize: 12 }}>{discountPercentError}</div> : null}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                 <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>İndirim Tutarı</div>
                 <div style={{ fontWeight: 700 }}>{money(discountTotal)} ₺</div>
@@ -1431,7 +1439,7 @@ export default function CanteenCashierPage() {
               </div>
             )}
 
-            <button className="btn btn--primary btn--large onlyDesktop kasaCheckoutButton" type="button" onClick={completeSale} disabled={saving || cart.length === 0}>
+            <button className="btn btn--primary btn--large onlyDesktop kasaCheckoutButton" type="button" onClick={completeSale} disabled={saving || cart.length === 0 || !!discountPercentError}>
               {saving ? 'Kaydediliyor...' : 'Satışı tamamla'}
             </button>
 
@@ -1457,7 +1465,7 @@ export default function CanteenCashierPage() {
             <div style={{ fontWeight: 800 }}>Toplam</div>
             <div style={{ fontWeight: 800 }}>{money(total)} ₺</div>
           </div>
-          <button className="btn btn--primary btn--large" type="button" onClick={completeSale} disabled={saving || cart.length === 0}>
+          <button className="btn btn--primary btn--large" type="button" onClick={completeSale} disabled={saving || cart.length === 0 || !!discountPercentError}>
             {saving ? 'Kaydediliyor...' : 'Satışı tamamla'}
           </button>
         </div>

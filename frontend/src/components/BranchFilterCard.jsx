@@ -143,7 +143,7 @@ export default function BranchFilterCard({
               </button>
               {!iconOnly && !hideSummary && (
                 <span style={{ color: 'var(--app-text-secondary, var(--muted))', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  {selectedNames.length > 0 ? `${selectedNames.length} şube seçili` : 'Tüm subeler seçili degil'}
+                  {selectedNames.length > 0 ? `${selectedNames.length} şube seçili` : 'Tüm şubeler seçili değil'}
                 </span>
               )}
             </div>
@@ -157,7 +157,7 @@ export default function BranchFilterCard({
                 onClick={() => setSelectedBranches(visibleOptions.map((branch) => branch.id))}
                 style={{ borderRadius: 16, padding: '10px 14px', fontWeight: 800 }}
               >
-                Tumunu Seç
+                Tümünü Seç
               </button>
               <button
                 type="button"
@@ -208,7 +208,7 @@ export default function BranchFilterCard({
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--app-text-secondary, var(--muted))' }}>
-                Gosterilecek subeleri seç
+                Gösterilecek şubeleri seç
               </div>
               {compact && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -218,7 +218,7 @@ export default function BranchFilterCard({
                     onClick={() => setSelectedBranches(visibleOptions.map((branch) => branch.id))}
                     style={{ borderRadius: 12, padding: '8px 10px', fontWeight: 800, fontSize: 12 }}
                   >
-                    Tumunu Seç
+                    Tümünü Seç
                   </button>
                   <button
                     type="button"

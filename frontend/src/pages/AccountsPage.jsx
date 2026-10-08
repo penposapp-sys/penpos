@@ -298,7 +298,7 @@ export default function AccountsPage() {
             openEdit(account)
           }}
         >
-          Duzenle
+          Düzenle
         </button>
         <button
           className="btn btn--xs btn--danger-soft"
@@ -429,7 +429,7 @@ export default function AccountsPage() {
         <div className="card" style={{ display: 'grid', placeItems: 'center', padding: 24 }}>
           <div style={{ maxWidth: 520, width: '100%', display: 'grid', gap: 10 }}>
             <div style={{ fontWeight: 800, fontSize: 18 }}>
-              Sube yetkisi yok. Ayarlar &gt; Sistem Ayarlari &gt; Yetkili Subeler'den sube sec.
+              Şube yetkisi yok. Ayarlar &gt; Sistem Ayarları &gt; Yetkili Şubeler'den şube seçin.
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {user?.role === 'tenant_admin' && (
@@ -457,7 +457,7 @@ export default function AccountsPage() {
                 </button>
               ) : null}
               <button className="btn" type="button" onClick={exportAccounts} disabled={exporting || loading}>
-                {exporting ? 'Indiriliyor...' : 'Indir'}
+                {exporting ? 'İndiriliyor...' : 'İndir'}
               </button>
               {canManage ? (
                 <button className="btn" type="button" onClick={() => setCreateOpen(true)}>
@@ -504,7 +504,7 @@ export default function AccountsPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', color: 'var(--muted)', fontSize: 13 }}>
-              <div>{loading ? 'Cari listesi guncelleniyor...' : `${accounts.length} cari listelendi`}</div>
+              <div>{loading ? 'Cari listesi güncelleniyor...' : `${accounts.length} cari listelendi`}</div>
               <div>{viewMode === 'table' ? 'Bir satira tiklayarak detay sayfasini acabilirsiniz.' : 'Bir karta tiklayarak detay sayfasini acabilirsiniz.'}</div>
             </div>
           </div>
@@ -513,7 +513,7 @@ export default function AccountsPage() {
 
           {!loading && (accounts || []).length === 0 ? (
             <div className="card" style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
-              Aramaniza uygun cari bulunamadi.
+              Aramanıza uygun cari bulunamadı.
             </div>
           ) : null}
 
@@ -524,14 +524,14 @@ export default function AccountsPage() {
                   <div style={{ fontWeight: 700, color: '#b91c1c' }}>{createError}</div>
                 </div>
               )}
-              <label>Isim <input ref={createNameRef} className="input" value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} /></label>
+              <label>İsim <input ref={createNameRef} className="input" value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} /></label>
               <label>Telefon <input ref={createPhoneRef} className="input" value={createForm.phone} onChange={(event) => setCreateForm({ ...createForm, phone: event.target.value })} /></label>
               <label>Not <input className="input" value={createForm.note} onChange={(event) => setCreateForm({ ...createForm, note: event.target.value })} /></label>
               <button className="btn" onClick={createAccount} disabled={createSaving}>{createSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
             </div>
           </Modal>
 
-          <Modal open={editOpen} onClose={() => { setEditOpen(false); setEditError('') }} title="Cari Duzenle">
+          <Modal open={editOpen} onClose={() => { setEditOpen(false); setEditError('') }} title="Cari Düzenle">
             <div style={{ display: 'grid', gap: 10 }}>
               {!!editError && (
                 <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>

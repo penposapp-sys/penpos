@@ -38,8 +38,10 @@ import { UPLOADS_STATIC_DIRS } from './utils/uploads.js'
 import debugRouter from './routes/debug.js'
 import canteenRouter from './modules/canteen/routes/canteen.js'
 import { getPublicWebsiteSettings } from './controllers/websiteSettingsController.js'
+import { startTenantUsageCleanup } from './services/tenantUsageService.js'
 
 export const createServer = () => {
+  startTenantUsageCleanup()
   const app = express()
   const __filename = fileURLToPath(import.meta.url)
   const __dirname = path.dirname(__filename)

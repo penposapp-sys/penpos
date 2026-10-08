@@ -20,22 +20,23 @@ const money = (value) =>
 const normalizeApiMessage = (message, fallback) => {
   const raw = String(message || '').trim()
   if (!raw) return fallback
-  if (raw === 'network_error') return 'Sunucuya ulasilamadi. Backend servisinin calistigini kontrol edin.'
+  if (raw === 'network_error') return 'Sunucuya ulaşılamadı. Backend servisinin çalıştığını kontrol edin.'
+  if (raw === 'start must be <= end') return 'Başlangıç tarihi bitiş tarihinden büyük olamaz.'
   return raw
 }
 
 const movementOptions = [
-  { key: 'all', label: 'Tumu' },
+  { key: 'all', label: 'Tümü' },
   { key: 'income', label: 'Sadece Gelir' },
   { key: 'expense', label: 'Sadece Gider' }
 ]
 
 const filterOptions = [
-  { key: 'all', label: 'Tumu' },
+  { key: 'all', label: 'Tümü' },
   { key: 'cash', label: 'Nakit' },
   { key: 'pos', label: 'POS' },
   { key: 'bank', label: 'Banka' },
-  { key: 'sales', label: 'Satis Geliri' },
+  { key: 'sales', label: 'Satış Geliri' },
   { key: 'collection', label: 'Cari Tahsilat' },
   { key: 'stock', label: 'Stok Hareketi' }
 ]
@@ -71,12 +72,17 @@ export default function CanteenCashReportModal({
 
   const branchSummary = useMemo(() => {
     const count = Array.isArray(branchIds) ? branchIds.length : 0
-    if (count <= 0) return 'Sube secilmedi'
-    if (count === 1) return '1 sube secili'
-    return `${count} sube secili`
+    if (count <= 0) return 'Şube seçilmedi'
+    if (count === 1) return '1 şube seçili'
+    return `${count} şube seçili`
   }, [branchIds])
 
   const loadReport = async () => {
+    if (start && end && start > end) {
+      setReport(null)
+      setError('Başlangıç tarihi bitiş tarihinden büyük olamaz.')
+      return
+    }
     setLoading(true)
     setError('')
     try {
@@ -96,11 +102,11 @@ export default function CanteenCashReportModal({
         suppressBranchModal: true,
         portalOverride: 'canteen'
       })
-      if (!res?.ok) throw new Error(normalizeApiMessage(res?.message, 'Kasa raporu alinamadi'))
+      if (!res?.ok) throw new Error(normalizeApiMessage(res?.message, 'Kasa raporu alınamadı'))
       setReport(res)
     } catch (err) {
       setReport(null)
-      setError(normalizeApiMessage(err?.message, 'Kasa raporu alinamadi'))
+      setError(normalizeApiMessage(err?.message, 'Kasa raporu alınamadı'))
     } finally {
       setLoading(false)
     }
@@ -149,14 +155,14 @@ export default function CanteenCashReportModal({
       <div style={{ display: 'grid', gap: isCompact ? 12 : 16 }}>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : 'minmax(220px, 0.95fr) minmax(340px, 1.35fr) minmax(240px, 0.7fr)' }}>
           <section style={{ ...cardStyle, display: 'grid', gap: 10, padding: isCompact ? 12 : 16, borderRadius: isCompact ? 14 : 18 }}>
-            <div style={{ fontSize: 15, fontWeight: 900 }}>Tarih Araliklari</div>
+            <div style={{ fontSize: 15, fontWeight: 900 }}>Tarih Aralıkları</div>
             <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : '1fr 1fr', gap: 10 }}>
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 700 }}>Baslangic</span>
+                <span style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 700 }}>Başlangıç</span>
                 <input className="input" type="date" value={start} onChange={(event) => setStart(event.target.value)} />
               </label>
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 700 }}>Bitis</span>
+                <span style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))', fontWeight: 700 }}>Bitiş</span>
                 <input className="input" type="date" value={end} onChange={(event) => setEnd(event.target.value)} />
               </label>
             </div>
@@ -164,7 +170,7 @@ export default function CanteenCashReportModal({
           </section>
 
           <section style={{ ...cardStyle, display: 'grid', gap: 14, padding: isCompact ? 12 : 16, borderRadius: isCompact ? 14 : 18 }}>
-            <div style={{ fontSize: 15, fontWeight: 900 }}>Hareket Turu</div>
+            <div style={{ fontSize: 15, fontWeight: 900 }}>Hareket Türü</div>
             <div style={{ display: 'flex', gap: isCompact ? 10 : 18, flexWrap: 'wrap', flexDirection: isMobilePortrait ? 'column' : 'row' }}>
               {movementOptions.map((option) => (
                 <label key={option.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
@@ -174,7 +180,7 @@ export default function CanteenCashReportModal({
               ))}
             </div>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontSize: 12, color: isDark ? '#fca5a5' : '#dc2626', fontWeight: 900 }}>Gelir Gider Turu</span>
+              <span style={{ fontSize: 12, color: isDark ? '#fca5a5' : '#dc2626', fontWeight: 900 }}>Gelir Gider Türü</span>
               <select className="input" value={filterType} onChange={(event) => setFilterType(event.target.value)}>
                 {filterOptions.map((option) => (
                   <option key={option.key} value={option.key}>{option.label}</option>
@@ -201,11 +207,11 @@ export default function CanteenCashReportModal({
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 13, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
-            {loading ? 'Kasa hareketleri yukleniyor...' : `Listelenen kayit sayisi: ${Number(report?.summary?.count || 0)}`}
+            {loading ? 'Kasa hareketleri yükleniyor...' : `Listelenen kayıt sayısı: ${Number(report?.summary?.count || 0)}`}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn" type="button" onClick={loadReport} disabled={loading || !start || !end}>
-              {loading ? 'Rapor Aliniyor...' : 'Rapor Al'}
+              {loading ? 'Rapor Alınıyor...' : 'Rapor Al'}
             </button>
             <button className="btn button-light" type="button" onClick={onClose}>Kapat</button>
           </div>
@@ -222,7 +228,7 @@ export default function CanteenCashReportModal({
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isCompact ? 860 : 980 }}>
               <thead>
                 <tr style={{ background: tableHeaderStyle.background }}>
-                  {['Tarih', 'Saat', 'Turu', 'Gelir Gider Sebebi', 'Aciklama', 'Tutar', 'Odeme', 'Barkodu'].map((column) => (
+                  {['Tarih', 'Saat', 'Türü', 'Gelir Gider Sebebi', 'Açıklama', 'Tutar', 'Ödeme', 'Barkodu'].map((column) => (
                     <th
                       key={column}
                       style={{
@@ -253,7 +259,7 @@ export default function CanteenCashReportModal({
                 )) : (
                   <tr>
                     <td colSpan={8} style={{ padding: '18px 12px', color: 'var(--app-text-muted, var(--muted))' }}>
-                      {loading ? 'Rapor hazirlaniyor...' : 'Bu filtreler icin kayit bulunamadi.'}
+                      {loading ? 'Rapor hazırlanıyor...' : 'Bu filtreler için kayıt bulunamadı.'}
                     </td>
                   </tr>
                 )}

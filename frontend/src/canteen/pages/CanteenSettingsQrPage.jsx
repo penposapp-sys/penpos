@@ -408,26 +408,26 @@ export default function CanteenSettingsQrPage() {
               ◦
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 950, color: 'var(--app-text)' }}>Firma ve gorunum</div>
+              <div style={{ fontSize: 22, fontWeight: 950, color: 'var(--app-text)' }}>Firma ve görünüm</div>
               <div style={{ marginTop: 4, color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700 }}>
-                Baslik, kapak, iletisim alanlari ve tema secimi burada tutulur.
+                Başlık, kapak, iletişim alanları ve tema seçimi burada tutulur.
               </div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gap: 14, minWidth: 0, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={FIELD_LABEL_STYLE}>Firma Adi</span>
+              <span style={FIELD_LABEL_STYLE}>Firma Adı</span>
               <input className="input" value={settings.qrTitle} onChange={(event) => setSettings((current) => ({ ...current, qrTitle: event.target.value }))} />
             </label>
             <div style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
-              <span style={FIELD_LABEL_STYLE}>QR Kapak Gorseli</span>
+              <span style={FIELD_LABEL_STYLE}>QR Kapak Görseli</span>
               <ProductImageUploadField
                 currentImageUrl={qrCoverRemovePending ? '' : settings.qrCoverImageUrl}
                 file={qrCoverFile}
                 error={qrCoverError}
                 disabled={!canManage || saving}
-                helperText="JPG, PNG, WEBP, AVIF veya HEIC/HEIF. Maksimum 5 MB, kapak alani icin optimize edilerek saklanir."
+                helperText="JPG, PNG, WEBP, AVIF veya HEIC/HEIF. En fazla 5 MB; kapak alanı için optimize edilerek saklanır."
                 onFileChange={(nextFile, validationMessage) => {
                   setQrCoverError(validationMessage || '')
                   setQrCoverFile(validationMessage ? null : nextFile)
@@ -445,7 +445,7 @@ export default function CanteenSettingsQrPage() {
               />
             </div>
             <label style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
-              <span style={FIELD_LABEL_STYLE}>Kisa Aciklama</span>
+              <span style={FIELD_LABEL_STYLE}>Kısa Açıklama</span>
               <textarea
                 value={settings.qrDescription}
                 onChange={(event) => setSettings((current) => ({ ...current, qrDescription: event.target.value }))}
@@ -466,7 +466,7 @@ export default function CanteenSettingsQrPage() {
               <input className="input" value={settings.qrEmail} onChange={(event) => setSettings((current) => ({ ...current, qrEmail: event.target.value }))} />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={FIELD_LABEL_STYLE}>Calisma Saatleri</span>
+              <span style={FIELD_LABEL_STYLE}>Çalışma Saatleri</span>
               <input className="input" value={settings.qrWorkingHours} onChange={(event) => setSettings((current) => ({ ...current, qrWorkingHours: event.target.value }))} />
             </label>
             <label style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
@@ -481,7 +481,7 @@ export default function CanteenSettingsQrPage() {
           </div>
 
           <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
-            <div style={FIELD_LABEL_STYLE}>Musteri Online Siparis Sayfasi Tema Secimi</div>
+            <div style={FIELD_LABEL_STYLE}>Müşteri Online Sipariş Sayfası Tema Seçimi</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 10 }}>
               {qrThemes.map((theme) => {
                 const selected = theme.id === settings.qrTheme
@@ -501,7 +501,7 @@ export default function CanteenSettingsQrPage() {
                     <div style={{ height: 52, borderRadius: 18, background: theme.colors.panel, border: '1px solid color-mix(in srgb, var(--app-text) 6%, transparent)' }} />
                     <div style={{ marginTop: 12, fontWeight: 900, color: 'var(--app-text)' }}>{theme.name}</div>
                     <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: 'var(--app-text-secondary)' }}>
-                      {selected ? 'Secili tema' : 'Musteri siparis sayfasinda kullan'}
+                      {selected ? 'Seçili tema' : 'Müşteri sipariş sayfasında kullan'}
                     </div>
                   </button>
                 )
@@ -510,26 +510,26 @@ export default function CanteenSettingsQrPage() {
           </div>
 
           <div style={{ marginTop: 18, display: 'grid', gap: 8 }}>
-            <div style={FIELD_LABEL_STYLE}>Online siparis sayfalari sube bazli olusturulur</div>
+            <div style={FIELD_LABEL_STYLE}>Online sipariş sayfaları şube bazlı oluşturulur</div>
             <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
-              Yeni sube eklendiginde asagidaki listede otomatik yeni public online siparis sayfasi ve erisim kodu olusur.
+              Yeni şube eklendiğinde aşağıdaki listede otomatik olarak yeni bir herkese açık online sipariş sayfası ve erişim kodu oluşturulur.
             </div>
           </div>
         </div>
 
         <div className="card" style={{ ...SOFT_CARD_STYLE, padding: 24 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 1, color: 'var(--theme-accent)', textTransform: 'uppercase' }}>Online Siparis Erisimi</div>
-            <div style={{ marginTop: 6, fontSize: 22, fontWeight: 950, color: 'var(--app-text)' }}>Sube bazli online siparis sayfalari</div>
+            <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 1, color: 'var(--theme-accent)', textTransform: 'uppercase' }}>Online Sipariş Erişimi</div>
+            <div style={{ marginTop: 6, fontSize: 22, fontWeight: 950, color: 'var(--app-text)' }}>Şube bazlı online sipariş sayfaları</div>
             <div style={{ marginTop: 8, color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.6 }}>
-              Her sube icin ayri public link ve ayri erisim kodu olusturulur. Personel ciktisini veya masa ustu gorselini bu kartlardan kullanabilir.
+              Her şube için ayrı bir herkese açık bağlantı ve erişim kodu oluşturulur. Personel çıktısını veya masa üstü görselini bu kartlardan kullanabilirsiniz.
             </div>
           </div>
 
           <div style={{ marginTop: 18, display: 'grid', gap: 16 }}>
             {publicBranchCards.length === 0 ? (
               <div style={{ color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700 }}>
-                Sube veya slug bulunamadigi icin online siparis sayfasi listesi hazirlanamadi.
+                Şube veya slug bulunamadığı için online sipariş sayfası listesi hazırlanamadı.
               </div>
             ) : publicBranchCards.map((branchCard) => {
               const qrDataUrl = qrCodeMap[branchCard.id] || ''
@@ -610,7 +610,7 @@ export default function CanteenSettingsQrPage() {
                           textAlign: 'center'
                         }}
                       >
-                        Online Siparis Sayfasini Ac
+                        Online Sipariş Sayfasını Aç
                       </a>
                     </div>
                   </div>

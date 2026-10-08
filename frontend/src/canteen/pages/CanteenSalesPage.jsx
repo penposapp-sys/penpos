@@ -40,7 +40,7 @@ function DetailRow({ label, value }) {
   )
 }
 
-function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading, isCompact = false }) {
+function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading, detailsLoading = false, isCompact = false }) {
   const status = statusMeta(sale?.status)
   const items = Array.isArray(sale?.items) ? sale.items : []
   const isCreditSale = ['account', 'credit'].includes(String(sale?.payment?.methodType || sale?.paymentMethodType || '').trim().toLowerCase()) ||
@@ -48,7 +48,7 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading, isC
 
   return (
     <Modal open={open} onClose={onClose} title={sale?.saleNo ? `Satış Detayı ${sale.saleNo}` : 'Satış Detayı'} dialogStyle={{ width: isCompact ? 'calc(100% - 4px)' : 'min(760px, calc(100vw - 24px))', maxWidth: '100%', maxHeight: isCompact ? 'calc(100dvh - 4px)' : 'calc(100dvh - 24px)', justifySelf: 'center' }} bodyStyle={{ padding: isCompact ? 2 : 22 }}>
-      {!sale ? (
+      {!sale || detailsLoading ? (
         <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))' }}>Detay yükleniyor...</div>
       ) : (
         <div style={{ display: 'grid', gap: 16 }}>
@@ -118,7 +118,7 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading, isC
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'grid', gap: 6, fontSize: 12, color: 'var(--app-text-secondary, var(--text-secondary))' }}>
-              <div>Sube: <b>{sale.branchName || '-'}</b></div>
+              <div>Şube: <b>{sale.branchName || '-'}</b></div>
               <div>Personel: <b>{sale.cashierName || '-'}</b></div>
               {isCreditSale ? <div>Veresiye satisi yapilan cari: <b>{sale.customerName || '-'}</b></div> : null}
               <div>Ödeme yöntemi: <b>{sale.payment?.methodName || sale.payment?.method || '-'}</b></div>
@@ -548,6 +548,7 @@ export default function CanteenSalesPage() {
           setReopenConfirmOpen(true)
         }}
         loading={detailLoading || savingAction}
+        detailsLoading={detailLoading}
         isCompact={isCompact}
       />
 

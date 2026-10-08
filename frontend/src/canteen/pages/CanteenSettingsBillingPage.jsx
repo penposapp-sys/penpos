@@ -14,9 +14,9 @@ import {
 const statusLabel = (s) => {
   const t = String(s || '').toLowerCase()
   if (t === 'pending') return 'Beklemede'
-  if (t === 'approved') return 'Onaylandi'
+  if (t === 'approved') return 'Onaylandı'
   if (t === 'rejected') return 'Reddedildi'
-  if (t === 'cancelled') return 'Iptal edildi'
+  if (t === 'cancelled') return 'İptal edildi'
   return String(s || '')
 }
 
@@ -231,9 +231,9 @@ export default function CanteenSettingsBillingPage() {
             </div>
 
             <div style={{ display: 'grid', gap: 6, color: 'var(--muted)', fontSize: 13 }}>
-              <div>Baslangic: {formatPlanDate(plan?.startsAt) || '-'}</div>
-              <div>Bitis: {formatPlanDate(plan?.endsAt) || '-'}</div>
-              <div>Kalan sure: {remainingMeta.label}</div>
+              <div>Başlangıç: {formatPlanDate(plan?.startsAt) || '-'}</div>
+              <div>Bitiş: {formatPlanDate(plan?.endsAt) || '-'}</div>
+              <div>Kalan süre: {remainingMeta.label}</div>
             </div>
 
             {planLimits.length > 0 ? (
@@ -299,7 +299,7 @@ export default function CanteenSettingsBillingPage() {
 
                 {canManage && isPending && (
                   <div>
-                    <button className="btn btn--danger btn--compact" type="button" onClick={() => cancel(it.id)} disabled={saving}>Iptal Et</button>
+                    <button className="btn btn--danger btn--compact" type="button" onClick={() => cancel(it.id)} disabled={saving}>İptal Et</button>
                   </div>
                 )}
               </div>
@@ -326,7 +326,7 @@ export default function CanteenSettingsBillingPage() {
               <input className="input" value={limitUsers} onChange={(e) => setLimitUsers(e.target.value)} placeholder="orn: 10" disabled={saving} />
             </label>
             <label>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sube limiti</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şube limiti</div>
               <input className="input" value={limitBranches} onChange={(e) => setLimitBranches(e.target.value)} placeholder="orn: 3" disabled={saving} />
             </label>
             <label>

@@ -8,8 +8,8 @@ export default function BranchAccessField({
   branches = [],
   value,
   onChange,
-  allLabel = 'Tum subelerde gecerli',
-  emptyText = 'Aktif sube bulunamadi.'
+  allLabel = 'Tüm şubelerde geçerli',
+  emptyText = 'Aktif şube bulunamadı.'
 }) {
   const visibleBranches = Array.isArray(branches)
     ? branches.filter((branch) => branch?.isActive !== false)
@@ -46,7 +46,7 @@ export default function BranchAccessField({
         <div className="settings-ui-branch-list">
           <SettingsToggle
             label={allLabel}
-            description="Aciksa bu kullanici tum aktif subeleri gorebilir."
+            description="Açıksa bu kullanıcı tüm aktif şubeleri görebilir."
             checked={safeValue.allBranches}
             onChange={(event) => update(event.target.checked ? { allBranches: true, branchIds: [] } : { allBranches: false, branchIds: [] })}
           />
@@ -60,7 +60,7 @@ export default function BranchAccessField({
                 <SettingsToggle
                   key={branchId}
                   label={branch?.name || '-'}
-                  description={branch?.address || branch?.description || 'Bu subeye erisim verilir.'}
+                  description={branch?.address || branch?.description || 'Bu şubeye erişim verilir.'}
                   checked={checked}
                   onChange={(event) => {
                     const isChecked = event.target.checked

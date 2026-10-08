@@ -298,7 +298,7 @@ function OpenTablesPanel({ items, onOpenDetail }) {
   const remainingCount = Math.max(0, items.length - 1)
   const handleOpenAll = () => onOpenDetail?.({
     title: 'Açık Masalar',
-    subtitle: items.length > 0 ? 'Serviste olan masalarin detay listesi' : 'Su anda serviste aktif masa bulunmuyor.',
+    subtitle: items.length > 0 ? 'Serviste olan masaların detay listesi' : 'Şu anda serviste aktif masa bulunmuyor.',
     items: items.length > 0 ? items : [{ title: 'Açık masa yok', note: 'Su anda serviste aktif masa bulunmuyor.' }]
   })
 
@@ -340,7 +340,7 @@ function OpenTablesPanel({ items, onOpenDetail }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>{latestItem.note}</div>
               <div style={{ color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 12, fontWeight: 800 }}>
-                {remainingCount > 0 ? `+${remainingCount} masa daha` : 'Detayi ac'}
+                {remainingCount > 0 ? `+${remainingCount} masa daha` : 'Detayı aç'}
               </div>
             </div>
           </button>
@@ -442,8 +442,8 @@ function OperationsDashboard({ loading, error, snapshot, isMobilePortrait }) {
   }
 
   const data = snapshot || buildFallbackOperationsSnapshot()
-  const displayKpis = data.kpis.filter((item) => item.title !== 'Iptal / Fire')
-  const cancelKpi = data.kpis.find((item) => item.title === 'Iptal / Fire')
+  const displayKpis = data.kpis.filter((item) => item.title !== 'İptal / Fire')
+  const cancelKpi = data.kpis.find((item) => item.title === 'İptal / Fire')
   const displayOperationCards = [
     {
       title: 'Kapanan Masalar',
@@ -459,10 +459,10 @@ function OperationsDashboard({ loading, error, snapshot, isMobilePortrait }) {
     ...data.operationCards
       .filter((item) => item.title === 'Hazırlanacak Sipariş' || item.title === 'Paket Sipariş'),
     ...(cancelKpi ? [{
-      title: 'İptal Urunler',
+      title: 'İptal Ürünler',
       value: cancelKpi.value,
-      note: 'İptal edilen urunler',
-      detail: cancelKpi.detail ? { ...cancelKpi.detail, title: 'İptal Urunler Detayi' } : undefined
+      note: 'İptal edilen ürünler',
+      detail: cancelKpi.detail ? { ...cancelKpi.detail, title: 'İptal Ürünler Detayı' } : undefined
     }] : [])
   ]
   const kpiGrid = isMobilePortrait ? '1fr' : 'repeat(4, minmax(0, 1fr))'
@@ -692,8 +692,8 @@ function ReportsOverviewDashboard({ loading, error, summary, datasets, isMobileP
     <div style={{ display: 'grid', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900 }}>Rapor Ozeti</h2>
-          <div style={{ marginTop: 4, color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Ana sayfadaki analizler sadece bugunun verisini gosterir.</div>
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900 }}>Rapor Özeti</h2>
+          <div style={{ marginTop: 4, color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>Ana sayfadaki analizler sadece bugünün verisini gösterir.</div>
         </div>
       </div>
 
@@ -732,7 +732,7 @@ function ReportsOverviewDashboard({ loading, error, summary, datasets, isMobileP
 
       <DetailModal
         open={detailState.open}
-        title={detailState.report?.detailTitle || detailState.report?.title || 'Rapor Detayi'}
+        title={detailState.report?.detailTitle || detailState.report?.title || 'Rapor Detayı'}
         subtitle={detailState.report?.description || ''}
         items={[]}
         renderContent={detailState.report && detailState.detailData
@@ -759,15 +759,15 @@ function ReportsOverviewDashboard({ loading, error, summary, datasets, isMobileP
 
 const buildFallbackOperationsSnapshot = () => ({
   kpis: [
-    { title: 'Toplam Ciro', value: '0,00 TL', note: 'Bugun', trend: '+0%', tone: 'green' },
-    { title: 'Tahsilat', value: '0,00 TL', note: 'Bugun', trend: '+0%', tone: 'blue' },
+    { title: 'Toplam Ciro', value: '0,00 TL', note: 'Bugün', trend: '+0%', tone: 'green' },
+    { title: 'Tahsilat', value: '0,00 TL', note: 'Bugün', trend: '+0%', tone: 'blue' },
     { title: 'Ortalama Hesap', value: '0,00 TL', note: 'Sipariş başı', trend: '+0%', tone: 'orange' },
     { title: 'Açık Hesap', value: '0,00 TL', note: 'Toplam', trend: '+0%', tone: 'blue' }
   ],
   operationCards: [
     { title: 'Hazırlanacak Sipariş', value: '0', note: 'Mutfakta bekleyenler' },
     { title: 'Paket Sipariş', value: '0', note: 'Yolda olanlar' },
-    { title: 'İptal Urunler', value: '0', note: 'İptal edilen urunler' }
+    { title: 'İptal Ürünler', value: '0', note: 'İptal edilen ürünler' }
   ],
   openTables: [],
   liveItems: [
@@ -907,25 +907,25 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
       {
         title: 'Toplam Ciro',
         value: fmtTl(totalRevenue),
-        note: 'Bugun',
+        note: 'Bugün',
         trend: getTrendText(12.5),
         tone: 'green',
         detail: {
-          title: 'Toplam Ciro Detayi',
-          subtitle: 'Bugunku ciro ve tahsilat kirilimlari',
+          title: 'Toplam Ciro Detayı',
+          subtitle: 'Bugünkü ciro ve tahsilat kırılımları',
           items: [
             {
               title: 'Genel Özet',
               value: fmtTl(totalRevenue),
               badge: `${orderCount} sipariş`,
-              note: 'Toplam ciroya ulasan tüm ödeme ve açık hesap kirilimlari.',
+              note: 'Toplam ciroya ulaşan tüm ödeme ve açık hesap kırılımları.',
               details: [
                 { label: 'Toplam Ciro', value: fmtTl(totalRevenue) },
                 ...(revenueBreakdownDetails.length > 0 ? revenueBreakdownDetails : [
                   { label: 'Nakit', value: fmtTl(cashValue) },
                   { label: 'Banka', value: fmtTl(bankValue) },
                   { label: 'K. Karti / POS', value: fmtTl(posValue) },
-                  { label: 'Cariye Yazilan', value: fmtTl(chargedToAccountValue) }
+                  { label: 'Cariye Yazılan', value: fmtTl(chargedToAccountValue) }
                 ])
               ]
             }
@@ -935,18 +935,18 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
       {
         title: 'Tahsilat',
         value: fmtTl(totalPaid),
-        note: 'Bugun',
+        note: 'Bugün',
         trend: getTrendText(9.3),
         tone: 'blue',
         detail: {
-          title: 'Tahsilat Detayi',
-          subtitle: 'Bugun alinan odemelerin yontemlere göre dağılımı',
+          title: 'Tahsilat Detayı',
+          subtitle: 'Bugün alınan ödemelerin yöntemlere göre dağılımı',
           items: [
             {
-              title: 'Ödeme Yontemleri',
+              title: 'Ödeme Yöntemleri',
               value: fmtTl(totalPaid),
               badge: 'Tahsilat',
-              note: 'Kasaya giren ve cariye yazilan tahsilatlar.',
+              note: 'Kasaya giren ve cariye yazılan tahsilatlar.',
               details: [
                 { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
                 ...(collectionBreakdownDetails.length > 0 ? collectionBreakdownDetails : [
@@ -969,7 +969,7 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
         trend: getTrendText(6.1),
         tone: 'orange',
         detail: {
-          title: 'Ortalama Hesap Detayi',
+          title: 'Ortalama Hesap Detayı',
           subtitle: 'Sipariş başı ortalama ve günlük özet',
           items: [
             {
@@ -990,20 +990,20 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
         }
       },
       {
-        title: 'Iptal / Fire',
+        title: 'İptal / Fire',
         value: fmtTl(cancelledValue),
         note: 'Kontrol gerekli',
         trend: getTrendText(-3.8),
         tone: 'red',
         detail: {
-          title: 'Iptal / Fire Detayi',
-          subtitle: 'İptal edilen urunlerin günlük özet verisi',
+          title: 'İptal / Fire Detayı',
+          subtitle: 'İptal edilen ürünlerin günlük özet verisi',
           items: [
             {
-              title: 'İptal Ozeti',
+              title: 'İptal Özeti',
               value: fmtTl(cancelledValue),
               badge: `${Number(cancelled?.itemCount || 0)} ürün`,
-              note: 'Fire verisi ayri tutulmuyorsa iptal tutari uzerinden izlenir.',
+              note: 'Fire verisi ayrı tutulmuyorsa iptal tutarı üzerinden izlenir.',
               details: [
                 { label: 'İptal Tutarı', value: fmtTl(cancelledValue) },
                 { label: 'İptal Edilen Ürün', value: String(Number(cancelled?.itemCount || 0)) },
@@ -1021,22 +1021,22 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
         trend: '+0',
         tone: 'blue',
         detail: {
-          title: 'Açık Hesap Detayi',
-          subtitle: 'Cari ve tahsil edilmemiş bakiye ozetleri',
+          title: 'Açık Hesap Detayı',
+          subtitle: 'Cari ve tahsil edilmemiş bakiye özetleri',
           items: [
             {
-              title: 'Cari / Acik Hesap',
+              title: 'Cari / Açık Hesap',
               value: fmtTl(openAccountValue),
               badge: 'Takip',
-              note: 'Tahsil edilmemiş bakiye ve cariye yazilan satislar.',
+              note: 'Tahsil edilmemiş bakiye ve cariye yazılan satışlar.',
               details: [
                 { label: 'Güncel Cari Bakiyesi', value: fmtTl(currentAccountBalanceValue) },
-                { label: 'Acilan Cari Borcu', value: fmtTl(chargedToAccountValue) },
+                { label: 'Açılan Cari Borcu', value: fmtTl(chargedToAccountValue) },
                 { label: 'Açık Masa Bekleyeni', value: fmtTl(openOrderBalanceTotal) },
                 { label: 'Bekleyen Açık Hesap', value: fmtTl(explicitOpenAccountValue) },
                 { label: 'Toplam Ciro', value: fmtTl(totalRevenue) },
                 { label: 'Toplam Tahsilat', value: fmtTl(totalPaid) },
-                { label: 'Net Açık Hesap Gosterimi', value: fmtTl(openAccountValue) }
+                { label: 'Net Açık Hesap Gösterimi', value: fmtTl(openAccountValue) }
               ]
             }
           ]
@@ -1049,9 +1049,9 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
         value: String(openTableCount),
         note: 'Serviste olan masalar',
         detail: {
-          title: 'Açık Masalar Detayi',
-          subtitle: 'Serviste olan masalarin listesi',
-          items: openTables.length > 0 ? openTables : [{ title: 'Açık masa yok', note: 'Su anda serviste aktif masa bulunmuyor.' }]
+          title: 'Açık Masalar Detayı',
+          subtitle: 'Serviste olan masaların listesi',
+          items: openTables.length > 0 ? openTables : [{ title: 'Açık masa yok', note: 'Şu anda serviste aktif masa bulunmuyor.' }]
         }
       },
       {
@@ -1059,12 +1059,12 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
         value: String(waitingKitchenCount),
         note: 'Mutfakta bekleyenler',
         detail: {
-          title: 'Hazırlanacak Siparisler',
+          title: 'Hazırlanacak Siparişler',
           subtitle: 'Mutfakta açık durumda bekleyen sipariş kalemleri',
           items: pendingKitchenOrders.length > 0
             ? pendingKitchenOrders.map((order, index) => ({
                 title: String(order?.tableName || order?.customerName || `Sipariş ${index + 1}`),
-                note: `${order.activeItems.length} ürün islemde`,
+                note: `${order.activeItems.length} ürün işlemde`,
                 time: formatTimeAgo(order?.createdAt),
                 orderId: String(order?.orderNo || order?.id || ''),
                 details: [
@@ -1073,7 +1073,7 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
                     label: 'Bekleyen Ürün',
                     value: String(order.activeItems.length)
                   },
-                  { label: 'Olusturma', value: order?.createdAt ? new Date(order.createdAt).toLocaleString('tr-TR') : '-' }
+                  { label: 'Oluşturma', value: order?.createdAt ? new Date(order.createdAt).toLocaleString('tr-TR') : '-' }
                 ]
               }))
             : [{ title: 'Bekleyen sipariş yok', note: 'Mutfakta sıra bekleyen sipariş bulunmuyor.' }]
@@ -1084,8 +1084,8 @@ const createOperationsSnapshot = ({ reportRes, tableRes, kitchenRes, deliveryRes
         value: String(deliveryOrders.length),
         note: 'Yolda olanlar',
         detail: {
-          title: 'Paket Siparisleri',
-          subtitle: 'Aktif paket siparislerinin durumu',
+          title: 'Paket Siparişleri',
+          subtitle: 'Aktif paket siparişlerinin durumu',
           items: deliveryOrders.length > 0
             ? deliveryOrders.map((order, index) => ({
                 title: `Paket #${String(order?.orderNo || order?.id || index + 1).slice(-6)}`,
@@ -1173,8 +1173,8 @@ const buildLiveItems = ({ tables, activeByTable, kitchenOrders, deliveryOrders, 
   const paymentTotal = toMoney(sales?.byMethod?.cash || 0) + toMoney(sales?.byMethod?.pos || 0)
   const cashierEntry = {
     title: 'Kasa',
-    note: `Bugun tahsil edilen ana ödeme: ${fmtTl(paymentTotal)}`,
-    time: 'Bugun',
+    note: `Bugün tahsil edilen ana ödeme: ${fmtTl(paymentTotal)}`,
+    time: 'Bugün',
     dotColor: '#f59e0b'
   }
 
@@ -1406,8 +1406,4 @@ export default function Dashboard() {
     </div>
   )
 }
-
-
-
-
 

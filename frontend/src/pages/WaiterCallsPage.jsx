@@ -30,12 +30,12 @@ export default function WaiterCallsPage() {
         cacheMode: 'no-store'
       })
       if (res?.success === false) {
-        toast.error(res?.message || 'Garson cagrilari yuklenemedi')
+        toast.error(res?.message || 'Garson çağrıları yüklenemedi')
         return
       }
       setCalls(Array.isArray(res?.calls) ? res.calls : [])
     } catch (err) {
-      toast.error(err?.message || 'Garson cagrilari yuklenemedi')
+      toast.error(err?.message || 'Garson çağrıları yüklenemedi')
     } finally {
       setLoading(false)
     }
@@ -58,13 +58,13 @@ export default function WaiterCallsPage() {
         skipBranchHeader: true,
       })
       if (res?.success === false) {
-        toast.error(res?.message || 'Cagri kapatilamadi')
+        toast.error(res?.message || 'Çağrı kapatılamadı')
         return
       }
       setCalls((prev) => prev.filter((item) => item.id !== call.id))
-      toast.success('Garson cagrisi kapatildi')
+      toast.success('Garson çağrısı kapatıldı')
     } catch (err) {
-      toast.error(err?.message || 'Cagri kapatilamadi')
+      toast.error(err?.message || 'Çağrı kapatılamadı')
     } finally {
       setBusyId('')
     }
@@ -74,17 +74,17 @@ export default function WaiterCallsPage() {
     <div style={{ display: 'grid', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em' }}>Garson Cagrilari</div>
+          <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em' }}>Garson Çağrıları</div>
           <div style={{ marginTop: 6, color: 'var(--muted)' }}>
-            QR menuden gelen acik masa cagrilarini buradan takip edebilirsiniz.
+            QR menüden gelen açık masa çağrılarını buradan takip edebilirsiniz.
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn" type="button" onClick={load} disabled={loading}>
-            {loading ? 'Yukleniyor...' : 'Yenile'}
+            {loading ? 'Yükleniyor...' : 'Yenile'}
           </button>
           <button className="btn" type="button" onClick={() => nav('/restoran/app/tables')}>
-            Masalara Don
+            Masalara Dön
           </button>
         </div>
       </div>
@@ -118,11 +118,11 @@ export default function WaiterCallsPage() {
                   color: '#fff'
                 }}
               >
-                Acik Cagri
+                Açık Çağrı
               </span>
 
               <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.15, paddingRight: 90 }}>
-                {call.tableName || 'Masa secilmedi'}
+                {call.tableName || 'Masa seçilmedi'}
               </div>
 
               <div style={{ color: 'var(--muted)', fontSize: 13 }}>
@@ -130,12 +130,12 @@ export default function WaiterCallsPage() {
               </div>
 
               <div style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
-                QR menu uzerinden garson cagrisi olusturuldu.
+                QR menü üzerinden garson çağrısı oluşturuldu.
               </div>
 
               <div style={{ marginTop: 'auto' }}>
                 <button className="btn" type="button" onClick={() => resolveCall(call)} disabled={busyId === call.id}>
-                  {busyId === call.id ? 'Kapatiliyor...' : 'Cagriyi Kapat'}
+                  {busyId === call.id ? 'Kapatılıyor...' : 'Çağrıyı Kapat'}
                 </button>
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function WaiterCallsPage() {
       ) : null}
 
       {calls.length === 0 && !loading ? (
-        <div className="card">Acik garson cagrisi yok.</div>
+        <div className="card">Açık garson çağrısı yok.</div>
       ) : null}
     </div>
   )

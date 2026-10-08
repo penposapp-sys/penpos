@@ -258,7 +258,7 @@ export default function Layout() {
       items.push({ path: '/restoran/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
     }
     if (!isExpired && kitchenPagesEnabled && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) {
-      items.push({ path: '/restoran/app/kitchen', label: 'Hazirlanacaklar', icon: IconUtensils, show: true })
+      items.push({ path: '/restoran/app/kitchen', label: 'Hazırlanacaklar', icon: IconUtensils, show: true })
       items.push({ path: '/restoran/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) {
@@ -813,7 +813,7 @@ export default function Layout() {
                       boxShadow: '0 14px 32px rgba(0,0,0,0.18)'
                     }}
                   >
-                    Rapor Indir
+                    Rapor İndir
                   </button>
                 )}
               </div>

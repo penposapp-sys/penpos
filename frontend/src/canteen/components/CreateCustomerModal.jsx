@@ -29,7 +29,12 @@ export default function CreateCustomerModal({ open, onClose, onCreated }) {
       toast.error('İsim en az 2 karakter olmalı')
       return
     }
-    const cleanPhone = normalizePhone(phone)
+    const rawPhone = String(phone || '').trim()
+    const cleanPhone = normalizePhone(rawPhone)
+    if (rawPhone && cleanPhone.replace(/[^0-9]/g, '').length < 10) {
+      toast.error('Telefon en az 10 karakter olmalı')
+      return
+    }
     const cleanNote = String(note || '').trim()
 
     setLoading(true)
@@ -76,4 +81,3 @@ export default function CreateCustomerModal({ open, onClose, onCreated }) {
     </Modal>
   )
 }
-

@@ -24,6 +24,7 @@ const tenantSchema = new mongoose.Schema({
   trialStartsAt: { type: Date, default: null },
   trialEndsAt: { type: Date, default: null },
   subscriptionStatus: { type: String, enum: ['trial', 'active', 'expired', 'inactive'], default: 'inactive', index: true },
+  lastSeenAt: { type: Date, default: null, index: true },
   createdAt: { type: Date, default: Date.now }
 })
 

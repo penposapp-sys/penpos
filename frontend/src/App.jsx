@@ -19,6 +19,7 @@ import PlatformAdminMembershipRequests from './pages/PlatformAdminMembershipRequ
 import PlatformAdminAnaokuluRegionAdmins from './pages/PlatformAdminAnaokuluRegionAdmins.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
+import TenantUsageHeartbeat from './components/TenantUsageHeartbeat.jsx'
 import { BusinessSettingsProvider } from './context/BusinessSettingsContext.jsx'
 import StaffPage from './pages/StaffPage.jsx'
 import SettingsPage, { SettingsTablesContent, SettingsPaymentsContent, SettingsSystemContent } from './pages/SettingsPage.jsx'
@@ -372,6 +373,7 @@ export default function App() {
     <AuthProvider>
       <BusinessSettingsProvider>
         <CapacitorBackButtonHandler />
+        <TenantUsageHeartbeat />
         <NativePushBridge />
         <Toast />
         <Routes>

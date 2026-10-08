@@ -191,9 +191,9 @@ export default function OnlineSalesSettingsPage() {
       <section style={{ ...cardStyle, display: 'grid', gap: compact ? 12 : 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'minmax(0, 1fr) auto', gap: 12, alignItems: 'start' }}>
           <div>
-            <div style={{ fontSize: compact ? 22 : 28, fontWeight: 900, letterSpacing: '-0.03em' }}>Online Satis</div>
+            <div style={{ fontSize: compact ? 22 : 28, fontWeight: 900, letterSpacing: '-0.03em' }}>Online Satış</div>
             <div style={{ marginTop: 6, fontSize: compact ? 12 : 13, color: 'var(--app-text-secondary, var(--muted))' }}>
-              QR menuden ayri calisan public siparis yuzeyini buradan yonetebilirsiniz.
+              QR menüden ayrı çalışan çevrimiçi sipariş yüzeyini buradan yönetebilirsiniz.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: compact ? 'stretch' : 'flex-end' }}>

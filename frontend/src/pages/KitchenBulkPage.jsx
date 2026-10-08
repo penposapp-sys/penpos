@@ -256,11 +256,11 @@ export default function KitchenBulkPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : (isTablet ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))'), gap: 12, alignItems: 'start', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: 10 }}>
-          <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocağa Atılmamış Urunler</div>
+          <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocağa Atılmamış Ürünler</div>
           {renderBulkCards(waitingItems, 'waiting')}
         </div>
         <div style={{ display: 'grid', gap: 10 }}>
-          <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocaktaki Urunler</div>
+          <div className="card theme-card-soft" style={{ fontWeight: 800 }}>Ocaktaki Ürünler</div>
           {renderBulkCards(stoveItems, 'cooking')}
         </div>
       </div>

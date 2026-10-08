@@ -165,7 +165,7 @@ export default function PublicSystemLogin({
                       checked={rememberMe}
                       onChange={(event) => onRememberMeChange(event.target.checked)}
                     />
-                    <span>Beni hatirla</span>
+                    <span>Beni hatırla</span>
                   </label>
                 ) : <span />}
                 <Link to={forgotTo} className="system-login__text-link">{forgotLabel}</Link>

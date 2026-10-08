@@ -21,9 +21,9 @@ const dt = (value) => {
 
 const getMovementTitle = (movement) => {
   if (movement?.kind === 'adjustment') {
-    return movement?.type === 'debit' ? 'Bakiye Ekleme' : 'Bakiye Dusme'
+    return movement?.type === 'debit' ? 'Bakiye Ekleme' : 'Bakiye Düşme'
   }
-  return movement?.type === 'debit' ? 'Borc' : 'Tahsilat'
+  return movement?.type === 'debit' ? 'Borç' : 'Tahsilat'
 }
 
 const getSelectedCanteenBranchId = () => {
@@ -174,12 +174,12 @@ export default function CanteenCustomerDetailPage() {
     if (!canCollect) return
     const branchId = getSelectedCanteenBranchId()
     if (!branchId) {
-      setError('Aktif sube secilmedi')
+      setError('Aktif şube seçilmedi')
       return
     }
     const amt = Number(String(actionAmount || '').replace(',', '.'))
     if (!Number.isFinite(amt) || amt <= 0) {
-      setError('Gecerli bir tutar gir')
+      setError('Geçerli bir tutar gir')
       return
     }
 
@@ -199,7 +199,7 @@ export default function CanteenCustomerDetailPage() {
         })
 
     if (!res?.ok) {
-      setError(res?.message || 'Islem basarisiz')
+      setError(res?.message || 'İşlem başarısız')
       setActionSaving(false)
       return
     }
@@ -209,7 +209,7 @@ export default function CanteenCustomerDetailPage() {
         ? 'Tahsilat kaydedildi'
         : actionType === 'add'
           ? 'Bakiye eklendi'
-          : 'Bakiye dusuldu'
+          : 'Bakiye düşürüldü'
     )
     setActionSaving(false)
     setActionModalOpen(false)
@@ -220,7 +220,7 @@ export default function CanteenCustomerDetailPage() {
 
   const deleteSale = async (saleId) => {
     if (!canDeleteSale) return
-    if (!window.confirm('Islemi silmek istiyor musun?')) return
+    if (!window.confirm('İşlemi silmek istiyor musun?')) return
     setLoading(true)
     const res = await api(`/api/magaza/sales/${saleId}`, { method: 'DELETE', silent: true })
     if (!res?.ok) {
@@ -244,7 +244,7 @@ export default function CanteenCustomerDetailPage() {
     const res = await deleteCustomerPayment(id, paymentDeleteId, paymentDeleteReason)
     setPaymentDeleteLoading(false)
     if (!res?.ok) {
-      toast.error(res?.message || 'Islem basarisiz')
+      toast.error(res?.message || 'İşlem başarısız')
       return
     }
     toast.success('Tahsilat silindi')
@@ -278,7 +278,7 @@ export default function CanteenCustomerDetailPage() {
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'grid', gap: 10 }}>
-              <div style={{ fontWeight: 700 }}>Hizli Islemler</div>
+              <div style={{ fontWeight: 700 }}>Hızlı İşlemler</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 <button className="btn btn--primary" type="button" onClick={() => openBalanceAction('add')} disabled={!canCollect}>+ Bakiye</button>
                 <button className="btn" type="button" onClick={() => openBalanceAction('subtract')} disabled={!canCollect}>- Bakiye</button>
@@ -317,7 +317,7 @@ export default function CanteenCustomerDetailPage() {
         <div className="card" style={{ display: 'grid', gap: 10, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <div style={{ fontWeight: 700 }}>Hareketler</div>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>{movementsLoading ? 'Yukleniyor...' : `${movements.length} kayit`}</div>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>{movementsLoading ? 'Yükleniyor...' : `${movements.length} kayıt`}</div>
           </div>
           <div style={isMobilePortrait ? { display: 'grid', gap: 8 } : { display: 'grid', gap: 8, maxHeight: '40vh', overflowY: 'auto', paddingRight: 6 }}>
             {(movements || []).map((movement) => {
@@ -347,12 +347,12 @@ export default function CanteenCustomerDetailPage() {
                 </div>
               )
             })}
-            {!movementsLoading && movements.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Kayit yok</div>}
+            {!movementsLoading && movements.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Kayıt yok</div>}
           </div>
         </div>
 
         <div className="card" style={{ display: 'grid', gap: 10, minWidth: 0 }}>
-          <div style={{ fontWeight: 700 }}>Satislar</div>
+          <div style={{ fontWeight: 700 }}>Satışlar</div>
           <div style={isMobilePortrait ? { display: 'grid', gap: 8 } : { display: 'grid', gap: 8, maxHeight: '60vh', overflowY: 'auto', paddingRight: 6 }}>
             {sales.map((sale) => {
               const isOpen = String(openSaleId || '') === String(sale.orderId || '')
@@ -367,7 +367,7 @@ export default function CanteenCustomerDetailPage() {
                     <div style={{ minWidth: 0 }}>
                       <div className="saleAmount">{money(sale.total)} TL</div>
                       <div className="canteen-subtext">{dt(sale.createdAt)}</div>
-                      <div className="canteen-subtext">Odeme: {paymentMethodLabel(sale.paymentMethod) || '-'}</div>
+                      <div className="canteen-subtext">Ödeme: {paymentMethodLabel(sale.paymentMethod) || '-'}</div>
                     </div>
 
                     <div className="saleActions">
@@ -417,7 +417,7 @@ export default function CanteenCustomerDetailPage() {
                 </div>
               )
             })}
-            {!loading && sales.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Satis yok</div>}
+            {!loading && sales.length === 0 && <div className="canteen-subtext" style={{ fontSize: 13 }}>Satış yok</div>}
           </div>
         </div>
       </div>
@@ -426,7 +426,7 @@ export default function CanteenCustomerDetailPage() {
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         title="Cari silinsin mi?"
-        description="Cari aktif listeden kaldirilir. Gecmis satis ve rapor verileri korunur."
+        description="Cari aktif listeden kaldırılır. Geçmiş satış ve rapor verileri korunur."
         danger
         confirmText={deleteLoading ? 'Siliniyor...' : 'Evet, Sil'}
         confirmDisabled={deleteLoading}
@@ -434,15 +434,15 @@ export default function CanteenCustomerDetailPage() {
         onConfirm={deleteCustomer}
       />
 
-      <Modal open={paymentDeleteOpen} onClose={() => setPaymentDeleteOpen(false)} title="Islemi Sil">
+      <Modal open={paymentDeleteOpen} onClose={() => setPaymentDeleteOpen(false)} title="İşlemi Sil">
         <div style={{ display: 'grid', gap: 10 }}>
-          <div>Bu islemi silmek istiyor musunuz? Islem geri alinir.</div>
+          <div>Bu işlemi silmek istiyor musunuz? İşlem geri alınır.</div>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Silme nedeni (opsiyonel)</div>
             <input className="input" value={paymentDeleteReason} onChange={(e) => setPaymentDeleteReason(e.target.value)} disabled={paymentDeleteLoading} />
           </label>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="btn" onClick={() => setPaymentDeleteOpen(false)} disabled={paymentDeleteLoading}>Vazgec</button>
+            <button className="btn" onClick={() => setPaymentDeleteOpen(false)} disabled={paymentDeleteLoading}>Vazgeç</button>
             <button className="btn btn--danger" onClick={confirmDeletePayment} disabled={paymentDeleteLoading}>{paymentDeleteLoading ? 'Siliniyor...' : 'Evet, Sil'}</button>
           </div>
         </div>
@@ -486,14 +486,14 @@ export default function CanteenCustomerDetailPage() {
           </label>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button className="btn" type="button" onClick={() => setActionModalOpen(false)} disabled={actionSaving}>Vazgec</button>
+            <button className="btn" type="button" onClick={() => setActionModalOpen(false)} disabled={actionSaving}>Vazgeç</button>
             <button className="btn btn--primary" type="button" onClick={submitBalanceAction} disabled={actionSaving}>
               {actionSaving
                 ? 'Kaydediliyor...'
                 : actionType === 'add'
                   ? 'Bakiyeye Ekle'
                   : actionType === 'subtract'
-                    ? 'Bakiyeden Dus'
+                    ? 'Bakiyeden Düş'
                     : 'Tahsilat Yap'}
             </button>
           </div>

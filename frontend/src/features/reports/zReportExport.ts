@@ -18,8 +18,8 @@ const normalizeLabel = (value: unknown) => {
   if (['cash', 'nakit'].includes(key)) return 'Nakit'
   if (['card', 'kart', 'pos'].includes(key)) return 'Kart'
   if (['bank', 'banka', 'eft', 'havale'].includes(key)) return 'Banka'
-  if (['online', 'online odeme', 'online ödeme'].includes(key)) return 'Online Odeme'
-  if (['mealcard', 'meal_card', 'yemek karti', 'yemek kartı'].includes(key)) return 'Yemek Karti'
+  if (['online', 'online odeme', 'online ödeme'].includes(key)) return 'Online Ödeme'
+  if (['mealcard', 'meal_card', 'yemek karti', 'yemek kartı'].includes(key)) return 'Yemek Kartı'
   return String(value || '-')
 }
 
@@ -38,8 +38,8 @@ const buildExcelHtml = (report: ZReportData) => {
     const fallbackRows = [
       ['Toplam Nakit', Number(safeReport.summary?.payments?.cash || 0)],
       ['Toplam Kart', Number(safeReport.summary?.payments?.card || 0)],
-      ['Toplam Yemek Karti', Number(safeReport.summary?.payments?.mealCard || 0)],
-      ['Toplam Online Odeme', Number(safeReport.summary?.payments?.online || 0)],
+      ['Toplam Yemek Kartı', Number(safeReport.summary?.payments?.mealCard || 0)],
+      ['Toplam Online Ödeme', Number(safeReport.summary?.payments?.online || 0)],
       ['Toplam Veresiye', creditTotal]
     ].filter(([, total]) => total > 0)
     paymentRows.push(...fallbackRows.map(([label, total]) => ({ label: String(label), total: Number(total || 0) })))
@@ -54,33 +54,33 @@ const buildExcelHtml = (report: ZReportData) => {
 <body>
   <table>
     <tr><th colspan="4">Z Raporu</th></tr>
-    <tr><td>Isletme</td><td>${escapeHtml(safeReport.businessName)}</td><td>Tarih</td><td>${escapeHtml(safeReport.date)}</td></tr>
-    <tr><td>Sube</td><td>${escapeHtml(safeReport.branchName)}</td><td>Olusturma</td><td>${escapeHtml(safeReport.generatedAt ? new Date(safeReport.generatedAt).toLocaleString('tr-TR') : '-')}</td></tr>
+    <tr><td>İşletme</td><td>${escapeHtml(safeReport.businessName)}</td><td>Tarih</td><td>${escapeHtml(safeReport.date)}</td></tr>
+    <tr><td>Şube</td><td>${escapeHtml(safeReport.branchName)}</td><td>Oluşturma</td><td>${escapeHtml(safeReport.generatedAt ? new Date(safeReport.generatedAt).toLocaleString('tr-TR') : '-')}</td></tr>
   </table>
   <br />
   <table>
-    <tr><th>Alan</th><th>Deger</th></tr>
-    <tr><td>Net toplam satis</td><td>${toMoney(safeReport.summary?.netSales || 0)}</td></tr>
-    <tr><td>Yapilan satis</td><td>${toMoney(safeReport.summary?.paidSalesTotal || 0)}</td></tr>
-    <tr><td>Veresiye satis</td><td>${toMoney(safeReport.summary?.payments?.credit || 0)}</td></tr>
+    <tr><th>Alan</th><th>Değer</th></tr>
+    <tr><td>Net toplam satış</td><td>${toMoney(safeReport.summary?.netSales || 0)}</td></tr>
+    <tr><td>Yapılan satış</td><td>${toMoney(safeReport.summary?.paidSalesTotal || 0)}</td></tr>
+    <tr><td>Veresiye satış</td><td>${toMoney(safeReport.summary?.payments?.credit || 0)}</td></tr>
     <tr><td>Toplam tahsilat</td><td>${toMoney(safeReport.summary?.cashIn?.total || 0)}</td></tr>
-    <tr><td>Yapilan satis adedi</td><td>${safeReport.summary?.orderCount || 0}</td></tr>
-    <tr><td>Toplam urun adedi</td><td>${safeReport.summary?.productCount || 0}</td></tr>
-    <tr><td>Toplam satis</td><td>${toMoney(safeReport.summary?.netSales || 0)}</td></tr>
-    <tr><td>Indirim</td><td>${toMoney(safeReport.summary?.discountTotal || 0)}</td></tr>
+    <tr><td>Yapılan satış adedi</td><td>${safeReport.summary?.orderCount || 0}</td></tr>
+    <tr><td>Toplam ürün adedi</td><td>${safeReport.summary?.productCount || 0}</td></tr>
+    <tr><td>Toplam satış</td><td>${toMoney(safeReport.summary?.netSales || 0)}</td></tr>
+    <tr><td>İndirim</td><td>${toMoney(safeReport.summary?.discountTotal || 0)}</td></tr>
     <tr><td>Kasadaki toplam</td><td>${toMoney(safeReport.summary?.cashIn?.total || 0)}</td></tr>
     <tr><td>Veresiye / cari</td><td>${toMoney(safeReport.summary?.periodCreditBalance || 0)}</td></tr>
-    <tr><td>Veresiye tahsilati</td><td>${toMoney(safeReport.summary?.collectionsTotal || 0)}</td></tr>
+    <tr><td>Veresiye tahsilatı</td><td>${toMoney(safeReport.summary?.collectionsTotal || 0)}</td></tr>
   </table>
   <br />
   <table>
-    <tr><th colspan="2">Odeme Tipleri</th></tr>
+    <tr><th colspan="2">Ödeme Tipleri</th></tr>
     ${paymentRows.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${toMoney(row.total)}</td></tr>`).join('')}
   </table>
   <br />
   <table>
-    <tr><th colspan="3">Satilan Urunler</th></tr>
-    <tr><th>Urun</th><th>Adet</th><th>Toplam</th></tr>
+    <tr><th colspan="3">Satılan Ürünler</th></tr>
+    <tr><th>Ürün</th><th>Adet</th><th>Toplam</th></tr>
     ${(safeReport.topProducts || []).map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${row.quantity}</td><td>${toMoney(row.total)}</td></tr>`).join('')}
   </table>
 </body>

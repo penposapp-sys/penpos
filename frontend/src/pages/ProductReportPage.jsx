@@ -235,15 +235,15 @@ export default function ProductReportPage() {
       </div>
 
       <div className="card">
-        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 10 }}>İptal Olan Urunler Raporu</div>
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 10 }}>İptal Olan Ürünler Raporu</div>
         <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 10 }}>
-          Hazir/onay sonrasi iptal edilen urunler. Tarih filtresi iptal zamanina gore uygulanir.
+          Hazır/onay sonrası iptal edilen ürünler. Tarih filtresi iptal zamanına göre uygulanır.
         </div>
         {error && <div style={{ color: '#b91c1c', marginBottom: 10 }}>{error}</div>}
         {loading && <div style={{ color: 'var(--muted)' }}>Yükleniyor...</div>}
         {!loading && !error && (
           cancelledItems.length === 0 ? (
-            <div style={{ color: 'var(--muted)' }}>Bu aralikta hazır olduktan sonra iptal edilen ürün yok.</div>
+            <div style={{ color: 'var(--muted)' }}>Bu aralıkta hazır olduktan sonra iptal edilen ürün yok.</div>
           ) : (
             <>
               <div className="onlyDesktop desktop-only reportsTableWrap">

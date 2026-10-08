@@ -10,23 +10,23 @@ const DEFAULT_SECTIONS = {
     id: 'about-1',
     type: 'about',
     title: 'Bizim Mekan',
-    subtitle: 'Sakin, modern ve gun boyu yasayan bir cafe restoran.',
-    content: 'Gunun ilk kahvesinden aksam paylasim tabaklarina kadar sade ama karakterli bir deneyim sunuyoruz.',
+    subtitle: 'Sakin, modern ve gün boyu yaşayan bir kafe restoranı.',
+    content: 'Günün ilk kahvesinden akşam paylaşım tabaklarına kadar sade ama karakterli bir deneyim sunuyoruz.',
     visible: true,
     order: 3,
     settings: {
       imageUrl: '',
       align: 'left',
       manifestoLabel: '01 / Manifesto',
-      manifestoText: 'Her tabak bir recete degil, bir karakter tasir.',
+      manifestoText: 'Her tabak bir reçete değil, bir karakter taşır.',
       sectionLabel: '02 / Mekan',
     },
   },
   products: {
     id: 'products-1',
     type: 'products',
-    title: 'One Cikan Lezzetler',
-    subtitle: 'Ayarlar ekraninda sectigin urunler burada otomatik yer alir.',
+    title: 'Öne Çıkan Lezzetler',
+    subtitle: 'Ayarlar ekranında seçtiğiniz ürünler burada otomatik yer alır.',
     content: '',
     visible: true,
     order: 2,
@@ -35,72 +35,72 @@ const DEFAULT_SECTIONS = {
       cardStyle: 'grid',
       featuredProductIds: [],
       galleryLabel: 'Galeri',
-      galleryTitle: 'Mekan ve detay fotograflari',
-      galleryDescription: 'Ayarlardan yukledigin galeri gorselleri burada gosterilir.',
-      emptyStateText: 'Gosterilecek one cikan urun bulunamadi.',
-      productFallbackDescription: 'Aciklama yakinda eklenecek.',
-      imageFallbackText: 'Gorsel Yok',
+      galleryTitle: 'Mekân ve detay fotoğrafları',
+      galleryDescription: 'Ayarlardan yüklediğiniz galeri görselleri burada gösterilir.',
+      emptyStateText: 'Gösterilecek öne çıkan ürün bulunamadı.',
+      productFallbackDescription: 'Açıklama yakında eklenecek.',
+      imageFallbackText: 'Görsel Yok',
     },
   },
   contact: {
     id: 'contact-1',
     type: 'contact',
-    title: 'Ugramadan Once',
-    subtitle: 'Adres, iletisim ve yonlendirmeler tek alanda.',
+    title: 'Uğramadan Önce',
+    subtitle: 'Adres, iletişim ve yönlendirmeler tek alanda.',
     content: '',
     visible: true,
     order: 4,
     settings: {
       addressLabel: 'Adres',
       reservationLabel: 'Rezervasyon',
-      quoteText: 'Iyi yemek acele etmez. Ama iyi siparis hizli olmalidir.',
+      quoteText: 'İyi yemek acele etmez. Ama iyi sipariş hızlı olmalıdır.',
       quoteAuthor: 'Kitchen Philosophy',
       emptyAddressText: 'Adres bilgisi eklenmedi',
-      emptyReservationText: 'Iletisim bilgisi eklenmedi',
-      mapLinkText: 'Haritada Ac',
+      emptyReservationText: 'İletişim bilgisi eklenmedi',
+      mapLinkText: 'Haritada Aç',
     },
   },
 }
 
 const STORE_SAMPLE_COPY = {
-  heroTitle: 'Yeni sezon urunlerini tek vitrinde sergileyin',
-  heroSubtitle: 'Kampanyalarinizi, cok satan urunlerinizi ve online siparis akisinizi sade bir magaza sayfasinda toplayin.',
-  heroKickerText: 'Magaza · Kampanya · Hizli Siparis',
-  heroButtonText: 'Online Siparisi Ac',
+  heroTitle: 'Yeni sezon ürünlerini tek vitrinde sergileyin',
+  heroSubtitle: 'Kampanyalarınızı, çok satan ürünlerinizi ve çevrimiçi sipariş akışınızı sade bir mağaza sayfasında toplayın.',
+  heroKickerText: 'Mağaza · Kampanya · Hızlı Sipariş',
+  heroButtonText: 'Çevrimiçi Siparişi Aç',
   navigation: {
     storyLabel: 'Koleksiyon',
-    menuLabel: 'Urunler',
+    menuLabel: 'Ürünler',
     contactLabel: 'Teslimat',
-    onlineButtonText: 'Online Siparis',
+    onlineButtonText: 'Çevrimiçi Sipariş',
   },
   products: {
-    title: 'One Cikan Urunler',
-    subtitle: 'En cok ilgi goren urunleri vitrinde one cikarip musteriye hizli secim alani sunun.',
+    title: 'Öne Çıkan Ürünler',
+    subtitle: 'En çok ilgi gören ürünleri vitrinde öne çıkarıp müşteriye hızlı seçim alanı sunun.',
     galleryLabel: 'Detaylar',
-    galleryTitle: 'Urun ve paket fotograflari',
-    galleryDescription: 'Magaza atmosferini, paket detaylarini ve kampanya gorsellerini burada sergileyin.',
-    emptyStateText: 'Henuz vitrine eklenmis urun yok.',
-    productFallbackDescription: 'Kisa urun aciklamasi burada gorunur.',
-    imageFallbackText: 'Urun Gorseli',
+    galleryTitle: 'Ürün ve paket fotoğrafları',
+    galleryDescription: 'Mağaza atmosferini, paket detaylarını ve kampanya görsellerini burada sergileyin.',
+    emptyStateText: 'Henüz vitrine eklenmiş ürün yok.',
+    productFallbackDescription: 'Kısa ürün açıklaması burada görünür.',
+    imageFallbackText: 'Ürün Görseli',
   },
   about: {
-    title: 'Magazamiz',
-    subtitle: 'Gunluk ihtiyac, ozel secki ve hizli teslimat tek yerde.',
-    content: 'Mahallenin sevdigi urunleri ozenle secip temiz, hizli ve guvenilir bir alisveris deneyimi sunuyoruz.',
+    title: 'Mağazamız',
+    subtitle: 'Günlük ihtiyaç, özel seçki ve hızlı teslimat tek yerde.',
+    content: 'Mahallenin sevdiği ürünleri özenle seçip temiz, hızlı ve güvenilir bir alışveriş deneyimi sunuyoruz.',
     manifestoLabel: '01 / Vitrin',
-    manifestoText: 'Dogru urun, temiz sunum ve hizli teslimat iyi magaza deneyiminin temelidir.',
-    sectionLabel: '02 / Magaza',
+    manifestoText: 'Doğru ürün, temiz sunum ve hızlı teslimat iyi mağaza deneyiminin temelidir.',
+    sectionLabel: '02 / Mağaza',
   },
   contact: {
-    title: 'Siparis ve Teslimat',
-    subtitle: 'Teslimat bolgesi, iletisim ve siparis notlari tek alanda.',
-    addressLabel: 'Teslimat Bolgesi',
-    reservationLabel: 'Siparis Hatti',
-    quoteText: 'Hizli siparis, temiz paketleme ve guven veren teslimat.',
+    title: 'Sipariş ve Teslimat',
+    subtitle: 'Teslimat bölgesi, iletişim ve sipariş notları tek alanda.',
+    addressLabel: 'Teslimat Bölgesi',
+    reservationLabel: 'Sipariş Hattı',
+    quoteText: 'Hızlı sipariş, temiz paketleme ve güven veren teslimat.',
     quoteAuthor: 'Store Service Standard',
-    emptyAddressText: 'Teslimat bolgesi bilgisi eklenmedi',
-    emptyReservationText: 'Siparis hatti bilgisi eklenmedi',
-    mapLinkText: 'Konumu Ac',
+    emptyAddressText: 'Teslimat bölgesi bilgisi eklenmedi',
+    emptyReservationText: 'Sipariş hattı bilgisi eklenmedi',
+    mapLinkText: 'Konumu Aç',
   },
 }
 
@@ -155,26 +155,26 @@ function ensureWebsiteShape(settings, systemType = 'kermes') {
     },
     hero: {
       visible: hero.visible !== false,
-      title: String(hero.title || (isStore ? STORE_SAMPLE_COPY.heroTitle : 'Modern, sicak ve sade bir masa deneyimi')),
-      subtitle: String(hero.subtitle || (isStore ? STORE_SAMPLE_COPY.heroSubtitle : 'Restoran vitrininizi ayarlardan yonetin; QR menu ve online satisi tek sayfada bulusturun.')),
-      kickerText: String(hero.kickerText || (isStore ? 'Magaza · Market · Isletmeniz' : 'Cafe · Restoran · Isletmeniz')),
+      title: String(hero.title || (isStore ? STORE_SAMPLE_COPY.heroTitle : 'Modern, sıcak ve sade bir masa deneyimi')),
+      subtitle: String(hero.subtitle || (isStore ? STORE_SAMPLE_COPY.heroSubtitle : 'Restoran vitrininizi ayarlardan yönetin; QR menüyü ve çevrimiçi satışı tek sayfada buluşturun.')),
+      kickerText: String(hero.kickerText || (isStore ? 'Mağaza · Market · İşletmeniz' : 'Kafe · Restoran · İşletmeniz')),
       logoUrl: String(hero.logoUrl || ''),
       coverImageUrl: String(hero.coverImageUrl || ''),
       backgroundColor: String(hero.backgroundColor || '#e5e7eb'),
       titleSize: Number(hero.titleSize || 54) || 54,
       subtitleSize: Number(hero.subtitleSize || 18) || 18,
       align: String(hero.align || 'left'),
-      buttonText: String(hero.buttonText || (isStore ? STORE_SAMPLE_COPY.heroButtonText : 'QR Menuyu Ac')),
+      buttonText: String(hero.buttonText || (isStore ? STORE_SAMPLE_COPY.heroButtonText : 'QR Menüyü Aç')),
       buttonLink: String(hero.buttonLink || ''),
       galleryImages: gallery,
     },
     navigation: {
-      storyLabel: String(navigation.storyLabel || (isStore ? STORE_SAMPLE_COPY.navigation.storyLabel : 'Hikaye')),
-      menuLabel: String(navigation.menuLabel || (isStore ? STORE_SAMPLE_COPY.navigation.menuLabel : 'Menu')),
-      contactLabel: String(navigation.contactLabel || (isStore ? STORE_SAMPLE_COPY.navigation.contactLabel : 'Iletisim')),
-      qrButtonText: String(navigation.qrButtonText || 'QR Menu'),
+      storyLabel: String(navigation.storyLabel || (isStore ? STORE_SAMPLE_COPY.navigation.storyLabel : 'Hikâye')),
+      menuLabel: String(navigation.menuLabel || (isStore ? STORE_SAMPLE_COPY.navigation.menuLabel : 'Menü')),
+      contactLabel: String(navigation.contactLabel || (isStore ? STORE_SAMPLE_COPY.navigation.contactLabel : 'İletişim')),
+      qrButtonText: String(navigation.qrButtonText || 'QR Menü'),
       cartButtonText: String(navigation.cartButtonText || 'Sepet'),
-      onlineButtonText: String(navigation.onlineButtonText || (isStore ? STORE_SAMPLE_COPY.navigation.onlineButtonText : 'Online Siparis')),
+      onlineButtonText: String(navigation.onlineButtonText || (isStore ? STORE_SAMPLE_COPY.navigation.onlineButtonText : 'Çevrimiçi Sipariş')),
     },
     sections: [
       {
@@ -341,7 +341,10 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
           ? api('/api/magaza/branches', { silent: true, skipBranchHeader: true, portalOverride: 'canteen', cacheMode: 'no-store' })
           : Promise.resolve(null),
       ])
-      const nextTenant = websiteRes?.tenant || profileRes?.tenant || null
+      const profileTenant = profileRes?.tenant && typeof profileRes.tenant === 'object' ? profileRes.tenant : {}
+      const websiteTenant = websiteRes?.tenant && typeof websiteRes.tenant === 'object' ? websiteRes.tenant : {}
+      const mergedTenant = { ...profileTenant, ...websiteTenant }
+      const nextTenant = Object.keys(mergedTenant).length ? mergedTenant : null
       let nextProducts = []
 
       if (isStore) {
@@ -379,7 +382,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       setSettings(ensureWebsiteShape(websiteRes?.settings || {}, systemType))
       setProducts(nextProducts)
     } catch (err) {
-      setError(err?.message || 'Web site ayarlari yuklenemedi')
+      setError(err?.message || 'Web sitesi ayarları yüklenemedi')
     } finally {
       setLoading(false)
     }
@@ -489,7 +492,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       skipBranchHeader: true,
     })
     if (res?.success === false) {
-      throw new Error(res?.message || 'Gorsel yuklenemedi')
+      throw new Error(res?.message || 'Görsel yüklenemedi')
     }
     return String(res?.imageUrl || '').trim()
   }
@@ -610,9 +613,9 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       setCoverError('')
       setAboutFile(null)
       setAboutError('')
-      toast.success('Web site ayarlari kaydedildi')
+      toast.success('Web sitesi ayarları kaydedildi')
     } catch (err) {
-      setError(err?.message || 'Web site ayarlari kaydedilemedi')
+      setError(err?.message || 'Web sitesi ayarları kaydedilemedi')
     } finally {
       setSaving(false)
     }
@@ -630,9 +633,9 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       })
       setTenant(res?.tenant || tenant)
       setSettings(ensureWebsiteShape(res?.settings || settings, systemType))
-      toast.success(nextPublished ? 'Web sitesi yayina alindi' : 'Web sitesi yayindan kaldirildi')
+      toast.success(nextPublished ? 'Web sitesi yayına alındı' : 'Web sitesi yayından kaldırıldı')
     } catch (err) {
-      setError(err?.message || 'Yayin durumu guncellenemedi')
+      setError(err?.message || 'Yayın durumu güncellenemedi')
     } finally {
       setPublishing(false)
     }
@@ -642,9 +645,9 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
     if (!liveUrl) return
     try {
       await navigator.clipboard.writeText(liveUrl)
-      toast.success('Link kopyalandi')
+      toast.success('Bağlantı kopyalandı')
     } catch {
-      toast.error('Link kopyalanamadi')
+      toast.error('Bağlantı kopyalanamadı')
     }
   }
 
@@ -690,7 +693,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
     color: 'var(--app-text)',
   }
 
-  if (loading) return <div className="card">Web site ayarlari yukleniyor...</div>
+  if (loading) return <div className="card">Web sitesi ayarları yükleniyor...</div>
 
   return (
     <div
@@ -706,21 +709,21 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       <section style={{ ...cardStyle, background: 'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 9%, var(--app-surface)), color-mix(in srgb, var(--app-surface) 92%, var(--app-surface-soft)))' }}>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'minmax(0, 1fr) auto', gap: 14, alignItems: 'start' }}>
           <div style={{ marginTop: 12, fontSize: 13, fontWeight: 800 }}>
-            Yayin adresi: <span style={{ color: 'var(--theme-accent, var(--settings-accent-text, var(--app-text)))' }}>{livePath || (isStore ? '/wepmagaza/site-adiniz' : '/weprestorant/site-adiniz')}</span>
+            Yayın adresi: <span style={{ color: 'var(--theme-accent, var(--settings-accent-text, var(--app-text)))' }}>{livePath || (isStore ? '/wepmagaza/site-adiniz' : '/weprestorant/site-adiniz')}</span>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: compact ? 'stretch' : 'flex-end' }}>
             <button className="btn" type="button" onClick={load} disabled={saving || publishing}>Yenile</button>
             <button className="btn" type="button" onClick={save} disabled={saving || publishing}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
             <button className="btn btn--primary" type="button" onClick={() => togglePublish(!settings.published)} disabled={saving || publishing}>
-              {publishing ? 'Isleniyor...' : settings.published ? 'Yayindan Kaldir' : 'Yayina Al'}
+              {publishing ? 'İşleniyor...' : settings.published ? 'Yayından Kaldır' : 'Yayına Al'}
             </button>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : `repeat(${isStore ? 2 : 3}, minmax(0, 1fr))`, gap: 10 }}>
-          <div className="card" style={{ borderColor: 'var(--settings-border, var(--app-border))', background: 'var(--app-surface)' }}><strong>Durum</strong><div style={{ marginTop: 6 }}>{settings.published ? 'Yayinda' : 'Taslak'}</div></div>
-          {!isStore ? <div className="card" style={{ borderColor: 'var(--settings-border, var(--app-border))', background: 'var(--app-surface)' }}><strong>QR Menu</strong><div style={{ marginTop: 6 }}>{settings.integrations?.showQrMenu ? 'Gorunur' : 'Kapali'}</div></div> : null}
-          <div className="card" style={{ borderColor: 'var(--settings-border, var(--app-border))', background: 'var(--app-surface)' }}><strong>Online Satis</strong><div style={{ marginTop: 6 }}>{settings.integrations?.showOnlineOrder ? 'Gorunur' : 'Kapali'}</div></div>
+          <div className="card" style={{ borderColor: 'var(--settings-border, var(--app-border))', background: 'var(--app-surface)' }}><strong>Durum</strong><div style={{ marginTop: 6 }}>{settings.published ? 'Yayında' : 'Taslak'}</div></div>
+          {!isStore ? <div className="card" style={{ borderColor: 'var(--settings-border, var(--app-border))', background: 'var(--app-surface)' }}><strong>QR Menü</strong><div style={{ marginTop: 6 }}>{settings.integrations?.showQrMenu ? 'Görünür' : 'Kapalı'}</div></div> : null}
+          <div className="card" style={{ borderColor: 'var(--settings-border, var(--app-border))', background: 'var(--app-surface)' }}><strong>Çevrimiçi Satış</strong><div style={{ marginTop: 6 }}>{settings.integrations?.showOnlineOrder ? 'Görünür' : 'Kapalı'}</div></div>
         </div>
 
         {error ? <div style={{ color: '#b91c1c', fontWeight: 800 }}>{error}</div> : null}
@@ -732,54 +735,54 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
           <input className="input" value={settings.slug} onChange={(event) => updateTopLevel('slug', event.target.value)} style={inputStyle} />
         </label>
         <label style={{ display: 'grid', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))', fontWeight: 800 }}>Canli Link</span>
+          <span style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))', fontWeight: 800 }}>Canlı Bağlantı</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input className="input" readOnly value={liveUrl} style={{ ...inputStyle, flex: '1 1 260px' }} />
             <button className="btn" type="button" onClick={copyLiveUrl} disabled={!liveUrl}>Kopyala</button>
-            {liveUrl ? <a className="btn" href={liveUrl} target="_blank" rel="noreferrer">Ac</a> : null}
+            {liveUrl ? <a className="btn" href={liveUrl} target="_blank" rel="noreferrer">Aç</a> : null}
           </div>
         </label>
       </section>
 
       <section style={cardStyle}>
-        <div style={{ fontSize: 22, fontWeight: 900 }}>Ust Menu ve Buton Metinleri</div>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>Üst Menü ve Buton Metinleri</div>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Hikaye Menu Yazisi</span>
+            <span>Hikâye Menüsü Yazısı</span>
             <input className="input" value={settings.navigation?.storyLabel || ''} onChange={(event) => updateNavigation('storyLabel', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Menu Menu Yazisi</span>
+            <span>Menü Yazısı</span>
             <input className="input" value={settings.navigation?.menuLabel || ''} onChange={(event) => updateNavigation('menuLabel', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Iletisim Menu Yazisi</span>
+            <span>İletişim Menüsü Yazısı</span>
             <input className="input" value={settings.navigation?.contactLabel || ''} onChange={(event) => updateNavigation('contactLabel', event.target.value)} style={inputStyle} />
           </label>
           {!isStore ? (
             <label style={{ display: 'grid', gap: 6 }}>
-              <span>QR Buton Yazisi</span>
+              <span>QR Buton Yazısı</span>
               <input className="input" value={settings.navigation?.qrButtonText || ''} onChange={(event) => updateNavigation('qrButtonText', event.target.value)} style={inputStyle} />
             </label>
           ) : null}
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Online Siparis Buton Yazisi</span>
+            <span>Çevrimiçi Sipariş Butonu Yazısı</span>
             <input className="input" value={settings.navigation?.onlineButtonText || ''} onChange={(event) => updateNavigation('onlineButtonText', event.target.value)} style={inputStyle} />
           </label>
         </div>
       </section>
 
       <section style={cardStyle}>
-        <div style={{ fontSize: 22, fontWeight: 900 }}>Aksiyon Butonlari</div>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>Aksiyon Butonları</div>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           {!isStore ? (
             <label style={{ display: 'grid', gap: 6 }}>
-              <span>QR Menu Linki</span>
+              <span>QR Menü Bağlantısı</span>
               <input className="input" value={settings.integrations.qrMenuUrl} onChange={(event) => updateIntegration('qrMenuUrl', event.target.value)} style={inputStyle} placeholder={`/menu/${tenant?.slug || ''}`} />
             </label>
           ) : null}
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Online Satis Linki</span>
+            <span>Çevrimiçi Satış Bağlantısı</span>
             <input
               className="input"
               value={normalizeWebsiteActionUrl(settings.integrations.onlineOrderUrl, 'online', settings.slug)}
@@ -791,40 +794,40 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
           {!isStore ? (
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800 }}>
               <input type="checkbox" checked={settings.integrations.showQrMenu} onChange={(event) => updateIntegration('showQrMenu', event.target.checked)} />
-              QR menu butonu gorunsun
+              QR menü butonu görünsün
             </label>
           ) : null}
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800 }}>
             <input type="checkbox" checked={settings.integrations.showOnlineOrder} onChange={(event) => updateIntegration('showOnlineOrder', event.target.checked)} />
-            Online satis butonu gorunsun
+            Çevrimiçi satış butonu görünsün
           </label>
         </div>
       </section>
 
       <section style={cardStyle}>
-        <div style={{ fontSize: 22, fontWeight: 900 }}>Hero ve Gorseller</div>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>Kapak Alanı ve Görseller</div>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Ust Kucuk Yazi</span>
-            <input className="input" value={settings.hero.kickerText || ''} onChange={(event) => updateHero('kickerText', event.target.value)} style={inputStyle} placeholder="Cafe · Restoran · Isletmeniz" />
+            <span>Üst Küçük Yazı</span>
+            <input className="input" value={settings.hero.kickerText || ''} onChange={(event) => updateHero('kickerText', event.target.value)} style={inputStyle} placeholder="Kafe · Restoran · İşletmeniz" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Daire Buton Yazisi</span>
-            <input className="input" value={settings.hero.buttonText || ''} onChange={(event) => updateHero('buttonText', event.target.value)} style={inputStyle} placeholder="Menuyu Kesfet" />
+            <span>Daire Buton Yazısı</span>
+            <input className="input" value={settings.hero.buttonText || ''} onChange={(event) => updateHero('buttonText', event.target.value)} style={inputStyle} placeholder="Menüyü Keşfet" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Baslik</span>
+            <span>Başlık</span>
             <input className="input" value={settings.hero.title} onChange={(event) => updateHero('title', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Alt Baslik</span>
+            <span>Alt Başlık</span>
             <input className="input" value={settings.hero.subtitle} onChange={(event) => updateHero('subtitle', event.target.value)} style={inputStyle} />
           </label>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <ProductImageUploadField
-            label="Logo Yukle"
+            label="Logo Yükle"
             currentImageUrl={settings.hero.logoUrl}
             file={logoFile}
             onFileChange={(file, nextError) => { setLogoFile(file); setLogoError(nextError || '') }}
@@ -832,10 +835,10 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
             compact={compact}
             ultraCompact
             error={logoError}
-            descriptionText="Header alanindaki yuvarlak marka gorseli."
+            descriptionText="Üst alandaki yuvarlak marka görseli."
           />
           <ProductImageUploadField
-            label="Kapak Gorseli Yukle"
+            label="Kapak Görseli Yükle"
             currentImageUrl={settings.hero.coverImageUrl}
             file={coverFile}
             onFileChange={(file, nextError) => { setCoverFile(file); setCoverError(nextError || '') }}
@@ -843,7 +846,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
             compact={compact}
             ultraCompact
             error={coverError}
-            descriptionText="Hero'nun ana buyuk gorseli."
+            descriptionText="Kapak alanının ana görseli."
           />
         </div>
       </section>
@@ -851,17 +854,17 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       <section style={cardStyle}>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>Manifesto ve Hakkimizda</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>Manifesto ve Hakkımızda</div>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span>Baslik</span>
+              <span>Başlık</span>
               <input className="input" value={aboutSection.title} onChange={(event) => updateSectionCopy('about', 'title', event.target.value)} style={inputStyle} />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span>Alt Baslik</span>
+              <span>Alt Başlık</span>
               <input className="input" value={aboutSection.subtitle} onChange={(event) => updateSectionCopy('about', 'subtitle', event.target.value)} style={inputStyle} />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span>Aciklama</span>
+              <span>Açıklama</span>
               <textarea className="input" value={aboutSection.content} onChange={(event) => updateSectionCopy('about', 'content', event.target.value)} style={textareaStyle} />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
@@ -873,15 +876,15 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
               <input className="input" value={String(aboutSection.settings?.manifestoLabel || '')} onChange={(event) => updateSectionSettings('about', 'manifestoLabel', event.target.value)} style={inputStyle} placeholder="01 / Manifesto" />
             </label>
             <label style={{ display: 'grid', gap: 6 }}>
-              <span>Hikaye Bolumu Etiketi</span>
+              <span>Hikâye Bölümü Etiketi</span>
               <input className="input" value={String(aboutSection.settings?.sectionLabel || '')} onChange={(event) => updateSectionSettings('about', 'sectionLabel', event.target.value)} style={inputStyle} placeholder="02 / Mekan" />
             </label>
           </div>
 
           <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>Yan Foto</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>Yan Görsel</div>
             <ProductImageUploadField
-              label="Mekan / Hikaye Gorseli"
+              label="Mekân / Hikâye Görseli"
               currentImageUrl={String(aboutSection.settings?.imageUrl || '')}
               file={aboutFile}
               onFileChange={(file, nextError) => { setAboutFile(file); setAboutError(nextError || '') }}
@@ -889,7 +892,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
               compact={compact}
               ultraCompact
               error={aboutError}
-              descriptionText="Hakkimizda bolumundeki buyuk yatay veya dikey gorsel."
+              descriptionText="Hakkımızda bölümündeki büyük yatay veya dikey görsel."
             />
           </div>
         </div>
@@ -903,21 +906,21 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
             <input className="input" value={String(productsSection.settings?.galleryLabel || '')} onChange={(event) => updateSectionSettings('products', 'galleryLabel', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Galeri Basligi</span>
+            <span>Galeri Başlığı</span>
             <input className="input" value={String(productsSection.settings?.galleryTitle || '')} onChange={(event) => updateSectionSettings('products', 'galleryTitle', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6, gridColumn: compact ? 'auto' : '1 / -1' }}>
-            <span>Galeri Aciklamasi</span>
+            <span>Galeri Açıklaması</span>
             <textarea className="input" value={String(productsSection.settings?.galleryDescription || '')} onChange={(event) => updateSectionSettings('products', 'galleryDescription', event.target.value)} style={textareaStyle} />
           </label>
         </div>
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontWeight: 900 }}>Galeri Gorselleri</div>
-              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Website galerisinde kayan detay fotograflari.</div>
+              <div style={{ fontWeight: 900 }}>Galeri Görselleri</div>
+              <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Web sitesi galerisinde kayan detay fotoğrafları.</div>
             </div>
-            <button className="btn" type="button" onClick={addGalleryItem}>+ Gorsel Ekle</button>
+            <button className="btn" type="button" onClick={addGalleryItem}>+ Görsel Ekle</button>
           </div>
           <div
             style={{
@@ -938,7 +941,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
                   ultraCompact
                   error={item.error}
                   helperText="Maks. 5 MB"
-                  descriptionText="Detay gorseli"
+                  descriptionText="Detay görseli"
                 />
                 <button className="btn" type="button" onClick={() => removeGalleryItem(item.id)}>Sil</button>
               </div>
@@ -950,33 +953,33 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       <section style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>Urun Vitrini</div>
-            <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Ekle dedikce menudeki urunler secilir ve website kartlarina gelir.</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>Ürün Vitrini</div>
+            <div style={{ fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>Ürün ekledikçe menüdeki ürünler seçilir ve web sitesi kartlarında gösterilir.</div>
           </div>
-          <button className="btn" type="button" onClick={addFeaturedProduct} disabled={!products.length}>+ Urun Ekle</button>
+          <button className="btn" type="button" onClick={addFeaturedProduct} disabled={!products.length}>+ Ürün Ekle</button>
         </div>
 
         <label style={{ display: 'grid', gap: 6 }}>
-          <span>Bolum Basligi</span>
+          <span>Bölüm Başlığı</span>
           <input className="input" value={productsSection.title} onChange={(event) => updateSectionCopy('products', 'title', event.target.value)} style={inputStyle} />
         </label>
 
         <label style={{ display: 'grid', gap: 6 }}>
-          <span>Bolum Aciklamasi</span>
+          <span>Bölüm Açıklaması</span>
           <input className="input" value={productsSection.subtitle} onChange={(event) => updateSectionCopy('products', 'subtitle', event.target.value)} style={inputStyle} />
         </label>
 
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Urun Aciklama Varsayilani</span>
+            <span>Varsayılan Ürün Açıklaması</span>
             <input className="input" value={String(productsSection.settings?.productFallbackDescription || '')} onChange={(event) => updateSectionSettings('products', 'productFallbackDescription', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Gorsel Yok Yazisi</span>
+            <span>Görsel Yok Yazısı</span>
             <input className="input" value={String(productsSection.settings?.imageFallbackText || '')} onChange={(event) => updateSectionSettings('products', 'imageFallbackText', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Urun Yok Mesaji</span>
+            <span>Ürün Bulunamadığında Gösterilecek Mesaj</span>
             <input className="input" value={String(productsSection.settings?.emptyStateText || '')} onChange={(event) => updateSectionSettings('products', 'emptyStateText', event.target.value)} style={inputStyle} />
           </label>
         </div>
@@ -984,7 +987,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
         <div style={{ display: 'grid', gap: 10 }}>
           {featuredIds.length === 0 ? (
             <div style={{ borderRadius: 16, border: '1px dashed var(--app-border)', padding: 14, color: 'var(--app-text-secondary, var(--muted))' }}>
-              Henuz urun vitrini secilmedi.
+              Henüz ürün vitrini seçilmedi.
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
@@ -1005,13 +1008,13 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 900 }}>{item?.name || 'Urun secilmedi'}</div>
+                        <div style={{ fontWeight: 900 }}>{item?.name || 'Ürün seçilmedi'}</div>
                         <div style={{ marginTop: 6, fontSize: 12, color: 'var(--app-text-secondary, var(--muted))' }}>
-                          {item?.description || 'Aciklama yok'}
+                          {item?.description || 'Açıklama yok'}
                         </div>
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--app-text-secondary, var(--muted))', whiteSpace: 'nowrap' }}>
-                        {isEditing ? 'Duzenleniyor' : 'Degistir'}
+                        {isEditing ? 'Düzenleme açık' : 'Düzenle'}
                       </div>
                     </div>
 
@@ -1041,35 +1044,35 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
       </section>
 
       <section style={cardStyle}>
-        <div style={{ fontSize: 22, fontWeight: 900 }}>Iletisim, Alinti ve SEO</div>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>İletişim, Alıntı ve SEO</div>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Adres Basligi</span>
+            <span>Adres Başlığı</span>
             <input className="input" value={String(contactSection.settings?.addressLabel || '')} onChange={(event) => updateSectionSettings('contact', 'addressLabel', event.target.value)} style={inputStyle} placeholder="Adres" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Rezervasyon Basligi</span>
+            <span>Rezervasyon Başlığı</span>
             <input className="input" value={String(contactSection.settings?.reservationLabel || '')} onChange={(event) => updateSectionSettings('contact', 'reservationLabel', event.target.value)} style={inputStyle} placeholder="Rezervasyon" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Bos Adres Yazisi</span>
+            <span>Adres Boşken Gösterilecek Metin</span>
             <input className="input" value={String(contactSection.settings?.emptyAddressText || '')} onChange={(event) => updateSectionSettings('contact', 'emptyAddressText', event.target.value)} style={inputStyle} placeholder="Adres bilgisi eklenmedi" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Bos Rezervasyon Yazisi</span>
-            <input className="input" value={String(contactSection.settings?.emptyReservationText || '')} onChange={(event) => updateSectionSettings('contact', 'emptyReservationText', event.target.value)} style={inputStyle} placeholder="Iletisim bilgisi eklenmedi" />
+            <span>Rezervasyon Boşken Gösterilecek Metin</span>
+            <input className="input" value={String(contactSection.settings?.emptyReservationText || '')} onChange={(event) => updateSectionSettings('contact', 'emptyReservationText', event.target.value)} style={inputStyle} placeholder="İletişim bilgisi eklenmedi" />
           </label>
           <label style={{ display: 'grid', gap: 6, gridColumn: compact ? 'auto' : '1 / -1' }}>
-            <span>Alinti Metni</span>
-            <textarea className="input" value={String(contactSection.settings?.quoteText || '')} onChange={(event) => updateSectionSettings('contact', 'quoteText', event.target.value)} style={textareaStyle} placeholder="Iyi yemek acele etmez. Ama iyi siparis hizli olmalidir." />
+            <span>Alıntı Metni</span>
+            <textarea className="input" value={String(contactSection.settings?.quoteText || '')} onChange={(event) => updateSectionSettings('contact', 'quoteText', event.target.value)} style={textareaStyle} placeholder="İyi yemek acele etmez. Ama iyi sipariş hızlı olmalıdır." />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Alinti Imzasi</span>
+            <span>Alıntı İmzası</span>
             <input className="input" value={String(contactSection.settings?.quoteAuthor || '')} onChange={(event) => updateSectionSettings('contact', 'quoteAuthor', event.target.value)} style={inputStyle} placeholder="Restoran Felsefesi" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Harita Link Yazisi</span>
-            <input className="input" value={String(contactSection.settings?.mapLinkText || '')} onChange={(event) => updateSectionSettings('contact', 'mapLinkText', event.target.value)} style={inputStyle} placeholder="Haritada Ac" />
+            <span>Harita Bağlantısı Metni</span>
+            <input className="input" value={String(contactSection.settings?.mapLinkText || '')} onChange={(event) => updateSectionSettings('contact', 'mapLinkText', event.target.value)} style={inputStyle} placeholder="Haritada Aç" />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
             <span>Telefon</span>
@@ -1084,7 +1087,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
             <input className="input" value={settings.contact.email} onChange={(event) => updateContact('email', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>Harita Linki</span>
+            <span>Harita Bağlantısı</span>
             <input className="input" value={settings.contact.mapUrl} onChange={(event) => updateContact('mapUrl', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6, gridColumn: compact ? 'auto' : '1 / -1' }}>
@@ -1092,11 +1095,11 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
             <textarea className="input" value={settings.contact.address} onChange={(event) => updateContact('address', event.target.value)} style={textareaStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>SEO Basligi</span>
+            <span>SEO Başlığı</span>
             <input className="input" value={settings.seo.title} onChange={(event) => updateSeo('title', event.target.value)} style={inputStyle} />
           </label>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span>SEO Aciklamasi</span>
+            <span>SEO Açıklaması</span>
             <input className="input" value={settings.seo.description} onChange={(event) => updateSeo('description', event.target.value)} style={inputStyle} />
           </label>
         </div>

@@ -399,7 +399,7 @@ export default function KitchenPage() {
           : (o.saleType === 'delivery'
             ? (o.customerName ? `Paket • ${o.customerName}` : 'Paket')
             : (o.saleType === 'walkin'
-              ? (o.customerName ? `Hızlı • ${o.customerName}` : 'Hızlı Satis')
+              ? (o.customerName ? `Hızlı • ${o.customerName}` : 'Hızlı Satış')
               : (o?.orderNo ? `Sipariş ${o.orderNo}` : `Sipariş #${String(o.id).slice(-6)}`)))
         const sendTime = o.batchSentAt
           ? new Date(o.batchSentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
@@ -576,7 +576,7 @@ export default function KitchenPage() {
 
       {filteredOut && (
         <div className="card theme-card-soft" style={{ borderColor: '#f59e0b', color: 'var(--app-text)' }}>
-          Filtreler tüm urunleri gizliyor.
+          Filtreler tüm ürünleri gizliyor.
           <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn" type="button" onClick={() => setFilterOpen(true)}>Filtreyi Ac</button>
             <button className="btn" type="button" onClick={() => menuFilters.resetAllVisible()}>Hepsini Ac</button>

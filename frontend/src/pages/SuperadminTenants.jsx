@@ -28,6 +28,49 @@ const SYSTEM_TYPE_LABEL = (value) => {
   return 'RESTORAN'
 }
 
+function formatUsageDuration(value, compact = false) {
+  const totalMinutes = Math.floor(Math.max(0, Number(value) || 0) / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${minutes} dk`
+  if (compact) return `${hours} sa ${minutes} dk`
+  const days = Math.floor(hours / 24)
+  return days > 0 ? `${days} gün ${hours % 24} sa` : `${hours} sa ${minutes} dk`
+}
+
+function getLastOnlineLabel(usage) {
+  if (!usage?.lastSeenAt) return '⚪ Henüz giriş yok'
+  const lastSeen = new Date(usage.lastSeenAt)
+  const elapsedMs = Math.max(0, Date.now() - lastSeen.getTime())
+  if (Number.isNaN(lastSeen.getTime())) return '⚪ Henüz giriş yok'
+  if (elapsedMs < 60 * 1000 && usage.isOnline) return '🟢 Şimdi online'
+
+  const elapsedMinutes = Math.floor(elapsedMs / (60 * 1000))
+  if (elapsedMinutes < 60) return `${usage.isOnline ? '🟢' : '🟡'} ${Math.max(1, elapsedMinutes)} dk önce`
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours < 24) return `🟡 ${elapsedHours} saat önce`
+
+  const now = new Date()
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  if (lastSeen >= yesterday && lastSeen.toDateString() === yesterday.toDateString()) return '⚪ Dün'
+  return `⚪ ${formatAdminDate(lastSeen, { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+}
+
+function formatLastActiveAt(value) {
+  if (!value) return 'Hiç giriş yapmadı'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Hiç giriş yapmadı'
+  return date.toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  })
+}
+
 export default function SuperadminTenants() {
   const [tenants, setTenants] = useState([])
   const [name, setName] = useState('')
@@ -55,22 +98,24 @@ export default function SuperadminTenants() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [planFilter, setPlanFilter] = useState('all')
 
-  const load = async () => {
-    setLoading(true)
-    setError('')
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true)
+    if (!quiet) setError('')
     try {
       const { tenants } = await api('/api/superadmin/tenants')
       setTenants(Array.isArray(tenants) ? tenants : [])
     } catch (err) {
       setError(err.message)
-      setTenants([])
+      if (!quiet) setTenants([])
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }
 
   useEffect(() => {
     load()
+    const refreshTimer = window.setInterval(() => load({ quiet: true }), 60 * 1000)
+    return () => window.clearInterval(refreshTimer)
   }, [])
 
   const onCreateTenant = async (event) => {
@@ -268,14 +313,11 @@ export default function SuperadminTenants() {
             <div className="admin-table-scroll">
               <table className="admin-table">
                 <colgroup>
-                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '13%' }} />
                   <col style={{ width: '12%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '12%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '18%' }} />
                   <col style={{ width: 140 }} />
                 </colgroup>
                 <thead>
@@ -285,51 +327,69 @@ export default function SuperadminTenants() {
                     <th>Sistem</th>
                     <th>Durum</th>
                     <th>Plan</th>
-                    <th>Plan Durumu</th>
-                    <th>Bitiş</th>
-                    <th>Oluşturulma</th>
                     <th className="admin-actions-cell">İşlemler</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTenants.map((tenant) => {
                     const isActive = tenant.isActive && tenant.status === 'active'
-                    const planMeta = getPlanMeta(tenant)
                     const endsAt = tenant.plan?.endsAt ? formatAdminDate(tenant.plan.endsAt) : ''
+                    const usage = tenant.usage || {}
                     return (
-                      <tr key={tenant.id} className="admin-table-row">
-                        <td title={tenant.name || ''}><span className="admin-cell-ellipsis">{tenant.name}</span></td>
-                        <td title={tenant.slug || ''}><span className="admin-cell-ellipsis admin-cell-secondary">{tenant.slug || 'Kod yok'}</span></td>
-                        <td>
-                          <AdminStatusBadge tone={(tenant.systemType || tenant.vertical || '') === 'anaokulu' ? 'info' : (tenant.systemType === 'kantin' || tenant.vertical === 'canteen' ? 'warning' : 'success')}>
-                            {SYSTEM_TYPE_LABEL(tenant.systemType || tenant.vertical || tenant.businessType || 'restaurant')}
-                          </AdminStatusBadge>
-                        </td>
-                        <td>
-                          <AdminStatusBadge tone={isActive ? 'success' : 'neutral'}>
-                            {isActive ? 'Aktif' : 'Pasif'}
-                          </AdminStatusBadge>
-                        </td>
-                        <td title={tenant.plan?.name || ''}><span className="admin-cell-ellipsis">{tenant.plan?.name || 'Plan yok'}</span></td>
-                        <td><AdminStatusBadge tone={planMeta.tone}>{planMeta.label}</AdminStatusBadge></td>
-                        <td>
-                          {endsAt
-                            ? <span className="admin-cell-ellipsis">{endsAt}</span>
-                            : <AdminStatusBadge tone={planMeta.tone}>{planMeta.label}</AdminStatusBadge>}
-                        </td>
-                        <td><span className="admin-cell-ellipsis">{tenant.createdAt ? formatAdminDate(tenant.createdAt) : 'Tarih yok'}</span></td>
-                        <td className="admin-actions-cell">
-                          <AdminActionMenu
-                            items={[
-                              { label: 'Düzenle', onClick: () => openEditModal(tenant) },
-                              { label: 'Yönetici Oluştur', onClick: () => openAdminModal(tenant) },
-                              { label: 'Deneme Uzat', onClick: () => openTrialExtend(tenant) },
-                              { label: 'Denemeyi Bitir', onClick: () => endTrial(tenant) },
-                              { label: 'Sil', onClick: () => openDelete(tenant), danger: true },
-                            ]}
-                          />
-                        </td>
-                      </tr>
+                      <React.Fragment key={tenant.id}>
+                        <tr className="admin-table-row tenant-main-row">
+                          <td title={tenant.name || ''}><span className="admin-cell-ellipsis">{tenant.name}</span></td>
+                          <td title={tenant.slug || ''}><span className="admin-cell-ellipsis admin-cell-secondary">{tenant.slug || 'Kod yok'}</span></td>
+                          <td>
+                            <AdminStatusBadge tone={(tenant.systemType || tenant.vertical || '') === 'anaokulu' ? 'info' : (tenant.systemType === 'kantin' || tenant.vertical === 'canteen' ? 'warning' : 'success')}>
+                              {SYSTEM_TYPE_LABEL(tenant.systemType || tenant.vertical || tenant.businessType || 'restaurant')}
+                            </AdminStatusBadge>
+                          </td>
+                          <td>
+                            <AdminStatusBadge tone={isActive ? 'success' : 'neutral'}>
+                              {isActive ? 'Aktif' : 'Pasif'}
+                            </AdminStatusBadge>
+                          </td>
+                          <td title={tenant.plan?.name || ''}><span className="admin-cell-ellipsis">{tenant.plan?.name || 'Plan yok'}</span></td>
+                          <td className="admin-actions-cell">
+                            <AdminActionMenu
+                              items={[
+                                { label: 'Düzenle', onClick: () => openEditModal(tenant) },
+                                { label: 'Yönetici Oluştur', onClick: () => openAdminModal(tenant) },
+                                { label: 'Deneme Uzat', onClick: () => openTrialExtend(tenant) },
+                                { label: 'Denemeyi Bitir', onClick: () => endTrial(tenant) },
+                                { label: 'Sil', onClick: () => openDelete(tenant), danger: true },
+                              ]}
+                            />
+                          </td>
+                        </tr>
+                        <tr className="admin-table-row tenant-usage-row">
+                          <td>
+                            <span className="tenant-usage-label">Son Online</span>
+                            <span className="tenant-usage-value">{getLastOnlineLabel(usage)}</span>
+                          </td>
+                          <td>
+                            <span className="tenant-usage-label">Bugünkü Kullanım</span>
+                            <strong className="tenant-usage-value">{formatUsageDuration(usage.todayUsageSeconds)}</strong>
+                          </td>
+                          <td>
+                            <span className="tenant-usage-label">7 Günlük Kullanım</span>
+                            <span className="tenant-usage-value tenant-usage-secondary">{formatUsageDuration(usage.weekUsageSeconds, true)}</span>
+                          </td>
+                          <td>
+                            <span className="tenant-usage-label">Toplam Kullanım</span>
+                            <strong className="tenant-usage-value">{formatUsageDuration(usage.totalUsageSeconds)}</strong>
+                          </td>
+                          <td>
+                            <span className="tenant-usage-label">Son Aktif</span>
+                            <span className="tenant-usage-value">{formatLastActiveAt(usage.lastActiveAt)}</span>
+                          </td>
+                          <td>
+                            <span className="tenant-usage-label">Bitiş</span>
+                            <span className="tenant-usage-value">{endsAt || '-'}</span>
+                          </td>
+                        </tr>
+                      </React.Fragment>
                     )
                   })}
                 </tbody>

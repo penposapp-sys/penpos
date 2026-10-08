@@ -3,8 +3,8 @@ import React from 'react'
 export default function ThemeSelectionCards({
   darkMode,
   onToggleDarkMode,
-  darkModeLabel = 'Gorunum Modu',
-  darkModeDescription = 'Panelin beyaz modda mi koyu modda mi gorunecegini belirler.',
+  darkModeLabel = 'Görünüm Modu',
+  darkModeDescription = 'Panelin beyaz modda mı koyu modda mı görüneceğini belirler.',
 }) {
   const canToggleDarkMode = typeof darkMode === 'boolean' && typeof onToggleDarkMode === 'function'
 
