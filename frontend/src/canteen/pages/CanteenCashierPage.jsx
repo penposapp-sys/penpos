@@ -83,6 +83,8 @@ const CashierProductCard = memo(function CashierProductCard({
   const hasImage = imageSource.length > 0
   const disableImages = isProductImagesDisabled()
   const productId = normalizeId(product?.id || product?._id)
+  const priceLabel = `${money(getSalePrice(product))} ₺`
+  const stockLabel = product.stockTrackingEnabled === true ? `Stok: ${Number(product.stockQty || 0)}` : 'Stok: —'
   const handleClick = useCallback(() => onAdd(product), [onAdd, product])
   const handleImageError = useCallback((event) => {
     event.currentTarget.src = IMAGE_PLACEHOLDER
@@ -123,9 +125,9 @@ const CashierProductCard = memo(function CashierProductCard({
           </div>
         ) : null}
         <div className="kasaProductCardFooter">
-          <div className="kasaProductCardPrice" style={{ color: accentText }}>{money(getSalePrice(product))} ₺</div>
-          <div className="kasaProductCardStock">
-            {product.stockTrackingEnabled === true ? `Stok: ${Number(product.stockQty || 0)}` : 'Stok: —'}
+          <div className="kasaProductCardPrice kasaProductCardCompactValue" data-long-value={priceLabel.length > 12 ? 'true' : 'false'} style={{ color: accentText }}>{priceLabel}</div>
+          <div className="kasaProductCardStock kasaProductCardCompactValue" data-long-value={stockLabel.length > 12 ? 'true' : 'false'}>
+            {stockLabel}
           </div>
         </div>
       </div>

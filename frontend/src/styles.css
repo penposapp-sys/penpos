@@ -13881,7 +13881,7 @@ body.pos-app-layout .canteen-cashier-page .kasaCategoryCard[data-active="true"] 
 
   body.pos-app-layout .canteen-cashier-page .kasaProductCardBody {
     gap: 3px;
-    padding: 6px 7px;
+    padding: 6px 3px;
   }
 
   body.pos-app-layout .canteen-cashier-page .kasaProductCardTitle {
@@ -13890,20 +13890,31 @@ body.pos-app-layout .canteen-cashier-page .kasaCategoryCard[data-active="true"] 
   }
 
   body.pos-app-layout .canteen-cashier-page .kasaProductCardFooter {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    justify-content: start;
-    gap: 3px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
   }
 
   body.pos-app-layout .canteen-cashier-page .kasaProductCardPrice {
-    font-size: 11px !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--theme-accent, #287a51) !important;
+    line-height: 1.2;
+    text-align: left;
+    white-space: nowrap;
+    overflow-wrap: normal;
   }
 
   body.pos-app-layout .canteen-cashier-page .kasaProductCardStock {
-    justify-self: start;
-    padding: 1px 5px;
-    font-size: 8px;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 1px 2px;
+    line-height: 1.2;
+    text-align: right;
+    white-space: nowrap;
+    overflow-wrap: normal;
   }
 }
 
@@ -15266,9 +15277,27 @@ body.pos-app-layout .modal-backdrop * {
   font-family: var(--app-font-family);
 }
 
-body.pos-app-layout #root :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *),
+body.pos-app-layout #root :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *):not(.kasaProductCardCompactValue),
 body.pos-app-layout .modal-backdrop :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *) {
   font-size: var(--app-font-size) !important;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardCompactValue {
+  font-size: var(--app-font-size) !important;
+}
+
+@media (max-width: 767px) {
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardPrice.kasaProductCardCompactValue {
+    font-size: clamp(7px, calc(var(--app-font-size) * 0.65), 8px) !important;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardStock.kasaProductCardCompactValue {
+    font-size: clamp(6px, calc(var(--app-font-size) * 0.55), 7px) !important;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardCompactValue[data-long-value="true"] {
+    font-size: clamp(5.5px, calc(var(--app-font-size) * 0.5), 6px) !important;
+  }
 }
 
 body.pos-app-layout #root :is(h1, h2, h3, h4, h5, h6, [role="heading"], .settings-card-title, .settings-page-title, .qr-ref-section-title),
