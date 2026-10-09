@@ -305,6 +305,7 @@ function ReportFilterCompact({
 
 function MainPanel({ summary, methodRows, compact = false }) {
   const max = methodRows.reduce((best, item) => Math.max(best, Number(item.value || 0)), 0) || 1
+  const hasPaymentActivity = methodRows.some((item) => Number(item.value || 0) > 0)
   return (
     <div style={{ ...CARD_STYLE, padding: 24, minWidth: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -324,35 +325,41 @@ function MainPanel({ summary, methodRows, compact = false }) {
           { label: 'Z Özeti', value: methodRows.length > 0 ? 'Hazır' : 'Boş' }
         ].map((item) => (
           <div key={item.label} style={{ borderRadius: 18, background: 'var(--theme-accent-soft)', padding: '12px 14px', minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--theme-accent-text)', fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--app-text, var(--text))', fontWeight: 700 }}>{item.label}</div>
             <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900, color: 'var(--text)', overflowWrap: 'anywhere' }}>{item.value}</div>
           </div>
         ))}
       </div>
 
       <div style={{ marginTop: 24, paddingTop: 10, borderTop: '1px solid var(--border)', overflowX: 'auto', overflowY: 'hidden' }}>
-        <div style={{ display: 'flex', width: `${Math.max(100, methodRows.length * 70)}px`, minWidth: '100%', height: 230, alignItems: 'stretch', gap: 8 }}>
-          {methodRows.map((row) => (
-            <div key={row.label} style={{ display: 'flex', flex: 1, minWidth: 48, flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', width: '100%', flex: 1, alignItems: 'flex-end' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${Math.max(18, Math.round((Number(row.value || 0) / max) * 100))}%`,
-                    minHeight: Number(row.value || 0) > 0 ? 18 : 0,
-                    borderTopLeftRadius: 18,
-                    borderTopRightRadius: 18,
-                    borderBottomLeftRadius: 12,
-                    borderBottomRightRadius: 12,
-                    background: 'var(--theme-gradient)',
-                    boxShadow: '0 12px 28px var(--theme-accent-soft)'
-                  }}
-                />
+        {hasPaymentActivity ? (
+          <div style={{ display: 'flex', width: `${Math.max(100, methodRows.length * 70)}px`, minWidth: '100%', height: 230, alignItems: 'stretch', gap: 8 }}>
+            {methodRows.map((row) => (
+              <div key={row.label} style={{ display: 'flex', flex: 1, minWidth: 48, flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', width: '100%', flex: 1, alignItems: 'flex-end' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: `${Math.max(18, Math.round((Number(row.value || 0) / max) * 100))}%`,
+                      minHeight: Number(row.value || 0) > 0 ? 18 : 0,
+                      borderTopLeftRadius: 18,
+                      borderTopRightRadius: 18,
+                      borderBottomLeftRadius: 12,
+                      borderBottomRightRadius: 12,
+                      background: 'var(--theme-gradient)',
+                      boxShadow: '0 12px 28px var(--theme-accent-soft)'
+                    }}
+                  />
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--app-text)', textAlign: 'center' }}>{row.label}</span>
               </div>
-              <span style={{ fontSize: 10, color: 'var(--app-text)', textAlign: 'center' }}>{row.label}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ height: 230, display: 'grid', placeItems: 'center', color: 'var(--app-text-secondary, var(--text-secondary))', fontSize: 13 }}>
+            Seçili dönemde ödeme hareketi yok.
+          </div>
+        )}
       </div>
     </div>
   )
@@ -375,7 +382,7 @@ function SidePanel({ summary, methodRows }) {
             <div key={row.label}>
               <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14, minWidth: 0 }}>
                 <b style={{ color: 'var(--text)' }}>{row.label}</b>
-                <span style={{ fontWeight: 900, color: 'var(--theme-accent-text)', textAlign: 'right' }}>{money(row.value)} ₺</span>
+                <span style={{ fontWeight: 900, color: 'var(--app-text, var(--text))', textAlign: 'right' }}>{money(row.value)} ₺</span>
               </div>
               <div style={{ height: 12, borderRadius: 999, background: 'var(--theme-accent-soft)' }}>
                 <div style={{ width: `${ratio}%`, height: 12, borderRadius: 999, background: 'var(--theme-gradient)' }} />
@@ -428,7 +435,7 @@ function ReportCatalog({ onSelect }) {
         >
           <div style={{ fontWeight: 900, color: 'var(--text)', fontSize: 18 }}>{item.title}</div>
           <div style={{ marginTop: 8, color: 'var(--app-text-secondary)', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>{item.desc}</div>
-          <div style={{ marginTop: 14, color: 'var(--theme-accent-text)', fontWeight: 900, fontSize: 13 }}>Raporu aç →</div>
+          <div style={{ marginTop: 14, color: 'var(--app-text, var(--text))', fontWeight: 900, fontSize: 13 }}>Raporu aç →</div>
         </button>
       ))}
     </div>

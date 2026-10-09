@@ -35,11 +35,14 @@
   --button-selected-shadow: 0 10px 24px rgba(107, 114, 128, 0.28);
   --button-border: #d1d5db;
   --button-disabled-bg: #e5e7eb;
-  --button-disabled-text: #6b7280;
+  --button-disabled-text: #4b5563;
   --card-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
   --success: #16a34a;
+  --success-text: #166534;
   --warning: #f59e0b;
+  --warning-text: #92400e;
   --danger: #dc2626;
+  --danger-text: #991b1b;
   --bg-main: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f3f4f6;
@@ -1429,7 +1432,7 @@
   --app-text: #f4f1ec;
   --app-text-secondary: #b8b4ad;
   --app-text-soft: #b8b4ad;
-  --app-text-muted: #77736d;
+  --app-text-muted: #b8b4ad;
   --app-input: rgba(21, 20, 18, 0.82);
   --app-input-border: rgba(255,255,255,0.08);
   --app-button-bg: rgba(255,255,255,0.06);
@@ -1464,7 +1467,7 @@
   --border-hover: rgba(255,255,255,0.14);
   --text-primary: #f4f1ec;
   --text-secondary: #b8b4ad;
-  --text-muted: #77736d;
+  --text-muted: #b8b4ad;
   --glass-blur: blur(18px);
   --shadow-soft: 0 10px 40px rgba(0,0,0,0.42);
   --shadow-glow: 0 0 0 1px rgba(255,255,255,0.025), 0 20px 80px rgba(0,0,0,0.56);
@@ -1491,10 +1494,13 @@
   --text-secondary: #b8b4ad;
   --text-muted: #77736d;
   --text: #f4f1ec;
-  --muted: #77736d;
+  --muted: #b8b4ad;
   --success: #57d38c;
+  --success-text: #86efac;
   --warning: #ffbe5c;
+  --warning-text: #fcd34d;
   --danger: #ff6f6f;
+  --danger-text: #ff6f6f;
 }
 * { box-sizing: border-box }
 html,
@@ -2022,10 +2028,22 @@ body.scroll-lock { overflow: hidden !important }
 .page-pill {
   background: var(--theme-accent-soft, #eef0f3);
   border: 1px solid var(--border);
-  color: var(--theme-accent-text, #111111);
+  color: var(--app-text, var(--theme-accent-text, #111111));
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
+}
+
+html[data-theme="dark"] .sale-order-status--ready {
+  color: #86efac !important;
+}
+
+html[data-theme="dark"] .sale-order-status--sent {
+  color: #fdba74 !important;
+}
+
+html[data-theme="dark"] .sale-order-status--open {
+  color: #d1d5db !important;
 }
 
 .pos-app-shell {
@@ -2531,7 +2549,7 @@ body.modal-open .qr-menu .menu-row:hover {
 .saleProductsMobileIntroMeta {
   margin-bottom: 0;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--app-text-secondary, var(--text-secondary));
   min-width: 0;
 }
 
@@ -5912,21 +5930,9 @@ button:hover::before {
 html[data-theme="light"].theme-white :is(
   .btn--primary,
   .btn-primary,
-  .settings-ui-submit,
+  .settings-ui-submit:not(:disabled):not([disabled]):not([aria-disabled="true"]),
   .product-dark-btn,
   .primary,
-  .btn.active,
-  .btn.is-active,
-  .btn.selected,
-  .btn.is-selected,
-  .btn[aria-pressed="true"],
-  .btn[data-active="true"],
-  button.active,
-  button.is-active,
-  button.selected,
-  button.is-selected,
-  button[aria-pressed="true"],
-  button[data-active="true"]:not(.topSheetItem),
   button[style*="var(--button-active-bg)"],
   button[style*="var(--menu-active-bg"],
   button[style*="#111111"],
@@ -5934,13 +5940,7 @@ html[data-theme="light"].theme-white :is(
   .btn[style*="var(--button-active-bg)"],
   .btn[style*="var(--menu-active-bg"],
   .btn[style*="#111111"],
-  .btn[style*="#111827"],
-  a.active,
-  [aria-current="page"],
-  .nav-link.active,
-  .sidebar-menu-button.active,
-  .sidebar-menu-button[aria-current="page"],
-  .theme-selection-card-selected
+  .btn[style*="#111827"]
 ) {
   background: var(--button-active-bg) !important;
   border-color: var(--button-active-bg) !important;
@@ -5950,21 +5950,9 @@ html[data-theme="light"].theme-white :is(
 html[data-theme="light"].theme-white :is(
   .btn--primary,
   .btn-primary,
-  .settings-ui-submit,
+  .settings-ui-submit:not(:disabled):not([disabled]):not([aria-disabled="true"]),
   .product-dark-btn,
   .primary,
-  .btn.active,
-  .btn.is-active,
-  .btn.selected,
-  .btn.is-selected,
-  .btn[aria-pressed="true"],
-  .btn[data-active="true"],
-  button.active,
-  button.is-active,
-  button.selected,
-  button.is-selected,
-  button[aria-pressed="true"],
-  button[data-active="true"],
   button[style*="var(--button-active-bg)"],
   button[style*="var(--menu-active-bg"],
   button[style*="#111111"],
@@ -5972,13 +5960,7 @@ html[data-theme="light"].theme-white :is(
   .btn[style*="var(--button-active-bg)"],
   .btn[style*="var(--menu-active-bg"],
   .btn[style*="#111111"],
-  .btn[style*="#111827"],
-  a.active,
-  [aria-current="page"],
-  .nav-link.active,
-  .sidebar-menu-button.active,
-  .sidebar-menu-button[aria-current="page"],
-  .theme-selection-card-selected
+  .btn[style*="#111827"]
 ) :is(*, svg, svg *, path, circle, rect, g, use, span, i) {
   color: var(--button-active-text) !important;
   fill: currentColor !important;
@@ -6617,18 +6599,18 @@ html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .ca
 ):not(.settings-module-card):not(.theme-selection-card):not(.settings-ui-btn-danger):not(.btn--danger):not(.settings-ui-branch-pill):not(.product-toggle):is(:disabled, [disabled], [aria-disabled="true"]) {
   background: var(--settings-button-disabled-bg, #d1d5db) !important;
   border-color: var(--settings-button-disabled-border, #d1d5db) !important;
-  color: var(--settings-button-disabled-text, #6b7280) !important;
+  color: var(--settings-button-disabled-text, #4b5563) !important;
   box-shadow: none !important;
 }
 .btn--danger {
-  background: #ef4444;
-  border-color: #ef4444;
+  background: #dc2626;
+  border-color: #dc2626;
   color: #ffffff;
   font-weight: 600;
 }
 .btn--danger:hover {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 .btn--danger-soft {
@@ -6644,8 +6626,8 @@ html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .ca
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
-  .btn:not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.saleCartBackdrop):not(.theme-mode-option):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  .btn:not(.btn--primary):not(.btn--success):not(.theme-mode-option):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
   .sidebar-menu-button,
   .saleCategoryButton:not([aria-pressed="true"]),
   .product-action-btn,
@@ -6665,15 +6647,15 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
   background: #ffffff !important;
   color: #111111 !important;
   border-color: #d1d5db !important;
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
-  .btn:not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.saleCartBackdrop):not(.theme-mode-option):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  .btn:not(.btn--primary):not(.btn--success):not(.theme-mode-option):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
   .sidebar-menu-button,
   .saleCategoryButton:not([aria-pressed="true"]),
   .product-action-btn,
@@ -6693,10 +6675,22 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(
+  *:not(.responsive-card-badge),
+  span:not(.responsive-card-badge),
+  svg:not(.responsive-card-badge),
+  svg *:not(.responsive-card-badge),
+  i:not(.responsive-card-badge)
+) {
   color: #111111 !important;
   fill: currentColor !important;
   stroke: currentColor !important;
+}
+
+html[data-theme="light"].theme-white body.app-shell-active .theme-mode-option[aria-pressed="true"] {
+  background: var(--theme-accent, #287a51) !important;
+  border-color: var(--theme-accent, #287a51) !important;
+  color: #ffffff !important;
 }
 
 html[data-theme="light"].theme-white button.productCard[data-has-image="true"] :is(.productCard__name, .productCard__price),
@@ -6715,7 +6709,7 @@ html[data-theme="light"].theme-white button.kasaProductCard[data-has-image="true
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:hover:not(.productCard):not(.kasaProductCard):not(.sidebar-menu-button):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button:hover:not(.productCard):not(.kasaProductCard):not(.saleCartBackdrop):not(.sidebar-menu-button):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   button:focus-visible:not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn:hover,
   .btn:focus-visible,
@@ -6747,7 +6741,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
 }
 
 html[data-theme="light"].theme-white body.app-shell-active :is(
-  button:active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
+  button:active:not(.saleCartBackdrop):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
   .btn:active,
   .nav-link:active,
   button.active:not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button),
@@ -6764,6 +6758,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   .product-category-pill.active,
   .settings-ui-branch-all-btn.active,
   .settings-ui-branch-pill.active,
+  button[data-active="true"]:not(.topSheetItem):not(.theme-mode-option),
   [aria-pressed="true"],
   [aria-current="page"]:not(.sidebar-menü-button)
 ):not(.product-toggle):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
@@ -6798,7 +6793,13 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   .canteen-settings-menu-toggle:hover,
   .hamburger-btn:hover,
   .nav-link:hover
-):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+):not(.btn--close-action):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(
+  *:not(.responsive-card-badge),
+  span:not(.responsive-card-badge),
+  svg:not(.responsive-card-badge),
+  svg *:not(.responsive-card-badge),
+  i:not(.responsive-card-badge)
+) {
   color: #111111 !important;
   fill: currentColor !important;
   stroke: currentColor !important;
@@ -6822,9 +6823,16 @@ html[data-theme="light"].theme-white body.app-shell-active :is(
   .product-category-pill.active,
   .settings-ui-branch-all-btn.active,
   .settings-ui-branch-pill.active,
+  button[data-active="true"]:not(.topSheetItem):not(.theme-mode-option),
   [aria-pressed="true"],
   [aria-current="page"]
-):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(*, span, svg, svg *, i) {
+):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(
+  *:not(.responsive-card-badge),
+  span:not(.responsive-card-badge),
+  svg:not(.responsive-card-badge),
+  svg *:not(.responsive-card-badge),
+  i:not(.responsive-card-badge)
+) {
   color: var(--button-selected-text, #111111) !important;
   fill: currentColor !important;
   stroke: currentColor !important;
@@ -12772,7 +12780,7 @@ body.tenant-dark-mode,
   --button-active-text: #ffffff;
   --button-border: #d9dee5;
   --button-disabled-bg: #e5e7eb;
-  --button-disabled-text: #6b7280;
+  --button-disabled-text: #4b5563;
   --card-shadow: none;
 }
 
@@ -12809,7 +12817,7 @@ body.tenant-dark-mode,
   --button-active-text: #111111;
   --button-border: #4a4a4a;
   --button-disabled-bg: #3a3a3a;
-  --button-disabled-text: #9ca3af;
+  --button-disabled-text: #b8b4ad;
   --theme-card-bg: #242424;
   --theme-border: #3a3a3a;
   --theme-text: #ffffff;
@@ -13247,12 +13255,21 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
 }
 
 .mobile-performance-mode.mobile-system-dark .saleCartModeBtn[aria-pressed="true"],
-.mobile-performance-mode.mobile-system-dark .saleCartModeChip[aria-pressed="true"],
-.mobile-performance-mode.mobile-system-dark .btn.btn--primary,
-.mobile-performance-mode.mobile-system-dark .btn.btn--success,
-.mobile-performance-mode.mobile-system-dark .btn-success,
-.mobile-performance-mode.mobile-system-dark .btn--success {
+.mobile-performance-mode.mobile-system-dark .saleCartModeChip[aria-pressed="true"] {
   color: #111111 !important;
+}
+
+.mobile-performance-mode.mobile-system-dark :is(
+  .btn.btn--primary,
+  .btn.btn--success,
+  .btn-success,
+  .btn--success,
+  .btn.btn--toggle[aria-pressed="true"],
+  .btn.btn--toggle.active,
+  .btn.btn--toggle.is-active,
+  .btn.btn--toggle[data-active="true"]
+) {
+  color: #ffffff !important;
 }
 
 .mobile-performance-mode.mobile-system-dark .btn.btn--danger,
@@ -13265,11 +13282,6 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
 .mobile-performance-mode.mobile-system-dark :is(
   .sale-cart-line-status,
   .saleCartModeChip,
-  .btn.btn--toggle[aria-pressed="true"],
-  .btn.btn--toggle.active,
-  .btn.btn--toggle.is-active,
-  .btn.btn--toggle[data-active="true"],
-  .saleCartModeBtn[aria-pressed="true"],
   .settings-ui-branch-all-btn.active,
   .settings-ui-branch-pill.active,
   .settings-ui-branch-pill,
@@ -13650,6 +13662,249 @@ html[data-theme="light"].theme-white body.public-site-layout button.register-typ
 
 .canteen-cashier-page .kasaProductCardStock {
   color: var(--app-text, #ffffff) !important;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductGrid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 11px;
+  justify-content: stretch;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 116px minmax(72px, auto);
+  min-width: 0;
+  min-height: 188px;
+  padding: 0;
+  gap: 0 !important;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--app-surface, #ffffff) !important;
+  box-shadow: 0 8px 24px #1b28120a !important;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCard[data-has-image="false"] {
+  grid-template-rows: minmax(188px, auto);
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardImage {
+  display: block;
+  grid-row: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  aspect-ratio: auto;
+  padding: 0;
+  border-radius: 0;
+  object-fit: cover !important;
+  background: var(--app-surface-soft, #f3f4f6);
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardBody {
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 4px;
+  min-width: 0;
+  padding: 7px 9px;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCard[data-has-image="false"] .kasaProductCardBody {
+  grid-row: 1;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardTitle {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-text, #20251f) !important;
+  font-size: 13px !important;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-shadow: none !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardMeta {
+  display: none !important;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardFooter {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardPrice {
+  min-width: 0;
+  color: var(--theme-accent, #287a51) !important;
+  font-size: 13px !important;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-shadow: none !important;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaProductCardStock {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--app-border, #d9dee5);
+  border-radius: 999px;
+  background: var(--app-surface-soft, #f3f4f6);
+  color: var(--app-text-secondary, #4b5563) !important;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCard {
+  display: grid;
+  grid-template-rows: 64px minmax(38px, auto);
+  gap: 0;
+  width: 108px;
+  min-width: 0;
+  min-height: 102px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--app-border, #e7e9e4);
+  border-radius: 10px;
+  background: var(--app-surface, #ffffff);
+  color: var(--app-text, #20251f);
+  text-align: left;
+  box-shadow: 0 8px 24px #1b28120a;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCardImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  object-fit: cover;
+  background: var(--app-surface-soft, #f3f4f6);
+  box-shadow: none;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCardBody {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-items: start;
+  align-self: stretch;
+  padding: 6px 8px;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCard span {
+  display: -webkit-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--app-text, #20251f);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: left;
+  text-overflow: clip;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCard[data-has-image="false"] {
+  grid-template-rows: minmax(76px, auto);
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCard[data-active="true"] {
+  border-color: color-mix(in srgb, var(--theme-accent, #287a51) 48%, var(--app-border, #e7e9e4));
+  background: color-mix(in srgb, var(--theme-accent, #287a51) 8%, var(--app-surface, #ffffff));
+}
+
+body.pos-app-layout .canteen-cashier-page .kasaCategoryCard[data-active="true"] span {
+  color: var(--app-text, #20251f);
+}
+
+@media (max-width: 767px) {
+  body.pos-app-layout .canteen-cashier-page .kasaCategoryRail {
+    grid-auto-columns: 92px;
+    gap: 8px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaCategoryCard {
+    grid-template-rows: 54px minmax(36px, auto);
+    width: 92px;
+    min-height: 90px;
+    border-radius: 9px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaCategoryCardBody {
+    padding: 5px 6px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaCategoryCard span {
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaCategoryCard[data-has-image="false"] {
+    grid-template-rows: minmax(68px, auto);
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCard {
+    grid-template-rows: 72px minmax(76px, auto);
+    min-height: 148px;
+    border-radius: 9px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCard[data-has-image="false"] {
+    grid-template-rows: minmax(148px, auto);
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardBody {
+    gap: 3px;
+    padding: 6px 7px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardTitle {
+    font-size: 11px !important;
+    line-height: 1.2;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardFooter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: start;
+    gap: 3px;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardPrice {
+    font-size: 11px !important;
+  }
+
+  body.pos-app-layout .canteen-cashier-page .kasaProductCardStock {
+    justify-self: start;
+    padding: 1px 5px;
+    font-size: 8px;
+  }
 }
 
 .canteen-cashier-page .kasaPaymentMethodButton {
@@ -14953,7 +15208,7 @@ body.mobile-performance-mode.public-site-layout .system-login.system-login--cant
 
 .system-login.system-login--restaurant .system-login__input::placeholder,
 .system-login.system-login--canteen .system-login__input::placeholder {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .system-login.system-login--restaurant .system-login__input:focus,
@@ -16608,9 +16863,9 @@ body.pos-app-layout:not(.mobile-system-dark):not(.tenant-dark-mode) {
   --app-surface-3: #e7e9e4;
   --app-border: #e7e9e4;
   --app-text: #20251f;
-  --app-text-secondary: #737970;
-  --app-text-soft: #737970;
-  --app-text-muted: #737970;
+  --app-text-secondary: #4b5563;
+  --app-text-soft: #4b5563;
+  --app-text-muted: #4b5563;
   --app-input: #ffffff;
   --app-input-border: #e7e9e4;
   --app-button-bg: #ffffff;
@@ -16619,7 +16874,7 @@ body.pos-app-layout:not(.mobile-system-dark):not(.tenant-dark-mode) {
   --bg: #f5f6f2;
   --panel: #ffffff;
   --panelElevated: #eaf4ed;
-  --muted: #737970;
+  --muted: #4b5563;
   --text: #20251f;
   --accent: #287a51;
   --accentHover: #226b45;
@@ -16644,7 +16899,7 @@ body.pos-app-layout:not(.mobile-system-dark):not(.tenant-dark-mode) {
   --theme-card-bg: #ffffff;
   --theme-border: #e7e9e4;
   --theme-text: #20251f;
-  --theme-muted: #737970;
+  --theme-muted: #4b5563;
   --menu-active-bg: #eaf4ed;
 }
 
@@ -16653,14 +16908,17 @@ body.pos-app-layout.tenant-dark-mode {
   --accent: #58a879;
   --accentHover: #71bc8f;
   --button-active-bg: #287a51;
+  --app-button-active-text: #ffffff;
+  --button-active-text: #ffffff;
   --button-selected-bg: rgba(40, 122, 81, 0.2);
   --button-selected-border: #3d7653;
+  --button-selected-text: #f4f1ec;
   --button-selected-shadow: none;
   --success: #58a879;
   --theme-accent: #58a879;
   --theme-accent-hover: #71bc8f;
   --theme-accent-soft: rgba(40, 122, 81, 0.2);
-  --theme-accent-text: #f5fff8;
+  --theme-accent-text: #102018;
   --theme-gradient: #287a51;
 }
 
@@ -16751,7 +17009,27 @@ body.pos-app-layout .pageShell.pos-layout .posItemsGrid {
   display: none;
 }
 
+.saleCartBackdrop {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  .saleCartBackdrop {
+    position: fixed;
+    z-index: 79;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgb(15 23 42 / 54%);
+    box-shadow: none;
+    cursor: default;
+    touch-action: none;
+  }
+
   body.pos-app-layout .pageShell.pos-layout .saleStandard3Col {
     grid-template-columns: minmax(0, 1fr) !important;
     grid-template-rows: 40px 38px minmax(0, 1fr) !important;
@@ -16785,20 +17063,28 @@ body.pos-app-layout .pageShell.pos-layout .posItemsGrid {
   }
 
   body.pos-app-layout .pageShell.pos-layout .posItemsGrid {
-    grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 8px;
   }
 
   body.pos-app-layout .pageShell.pos-layout .productCard {
-    grid-template-rows: 72px minmax(56px, auto);
-    min-height: 126px !important;
+    grid-template-rows: 62px minmax(50px, auto);
+    min-height: 112px !important;
     border-radius: 10px;
   }
 
   body.pos-app-layout .pageShell.pos-layout .productCard__content {
-    min-height: 0;
-    gap: 2px;
-    padding: 5px 7px;
+    gap: 3px;
+    padding: 4px 5px;
+  }
+
+  body.pos-app-layout .pageShell.pos-layout .productCard[data-has-image="true"] .productCard__name {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  body.pos-app-layout .pageShell.pos-layout .productCard[data-has-image="true"] .productCard__price {
+    font-size: 11px;
   }
 
   body.pos-app-layout .pageShell.pos-layout .saleCartModeBtn {
@@ -16891,6 +17177,7 @@ body.pos-app-layout .pageShell.pos-layout .posItemsGrid {
     overflow-x: hidden;
     overflow-y: auto;
   }
+
 }
 
 @container pos-cart (max-width: 319px) {

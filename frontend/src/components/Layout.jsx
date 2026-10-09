@@ -235,6 +235,7 @@ export default function Layout() {
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
     items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })
+    items.push({ path: '/platform/tercihlerim', label: 'Kişisel Ayarlar', icon: IconSettings, show: true })
   } else if (user.role === 'platform_admin') {
     items.push({ path: '/platform/restoran-tenants', label: 'Restoran Uyeler', icon: IconStore, show: true })
     items.push({ path: '/platform/magaza-tenants', label: 'Mağaza Üyeleri', icon: IconBuilding, show: true })
@@ -243,6 +244,7 @@ export default function Layout() {
     items.push({ path: '/platform/plans', label: 'Paketler', icon: IconLayers, show: true })
     items.push({ path: '/platform/billing-requests', label: 'Uyelik Talepleri', icon: IconLayers, show: true })
     items.push({ path: '/platform/settings/me', label: 'Hesabim', icon: IconUserCog, show: true })
+    items.push({ path: '/platform/tercihlerim', label: 'Kişisel Ayarlar', icon: IconSettings, show: true })
   } else {
     const isExpired = isSubscriptionExpired(tenantCtx)
     const perms = Array.isArray(user?.permissions) ? user.permissions : []
@@ -287,6 +289,7 @@ export default function Layout() {
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('audit_view'))) {
       items.push({ path: '/restoran/app/audit', label: 'Denetim', icon: IconShieldCheck, show: true })
     }
+    items.push({ path: '/restoran/tercihlerim', label: 'Kişisel Ayarlar', icon: IconSettings, show: true })
   }
 
   const navItems = useMemo(() => {
@@ -314,7 +317,8 @@ export default function Layout() {
     : (current?.label || 'Panel')
   const isDashboardPage = pathname === '/restoran/app/dashboard'
   const isReportsPage = pathname === '/restoran/app/reports'
-  const isSettingsRoute = pathname.startsWith('/restoran/settings')
+  const isSettingsRoute = pathname.startsWith('/restoran/settings') || pathname === '/restoran/tercihlerim'
+  const isPersonalAppearanceRoute = pathname === '/restoran/tercihlerim'
   const isMobileSettingsRoute = isMobilePortrait && isSettingsRoute
   const isDesktopSalesRoute = !isMobilePortrait && (
     pathname.startsWith('/restoran/app/pos') ||
@@ -323,7 +327,7 @@ export default function Layout() {
   )
 
   useEffect(() => {
-    if (isSettingsRoute || !topbarRef.current) {
+    if ((isSettingsRoute && !isPersonalAppearanceRoute) || !topbarRef.current) {
       setTopbarHeight(0)
       return undefined
     }
@@ -349,7 +353,7 @@ export default function Layout() {
       if (observer) observer.disconnect()
       window.removeEventListener('resize', updateHeight)
     }
-  }, [isSettingsRoute, isMobilePortrait, pathname])
+  }, [isPersonalAppearanceRoute, isSettingsRoute, isMobilePortrait, pathname])
   const sidebarTextColor = 'var(--sidebar-item-text, var(--sidebar-nav-text, var(--app-text)))'
   const sidebarActiveTextColor = 'var(--sidebar-item-text-active, var(--sidebar-nav-text-active, var(--app-text)))'
   const sidebarIconColor = 'var(--sidebar-item-icon, var(--sidebar-nav-icon, var(--app-text)))'
@@ -685,7 +689,7 @@ export default function Layout() {
         )}
 
         <main className="pos-main" style={{ position: 'relative', zIndex: 10, minWidth: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: isMobilePortrait ? mobileMainRadius : (isSettingsRoute ? 30 : 36), background: isMobileSettingsRoute ? 'transparent' : 'var(--card-bg)', border: isMobileSettingsRoute ? '0' : '1px solid var(--border-soft)', backdropFilter: isMobileSettingsRoute ? 'none' : 'var(--glass-blur)', padding: isMobilePortrait ? mobileMainPadding : (isSettingsRoute ? 12 : 18), boxShadow: isMobileSettingsRoute ? 'none' : 'var(--shadow-soft), var(--shadow-glow)', maxWidth: '100%' }}>
-          {isMobilePortrait && !isSettingsRoute ? <header
+          {isMobilePortrait && (!isSettingsRoute || isPersonalAppearanceRoute) ? <header
             ref={topbarRef}
             className="topbar"
             style={{

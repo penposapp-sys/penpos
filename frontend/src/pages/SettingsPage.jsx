@@ -7,7 +7,6 @@ import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import Modal from '../components/Modal.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import BulkProductsExcelCard from '../components/BulkProductsExcelCard.jsx'
-import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
 import { SettingsField, SettingsToggle, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
 import { PERMISSIONS } from '../constants/permissions.js'
 import SettingsBranchCards from '../components/SettingsBranchCards.jsx'
@@ -20,7 +19,6 @@ import { toast } from '../lib/toast.js'
 import { resolveApiOrigin } from '../lib/runtimeApi.js'
 import { validateProductImageFile } from '../lib/productImage.js'
 import { SettingsAccountPanel } from './SettingsMePage.jsx'
-import GlobalTypographySettings from '../components/settings/GlobalTypographySettings.jsx'
 
 const BUSINESS_SETTINGS_SECTIONS = {
   general: [
@@ -587,7 +585,7 @@ export default function SettingsPage() {
     '--settings-button-text': 'var(--sidebar-nav-text-active, #ffffff)',
     '--settings-button-disabled-bg': theme.darkMode ? '#2f2f2f' : '#d1d5db',
     '--settings-button-disabled-border': theme.darkMode ? '#3f3f46' : '#d1d5db',
-    '--settings-button-disabled-text': theme.darkMode ? '#9ca3af' : '#6b7280',
+    '--settings-button-disabled-text': theme.darkMode ? '#b8b4ad' : '#4b5563',
   }
   const todayLabel = useMemo(
     () => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()),
@@ -611,7 +609,7 @@ export default function SettingsPage() {
         label: 'İşletme Ayarları',
         icon: 'business',
         group: 'İşletme',
-        description: 'Hesabım, firma bilgileri, görünüm ve yetkili şubeler'
+        description: 'Firma bilgileri ve yetkili şube yönetimi'
       },
       ...(canManageMenu && !isExpired
         ? [{
@@ -1029,11 +1027,7 @@ export const SettingsSystemContent = () => {
   const [logoLoading, setLogoLoading] = useState(false)
   const [branches, setBranches] = useState([])
   const [allowedBranchIds, setAllowedBranchIdsLocal] = useState([])
-  const [selectedThemeId, setSelectedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
-  const [selectedDarkMode, setSelectedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
   const [kitchenPagesEnabled, setKitchenPagesEnabled] = useState(defaultBusinessSettings.general.kitchenPagesEnabled)
-  const [savedThemeId, setSavedThemeId] = useState(normalizeThemeId(defaultBusinessSettings.appearance.themeId))
-  const [savedDarkMode, setSavedDarkMode] = useState(defaultBusinessSettings.appearance.darkMode)
   const [savedKitchenPagesEnabled, setSavedKitchenPagesEnabled] = useState(defaultBusinessSettings.general.kitchenPagesEnabled)
   const [loading, setLoading] = useState(false)
   const [branchSaving, setBranchSaving] = useState(false)
@@ -1050,7 +1044,7 @@ export const SettingsSystemContent = () => {
   const [success, setSuccess] = useState('')
   const { refresh, setAllowedBranchIds } = useAuth()
   const { setSettingsLocally } = useBusinessSettings()
-  const { isMobileRuntime, setThemeKey, setDarkMode } = useTheme()
+  const { isMobileRuntime } = useTheme()
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
 
   const apiOrigin = React.useMemo(() => resolveApiOrigin(), [])
@@ -1091,8 +1085,6 @@ export const SettingsSystemContent = () => {
       return
     }
     const t = profileRes?.tenant || null
-    const nextThemeId = normalizeThemeId(businessRes?.settings?.appearance?.themeId || defaultBusinessSettings.appearance.themeId)
-    const nextDarkMode = businessRes?.settings?.appearance?.darkMode === true
     const nextKitchenPagesEnabled = businessRes?.settings?.general?.kitchenPagesEnabled !== false
     setName(t?.name || '')
     setDescription(t?.description || '')
@@ -1109,14 +1101,8 @@ export const SettingsSystemContent = () => {
       : []
     setAllowedBranchIdsLocal(nextAllowed)
     setAllowedBranchIds(nextAllowed)
-    setSelectedThemeId(nextThemeId)
-    setSelectedDarkMode(nextDarkMode)
     setKitchenPagesEnabled(nextKitchenPagesEnabled)
-    setSavedThemeId(nextThemeId)
-    setSavedDarkMode(nextDarkMode)
     setSavedKitchenPagesEnabled(nextKitchenPagesEnabled)
-    setThemeKey(nextThemeId)
-    setDarkMode(nextDarkMode)
 
     if (branchesRes?.success === false) {
       setBranches([])
@@ -1279,10 +1265,6 @@ export const SettingsSystemContent = () => {
           method: 'PUT',
           body: JSON.stringify({
             settings: {
-              appearance: {
-                themeId: selectedThemeId,
-                darkMode: selectedDarkMode,
-              },
               general: {
                 kitchenPagesEnabled,
               },
@@ -1301,24 +1283,12 @@ export const SettingsSystemContent = () => {
         return
       }
       if (businessRes?.success === false) {
-        setError(businessRes.message || 'Tema ayarları kaydedilemedi')
+        setError(businessRes.message || 'Sistem ayarları kaydedilemedi')
         return
       }
 
-      const nextThemeId = normalizeThemeId(businessRes?.settings?.appearance?.themeId || selectedThemeId || defaultBusinessSettings.appearance.themeId)
-      const nextDarkMode = businessRes?.settings?.appearance?.darkMode === true
-      setSelectedThemeId(nextThemeId)
-      setSelectedDarkMode(nextDarkMode)
-      setSavedThemeId(nextThemeId)
-      setSavedDarkMode(nextDarkMode)
       setSavedKitchenPagesEnabled(kitchenPagesEnabled)
-      setThemeKey(nextThemeId)
-      setDarkMode(nextDarkMode)
       setSettingsLocally({
-        appearance: {
-          themeId: nextThemeId,
-          darkMode: nextDarkMode,
-        },
         general: {
           kitchenPagesEnabled,
         },
@@ -1339,16 +1309,6 @@ export const SettingsSystemContent = () => {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleThemeSelect = (themeId) => {
-    setSelectedThemeId(themeId)
-    setThemeKey(themeId)
-  }
-
-  const handleDarkModeToggle = (nextDarkMode) => {
-    setSelectedDarkMode(Boolean(nextDarkMode))
-    setDarkMode(Boolean(nextDarkMode))
   }
 
   const uploadLogo = async () => {
@@ -1403,7 +1363,6 @@ export const SettingsSystemContent = () => {
     <div>
       <SettingsUiStyles />
       <h3 style={{ marginTop: 0 }}>Sistem Ayarları</h3>
-      <GlobalTypographySettings />
       <div
         style={{
           display: 'grid',
@@ -1413,7 +1372,7 @@ export const SettingsSystemContent = () => {
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <SettingsAccountPanel apiBase="/api/tenant" compact hideTitle />
+          <SettingsAccountPanel apiBase="/api/tenant" compact hideTitle hideAppearance />
         </div>
 
         <form onSubmit={onSave} style={{ display: 'grid', gap: 12, minWidth: 0 }}>
@@ -1506,7 +1465,7 @@ export const SettingsSystemContent = () => {
                 ) : (
                   branches.map((branch) => {
                     const branchId = String(getBranchId(branch) || '')
-                    const statusColor = branch?.isActive !== false ? '#16a34a' : '#b45309'
+                    const statusColor = branch?.isActive !== false ? 'var(--success-text)' : 'var(--warning-text)'
                     return (
                       <div
                         key={branchId || branch?.name}
@@ -1553,17 +1512,6 @@ export const SettingsSystemContent = () => {
           </div>
 
           <div className="card" style={{ borderColor: 'var(--border)' }}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Görünüm Modu</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-              Bu paneli beyaz veya koyu modda kullanın.
-            </div>
-            <ThemeSelectionCards
-              darkMode={selectedDarkMode}
-              onToggleDarkMode={handleDarkModeToggle}
-            />
-          </div>
-
-          <div className="card" style={{ borderColor: 'var(--border)' }}>
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Mutfak Akışı</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
               Hazırlanacaklar ve toplu hazırlama sayfalarını kullanıp kullanmayacağınızı belirleyin.
@@ -1578,7 +1526,7 @@ export const SettingsSystemContent = () => {
 
           {error && <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>}
           {success && <div style={{ color: '#22c55e', fontSize: 13 }}>{success}</div>}
-          <button className="btn" disabled={loading || (selectedThemeId === savedThemeId && selectedDarkMode === savedDarkMode && kitchenPagesEnabled === savedKitchenPagesEnabled)}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
+          <button className="btn" disabled={loading || kitchenPagesEnabled === savedKitchenPagesEnabled}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</button>
         </form>
       </div>
 
@@ -1925,7 +1873,7 @@ export const SettingsTablesContent = () => {
 
       {!selectedBranchId && (
         <div className="card" style={{ borderColor: '#ef4444', background: 'color-mix(in srgb, #ef4444 14%, var(--app-surface))', marginBottom: 12 }}>
-          <div style={{ fontWeight: 800, color: '#b91c1c' }}>Şube seçilmedi. Lütfen yukarıdan şube seçin.</div>
+          <div style={{ fontWeight: 800, color: 'var(--danger, #b91c1c)' }}>Şube seçilmedi. Lütfen yukarıdan şube seçin.</div>
         </div>
       )}
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
@@ -2258,5 +2206,3 @@ export const SettingsPaymentsContent = ({ showHeading = true } = {}) => {
     </div>
   )
 }
-
-

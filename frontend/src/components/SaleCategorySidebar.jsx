@@ -5,9 +5,13 @@ function SaleCategorySidebar({
   title = 'Kategoriler',
   categories = [],
   activeCategoryId,
+  showAllCategories = false,
   onSelect
 }) {
   const handleSelect = useCallback((categoryId) => onSelect?.(categoryId), [onSelect])
+  const categoryOptions = showAllCategories
+    ? [{ id: '', name: 'Tümü' }, ...categories]
+    : categories
 
   useEffect(() => {
     const renderCount = incrementPerfCounter('sidebarRenders', title || 'categories')
@@ -27,7 +31,7 @@ function SaleCategorySidebar({
       <div
         className="saleCategoryPanelScroll category-scroll sale-category-scroll"
       >
-        {categories.map(c => (
+        {categoryOptions.map(c => (
           <button
             key={c.id}
             className="btn btn--full btn--left saleCategoryButton sale-category-chip"
@@ -49,7 +53,7 @@ function SaleCategorySidebar({
             {c.name}
           </button>
         ))}
-        {categories.length === 0 && <div style={{ color: 'var(--muted)' }}>Kategori yok</div>}
+        {categoryOptions.length === 0 && <div style={{ color: 'var(--muted)' }}>Kategori yok</div>}
       </div>
     </div>
   )
@@ -58,5 +62,6 @@ function SaleCategorySidebar({
 export default memo(SaleCategorySidebar, (prev, next) => (
   prev.title === next.title &&
   String(prev.activeCategoryId || '') === String(next.activeCategoryId || '') &&
+  prev.showAllCategories === next.showAllCategories &&
   prev.categories === next.categories
 ))

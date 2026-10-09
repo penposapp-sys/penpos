@@ -379,7 +379,7 @@ export default function StaffPage({ systemType }) {
       <div className="settings-ui-toolbar">
         <div>
           <h3 style={{ margin: 0 }}>Personel</h3>
-          <div style={{ marginTop: 6, fontSize: 13, color: '#64748b' }}>Personel erişim, giriş ve şube görünürlüğünü bu panelden yönetin.</div>
+          <div style={{ marginTop: 6, fontSize: 13, color: 'var(--app-text-secondary, #64748b)' }}>Personel erişim, giriş ve şube görünürlüğünü bu panelden yönetin.</div>
         </div>
         <button
           className="settings-ui-btn"

@@ -53,6 +53,7 @@ export default function PosPage() {
   const [order, setOrder] = useState(null)
   const [mobileCartExpanded, setMobileCartExpanded] = useState(false)
   const mobileCartTouchStartYRef = useRef(null)
+  const mobileCartSuppressClickRef = useRef(false)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [payOpen, setPayOpen] = useState(false)
@@ -415,7 +416,7 @@ export default function PosPage() {
     }
     const categories = Array.isArray(res?.categories) ? res.categories : []
     setCategories(categories)
-    setActiveCategory(categories[0]?.id || '')
+    setActiveCategory('')
   }
   const loadItems = async () => {
     itemsApiCallCountRef.current += 1
@@ -451,16 +452,27 @@ export default function PosPage() {
 
   const filteredItems = useMemo(() => {
     const activeId = String(activeCategory || '').trim()
-    const nextItems = !activeId
-      ? items
-      : (items || []).filter((item) => String(item?.categoryId || '') === activeId)
+    let nextItems
+    if (!activeId) {
+      const categoryOrder = new Map(categories.map((category, index) => [String(category?.id || category?._id || ''), index]))
+      nextItems = (items || [])
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => {
+          const leftOrder = categoryOrder.get(String(left.item?.categoryId || '')) ?? Number.MAX_SAFE_INTEGER
+          const rightOrder = categoryOrder.get(String(right.item?.categoryId || '')) ?? Number.MAX_SAFE_INTEGER
+          return leftOrder - rightOrder || left.index - right.index
+        })
+        .map(({ item }) => item)
+    } else {
+      nextItems = (items || []).filter((item) => String(item?.categoryId || '') === activeId)
+    }
     logPerf('PosPage', 'filter-result', {
       activeCategory: activeId,
       totalProducts: (items || []).length,
       filteredCount: nextItems.length
     })
     return nextItems
-  }, [activeCategory, items])
+  }, [activeCategory, categories, items])
 
   const handleCategorySelect = useCallback((categoryId) => {
     categoryPerfRef.current = {
@@ -1244,7 +1256,8 @@ export default function PosPage() {
     mobileCartTouchStartYRef.current = null
     const endY = event.changedTouches[0]?.clientY
     if (startY !== null && endY !== undefined && endY - startY > 60) {
-      event.preventDefault()
+      mobileCartSuppressClickRef.current = true
+      window.setTimeout(() => { mobileCartSuppressClickRef.current = false }, 350)
       setMobileCartExpanded(false)
     }
   }
@@ -2235,6 +2248,14 @@ export default function PosPage() {
 
   return (
     <div className="pageShell pos-layout" style={{ display: 'grid', gap: 12 }}>
+      {mobileCartExpanded && (
+        <button
+          type="button"
+          className="saleCartBackdrop"
+          aria-label="Sepeti kapat"
+          onClick={() => setMobileCartExpanded(false)}
+        />
+      )}
       <div className="saleStandard3Col vhFit pos-grid">
         <div className="card saleProductsMobileIntro">
           <div className="saleProductsMobileIntroRow">
@@ -2254,7 +2275,7 @@ export default function PosPage() {
           </div>
         </div>
 
-        <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={handleCategorySelect} />
+        <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} showAllCategories onSelect={handleCategorySelect} />
 
         <div className="card salePanel saleProductsPanel">
           <div className="saleProductsPanelHeader">
@@ -2301,7 +2322,13 @@ export default function PosPage() {
             className="saleCartMobileToggle"
             aria-expanded={mobileCartExpanded}
             aria-controls="pos-sale-cart-content"
-            onClick={() => setMobileCartExpanded((expanded) => !expanded)}
+            onClick={() => {
+              if (mobileCartSuppressClickRef.current) {
+                mobileCartSuppressClickRef.current = false
+                return
+              }
+              setMobileCartExpanded((expanded) => !expanded)
+            }}
             onTouchStart={startMobileCartSwipe}
             onTouchEnd={endMobileCartSwipe}
             onTouchCancel={() => { mobileCartTouchStartYRef.current = null }}

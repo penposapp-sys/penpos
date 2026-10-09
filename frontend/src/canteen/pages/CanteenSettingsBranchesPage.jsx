@@ -191,7 +191,7 @@ export default function CanteenSettingsBranchesPage() {
                   fontSize: 12,
                   fontWeight: 900,
                   background: branch.isActive === false ? 'rgba(148, 163, 184, 0.18)' : 'var(--theme-accent-soft)',
-                  color: branch.isActive === false ? 'var(--app-text-secondary)' : 'var(--theme-accent-text)',
+                  color: branch.isActive === false ? 'var(--app-text-secondary)' : 'var(--app-text, var(--text))',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -201,15 +201,15 @@ export default function CanteenSettingsBranchesPage() {
 
             <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
               <div style={{ borderRadius: 16, background: 'var(--theme-accent-soft)', padding: '10px 12px' }}>
-                <div style={{ fontSize: 11, color: 'var(--theme-accent-text)', fontWeight: 800 }}>Durum</div>
+                <div style={{ fontSize: 11, color: 'var(--app-text, var(--text))', fontWeight: 800 }}>Durum</div>
                 <div style={{ marginTop: 5, fontWeight: 900 }}>{branch.isActive === false ? 'Kapalı' : 'Açık'}</div>
               </div>
               <div style={{ borderRadius: 16, background: 'var(--theme-accent-soft)', padding: '10px 12px' }}>
-                <div style={{ fontSize: 11, color: 'var(--theme-accent-text)', fontWeight: 800 }}>Personel</div>
+                <div style={{ fontSize: 11, color: 'var(--app-text, var(--text))', fontWeight: 800 }}>Personel</div>
                 <div style={{ marginTop: 5, fontWeight: 900 }}>Atanabilir</div>
               </div>
               <div style={{ borderRadius: 16, background: 'var(--theme-accent-soft)', padding: '10px 12px' }}>
-                <div style={{ fontSize: 11, color: 'var(--theme-accent-text)', fontWeight: 800 }}>Kayıt</div>
+                <div style={{ fontSize: 11, color: 'var(--app-text, var(--text))', fontWeight: 800 }}>Kayıt</div>
                 <div style={{ marginTop: 5, fontWeight: 900 }}>{branch.id ? 'Hazır' : 'Taslak'}</div>
               </div>
             </div>

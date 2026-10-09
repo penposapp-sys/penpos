@@ -17,10 +17,10 @@ export default function ThemeSelectionCards({
             <div style={{ fontSize: 13, color: 'var(--app-text-secondary, var(--muted))' }}>{darkModeDescription}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-            <button type="button" className="btn" aria-pressed={!darkMode} data-active={!darkMode ? 'true' : 'false'} onClick={() => onToggleDarkMode(false)} style={{ minWidth: 0, fontWeight: 900 }}>
+            <button type="button" className="btn theme-mode-option" aria-pressed={!darkMode} data-active={!darkMode ? 'true' : 'false'} onClick={() => onToggleDarkMode(false)} style={{ minWidth: 0, fontWeight: 900 }}>
               Beyaz Mod
             </button>
-            <button type="button" className="btn" aria-pressed={darkMode} data-active={darkMode ? 'true' : 'false'} onClick={() => onToggleDarkMode(true)} style={{ minWidth: 0, fontWeight: 900 }}>
+            <button type="button" className="btn theme-mode-option" aria-pressed={darkMode} data-active={darkMode ? 'true' : 'false'} onClick={() => onToggleDarkMode(true)} style={{ minWidth: 0, fontWeight: 900 }}>
               Koyu Mod
             </button>
           </div>

@@ -261,7 +261,8 @@ export default function CanteenLayout() {
     if (isExpired) {
       return [
         { to: getSubscriptionUpgradePath('canteen'), label: 'Paket', icon: IconBarChart },
-        { to: getSubscriptionProfilePath('canteen'), label: 'Hesabım', icon: IconUsers }
+        { to: getSubscriptionProfilePath('canteen'), label: 'Hesabım', icon: IconUsers },
+        { to: '/magaza/tercihlerim', label: 'Kişisel Ayarlar', icon: IconSettings }
       ]
     }
 
@@ -272,6 +273,7 @@ export default function CanteenLayout() {
     if (canSales) base.push({ to: '/magaza/yapilan-satislar', label: 'Yapılan Satışlar', icon: IconHistory })
     if (canCustomers) base.push({ to: '/magaza/cariler', label: 'Cariler', icon: IconUsers })
     if (canSettings) base.push({ to: '/magaza/ayarlar', label: 'Ayarlar', icon: IconSettings })
+    base.push({ to: '/magaza/tercihlerim', label: 'Kişisel Ayarlar', icon: IconSettings })
     return base
   }, [canCustomers, canPos, canQrOrders, canReports, canSales, canSettings, isExpired])
 
@@ -333,7 +335,6 @@ export default function CanteenLayout() {
   }
 
   const logout = () => {
-    try { removeAuthToken(tokenKey) } catch {}
     authLogout()
   }
 

@@ -35,7 +35,7 @@ export function CanteenSettingsStat({ label, value }) {
         minWidth: 0,
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--theme-accent-text)' }}>{label}</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--app-text, var(--text))' }}>{label}</div>
       <div style={{ marginTop: 6, fontSize: 22, fontWeight: 900, color: 'var(--app-text, var(--text))', overflowWrap: 'anywhere' }}>{value}</div>
     </div>
   )

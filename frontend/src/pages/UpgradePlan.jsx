@@ -117,14 +117,14 @@ export default function UpgradePlan() {
       ) : ((infoPlan || subscriptionStatus === 'expired') && (
         <div className="card" style={{ borderColor: subscriptionStatus === 'expired' ? '#dc2626' : '#f59e0b' }}>
           {paymentPending ? (
-            <div style={{ fontWeight: 700, color: '#f59e0b' }}>Uyelik talebiniz onay bekliyor.</div>
+            <div style={{ fontWeight: 700, color: 'var(--warning-text)' }}>Üyelik talebiniz onay bekliyor.</div>
           ) : subscriptionStatus === 'expired' ? (
             <>
-              <div style={{ fontWeight: 700, color: '#dc2626' }}>Paket sureniz doldu. Sistemi kullanmaya devam etmek icin planinizi yukseltin.</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Bu surede sadece abonelik ve hesap islemleri acik kalir.</div>
+              <div style={{ fontWeight: 700, color: 'var(--danger-text)' }}>Paket süreniz doldu. Sistemi kullanmaya devam etmek için planınızı yükseltin.</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Bu sürede sadece abonelik ve hesap işlemleri açık kalır.</div>
             </>
           ) : (
-            <div style={{ fontWeight: 700, color: '#f59e0b' }}>Uyelik surenizin bitmesine {remainingMeta.days || 0} gun kaldi.</div>
+            <div style={{ fontWeight: 700, color: 'var(--warning-text)' }}>Üyelik sürenizin bitmesine {remainingMeta.days || 0} gün kaldı.</div>
           )}
         </div>
       ))}

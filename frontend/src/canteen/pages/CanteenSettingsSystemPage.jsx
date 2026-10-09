@@ -3,19 +3,10 @@ import { useOutletContext } from 'react-router-dom'
 import Modal from '../../components/Modal.jsx'
 import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
-import { useBusinessSettings } from '../../context/BusinessSettingsContext.jsx'
 import { useTheme } from '../../theme/ThemeContext.jsx'
-import ThemeSelectionCards from '../../components/settings/ThemeSelectionCards.jsx'
-import { normalizeThemeId } from '../../theme/themeConfig.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
-import GlobalTypographySettings from '../../components/settings/GlobalTypographySettings.jsx'
 
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/
-
-const buildAppearanceSnapshot = (appearance) => ({
-  themeId: normalizeThemeId(appearance?.themeId || 'white'),
-  darkMode: appearance?.darkMode === true,
-})
 
 const normalizeBranchIdsList = (branchIds) => (
   Array.isArray(branchIds)
@@ -27,20 +18,17 @@ const normalizeUsername = (value) => String(value || '').trim().toLowerCase()
 
 export default function CanteenSettingsSystemPage() {
   const { me } = useOutletContext()
-  const { setSettingsLocally } = useBusinessSettings()
-  const { setThemeKey, setDarkMode, theme, isMobileRuntime } = useTheme()
+  const { theme, isMobileRuntime } = useTheme()
   const { isMobilePortrait } = useResponsiveFlags()
   const isAdmin = me?.role === 'tenant_admin'
 
   const [loading, setLoading] = useState(false)
-  const [savingTheme, setSavingTheme] = useState(false)
   const [settings, setSettings] = useState(null)
   const [branches, setBranches] = useState([])
   const [allowedBranchIds, setAllowedBranchIds] = useState([])
   const [savedAllowedBranchIds, setSavedAllowedBranchIds] = useState([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [savedAppearance, setSavedAppearance] = useState({ themeId: 'white', darkMode: false })
 
   const [account, setAccount] = useState(null)
   const [accountSaving, setAccountSaving] = useState(false)
@@ -88,15 +76,7 @@ export default function CanteenSettingsSystemPage() {
         api('/api/magaza/me', { silent: true, skipBranchHeader: true }),
       ])
 
-      const nextAppearance = buildAppearanceSnapshot(settingsRes?.settings?.appearance)
-      setSettings({
-        ...(settingsRes?.settings || null),
-        appearance: nextAppearance,
-      })
-      setSettingsLocally({ appearance: nextAppearance })
-      setSavedAppearance(nextAppearance)
-      setThemeKey(nextAppearance.themeId)
-      setDarkMode(nextAppearance.darkMode)
+      setSettings(settingsRes?.settings || null)
 
       const nextBranches = Array.isArray(branchesRes?.branches) ? branchesRes.branches : []
       setBranches(nextBranches)
@@ -129,13 +109,7 @@ export default function CanteenSettingsSystemPage() {
       return res
     }
 
-    const nextAppearance = buildAppearanceSnapshot(res?.settings?.appearance)
-    setSettings({
-      ...(res.settings || null),
-      appearance: nextAppearance,
-    })
-    setSettingsLocally({ appearance: nextAppearance })
-    setSavedAppearance(nextAppearance)
+    setSettings(res.settings || null)
     if (Array.isArray(res?.settings?.allowedBranchIds)) {
       const nextAllowedBranchIds = normalizeBranchIdsList(res.settings.allowedBranchIds)
       setAllowedBranchIds(nextAllowedBranchIds)
@@ -147,9 +121,6 @@ export default function CanteenSettingsSystemPage() {
 
   const activeBranches = useMemo(() => branches.filter((branch) => branch.isActive !== false), [branches])
   const allowedSet = useMemo(() => new Set((allowedBranchIds || []).map(String)), [allowedBranchIds])
-  const currentAppearance = buildAppearanceSnapshot(settings?.appearance)
-  const darkModeEnabled = settings?.appearance?.darkMode === true
-  const themeDirty = currentAppearance.themeId !== savedAppearance.themeId || currentAppearance.darkMode !== savedAppearance.darkMode
   const branchesDirty = normalizeBranchIdsList(allowedBranchIds).join(',') !== savedAllowedBranchIds.join(',')
   const usernameHint = useMemo(() => {
     const value = normalizeUsername(username)
@@ -157,42 +128,15 @@ export default function CanteenSettingsSystemPage() {
     return 'Kullanıcı adı 3-24 karakter olmalı; yalnızca a-z, 0-9, nokta, alt çizgi veya tire içerebilir.'
   }, [username])
 
-  const revertThemePreview = () => {
-    setSettings((current) => ({
-      ...(current || {}),
-      appearance: buildAppearanceSnapshot(savedAppearance),
-    }))
-    setSettingsLocally({ appearance: buildAppearanceSnapshot(savedAppearance) })
-    setThemeKey(normalizeThemeId(savedAppearance.themeId))
-    setDarkMode(savedAppearance.darkMode)
-  }
-
-  const saveThemeSettings = async () => {
-    setSavingTheme(true)
-    setError('')
-    setSuccess('')
-    const saved = await updateSettings({ appearance: currentAppearance })
-    setSavingTheme(false)
-    if (!saved?.ok) {
-      revertThemePreview()
-      return
-    }
-    setSuccess('Görünüm modu kaydedildi')
-  }
-
   const saveSystemSettings = async () => {
     const nextAllowed = normalizeBranchIdsList(allowedBranchIds)
     if (nextAllowed.length === 0) {
       setError('En az bir yetkili şube seçmeniz gerekiyor.')
       return
     }
-    const patch = {
-      allowedBranchIds: nextAllowed,
-      ...(themeDirty ? { appearance: currentAppearance } : {}),
-    }
-    const saved = await updateSettings(patch)
+    const saved = await updateSettings({ allowedBranchIds: nextAllowed })
     if (!saved?.ok) return
-    setSuccess(themeDirty ? 'Görünüm ve şube ayarları kaydedildi' : 'Şube ayarları kaydedildi')
+    setSuccess('Şube ayarları kaydedildi')
   }
 
   const saveEmail = async (event) => {
@@ -397,7 +341,6 @@ export default function CanteenSettingsSystemPage() {
 
   return (
     <div className="canteen-settings-system-page" style={{ display: 'grid', gap: 16 }}>
-      <GlobalTypographySettings />
       <style>{`
         .canteen-settings-system-page .card {
           background: linear-gradient(180deg, var(--app-surface), var(--app-surface-soft, var(--panelElevated))) !important;
@@ -541,7 +484,7 @@ export default function CanteenSettingsSystemPage() {
           font-size: 11px;
           font-weight: 900;
           background: var(--theme-accent-soft);
-          color: var(--theme-accent-text);
+          color: var(--app-text, var(--text));
         }
         @media (max-width: 1380px) {
           .canteen-system-layout {
@@ -575,10 +518,10 @@ export default function CanteenSettingsSystemPage() {
           <div>
             <div style={{ fontSize: isMobilePortrait ? 22 : 30, lineHeight: 1.08, fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--app-text)' }}>Sistem Ayarları</div>
             <div style={{ marginTop: 8, maxWidth: 860, color: 'var(--app-text-secondary)', fontWeight: 700, lineHeight: 1.6, fontSize: isMobilePortrait ? 12.5 : 14 }}>
-              Hesap bilgileri, görünüm tercihleri ve şube yönetimini tek ekranda yapın. Yetkili şube seçimi, yeni şube oluşturma, düzenleme, aktif/pasif durumu ve silme işlemleri bu sayfada.
+              Hesap bilgileri, sistem ayarları ve şube yönetimini tek ekranda yapın. Kişisel görünüm tercihleri Kişisel Ayarlar sayfasından yönetilir.
             </div>
           </div>
-          <button className="btn" type="button" onClick={() => load()} disabled={loading || savingTheme || accountSaving || branchSaving}>
+          <button className="btn" type="button" onClick={() => load()} disabled={loading || accountSaving || branchSaving}>
             {loading ? 'Yükleniyor...' : 'Yenile'}
           </button>
         </div>
@@ -686,37 +629,6 @@ export default function CanteenSettingsSystemPage() {
             </div>
           </div>
 
-          <div className="card canteen-system-card">
-            <div>
-              <h3>Görünüm Modu</h3>
-              <p>Bu paneli açık veya koyu modda kullanın.</p>
-            </div>
-
-            <ThemeSelectionCards
-              darkMode={darkModeEnabled}
-              onToggleDarkMode={(nextDarkMode) => {
-                const nextAppearance = {
-                  ...buildAppearanceSnapshot(settings?.appearance),
-                  darkMode: Boolean(nextDarkMode),
-                }
-                setSettings((current) => ({
-                  ...current,
-                  appearance: nextAppearance,
-                }))
-                setSettingsLocally({ appearance: nextAppearance })
-                setDarkMode(Boolean(nextDarkMode))
-              }}
-            />
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn" type="button" disabled={!isAdmin || loading || savingTheme || !themeDirty} onClick={revertThemePreview}>
-                Vazgeç
-              </button>
-              <button className="btn btn--primary" type="button" disabled={!isAdmin || loading || savingTheme || !themeDirty} onClick={saveThemeSettings}>
-                {savingTheme ? 'Kaydediliyor...' : 'Görünümü Kaydet'}
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="canteen-system-column is-branches">
@@ -800,7 +712,7 @@ export default function CanteenSettingsSystemPage() {
               <button
                 className="btn btn--primary"
                 type="button"
-                disabled={!isAdmin || loading || branchSaving || (!branchesDirty && !themeDirty) || !Array.isArray(allowedBranchIds) || allowedBranchIds.length === 0}
+                disabled={!isAdmin || loading || branchSaving || !branchesDirty || !Array.isArray(allowedBranchIds) || allowedBranchIds.length === 0}
                 onClick={saveSystemSettings}
               >
                 Şube Seçimlerini Kaydet

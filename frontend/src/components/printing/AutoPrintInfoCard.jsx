@@ -25,7 +25,7 @@ export default function AutoPrintInfoCard({
             : isStale ? 'Ajan yavaş yanıt veriyor'
               : isOffline ? 'Ajan çevrimdışı'
                 : 'Ajan bekleniyor'
-  const statusColor = isOnline ? '#22c55e' : isStale ? '#f59e0b' : '#ef4444'
+  const statusColor = isOnline ? 'var(--success-text)' : isStale ? 'var(--warning-text)' : 'var(--danger-text)'
 
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
@@ -47,7 +47,7 @@ export default function AutoPrintInfoCard({
             </div>
           ) : null}
           {!!String(latestVersion || '').trim() && (
-            <div style={{ marginTop: 4, fontSize: 12, color: updateAvailable ? '#f59e0b' : 'var(--muted)', fontWeight: updateAvailable ? 700 : 500 }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: updateAvailable ? 'var(--warning-text)' : 'var(--muted)', fontWeight: updateAvailable ? 700 : 500 }}>
               {updateAvailable ? `Güncelleme var: ${latestVersion}` : `Güncel sürüm: ${latestVersion}`}
             </div>
           )}
@@ -58,11 +58,11 @@ export default function AutoPrintInfoCard({
       </div>
 
       {!!String(error || '').trim() && (
-        <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 700 }}>{error}</div>
+        <div style={{ fontSize: 12, color: 'var(--danger-text)', fontWeight: 700 }}>{error}</div>
       )}
 
       {!!String(hint || '').trim() && (
-        <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 700 }}>{hint}</div>
+        <div style={{ fontSize: 12, color: 'var(--danger-text)', fontWeight: 700 }}>{hint}</div>
       )}
     </div>
   )

@@ -3,15 +3,13 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { SettingsCard, SettingsField, SettingsUiStyles } from '../components/settings/SettingsUi.jsx'
-import ThemeSelectionCards from '../components/settings/ThemeSelectionCards.jsx'
-import { useTheme } from '../theme/ThemeContext.jsx'
+import UserAppearancePreferences from '../components/settings/UserAppearancePreferences.jsx'
 
 const normalizeUsername = (value) => String(value || '').trim().toLowerCase()
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/
 
-export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = false }) {
+export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = false, hideAppearance = false }) {
   const { refresh } = useAuth()
-  const { themeKey, darkMode, setThemeKey, setDarkMode } = useTheme()
   const [me, setMe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
@@ -22,11 +20,6 @@ export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = fal
   const [pwNext, setPwNext] = useState('')
   const [pwNext2, setPwNext2] = useState('')
   const [saving, setSaving] = useState(false)
-  const [platformThemeId, setPlatformThemeId] = useState(themeKey)
-  const [platformDarkMode, setPlatformDarkMode] = useState(darkMode)
-
-  const isPlatformMode = apiBase === '/api/platform'
-
   const load = async () => {
     setLoading(true)
     try {
@@ -47,11 +40,6 @@ export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = fal
   useEffect(() => {
     load()
   }, [])
-
-  useEffect(() => {
-    setPlatformThemeId(themeKey)
-    setPlatformDarkMode(darkMode)
-  }, [darkMode, themeKey])
 
   const usernameHint = useMemo(() => {
     const next = normalizeUsername(username)
@@ -150,17 +138,11 @@ export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = fal
     }
   }
 
-  const savePlatformTheme = async (event) => {
-    event.preventDefault()
-    setThemeKey(platformThemeId)
-    setDarkMode(platformDarkMode)
-    toast.success('Platform tema tercihleri kaydedildi')
-  }
-
   return (
     <div style={{ display: 'grid', gap: 16, maxWidth: compact ? 420 : 920 }}>
       <SettingsUiStyles />
       {!hideTitle ? <h3 style={{ marginTop: 0 }}>Hesabım</h3> : null}
+      {!hideAppearance ? <UserAppearancePreferences /> : null}
       {loading && <div className="settings-ui-table-shell" style={{ padding: 18 }}>Yükleniyor...</div>}
       {!loading && !me && <div className="settings-ui-table-shell" style={{ padding: 18 }}>Kullanıcı bilgisi alınamadı</div>}
       {!loading && me ? (
@@ -171,7 +153,7 @@ export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = fal
                 <SettingsField label="Kullanıcı Adı">
                   <input className="settings-ui-input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ornek: platformadmin" />
                 </SettingsField>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Giriş için kullanılabilir.</div>
+                <div style={{ fontSize: 12, color: 'var(--app-text-secondary, #64748b)' }}>Giriş için kullanılabilir.</div>
                 {usernameHint ? <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 700 }}>{usernameHint}</div> : null}
                 <SettingsField label="Mevcut Şifre">
                   <input className="settings-ui-input" type="password" value={usernamePw} onChange={(e) => setUsernamePw(e.target.value)} />
@@ -206,26 +188,12 @@ export function SettingsAccountPanel({ apiBase, compact = false, hideTitle = fal
             </form>
           </SettingsCard>
 
-          {isPlatformMode ? (
-            <SettingsCard title="Görünüm Modu" description="Platform panelini beyaz mod veya koyu mod olarak kullanın." icon="🎨">
-              <form onSubmit={savePlatformTheme} style={{ display: 'grid', gap: 14 }}>
-                <ThemeSelectionCards
-                  darkMode={platformDarkMode}
-                  onToggleDarkMode={(nextDarkMode) => setPlatformDarkMode(Boolean(nextDarkMode))}
-                />
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button className="settings-ui-submit" disabled={saving}>Görünüm Modunu Kaydet</button>
-                </div>
-              </form>
-            </SettingsCard>
-          ) : null}
         </>
       ) : null}
     </div>
   )
 }
 
-export default function SettingsMePage({ apiBase }) {
-  return <SettingsAccountPanel apiBase={apiBase} />
+export default function SettingsMePage({ apiBase, hideAppearance = false }) {
+  return <SettingsAccountPanel apiBase={apiBase} hideAppearance={hideAppearance} />
 }

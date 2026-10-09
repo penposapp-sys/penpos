@@ -101,6 +101,7 @@ export default function AnaokuluLayout() {
   } else if (isStaff) {
     NAV.push({ to: '/anaokulu/ayarlar', label: 'Ayarlar', icon: '⚙️' })
   }
+  NAV.push({ to: '/anaokulu/tercihlerim', label: 'Kişisel Ayarlar', icon: '🎨' })
 
   const currentTenantForTitle = isManager
     ? (accessibleTenants.find((t) => String(t.id) === String(regionCurrentTenantId)))

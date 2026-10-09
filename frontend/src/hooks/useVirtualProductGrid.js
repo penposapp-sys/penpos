@@ -11,6 +11,7 @@ export function useVirtualProductGrid({
   enabled,
   debugKey = 'default',
   minCardWidth = DEFAULT_MIN_CARD_WIDTH,
+  columnCount = null,
   gridGap = DEFAULT_GRID_GAP,
   estimatedRowHeight = DEFAULT_ROW_HEIGHT,
   bufferRows = DEFAULT_BUFFER_ROWS,
@@ -124,7 +125,9 @@ export function useVirtualProductGrid({
   const virtual = useMemo(() => {
     if (!enabled) return null
     const gridWidth = Math.max(1, Number(viewport.width || 0))
-    const columns = Math.max(1, Math.floor((gridWidth + gridGap) / (minCardWidth + gridGap)))
+    const columns = Number.isInteger(columnCount) && columnCount > 0
+      ? columnCount
+      : Math.max(1, Math.floor((gridWidth + gridGap) / (minCardWidth + gridGap)))
     const rowHeight = Math.max(1, Number(viewport.rowHeight || estimatedRowHeight))
     const totalRows = Math.ceil(items.length / columns)
     const viewportRows = Math.max(1, Math.ceil((Number(viewport.height || 0) || rowHeight) / rowHeight))
@@ -141,7 +144,7 @@ export function useVirtualProductGrid({
       topSpacer: startRow * rowHeight,
       bottomSpacer: Math.max(0, (totalRows - endRow) * rowHeight)
     }
-  }, [bufferRows, enabled, estimatedRowHeight, gridGap, items, minCardWidth, viewport])
+  }, [bufferRows, columnCount, enabled, estimatedRowHeight, gridGap, items, minCardWidth, viewport])
 
   const visibleItems = useMemo(() => {
     if (!enabled || !virtual) return items

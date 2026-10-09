@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { api, clearApiCache } from '../lib/apiClient.js'
 import { normalizePermissions } from '../constants/permissions.js'
 import { clearAllAuthTokens, getAuthToken, removeAuthToken, setAuthToken } from '../lib/authStorage.js'
+import { confirmUnsavedAppearanceChanges } from '../lib/unsavedAppearanceChanges.js'
 
 const AuthContext = createContext()
 
@@ -290,6 +291,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
+    if (!confirmUnsavedAppearanceChanges()) return
     const pathname = (() => {
       try {
         return String(window.location?.pathname || '')

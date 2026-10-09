@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getScopedDarkModeStorageKey, getScopedThemeStorageKey, normalizeThemeId, resolveThemeScope, themes } from './themeConfig.js'
 import {
@@ -89,6 +89,9 @@ const RUNTIME_THEME_VAR_KEYS = [
   '--button-active-bg',
   '--app-button-active-text',
   '--button-active-text',
+  '--button-selected-bg',
+  '--button-selected-border',
+  '--button-selected-text',
   '--button-disabled-bg',
   '--button-disabled-text',
   '--card-shadow',
@@ -103,7 +106,7 @@ const getButtonTokens = (themeFamily, darkMode) => {
       buttonActiveBg: '#111111',
       buttonActiveText: '#ffffff',
       buttonDisabledBg: '#e5e7eb',
-      buttonDisabledText: '#6b7280',
+      buttonDisabledText: '#4b5563',
     }
   }
 
@@ -115,7 +118,7 @@ const getButtonTokens = (themeFamily, darkMode) => {
       buttonActiveBg: '#111111',
       buttonActiveText: '#ffffff',
       buttonDisabledBg: '#d1d5db',
-      buttonDisabledText: '#6b7280',
+      buttonDisabledText: '#4b5563',
     }
   }
 
@@ -126,8 +129,11 @@ const getButtonTokens = (themeFamily, darkMode) => {
       buttonBorder: '#3a3a3a',
       buttonActiveBg: '#3f3f46',
       buttonActiveText: '#f5f5f5',
+      buttonSelectedBg: '#3f3f46',
+      buttonSelectedBorder: '#73737d',
+      buttonSelectedText: '#ffffff',
       buttonDisabledBg: '#3a3a3a',
-      buttonDisabledText: '#9ca3af',
+      buttonDisabledText: '#b8b4ad',
     }
   }
 
@@ -138,7 +144,7 @@ const getButtonTokens = (themeFamily, darkMode) => {
     buttonActiveBg: '#ea7a1a',
     buttonActiveText: '#111111',
     buttonDisabledBg: '#3a3a3a',
-    buttonDisabledText: '#9ca3af',
+    buttonDisabledText: '#b8b4ad',
   }
 }
 
@@ -402,6 +408,9 @@ const buildDesktopThemeVars = (theme) => ({
   '--button-active-bg': theme.buttonActiveBg || theme.accent,
   '--app-button-active-text': theme.buttonActiveText || '#ffffff',
   '--button-active-text': theme.buttonActiveText || '#ffffff',
+  '--button-selected-bg': theme.buttonSelectedBg || (theme.darkMode ? '#3f3f46' : '#eef2f7'),
+  '--button-selected-border': theme.buttonSelectedBorder || (theme.darkMode ? '#73737d' : '#b8c1cc'),
+  '--button-selected-text': theme.buttonSelectedText || (theme.darkMode ? '#ffffff' : '#111111'),
   '--button-disabled-bg': theme.buttonDisabledBg || theme.appSurfaceSoft || theme.surfaceElevated,
   '--button-disabled-text': theme.buttonDisabledText || theme.mutedText,
   '--card-shadow': theme.cardShadow,
@@ -545,30 +554,34 @@ export function ThemeProvider({ children }) {
     body?.classList.toggle('tenant-dark-mode', !isPublicScope && theme.darkMode)
   }, [darkMode, isPublicScope, mobileRuntime, theme])
 
+  const updateThemeKey = useCallback((next) => {
+    if (isPublicScope) return
+    const nextThemeKey = normalizeThemeId(next)
+    setStoredThemeKey(nextThemeKey)
+    try {
+      localStorage.setItem(getScopedThemeStorageKey(themeScope), nextThemeKey)
+    } catch {}
+  }, [isPublicScope, themeScope])
+
+  const updateDarkMode = useCallback((next) => {
+    if (isPublicScope) return
+    const nextDarkMode = Boolean(next)
+    setStoredDarkMode(nextDarkMode)
+    try {
+      localStorage.setItem(getScopedDarkModeStorageKey(themeScope), String(nextDarkMode))
+    } catch {}
+  }, [isPublicScope, themeScope])
+
   const value = useMemo(() => ({
     themeScope,
     themeKey,
-    setThemeKey: (next) => {
-      if (isPublicScope) return
-      const nextThemeKey = normalizeThemeId(next)
-      setStoredThemeKey(nextThemeKey)
-      try {
-        localStorage.setItem(getScopedThemeStorageKey(themeScope), nextThemeKey)
-      } catch {}
-    },
+    setThemeKey: updateThemeKey,
     darkMode,
-    setDarkMode: (next) => {
-      if (isPublicScope) return
-      const nextDarkMode = Boolean(next)
-      setStoredDarkMode(nextDarkMode)
-      try {
-        localStorage.setItem(getScopedDarkModeStorageKey(themeScope), String(nextDarkMode))
-      } catch {}
-    },
+    setDarkMode: updateDarkMode,
     theme,
     isMobileRuntime: mobileRuntime,
     systemDarkMode,
-  }), [darkMode, isPublicScope, mobileRuntime, systemDarkMode, theme, themeKey, themeScope])
+  }), [darkMode, isPublicScope, mobileRuntime, systemDarkMode, theme, themeKey, themeScope, updateDarkMode, updateThemeKey])
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }

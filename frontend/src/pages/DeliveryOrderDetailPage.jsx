@@ -53,6 +53,7 @@ export default function DeliveryOrderDetailPage() {
   const [selectedId, setSelectedId] = useState(null)
   const [mobileCartExpanded, setMobileCartExpanded] = useState(false)
   const mobileCartTouchStartYRef = useRef(null)
+  const mobileCartSuppressClickRef = useRef(false)
   const addRequestQueueRef = useRef(new Map())
   const [tab, setTab] = useState('active')
   const [totalCount, setTotalCount] = useState(0)
@@ -811,7 +812,8 @@ export default function DeliveryOrderDetailPage() {
     mobileCartTouchStartYRef.current = null
     const endY = event.changedTouches[0]?.clientY
     if (startY !== null && endY !== undefined && endY - startY > 60) {
-      event.preventDefault()
+      mobileCartSuppressClickRef.current = true
+      window.setTimeout(() => { mobileCartSuppressClickRef.current = false }, 350)
       setMobileCartExpanded(false)
     }
   }
@@ -1349,6 +1351,14 @@ export default function DeliveryOrderDetailPage() {
 
   return (
     <div className="splitLayout splitLayoutStretch vhFit delivery-orders-page delivery-layout" style={{ gridTemplateColumns: gridCols }}>
+{mobileCartExpanded && (
+      <button
+        type="button"
+        className="saleCartBackdrop"
+        aria-label="Sepeti kapat"
+        onClick={() => setMobileCartExpanded(false)}
+      />
+)}
 {showList && (
       <aside className="card delivery-left-panel">
         <div className="delivery-left-fixed">
@@ -1697,7 +1707,13 @@ export default function DeliveryOrderDetailPage() {
                   className="saleCartMobileToggle"
                   aria-expanded={mobileCartExpanded}
                   aria-controls="delivery-sale-cart-content"
-                  onClick={() => setMobileCartExpanded((expanded) => !expanded)}
+                  onClick={() => {
+                    if (mobileCartSuppressClickRef.current) {
+                      mobileCartSuppressClickRef.current = false
+                      return
+                    }
+                    setMobileCartExpanded((expanded) => !expanded)
+                  }}
                   onTouchStart={startMobileCartSwipe}
                   onTouchEnd={endMobileCartSwipe}
                   onTouchCancel={() => { mobileCartTouchStartYRef.current = null }}

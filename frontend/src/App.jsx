@@ -19,11 +19,17 @@ import PlatformAdminMembershipRequests from './pages/PlatformAdminMembershipRequ
 import PlatformAdminAnaokuluRegionAdmins from './pages/PlatformAdminAnaokuluRegionAdmins.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
+import { useTheme } from './theme/ThemeContext.jsx'
+import { useGlobalTypography } from './context/GlobalTypographyContext.jsx'
+import { api } from './lib/apiClient.js'
+import { toast } from './lib/toast.js'
+import { confirmUnsavedAppearanceChanges, hasUnsavedAppearanceChanges } from './lib/unsavedAppearanceChanges.js'
 import TenantUsageHeartbeat from './components/TenantUsageHeartbeat.jsx'
 import { BusinessSettingsProvider } from './context/BusinessSettingsContext.jsx'
 import StaffPage from './pages/StaffPage.jsx'
 import SettingsPage, { SettingsTablesContent, SettingsPaymentsContent, SettingsSystemContent } from './pages/SettingsPage.jsx'
 import SettingsMePage from './pages/SettingsMePage.jsx'
+import UserAppearancePage from './pages/UserAppearancePage.jsx'
 import SettingsDeliveryPage from './pages/SettingsDeliveryPage.jsx'
 import CategoriesPage from './pages/CategoriesPage.jsx'
 import MenuItemsPage from './pages/MenuItemsPage.jsx'
@@ -368,10 +374,166 @@ const AnaokuluIndexRoute = () => {
   return <Navigate to="/anaokulu/genel-bakis" replace />
 }
 
+function AppearancePreferencesSync() {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  const { setThemeKey, setDarkMode } = useTheme()
+  const { resetPreference, setPreferenceValue } = useGlobalTypography()
+  const userId = String(user?.id || user?._id || '')
+  const loadedPreferencesRef = useRef({ userId: '', preferences: null })
+
+  useEffect(() => {
+    if (loading) return undefined
+    let cancelled = false
+    if (!userId) {
+      loadedPreferencesRef.current = { userId: '', preferences: null }
+      setThemeKey('white')
+      setDarkMode(false)
+      resetPreference()
+      return undefined
+    }
+
+    const cached = loadedPreferencesRef.current
+    if (cached.userId === userId && cached.preferences) {
+      setThemeKey(cached.preferences.themeKey)
+      setDarkMode(cached.preferences.darkMode)
+      if (Number.isInteger(cached.preferences.fontSize)) setPreferenceValue(cached.preferences.fontSize)
+      return undefined
+    }
+
+    const load = async () => {
+      try {
+        const response = await api('/api/user/preferences/appearance', { silent: true })
+        if (cancelled) return
+        if (!response?.ok || response?.success === false) {
+          toast.error(response?.message || 'Kişisel görünüm tercihleri alınamadı.')
+          return
+        }
+        const preferences = response.preferences || {}
+        const resolvedPreferences = {
+          themeKey: preferences.themeKey || 'white',
+          darkMode: preferences.darkMode === true,
+          fontSize: Number.isInteger(preferences.fontSize) ? preferences.fontSize : null,
+        }
+        loadedPreferencesRef.current = { userId, preferences: resolvedPreferences }
+        setThemeKey(resolvedPreferences.themeKey)
+        setDarkMode(resolvedPreferences.darkMode)
+        if (Number.isInteger(resolvedPreferences.fontSize)) setPreferenceValue(resolvedPreferences.fontSize)
+      } catch (error) {
+        if (!cancelled) toast.error(error?.message || 'Kişisel görünüm tercihleri alınamadı.')
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [loading, location.pathname, resetPreference, setDarkMode, setPreferenceValue, setThemeKey, userId])
+
+  useEffect(() => {
+    const updateCachedPreferences = (event) => {
+      if (!event.detail) return
+      loadedPreferencesRef.current = { userId, preferences: event.detail }
+    }
+    window.addEventListener('appearance-preferences-updated', updateCachedPreferences)
+    return () => window.removeEventListener('appearance-preferences-updated', updateCachedPreferences)
+  }, [userId])
+
+  return null
+}
+
+function UnsavedAppearanceNavigationGuard() {
+  const location = useLocation()
+  const restorePopRef = useRef(false)
+  const historyIndexRef = useRef(Number(window.history.state?.idx ?? 0))
+
+  useEffect(() => {
+    historyIndexRef.current = Number(window.history.state?.idx ?? historyIndexRef.current)
+  }, [location])
+
+  useEffect(() => {
+    const originalPushState = window.history.pushState
+    const originalReplaceState = window.history.replaceState
+    const guardHistoryChange = (originalMethod) => function guardedHistoryChange(state, title, url) {
+      if (hasUnsavedAppearanceChanges()) {
+        let destination
+        try {
+          destination = new URL(url == null ? window.location.href : String(url), window.location.href)
+        } catch {
+          destination = null
+        }
+        if (
+          destination &&
+          destination.origin === window.location.origin &&
+          destination.href !== window.location.href &&
+          !confirmUnsavedAppearanceChanges()
+        ) return
+      }
+      return originalMethod.call(this, state, title, url)
+    }
+    const guardedPushState = guardHistoryChange(originalPushState)
+    const guardedReplaceState = guardHistoryChange(originalReplaceState)
+    window.history.pushState = guardedPushState
+    window.history.replaceState = guardedReplaceState
+
+    const onClick = (event) => {
+      if (!hasUnsavedAppearanceChanges() || !(event.target instanceof Element)) return
+      const anchor = event.target.closest('a[href]')
+      if (!anchor || anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      let destination
+      try {
+        destination = new URL(anchor.href, window.location.href)
+      } catch {
+        return
+      }
+      if (destination.origin !== window.location.origin || destination.href === window.location.href) return
+      if (!confirmUnsavedAppearanceChanges()) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation?.()
+      }
+    }
+
+    const onBeforeUnload = (event) => {
+      if (!hasUnsavedAppearanceChanges()) return
+      event.preventDefault()
+      event.returnValue = 'Kaydetmediğiniz değişiklikler iptal edilecektir. Devam etmek istiyor musunuz?'
+    }
+
+    const onPopState = (event) => {
+      if (restorePopRef.current) {
+        restorePopRef.current = false
+        return
+      }
+      if (!hasUnsavedAppearanceChanges()) return
+      if (confirmUnsavedAppearanceChanges()) return
+      event.preventDefault()
+      event.stopImmediatePropagation?.()
+      const currentIndex = Number(window.history.state?.idx)
+      const isBackNavigation = Number.isFinite(currentIndex) && currentIndex < historyIndexRef.current
+      restorePopRef.current = true
+      if (isBackNavigation) window.history.forward()
+      else window.history.back()
+    }
+
+    document.addEventListener('click', onClick, true)
+    window.addEventListener('beforeunload', onBeforeUnload)
+    window.addEventListener('popstate', onPopState, true)
+    return () => {
+      document.removeEventListener('click', onClick, true)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      window.removeEventListener('popstate', onPopState, true)
+      if (window.history.pushState === guardedPushState) window.history.pushState = originalPushState
+      if (window.history.replaceState === guardedReplaceState) window.history.replaceState = originalReplaceState
+    }
+  }, [])
+
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BusinessSettingsProvider>
+        <AppearancePreferencesSync />
+        <UnsavedAppearanceNavigationGuard />
         <CapacitorBackButtonHandler />
         <TenantUsageHeartbeat />
         <NativePushBridge />
@@ -413,6 +575,7 @@ export default function App() {
 
         <Route path="/anaokulu" element={<AnaokuluDataProvider><ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu"><AnaokuluLayout /></ProtectedRoute></AnaokuluDataProvider>}>
           <Route index element={<AnaokuluIndexRoute />} />
+          <Route path="tercihlerim" element={<ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu" allowExpired><UserAppearancePage /></ProtectedRoute>} />
           <Route path="genel-bakis" element={<DashboardPage />} />
           <Route path="ogrenciler" element={<OgrencilerPage />} />
           <Route path="ucret-taksit" element={<UcretPlaniPage />} />
@@ -426,6 +589,7 @@ export default function App() {
         </Route>
         <Route path="/magaza" element={<CanteenLayout />}>
           <Route index element={<Navigate to="/magaza/kasa" replace />} />
+          <Route path="tercihlerim" element={<ProtectedRoute roles={['tenant_admin', 'staff']} system="canteen" allowExpired><UserAppearancePage /></ProtectedRoute>} />
           <Route path="kasa" element={<CanteenCashierPage />} />
           <Route path="qr-siparisleri" element={<CanteenQrOrdersPage />} />
           <Route path="cariler" element={<CanteenCustomersPage />} />
@@ -460,7 +624,8 @@ export default function App() {
           <Route path="platform/plans" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminPlans /></ProtectedRoute>} />
           <Route path="platform/billing-requests" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><PlatformAdminMembershipRequests /></ProtectedRoute>} />
           <Route path="platform/payments" element={<Navigate to="/platform/billing-requests" replace />} />
-          <Route path="platform/settings/me" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><SettingsMePage apiBase="/api/platform" /></ProtectedRoute>} />
+          <Route path="platform/settings/me" element={<ProtectedRoute roles={['platform_admin', 'superadmin']}><SettingsMePage apiBase="/api/platform" hideAppearance /></ProtectedRoute>} />
+          <Route path="platform/tercihlerim" element={<ProtectedRoute roles={['platform_admin', 'superadmin']} allowExpired><UserAppearancePage /></ProtectedRoute>} />
           <Route path="superadmin/tenants" element={<ProtectedRoute roles={['superadmin']}><SuperadminTenants /></ProtectedRoute>} />
           <Route path="superadmin/website-settings" element={<ProtectedRoute roles={['superadmin']}><SuperadminWebsiteSettings /></ProtectedRoute>} />
         </Route>
@@ -474,6 +639,7 @@ export default function App() {
 
         <Route path="/restoran" element={<Layout />}>
           <Route index element={<KermesIndexRedirect />} />
+          <Route path="tercihlerim" element={<ProtectedRoute roles={['tenant_admin', 'staff']} system="kermes" allowExpired><UserAppearancePage /></ProtectedRoute>} />
           <Route path="app/dashboard" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><Dashboard /></ProtectedRoute>} />
           <Route path="app/tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><TablesPage /></ProtectedRoute>} />
           <Route path="app/waiter-calls" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><WaiterCallsPage /></ProtectedRoute>} />

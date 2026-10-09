@@ -32,30 +32,30 @@ const paymentLabelMap = Object.fromEntries(PAYMENT_OPTIONS)
 
 const statusTone = {
   yeni: { bg: '#eff6ff', color: '#2563eb' },
-  hazirlaniyor: { bg: '#fff7ed', color: '#ea580c' },
+  hazirlaniyor: { bg: '#fff7ed', color: '#9a3412' },
   hazir: { bg: '#ecfdf5', color: '#047857' },
   kuryeye_atandi: { bg: '#fef3c7', color: '#b45309' },
   yola_cikti: { bg: '#dbeafe', color: '#1d4ed8' },
   teslim_edildi: { bg: '#dcfce7', color: '#15803d' },
-  iptal_edildi: { bg: '#fee2e2', color: '#dc2626' },
-  geri_dondu: { bg: '#fee2e2', color: '#dc2626' },
-  musteriyi_bulamadi: { bg: '#fee2e2', color: '#dc2626' },
-  adreste_yok: { bg: '#fee2e2', color: '#dc2626' }
+  iptal_edildi: { bg: '#fee2e2', color: '#991b1b' },
+  geri_dondu: { bg: '#fee2e2', color: '#991b1b' },
+  musteriyi_bulamadi: { bg: '#fee2e2', color: '#991b1b' },
+  adreste_yok: { bg: '#fee2e2', color: '#991b1b' }
 }
 
 const prepTone = {
   new: { bg: '#f3f4f6', color: '#475569', label: 'Yeni' },
-  preparing: { bg: '#fff7ed', color: '#ea580c', label: 'Hazirlaniyor' },
+  preparing: { bg: '#fff7ed', color: '#9a3412', label: 'Hazirlaniyor' },
   ready: { bg: '#dbeafe', color: '#1d4ed8', label: 'Hazir' }
 }
 
 const paymentTone = {
-  odeme_bekliyor: { bg: '#fff7ed', color: '#ea580c' },
+  odeme_bekliyor: { bg: '#fff7ed', color: '#9a3412' },
   odeme_alindi: { bg: '#ecfdf5', color: '#16a34a' },
   kismi_odeme: { bg: '#eff6ff', color: '#2563eb' },
   veresiye: { bg: '#e9f0f8', color: '#274066' },
   online_odendi: { bg: '#eff6ff', color: '#2563eb' },
-  iade_edildi: { bg: '#fee2e2', color: '#dc2626' }
+  iade_edildi: { bg: '#fee2e2', color: '#991b1b' }
 }
 
 const compactButton = {
@@ -73,7 +73,7 @@ const primaryButton = {
   ...compactButton,
   background: 'var(--theme-accent, #0f172a)',
   borderColor: 'var(--theme-accent, #0f172a)',
-  color: '#fff'
+  color: 'var(--theme-accent-text, #fff)'
 }
 
 const successButton = {

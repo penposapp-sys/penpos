@@ -47,7 +47,7 @@ export default function PrintStationPage({ system }) {
           {activeStation ? `Aktif istasyon: ${activeStation.name}` : 'Aktif istasyon yok'}
           {activeStation?.lastHeartbeatAt ? ` · Son: ${new Date(activeStation.lastHeartbeatAt).toLocaleString('tr-TR')}` : ''}
         </div>
-        <div style={{ fontWeight: 800, color: online ? '#22c55e' : '#ef4444' }}>{online ? 'Agent aktif' : 'Agent bekleniyor'}</div>
+        <div style={{ fontWeight: 800, color: online ? 'var(--success-text)' : 'var(--danger-text)' }}>{online ? 'Agent aktif' : 'Agent bekleniyor'}</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn" onClick={load} disabled={busy}>{busy ? '...' : 'Yenile'}</button>
         </div>

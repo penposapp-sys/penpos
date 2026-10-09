@@ -61,7 +61,7 @@ const getInitialBusinessSettings = (scope = resolveThemeScope(getCurrentPathname
 
 export function BusinessSettingsProvider({ children }) {
   const { user, loading: authLoading } = useAuth()
-  const { setThemeKey, setDarkMode, themeScope, isMobileRuntime } = useTheme()
+  const { themeScope, isMobileRuntime } = useTheme()
   const [settings, setSettings] = useState(() => getInitialBusinessSettings())
   const [tenant, setTenant] = useState(null)
   const [branches, setBranches] = useState([])
@@ -131,8 +131,6 @@ export function BusinessSettingsProvider({ children }) {
     const root = document.documentElement
     const body = document.body
     const publicDefaults = mergeBusinessSettings()
-    const themeId = normalizeThemeId(settings?.appearance?.themeId || 'white')
-    const darkMode = settings?.appearance?.darkMode === true
     const fontSize = String(settings?.appearance?.fontSize || 'medium')
     const animationsEnabled = settings?.appearance?.animationsEnabled !== false
     const colorfulProducts = settings?.appearance?.colorfulProducts === true
@@ -144,15 +142,12 @@ export function BusinessSettingsProvider({ children }) {
       body?.classList.remove('tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
       body?.classList.add(`tenant-font-${String(publicDefaults?.appearance?.fontSize || 'medium')}`)
 
-      root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-      body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-
-      setThemeKey('white')
-      setDarkMode(false)
+      root.classList.remove('tenant-no-animations', 'tenant-colorful-products')
+      body?.classList.remove('tenant-no-animations', 'tenant-colorful-products')
 
       return () => {
-        root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-        body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products', 'tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
+        root.classList.remove('tenant-no-animations', 'tenant-colorful-products')
+        body?.classList.remove('tenant-no-animations', 'tenant-colorful-products', 'tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
       }
     }
 
@@ -161,15 +156,8 @@ export function BusinessSettingsProvider({ children }) {
     body?.classList.remove('tenant-font-small', 'tenant-font-medium', 'tenant-font-large')
     body?.classList.add(`tenant-font-${fontSize}`)
 
-    root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-    body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-
-    setThemeKey(themeId)
-    setDarkMode(darkMode)
-    try {
-      localStorage.setItem(getScopedThemeStorageKey(storageScope), themeId)
-      localStorage.setItem(getScopedDarkModeStorageKey(storageScope), String(darkMode))
-    } catch {}
+    root.classList.remove('tenant-no-animations', 'tenant-colorful-products')
+    body?.classList.remove('tenant-no-animations', 'tenant-colorful-products')
 
     if (isMobileRuntime) {
       return () => {
@@ -177,19 +165,17 @@ export function BusinessSettingsProvider({ children }) {
       }
     }
 
-    root.classList.toggle('tenant-dark-mode', darkMode)
     root.classList.toggle('tenant-no-animations', !animationsEnabled)
     root.classList.toggle('tenant-colorful-products', colorfulProducts)
 
-    body?.classList.toggle('tenant-dark-mode', darkMode)
     body?.classList.toggle('tenant-no-animations', !animationsEnabled)
     body?.classList.toggle('tenant-colorful-products', colorfulProducts)
 
     return () => {
-      root.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products')
-      body?.classList.remove('tenant-dark-mode', 'tenant-no-animations', 'tenant-colorful-products', `tenant-font-${fontSize}`)
+      root.classList.remove('tenant-no-animations', 'tenant-colorful-products')
+      body?.classList.remove('tenant-no-animations', 'tenant-colorful-products', `tenant-font-${fontSize}`)
     }
-  }, [isMobileRuntime, isPublicScope, setDarkMode, setThemeKey, settings, storageScope])
+  }, [isMobileRuntime, isPublicScope, settings])
 
   const value = useMemo(() => ({
     settings,

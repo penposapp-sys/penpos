@@ -440,6 +440,7 @@ export default function CanteenCashierPage() {
     items: filteredProducts,
     enabled: isMobilePortrait,
     debugKey: 'CanteenCashierPage',
+    columnCount: isMobilePortrait ? 3 : null,
     resetDeps: [activeCategoryId, q, selectedBranchId]
   })
 
@@ -705,10 +706,6 @@ export default function CanteenCashierPage() {
   const discountPercent = discountPercentError ? 0 : parsedDiscountPercent
   const discountTotal = roundMoney((Number(total || 0) * discountPercent) / 100)
   const netTotal = roundMoney(Math.max(0, Number(total || 0) - discountTotal))
-
-  const cartItemCount = useMemo(() => {
-    return cart.reduce((sum, it) => sum + Number(it.qty || 0), 0)
-  }, [cart])
 
   const cartBranchIds = useMemo(() => {
     const ids = cart.map(it => String(it.productBranchId || '')).filter(Boolean)

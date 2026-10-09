@@ -144,7 +144,7 @@ function SettingsPageSurface({ title, description, actions, children }) {
     '--settings-button-text': 'var(--sidebar-nav-text-active, #ffffff)',
     '--settings-button-disabled-bg': theme.darkMode ? '#2f2f2f' : '#d1d5db',
     '--settings-button-disabled-border': theme.darkMode ? '#3f3f46' : '#d1d5db',
-    '--settings-button-disabled-text': theme.darkMode ? '#9ca3af' : '#6b7280',
+    '--settings-button-disabled-text': theme.darkMode ? '#b8b4ad' : '#4b5563',
   }
   return (
     <div
@@ -1406,6 +1406,5 @@ export function SettingsMenuHub() {
     </>
   )
 }
-
 
 

@@ -248,8 +248,8 @@ function LiveActivityPanel({ items, onOpenDetail }) {
     <div style={{ ...CARD_STYLE, minHeight: 360, padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>Canlı İşlem Akisi</h2>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 900, color: '#059669' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 6px rgba(16, 185, 129, 0.12)' }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 900, color: 'var(--success-text)' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success-text)', boxShadow: '0 0 0 6px rgba(16, 185, 129, 0.12)' }} />
           CANLI
         </span>
       </div>
@@ -1406,4 +1406,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

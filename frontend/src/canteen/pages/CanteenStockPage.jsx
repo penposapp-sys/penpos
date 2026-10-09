@@ -280,19 +280,30 @@ export function CanteenStockWorkspace({
           --legacy-panel: #f2f2f2;
           --legacy-line: #9ca3af;
           --legacy-line-strong: #7c8796;
+          --app-text: #20251f;
+          --app-text-secondary: #4b5563;
+          --app-text-muted: #4b5563;
+          --text: #20251f;
+          --muted: #4b5563;
           --legacy-title: #0b35ff;
           --legacy-orange: #ff8700;
           --legacy-yellow: #fff7a8;
           --legacy-green: #c9ffc7;
           --legacy-header: #d4d2ff;
-          --legacy-red: #ff1414;
+          --legacy-red: #b91c1c;
           --legacy-blue: #1300d8;
+          color: var(--app-text) !important;
         }
         .canteen-stock-page:not(.canteen-stock-page--embedded) .card {
           background: var(--legacy-panel) !important;
           border: 1px solid var(--legacy-line-strong) !important;
           border-radius: 0 !important;
           box-shadow: none !important;
+          color: #20251f !important;
+        }
+        .canteen-stock-page:not(.canteen-stock-page--embedded) .canteen-legacy-shell,
+        .canteen-stock-page:not(.canteen-stock-page--embedded) .canteen-legacy-panel {
+          color: #20251f !important;
         }
         .canteen-stock-page--embedded .card {
           background: var(--app-surface, var(--panel)) !important;
@@ -307,8 +318,14 @@ export function CanteenStockWorkspace({
           border-radius: 0 !important;
           border: 1px solid var(--legacy-line-strong) !important;
           background: #fff !important;
+          color: #20251f !important;
           min-height: 32px;
           box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+        }
+        .canteen-stock-page:not(.canteen-stock-page--embedded) input::placeholder,
+        .canteen-stock-page:not(.canteen-stock-page--embedded) textarea::placeholder {
+          color: #4b5563 !important;
+          opacity: 1;
         }
         .canteen-stock-page--embedded .input,
         .canteen-stock-page--embedded input,
@@ -510,7 +527,7 @@ export function CanteenStockWorkspace({
         }
         .canteen-stock-table-head > div {
           background: #f7f7f7;
-          color: #ff1a1a;
+          color: #b91c1c;
           font-weight: 700;
           border-right: 1px solid var(--legacy-line);
           border-bottom: 1px solid var(--legacy-line-strong);
@@ -557,7 +574,7 @@ export function CanteenStockWorkspace({
         }
         .canteen-stock-table-empty {
           padding: 16px;
-          color: #fff;
+          color: #4b5563;
           font-weight: 700;
         }
         .canteen-legacy-grid-header,
@@ -568,7 +585,7 @@ export function CanteenStockWorkspace({
         }
         .canteen-legacy-grid-header > div {
           background: #fff;
-          color: #ff1a1a;
+          color: #b91c1c;
           font-weight: 700;
           border-right: 1px solid var(--legacy-line);
           border-bottom: 1px solid var(--legacy-line);
@@ -4350,5 +4367,3 @@ function CountList({ title, items }) {
     </div>
   )
 }
-
-

@@ -48,7 +48,7 @@ function buildSettingsThemeVars(theme) {
     '--settings-button-text': 'var(--sidebar-nav-text-active, #ffffff)',
     '--settings-button-disabled-bg': dark ? '#2f2f2f' : '#d1d5db',
     '--settings-button-disabled-border': dark ? '#3f3f46' : '#d1d5db',
-    '--settings-button-disabled-text': dark ? '#9ca3af' : '#6b7280',
+    '--settings-button-disabled-text': dark ? '#b8b4ad' : '#4b5563',
     '--settings-side-link-active-bg': dark ? 'var(--menu-active-bg)' : 'linear-gradient(135deg, var(--settings-accent), var(--settings-accent-2))',
     '--settings-side-link-active-border': dark ? 'var(--border-hover)' : 'transparent',
     '--settings-side-link-active-text': dark ? 'var(--sidebar-nav-text-active, #ffffff)' : '#ffffff',

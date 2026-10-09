@@ -101,6 +101,7 @@ export default function WalkInPosPage() {
   const [pendingConfigItem, setPendingConfigItem] = useState(null)
   const [mobileCartExpanded, setMobileCartExpanded] = useState(false)
   const mobileCartTouchStartYRef = useRef(null)
+  const mobileCartSuppressClickRef = useRef(false)
   const addRequestQueueRef = useRef(new Map())
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [selectedItemForCancel, setSelectedItemForCancel] = useState(null)
@@ -784,7 +785,8 @@ export default function WalkInPosPage() {
     mobileCartTouchStartYRef.current = null
     const endY = event.changedTouches[0]?.clientY
     if (startY !== null && endY !== undefined && endY - startY > 60) {
-      event.preventDefault()
+      mobileCartSuppressClickRef.current = true
+      window.setTimeout(() => { mobileCartSuppressClickRef.current = false }, 350)
       setMobileCartExpanded(false)
     }
   }
@@ -1740,7 +1742,7 @@ export default function WalkInPosPage() {
             const oid = getListOrderId(o)
             const ui = String(o?.uiStatus || '').trim() || (String(o?.status || '').trim() === 'sent' ? 'sent' : 'open')
             const label = ui === 'ready' ? 'Hazır' : ui === 'sent' ? 'Hazırlanıyor' : 'Bekliyor'
-            const color = ui === 'ready' ? '#16a34a' : ui === 'sent' ? '#f97316' : '#6b7280'
+            const color = ui === 'ready' ? '#166534' : ui === 'sent' ? '#9a3412' : '#4b5563'
             const borderColor = ui === 'ready' ? '#86efac' : ui === 'sent' ? '#fdba74' : '#e5e7eb'
             const customerName = String(o.customerName || '').trim() || 'Misafir'
             const title = `Masasız Satış — ${customerName} • ${o?.orderNo ? `Sipariş ${o.orderNo}` : 'Sipariş —'}`
@@ -1764,7 +1766,7 @@ export default function WalkInPosPage() {
                 </span>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
                   <div style={{ fontWeight: 800, lineHeight: 1.2 }}>{customerName}</div>
-                  <span className="page-pill" style={{ color, borderColor: color }}>{label}</span>
+                  <span className={`page-pill sale-order-status sale-order-status--${ui}`} style={{ color, borderColor: color }}>{label}</span>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>{title}</div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -1774,7 +1776,7 @@ export default function WalkInPosPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kalan</div>
-                    <div style={{ fontWeight: 700, color: balanceDue > 0.01 ? '#b91c1c' : 'var(--text)' }}>{balanceDue.toFixed(2)} TL</div>
+                    <div style={{ fontWeight: 700, color: balanceDue > 0.01 ? 'var(--danger)' : 'var(--text)' }}>{balanceDue.toFixed(2)} TL</div>
                   </div>
                 </div>
               </div>
@@ -1787,6 +1789,14 @@ export default function WalkInPosPage() {
 
   return (
     <div className="pageShell walkin-sales-page walkin-layout" style={{ gap: 12 }}>
+      {mobileCartExpanded && (
+        <button
+          type="button"
+          className="saleCartBackdrop"
+          aria-label="Sepeti kapat"
+          onClick={() => setMobileCartExpanded(false)}
+        />
+      )}
       <div className="card stickyTop" style={topbarStyle}>
         <button className="btn" onClick={() => nav('/restoran/app/walkin')}>← Geri</button>
         <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
@@ -1911,7 +1921,13 @@ export default function WalkInPosPage() {
               className="saleCartMobileToggle"
               aria-expanded={mobileCartExpanded}
               aria-controls="walkin-sale-cart-content"
-              onClick={() => setMobileCartExpanded((expanded) => !expanded)}
+              onClick={() => {
+                if (mobileCartSuppressClickRef.current) {
+                  mobileCartSuppressClickRef.current = false
+                  return
+                }
+                setMobileCartExpanded((expanded) => !expanded)
+              }}
               onTouchStart={startMobileCartSwipe}
               onTouchEnd={endMobileCartSwipe}
               onTouchCancel={() => { mobileCartTouchStartYRef.current = null }}
@@ -2270,8 +2286,8 @@ export default function WalkInPosPage() {
                   <div className="saleCartFooterInner">
                   <div className="saleCartFooterSummary">
                     <div className="saleCartFooterSummaryMain">
-                      <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceLabel}</div>
-                      <div style={{ color: signedBalance < -0.01 ? '#b91c1c' : undefined }}>{signedBalanceValue.toFixed(2)} TL</div>
+                      <div style={{ color: signedBalance < -0.01 ? 'var(--danger)' : undefined }}>{signedBalanceLabel}</div>
+                      <div style={{ color: signedBalance < -0.01 ? 'var(--danger)' : undefined }}>{signedBalanceValue.toFixed(2)} TL</div>
                     </div>
                     <div className="saleCartFooterSummaryMeta">
                       <div>Brüt: {grossTotal.toFixed(2)} TL</div>
@@ -2467,7 +2483,7 @@ export default function WalkInPosPage() {
       <div style={{ display: 'grid', gap: 10 }}>
         {!!veresiyeBranchError && (
           <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
-            <div style={{ fontWeight: 700, color: '#b91c1c' }}>Şube seçimi gerekli</div>
+            <div style={{ fontWeight: 700, color: 'var(--danger)' }}>Şube seçimi gerekli</div>
             <div style={{ color: 'var(--muted)', marginTop: 4 }}>{veresiyeBranchError}</div>
           </div>
         )}
@@ -2535,13 +2551,13 @@ export default function WalkInPosPage() {
       <div style={{ display: 'grid', gap: 10 }}>
         {!!veresiyeBranchError && (
           <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
-            <div style={{ fontWeight: 700, color: '#b91c1c' }}>Şube seçimi gerekli</div>
+            <div style={{ fontWeight: 700, color: 'var(--danger)' }}>Şube seçimi gerekli</div>
             <div style={{ color: 'var(--muted)', marginTop: 4 }}>{veresiyeBranchError}</div>
           </div>
         )}
         {!!createAccountError && (
           <div className="card" style={{ borderColor: '#fecaca', background: '#fef2f2' }}>
-            <div style={{ fontWeight: 700, color: '#b91c1c' }}>{createAccountError}</div>
+            <div style={{ fontWeight: 700, color: 'var(--danger)' }}>{createAccountError}</div>
           </div>
         )}
         <label>
@@ -2662,7 +2678,7 @@ export default function WalkInPosPage() {
           </div>
         </div>
         {branchPickerLoading ? <div style={{ color: 'var(--muted)' }}>Şubeler yükleniyor...</div> : null}
-        {!!branchPickerError ? <div style={{ color: '#b91c1c' }}>{branchPickerError}</div> : null}
+        {!!branchPickerError ? <div style={{ color: 'var(--danger)' }}>{branchPickerError}</div> : null}
         {!branchPickerLoading && !branchPickerError && availableBranches.length === 0 ? (
           <div style={{ color: 'var(--muted)' }}>Kullanılabilir şube bulunamadı.</div>
         ) : null}

@@ -6,8 +6,9 @@ import * as ctrl from '../controllers/userPreferencesController.js'
 
 const router = Router()
 
+router.get('/appearance', requireAuth, ctrl.getAppearancePreferences)
+router.put('/appearance', requireAuth, ctrl.putAppearancePreferences)
 router.get('/kitchen-filters', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), ctrl.getKitchenFilters)
 router.put('/kitchen-filters', requireAuth, tenantGuard, requireRole(['tenant_admin', 'staff']), ctrl.putKitchenFilters)
 
 export default router
-

@@ -264,7 +264,7 @@ export default function OnlineSalesSettingsPage() {
           <div style={{ fontSize: compact ? 12 : 13, color: 'var(--app-text-secondary, var(--muted))' }}>
             One cikan urun: <strong>{selectedProductName || 'Otomatik'}</strong>
           </div>
-          <div style={{ fontSize: compact ? 12 : 13, color: onlineSales?.enabled ? 'var(--theme-accent)' : '#b91c1c', fontWeight: 800 }}>
+          <div style={{ fontSize: compact ? 12 : 13, color: onlineSales?.enabled ? 'var(--theme-accent)' : 'var(--danger, #b91c1c)', fontWeight: 800 }}>
             {onlineSales?.enabled ? 'Online satis yayinda' : 'Online satis kapali'}
           </div>
         </div>
