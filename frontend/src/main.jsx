@@ -6,14 +6,17 @@ import ScrollReset from './components/ScrollReset.jsx'
 import './styles.css'
 import { ThemeProvider } from './theme/ThemeContext.jsx'
 import { AppDateProvider } from './context/AppDateContext.jsx'
+import { GlobalTypographyProvider } from './context/GlobalTypographyContext.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter future={{ v7_relativeSplatPath: true }}>
-    <ThemeProvider>
-      <AppDateProvider>
-        <ScrollReset />
-        <App />
-      </AppDateProvider>
-    </ThemeProvider>
-  </BrowserRouter>
+  <GlobalTypographyProvider>
+    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+      <ThemeProvider>
+        <AppDateProvider>
+          <ScrollReset />
+          <App />
+        </AppDateProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  </GlobalTypographyProvider>
 )

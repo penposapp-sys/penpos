@@ -116,7 +116,7 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
       if (activeOrder && String(activeOrder.status || '') !== 'closed' && String(activeOrder.status || '') !== 'cancelled') {
         await Order.updateOne({ _id: activeOrder._id, tenantId }, { $set: { status: 'closed', closedAt: activeOrder.closedAt || new Date() } })
       }
-      await Table.updateOne({ _id: t._id, tenantId }, { $set: { status: 'empty', activeOrderId: null } })
+      await Table.updateOne({ _id: t._id, tenantId }, { $set: { status: 'empty', activeOrderId: null, note: '' } })
       t.status = 'empty'
       t.activeOrderId = null
     } else {
@@ -162,7 +162,7 @@ export const startOrderForTableService = async (tenantId, userId, tableId, branc
     totals: { subtotal: 0, grandTotal: 0 },
     createdAt
   })
-  await updateById(tableId, { status: 'occupied', activeOrderId: order.id })
+  await updateById(tableId, { status: 'occupied', activeOrderId: order.id, note: '' })
   await (await import('./auditService.js')).log(tenantId, userId, 'table_start_order', 'Table', tableId, { orderId: order.id })
   return { success: true, orderId: order.id }
 }
@@ -379,7 +379,7 @@ export const closeTableService = async (tenantId, tableId, branchId) => {
     { $set: { status: 'closed', closedAt: new Date() } }
   )
 
-  await Table.updateOne({ _id: tableId, tenantId }, { $set: { status: 'empty', activeOrderId: null } })
+  await Table.updateOne({ _id: tableId, tenantId }, { $set: { status: 'empty', activeOrderId: null, note: '' } })
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'table_close', 'Table', tableId, { previousOrderId: t.activeOrderId })
   return { tableId: String(t._id), cleared: true }
 }
@@ -418,6 +418,6 @@ export const abandonIfEmpty = async ({ tenantId, branchId, tableId }) => {
   } catch {}
 
   await Order.updateOne({ _id: order._id }, { $set: { status: 'cancelled' } })
-  await Table.updateOne({ _id: tableId }, { $set: { status: 'empty', activeOrderId: null } })
+  await Table.updateOne({ _id: tableId }, { $set: { status: 'empty', activeOrderId: null, note: '' } })
   return { cleared: true }
 }

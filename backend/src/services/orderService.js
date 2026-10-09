@@ -260,7 +260,7 @@ const maybeAutoClosePaidOrder = async (tenantId, order) => {
 
   if (order?.tableId && settings.automation.autoClosePaidTables === true) {
     await updateById(order.id || order._id, { status: 'closed', closedAt: order.closedAt || new Date() })
-    await Table.updateOne({ _id: order.tableId, tenantId }, { $set: { status: 'empty', activeOrderId: null } })
+    await Table.updateOne({ _id: order.tableId, tenantId }, { $set: { status: 'empty', activeOrderId: null, note: '' } })
   }
 }
 
@@ -2505,7 +2505,7 @@ export const cancelOrderService = async (tenantId, id) => {
   })
   await order.save()
   if (order.tableId) {
-    await (await import('../repositories/tableRepository.js')).updateById(order.tableId, { status: 'empty', activeOrderId: null })
+    await (await import('../repositories/tableRepository.js')).updateById(order.tableId, { status: 'empty', activeOrderId: null, note: '' })
   }
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_cancel', 'Order', order.id, {})
   return { id: order.id, status: order.status }
@@ -3332,7 +3332,7 @@ export const closeOrderService = async (tenantId, id) => {
   const nextStatus = order.status === 'cancelled' ? 'closed' : 'completed'
   const updated = await updateById(id, { status: nextStatus, closedAt: new Date() })
   if (updated.tableId) {
-    await (await import('../repositories/tableRepository.js')).updateById(updated.tableId, { status: 'empty', activeOrderId: null })
+    await (await import('../repositories/tableRepository.js')).updateById(updated.tableId, { status: 'empty', activeOrderId: null, note: '' })
   }
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_close', 'Order', updated.id, {})
   const fresh = await Order.findById(updated.id).lean()
@@ -3693,7 +3693,7 @@ const transferOrderWithTransaction = async (tenantId, id, targetTableId) => {
 
       const clearedSource = await Table.findOneAndUpdate(
         { _id: sourceTable.id, tenantId, isActive: true, activeOrderId: order.id },
-        { $set: { activeOrderId: null, status: 'empty' } },
+        { $set: { activeOrderId: null, status: 'empty', note: '' } },
         { new: true, session }
       )
       if (!clearedSource) {
@@ -3742,7 +3742,7 @@ const transferOrderFallbackAtomic = async (tenantId, id, targetTableId) => {
 
   const updatedSource = await Table.findOneAndUpdate(
     { _id: sourceTable.id, tenantId, isActive: true, activeOrderId: order.id },
-    { $set: { activeOrderId: null, status: 'empty' } },
+    { $set: { activeOrderId: null, status: 'empty', note: '' } },
     { new: true }
   )
   if (!updatedSource) {
@@ -3890,7 +3890,7 @@ const mergeOrdersWithTransaction = async (tenantId, targetOrder, sourceOrders, s
       }
       await Table.updateMany(
         { _id: { $in: sourceTables.map(t => t.id) } },
-        { status: 'empty', activeOrderId: null },
+        { status: 'empty', activeOrderId: null, note: '' },
         { session }
       )
     })
@@ -3928,7 +3928,7 @@ const mergeOrdersFallbackAtomic = async (tenantId, targetOrder, sourceOrders, so
   }
   await Table.updateMany(
     { _id: { $in: sourceTables.map(t => t.id) } },
-    { status: 'empty', activeOrderId: null }
+    { status: 'empty', activeOrderId: null, note: '' }
   )
 }
 

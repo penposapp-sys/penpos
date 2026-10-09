@@ -51,6 +51,8 @@ export default function PosPage() {
   const [items, setItems] = useState([])
   const [activeCategory, setActiveCategory] = useState('')
   const [order, setOrder] = useState(null)
+  const [mobileCartExpanded, setMobileCartExpanded] = useState(false)
+  const mobileCartTouchStartYRef = useRef(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [payOpen, setPayOpen] = useState(false)
@@ -107,6 +109,7 @@ export default function PosPage() {
   const tableIdRef = useRef(null)
   const currentOrderIdRef = useRef(null)
   const optimisticItemSeqRef = useRef(0)
+  const addRequestQueueRef = useRef(new Map())
   const inflightRef = useRef(new Map())
   const lastClickRef = useRef(new Map())
   const [, setLockTick] = useState(0)
@@ -710,26 +713,50 @@ export default function PosPage() {
     const product = (menuItem && typeof menuItem === 'object') ? menuItem : null
     const menuItemId = String(product?.id || product?.menuItemId || '')
     if (!menuItemId) return null
-    const tempId = `tmp:${menuItemId}:${Date.now()}:${optimisticItemSeqRef.current++}`
     const unitPrice = Number(product?.price || 0)
     const nextServingType = normalizeServingType(product?.servingType || servingType || orderRef.current?.servingType, { fallback: null })
+    const canMerge = !product?.isWeightBased
+    const existingItem = canMerge
+      ? (Array.isArray(orderRef.current?.items) ? orderRef.current.items : []).find((item) =>
+        String(item?.menuItemId || '') === menuItemId &&
+        item?.status === 'open' &&
+        String(item?.nameSnapshot || '') === String(product?.name || 'Ürün') &&
+        Number(item?.priceSnapshot || 0) === unitPrice &&
+        String(item?.note || '') === ''
+      )
+      : null
+    const existingId = existingItem ? String(existingItem?._id || existingItem?.id || existingItem?.itemId || '') : ''
+    const tempId = existingId ? null : `tmp:${menuItemId}:${Date.now()}:${optimisticItemSeqRef.current++}`
     setOrder((prev) => {
       if (!prev) return prev
       const nextItems = Array.isArray(prev.items) ? [...prev.items] : []
-      nextItems.push({
-        _id: tempId,
-        id: tempId,
-        itemId: tempId,
-        menuItemId,
-        nameSnapshot: String(product?.name || 'Ürün'),
-        priceSnapshot: unitPrice,
-        qty: 1,
-        subtotal: unitPrice,
-        status: 'open',
-        note: '',
-        isWeightBased: !!product?.isWeightBased,
-        servingType: nextServingType
-      })
+      const existingIndex = existingId
+        ? nextItems.findIndex((item) => String(item?._id || item?.id || item?.itemId || '') === existingId)
+        : -1
+      if (existingIndex >= 0) {
+        const currentItem = nextItems[existingIndex]
+        const nextQty = Number(currentItem?.qty || 0) + 1
+        nextItems[existingIndex] = {
+          ...currentItem,
+          qty: nextQty,
+          subtotal: nextQty * Number(currentItem?.priceSnapshot ?? unitPrice)
+        }
+      } else {
+        nextItems.push({
+          _id: tempId,
+          id: tempId,
+          itemId: tempId,
+          menuItemId,
+          nameSnapshot: String(product?.name || 'Ürün'),
+          priceSnapshot: unitPrice,
+          qty: 1,
+          subtotal: unitPrice,
+          status: 'open',
+          note: '',
+          isWeightBased: !!product?.isWeightBased,
+          servingType: nextServingType
+        })
+      }
       const prevGross = Number(prev?.total ?? prev?.totals?.total ?? prev?.totals?.grandTotal ?? 0)
       const prevDiscountPercent = Number(prev?.discountPercent ?? 0)
       const prevPaid = Number(prev?.paidTotal ?? prev?.totals?.paidTotal ?? 0)
@@ -752,18 +779,34 @@ export default function PosPage() {
         }
       }
     })
-    return tempId
+    return existingId
+      ? { kind: 'increment', itemId: existingId, unitPrice }
+      : { kind: 'insert', itemId: tempId }
   }, [servingType])
 
-  const removeOptimisticOrderItem = useCallback((tempId) => {
-    if (!tempId) return
+  const removeOptimisticOrderItem = useCallback((optimisticItem) => {
+    if (!optimisticItem?.itemId) return
     setOrder((prev) => {
       if (!prev) return prev
       const prevItems = Array.isArray(prev.items) ? prev.items : []
-      const removed = prevItems.find((item) => String(item?._id || item?.id || item?.itemId || '') === String(tempId))
-      if (!removed) return prev
-      const unitPrice = Number(removed?.subtotal || 0)
-      const nextItems = prevItems.filter((item) => String(item?._id || item?.id || item?.itemId || '') !== String(tempId))
+      const optimisticId = String(optimisticItem.itemId)
+      const itemIndex = prevItems.findIndex((item) => String(item?._id || item?.id || item?.itemId || '') === optimisticId)
+      if (itemIndex < 0) return prev
+      const removed = prevItems[itemIndex]
+      const unitPrice = optimisticItem.kind === 'increment'
+        ? Number(optimisticItem.unitPrice || 0)
+        : Number(removed?.subtotal || 0)
+      const nextItems = [...prevItems]
+      if (optimisticItem.kind === 'increment' && Number(removed?.qty || 0) > 1) {
+        const nextQty = Number(removed.qty) - 1
+        nextItems[itemIndex] = {
+          ...removed,
+          qty: nextQty,
+          subtotal: nextQty * Number(removed?.priceSnapshot ?? optimisticItem.unitPrice)
+        }
+      } else {
+        nextItems.splice(itemIndex, 1)
+      }
       const prevGross = Number(prev?.total ?? prev?.totals?.total ?? prev?.totals?.grandTotal ?? 0)
       const prevDiscountPercent = Number(prev?.discountPercent ?? 0)
       const prevPaid = Number(prev?.paidTotal ?? prev?.totals?.paidTotal ?? 0)
@@ -847,31 +890,43 @@ export default function PosPage() {
       setProductConfigOpen(true)
       return
     }
-    const optimisticTempId = addOptimisticOrderItem(menuItem)
     const lockKey = `${orderId}:${menuItemId}:add`
-    if (isDebounced(lockKey, 200)) return
-    const result = await withLock(lockKey, () => api(`/api/pos/orders/${orderId}/items`, {
-      method: 'POST',
-      body: JSON.stringify({ menuItemId }),
-      silent: true
-    }))
-    if (!result?.ok) {
-      const code = result?.data?.code || result?.code || result?.data?.error || result?.error || ''
-      const message = String(result?.data?.message || result?.message || '')
-      if (menuItem && (code === 'invalid_weight' || /gram/i.test(message))) {
-        removeOptimisticOrderItem(optimisticTempId)
-        setPendingWeightItem(menuItem)
-        setWeightModalOpen(true)
+    const runAdd = async () => {
+      const optimisticItem = addOptimisticOrderItem(menuItem)
+      const result = await withLock(lockKey, () => api(`/api/pos/orders/${orderId}/items`, {
+        method: 'POST',
+        body: JSON.stringify({ menuItemId }),
+        silent: true
+      }))
+      if (!result?.ok) {
+        const code = result?.data?.code || result?.code || result?.data?.error || result?.error || ''
+        const message = String(result?.data?.message || result?.message || '')
+        if (menuItem && (code === 'invalid_weight' || /gram/i.test(message))) {
+          removeOptimisticOrderItem(optimisticItem)
+          setPendingWeightItem(menuItem)
+          setWeightModalOpen(true)
+          return
+        }
+        removeOptimisticOrderItem(optimisticItem)
+        toast.error(message || 'İşlem başarısız')
         return
       }
-      removeOptimisticOrderItem(optimisticTempId)
-      toast.error(message || 'İşlem başarısız')
-      return
+      const fresh = pickOrder(result?.data || result)
+      if (fresh) {
+        orderRef.current = fresh
+        setOrder(fresh)
+        setNote(fresh.note || '')
+      }
     }
-    const fresh = pickOrder(result?.data || result)
-    if (fresh) {
-      setOrder(fresh)
-      setNote(fresh.note || '')
+    const previousAdd = addRequestQueueRef.current.get(lockKey) || Promise.resolve()
+    const queuedAdd = previousAdd.catch(() => {}).then(runAdd)
+    addRequestQueueRef.current.set(lockKey, queuedAdd)
+    try {
+      await queuedAdd
+    } finally {
+      if (addRequestQueueRef.current.get(lockKey) === queuedAdd) {
+        addRequestQueueRef.current.delete(lockKey)
+      }
     }
   }, [addOptimisticOrderItem, removeOptimisticOrderItem])
 
@@ -1178,6 +1233,20 @@ export default function PosPage() {
     }
     setTableNote(String(res?.data?.table?.note ?? tableNoteDraft))
     setTableNoteModalOpen(false)
+  }
+
+  const startMobileCartSwipe = (event) => {
+    mobileCartTouchStartYRef.current = event.touches[0]?.clientY ?? null
+  }
+
+  const endMobileCartSwipe = (event) => {
+    const startY = mobileCartTouchStartYRef.current
+    mobileCartTouchStartYRef.current = null
+    const endY = event.changedTouches[0]?.clientY
+    if (startY !== null && endY !== undefined && endY - startY > 60) {
+      event.preventDefault()
+      setMobileCartExpanded(false)
+    }
   }
 
   const cancelOrder = async () => {
@@ -1628,7 +1697,18 @@ export default function PosPage() {
       (order?.items || []).every(it => it.status === 'completed' || it.status === 'cancelled')
     )
 
-  const itemCount = (Array.isArray(order?.items) ? order.items : []).reduce((sum, it) => sum + (Number(it?.qty) || 0), 0)
+  const cartCounts = useMemo(() => {
+    const activeItems = (Array.isArray(order?.items) ? order.items : [])
+      .filter((item) => item && item.status !== 'cancelled' && Number(item?.qty || 0) > 0)
+    const varieties = new Set(activeItems.map((item) => String(
+      item?.menuItemId || item?.productId || item?.nameSnapshot || ''
+    )).filter(Boolean))
+    return {
+      quantity: activeItems.reduce((sum, item) => sum + Math.max(0, Number(item?.qty) || 0), 0),
+      varieties: varieties.size
+    }
+  }, [order?.items])
+  const cartCountLabel = `${cartCounts.quantity} adet · ${cartCounts.varieties} çeşit`
 
   const previousLines = useMemo(() => {
     const out = []
@@ -1721,9 +1801,12 @@ export default function PosPage() {
   }
 
   const CartPanel = ({ inDrawer = false } = {}) => (
-    <div className={`saleCartPanelContent${inDrawer ? ' saleCartPanelContent--drawer' : ''}`}>
+    <div id="pos-sale-cart-content" className={`saleCartPanelContent${inDrawer ? ' saleCartPanelContent--drawer' : ''}`}>
       <div className="saleCartHeader" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>Sepet</h3>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0 }}>Sepet</h3>
+          <span className="saleCartCountLabel">{cartCountLabel}</span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {canCloseTable && (
             <button
@@ -2212,7 +2295,20 @@ export default function PosPage() {
           </div>
         </div>
 
-        <div className="card salePanel saleCartPanelShell">
+        <div className="card salePanel saleCartPanelShell" data-mobile-expanded={mobileCartExpanded}>
+          <button
+            type="button"
+            className="saleCartMobileToggle"
+            aria-expanded={mobileCartExpanded}
+            aria-controls="pos-sale-cart-content"
+            onClick={() => setMobileCartExpanded((expanded) => !expanded)}
+            onTouchStart={startMobileCartSwipe}
+            onTouchEnd={endMobileCartSwipe}
+            onTouchCancel={() => { mobileCartTouchStartYRef.current = null }}
+          >
+            <span>Sepet · {cartCountLabel}</span>
+            <span>{balanceDue.toFixed(2)} TL · {mobileCartExpanded ? 'Kapat' : 'Aç'}</span>
+          </button>
           <CartPanel />
         </div>
       </div>

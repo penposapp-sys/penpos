@@ -8,6 +8,7 @@ import { useTheme } from '../../theme/ThemeContext.jsx'
 import ThemeSelectionCards from '../../components/settings/ThemeSelectionCards.jsx'
 import { normalizeThemeId } from '../../theme/themeConfig.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
+import GlobalTypographySettings from '../../components/settings/GlobalTypographySettings.jsx'
 
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/
 
@@ -396,6 +397,7 @@ export default function CanteenSettingsSystemPage() {
 
   return (
     <div className="canteen-settings-system-page" style={{ display: 'grid', gap: 16 }}>
+      <GlobalTypographySettings />
       <style>{`
         .canteen-settings-system-page .card {
           background: linear-gradient(180deg, var(--app-surface), var(--app-surface-soft, var(--panelElevated))) !important;

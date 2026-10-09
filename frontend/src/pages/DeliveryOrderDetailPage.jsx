@@ -51,6 +51,9 @@ export default function DeliveryOrderDetailPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
+  const [mobileCartExpanded, setMobileCartExpanded] = useState(false)
+  const mobileCartTouchStartYRef = useRef(null)
+  const addRequestQueueRef = useRef(new Map())
   const [tab, setTab] = useState('active')
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -139,6 +142,7 @@ export default function DeliveryOrderDetailPage() {
 
   useEffect(() => {
     setOnlineEditMode(false)
+    setMobileCartExpanded(false)
   }, [selectedId, routeOrderId])
 
   const getQtyDraft = (rowKey, fallbackNumber = 1) => {
@@ -776,10 +780,40 @@ export default function DeliveryOrderDetailPage() {
       return
     }
     const key = `${orderId}:${menuItemId}:add`
-    if (isDebounced(key, 200)) return
-    const result = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, { method: 'POST', body: JSON.stringify({ menuItemId }), signal, silent: true })))
-    const fresh = pickOrder(result)
-    if (fresh) setNote(fresh.note || '')
+    const runAdd = async () => {
+      const result = await withLock(key, () => safeAction((signal) => api(`/api/pos/orders/${orderId}/items`, {
+        method: 'POST',
+        body: JSON.stringify({ menuItemId }),
+        signal,
+        silent: true
+      })))
+      const fresh = pickOrder(result)
+      if (fresh) setNote(fresh.note || '')
+    }
+    const previousAdd = addRequestQueueRef.current.get(key) || Promise.resolve()
+    const queuedAdd = previousAdd.catch(() => {}).then(runAdd)
+    addRequestQueueRef.current.set(key, queuedAdd)
+    try {
+      await queuedAdd
+    } finally {
+      if (addRequestQueueRef.current.get(key) === queuedAdd) {
+        addRequestQueueRef.current.delete(key)
+      }
+    }
+  }
+
+  const startMobileCartSwipe = (event) => {
+    mobileCartTouchStartYRef.current = event.touches[0]?.clientY ?? null
+  }
+
+  const endMobileCartSwipe = (event) => {
+    const startY = mobileCartTouchStartYRef.current
+    mobileCartTouchStartYRef.current = null
+    const endY = event.changedTouches[0]?.clientY
+    if (startY !== null && endY !== undefined && endY - startY > 60) {
+      event.preventDefault()
+      setMobileCartExpanded(false)
+    }
   }
 
   const submitConfiguredItem = async (payload) => {
@@ -1222,6 +1256,18 @@ export default function DeliveryOrderDetailPage() {
   const netTotal = Number(order?.netTotal ?? order?.totals?.netTotal ?? Math.max(0, grossTotal - discountTotal))
   const paidTotal = Number(order?.paidTotal ?? order?.totals?.paidTotal ?? 0)
   const balanceDue = Math.max(0, netTotal - paidTotal)
+  const cartCounts = useMemo(() => {
+    const activeItems = (Array.isArray(order?.items) ? order.items : [])
+      .filter((item) => item && item.status !== 'cancelled')
+    const varieties = new Set(activeItems.map((item) => String(
+      item?.menuItemId || item?.productId || item?.nameSnapshot || item?.name || ''
+    )).filter(Boolean))
+    return {
+      quantity: activeItems.reduce((sum, item) => sum + Math.max(0, Number(item?.qty ?? item?.quantity) || 0), 0),
+      varieties: varieties.size
+    }
+  }, [order?.items])
+  const cartCountLabel = `${cartCounts.quantity} adet · ${cartCounts.varieties} çeşit`
   const payments = Array.isArray(order?.payments) ? order.payments : []
   const infoModeItems = Array.isArray(order?.items) ? order.items : []
   const infoModeGroups = infoModeItems.reduce((acc, item) => {
@@ -1645,9 +1691,23 @@ export default function DeliveryOrderDetailPage() {
                 </div>
               </div>
 
-              <div className="card salePanel saleCartPanelShell delivery-cart-panel delivery-detail-summary" style={{ gap: 10 }}>
-                <div className="saleCartPanelContent">
+              <div className="card salePanel saleCartPanelShell delivery-cart-panel delivery-detail-summary" data-mobile-expanded={mobileCartExpanded} style={{ gap: 10 }}>
+                <button
+                  type="button"
+                  className="saleCartMobileToggle"
+                  aria-expanded={mobileCartExpanded}
+                  aria-controls="delivery-sale-cart-content"
+                  onClick={() => setMobileCartExpanded((expanded) => !expanded)}
+                  onTouchStart={startMobileCartSwipe}
+                  onTouchEnd={endMobileCartSwipe}
+                  onTouchCancel={() => { mobileCartTouchStartYRef.current = null }}
+                >
+                  <span>Sepet · {cartCountLabel}</span>
+                  <span>{balanceDue.toFixed(2)} TL · {mobileCartExpanded ? 'Kapat' : 'Aç'}</span>
+                </button>
+                <div id="delivery-sale-cart-content" className="saleCartPanelContent">
                 <div className="saleCartHeader delivery-detail-section-head" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span className="saleCartCountLabel">{cartCountLabel}</span>
                   <div className="saleCartModeRow saleCartModeRow--delivery">
                     <div className="saleCartModeRowInner">
                       <div className="saleCartModeGroup saleCartModeGroup--compact">

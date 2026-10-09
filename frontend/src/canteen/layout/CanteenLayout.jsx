@@ -63,7 +63,7 @@ export default function CanteenLayout() {
   const [loading, setLoading] = useState(true)
   const [qrAlertCount, setQrAlertCount] = useState(0)
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false)
+  const desktopCollapsed = false
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { theme, themeKey, isMobileRuntime } = useTheme()
 
@@ -340,7 +340,6 @@ export default function CanteenLayout() {
   const handleSidebarNavigate = (to) => {
     if (!to) return
     nav(to)
-    if (!desktopCollapsed) setDesktopCollapsed(true)
   }
 
   return (
@@ -357,6 +356,7 @@ export default function CanteenLayout() {
       />
 
       <div
+        className="pos-app-frame"
         style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
@@ -390,9 +390,7 @@ export default function CanteenLayout() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => setDesktopCollapsed((value) => !value)}
+              <div
                 style={{
                   width: desktopCollapsed ? 64 : 140,
                   height: 64,
@@ -403,10 +401,9 @@ export default function CanteenLayout() {
                   boxShadow: 'var(--sidebar-active-shadow, var(--shadow-soft))',
                   display: 'grid',
                   placeItems: 'center',
-                  cursor: 'pointer',
+                  cursor: 'default',
                   transition: 'width 500ms ease'
                 }}
-                aria-label="Sidebar aç kapat"
               >
                 <img
                   src={desktopCollapsed ? '/logo-1.png' : (effectiveDarkMode ? '/logo-3.png' : '/logo-2.png')}
@@ -420,7 +417,7 @@ export default function CanteenLayout() {
                   }}
                   onError={(e) => { e.currentTarget.src = '/penpos%20logo.png' }}
                 />
-              </button>
+              </div>
             </div>
 
             <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -572,6 +569,7 @@ export default function CanteenLayout() {
               </nav>
 
               <div style={{ marginTop: 'auto', paddingTop: 10, display: 'grid', gap: 8, justifyItems: desktopCollapsed ? 'center' : 'end' }}>
+                <span className="pos-navbar-date">{todayLabel()}</span>
                 {!desktopCollapsed && (
                   <div
                     style={{
@@ -634,7 +632,7 @@ export default function CanteenLayout() {
             boxShadow: shellShadow
           }}
         >
-          <header className="topbar" style={{ marginBottom: 16, background: 'transparent', borderBottom: 'none', boxShadow: 'none', padding: 0, flexShrink: 0, position: 'static' }}>
+          {isMobilePortrait && <header className="topbar" style={{ marginBottom: 16, background: 'transparent', borderBottom: 'none', boxShadow: 'none', padding: 0, flexShrink: 0, position: 'static' }}>
             <div
               style={{
                 width: '100%',
@@ -670,7 +668,7 @@ export default function CanteenLayout() {
                     &#8801;
                   </button>
                 )}
-                <div style={{ fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 17 : 22, lineHeight: 1.1 }}>{pageTitle}</div>
+                <div className="pos-page-heading" style={{ fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 17 : 22, lineHeight: 1.1 }}>{pageTitle}</div>
               </div>
 
               <div className="topbar-meta" style={{ gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -687,7 +685,7 @@ export default function CanteenLayout() {
                 )}
               </div>
             </div>
-          </header>
+          </header>}
 
           <section className="page-scroll page-scroll-area scrollbar-hidden" style={{ minHeight: 0, flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingRight: isMobilePortrait ? 0 : 2 }}>
             <div className="page-content" key={pathname} style={{ minWidth: 0, minHeight: '100%' }}>

@@ -113,6 +113,11 @@ export default function AnaokuluLayout() {
     ? (isAdminPanelMode ? 'SUPER ADMİN MODU' : `SUPER ADMİN MODU · ${currentSchoolName}`)
     : currentSchoolName
   const headerHeight = isMobile ? 48 : 62
+  const headerDate = new Date().toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
 
   return (
     <div className={`anaokulu-layout-shell${isMobile ? ' anaokulu-layout-shell--mobile' : ''}`} style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fafc' }}>
@@ -288,9 +293,9 @@ export default function AnaokuluLayout() {
           {/* Navigation Items (Horizontal Top Bar) */}
           {!isMobile && (
           <nav className="anaokulu-layout-nav" style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            overflowX: 'auto', padding: '4px 0', scrollbarWidth: 'none',
-            flex: 1, minWidth: 0, justifyContent: 'center'
+            display: 'flex', alignItems: 'center', gap: 2,
+            overflowX: 'auto', overflowY: 'hidden', padding: '4px 0', scrollbarWidth: 'none',
+            flex: '1 1 0', minWidth: 0, justifyContent: 'center', flexWrap: 'nowrap'
           }}>
             {NAV.map(item => (
               <NavLink
@@ -299,18 +304,17 @@ export default function AnaokuluLayout() {
                 end
                 style={({ isActive }) => ({
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '7px 12px', borderRadius: 8,
+                  padding: '6px 8px', borderRadius: 7,
                   color: isActive ? '#fff' : '#94a3b8',
                   textDecoration: 'none',
-                  fontSize: 13,
-                  fontWeight: isActive ? 700 : 500,
-                  background: isActive ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'transparent',
-                  boxShadow: isActive ? '0 2px 8px rgba(99,102,241,0.35)' : 'none',
+                  fontSize: 12.5,
+                  fontWeight: isActive ? 600 : 500,
+                  background: isActive ? 'rgba(148,163,184,0.2)' : 'transparent',
+                  boxShadow: isActive ? 'inset 0 -2px 0 #93c5fd' : 'none',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease'
                 })}
               >
-                <span>{item.icon}</span>
                 <span>{item.label}</span>
               </NavLink>
             ))}
@@ -319,6 +323,7 @@ export default function AnaokuluLayout() {
 
           {/* User Profile & Logout */}
           <div className="anaokulu-layout-userbar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <span className="anaokulu-layout-date">{headerDate}</span>
             {isManager && (
               <span style={{
                 display: isMobile ? 'none' : 'inline-block',
@@ -557,7 +562,6 @@ export default function AnaokuluLayout() {
                     boxShadow: isActive ? '0 6px 18px rgba(99,102,241,0.28)' : 'none'
                   })}
                 >
-                  <span>{item.icon}</span>
                   <span>{item.label}</span>
                 </NavLink>
               ))}

@@ -20,6 +20,7 @@ import { toast } from '../lib/toast.js'
 import { resolveApiOrigin } from '../lib/runtimeApi.js'
 import { validateProductImageFile } from '../lib/productImage.js'
 import { SettingsAccountPanel } from './SettingsMePage.jsx'
+import GlobalTypographySettings from '../components/settings/GlobalTypographySettings.jsx'
 
 const BUSINESS_SETTINGS_SECTIONS = {
   general: [
@@ -1402,6 +1403,7 @@ export const SettingsSystemContent = () => {
     <div>
       <SettingsUiStyles />
       <h3 style={{ marginTop: 0 }}>Sistem Ayarları</h3>
+      <GlobalTypographySettings />
       <div
         style={{
           display: 'grid',
@@ -2256,6 +2258,5 @@ export const SettingsPaymentsContent = ({ showHeading = true } = {}) => {
     </div>
   )
 }
-
 
 

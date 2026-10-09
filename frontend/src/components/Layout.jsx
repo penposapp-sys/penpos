@@ -31,7 +31,7 @@ export default function Layout() {
   const { selectedDate, setSelectedDate } = useAppDate()
   const dateInputRef = useRef(null)
   const topbarRef = useRef(null)
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false)
+  const desktopCollapsed = false
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [topbarHeight, setTopbarHeight] = useState(0)
   const [pendingOnlineCount, setPendingOnlineCount] = useState(0)
@@ -323,19 +323,6 @@ export default function Layout() {
   )
 
   useEffect(() => {
-    if (isMobilePortrait || !isDesktopSalesRoute) return undefined
-
-    const updateDesktopCollapse = () => {
-      const shouldCollapse = window.innerWidth <= 1500
-      setDesktopCollapsed((prev) => (prev === shouldCollapse ? prev : shouldCollapse))
-    }
-
-    updateDesktopCollapse()
-    window.addEventListener('resize', updateDesktopCollapse)
-    return () => window.removeEventListener('resize', updateDesktopCollapse)
-  }, [isDesktopSalesRoute, isMobilePortrait])
-
-  useEffect(() => {
     if (isSettingsRoute || !topbarRef.current) {
       setTopbarHeight(0)
       return undefined
@@ -419,7 +406,7 @@ export default function Layout() {
           }, 0)
         }}
       />
-      <div style={{ display: 'flex', height: '100%', minHeight: 0, alignItems: isMobilePortrait ? 'stretch' : 'flex-start', gap: isMobilePortrait ? 8 : (isSettingsRoute ? 10 : 12), padding: isMobilePortrait ? mobileShellPadding : (isSettingsRoute ? 12 : 16) }}>
+      <div className="pos-app-frame" style={{ display: 'flex', height: '100%', minHeight: 0, alignItems: isMobilePortrait ? 'stretch' : 'flex-start', gap: isMobilePortrait ? 8 : (isSettingsRoute ? 10 : 12), padding: isMobilePortrait ? mobileShellPadding : (isSettingsRoute ? 12 : 16) }}>
         {!isMobilePortrait && (
           <aside
             className="pos-sidebar"
@@ -452,15 +439,6 @@ export default function Layout() {
               }}
             >
               <div
-                onClick={() => setDesktopCollapsed((value) => !value)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    setDesktopCollapsed((value) => !value)
-                  }
-                }}
                 style={{
                   width: desktopCollapsed ? 64 : 140,
                   height: 64,
@@ -474,7 +452,7 @@ export default function Layout() {
                   cursor: 'pointer',
                   transition: 'width 500ms ease'
                 }}
-                aria-label="Sidebari Ac Kapat"
+                aria-label="PenPOS"
               >
                 <img
                   src={sidebarLogoSrc}
@@ -522,21 +500,11 @@ export default function Layout() {
 
                   return (
                     <Link
-                    className="sidebar-menü-button"
+                    className={active ? 'sidebar-menü-button active' : 'sidebar-menü-button'}
                     key={item.to}
                     to={item.to}
-                    onClick={(event) => {
-                      if (
-                        event.defaultPrevented
-                        || event.button !== 0
-                        || event.metaKey
-                        || event.ctrlKey
-                        || event.shiftKey
-                        || event.altKey
-                      ) return
-                      if (!desktopCollapsed) setDesktopCollapsed(true)
-                    }}
                     title={item.label}
+                    aria-current={active ? 'page' : undefined}
                     style={{
                         position: 'relative',
                         zIndex: 10,
@@ -631,6 +599,34 @@ export default function Layout() {
               </div>
             </nav>
             <div style={{ marginTop: 'auto', paddingTop: 10, display: 'grid', gap: 6, justifyItems: desktopCollapsed ? 'center' : 'end' }}>
+              <button
+                className="pos-navbar-date"
+                type="button"
+                onClick={() => {
+                  if (!isDashboardPage) return
+                  const input = dateInputRef.current
+                  if (!input) return
+                  if (typeof input.showPicker === 'function') {
+                    input.showPicker()
+                    return
+                  }
+                  input.focus()
+                  input.click()
+                }}
+                aria-label={`Tarih: ${topbarDate}`}
+              >
+                {topbarDate}
+                {isDashboardPage && (
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) => setSelectedDate(event.target.value)}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
               {!desktopCollapsed && (
                 <div style={{ width: navButtonWidth, color: sidebarTextColor, fontSize: 11.5, fontWeight: 800, padding: '0 6px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {accountLabel}
@@ -689,7 +685,7 @@ export default function Layout() {
         )}
 
         <main className="pos-main" style={{ position: 'relative', zIndex: 10, minWidth: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: isMobilePortrait ? mobileMainRadius : (isSettingsRoute ? 30 : 36), background: isMobileSettingsRoute ? 'transparent' : 'var(--card-bg)', border: isMobileSettingsRoute ? '0' : '1px solid var(--border-soft)', backdropFilter: isMobileSettingsRoute ? 'none' : 'var(--glass-blur)', padding: isMobilePortrait ? mobileMainPadding : (isSettingsRoute ? 12 : 18), boxShadow: isMobileSettingsRoute ? 'none' : 'var(--shadow-soft), var(--shadow-glow)', maxWidth: '100%' }}>
-          {!isSettingsRoute ? <header
+          {isMobilePortrait && !isSettingsRoute ? <header
             ref={topbarRef}
             className="topbar"
             style={{
@@ -729,7 +725,7 @@ export default function Layout() {
                     ≡
                   </button>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 16 : 26 }}>
+                <div className="pos-page-heading" style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, fontWeight: 900, color: theme.text, fontSize: isMobilePortrait ? 16 : 26 }}>
                   <span style={{ display: 'block', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pageTitle}</span>
                 </div>
               </div>
