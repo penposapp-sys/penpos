@@ -6626,8 +6626,8 @@ html[data-theme="dark"].theme-white .pos-sidebar .sidebar-menu-button.active .ca
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.saleCartBackdrop):not(.theme-mode-option):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
-  .btn:not(.btn--primary):not(.btn--success):not(.theme-mode-option):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.saleCartMobileActionBtn):not(.saleCartBackdrop):not(.theme-mode-option):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  .btn:not(.btn--primary):not(.btn--success):not(.saleCartMobileActionBtn):not(.theme-mode-option):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
   .sidebar-menu-button,
   .saleCategoryButton:not([aria-pressed="true"]),
   .product-action-btn,
@@ -6654,8 +6654,8 @@ html[data-theme="light"].theme-white :is(
 }
 
 html[data-theme="light"].theme-white :is(
-  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.saleCartBackdrop):not(.theme-mode-option):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
-  .btn:not(.btn--primary):not(.btn--success):not(.theme-mode-option):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  button:not(.system-login__submit):not(.register-submit):not(.productCard):not(.kasaProductCard):not(.topSheetItem):not(.qr-ref-category):not(.qr-ref-menu-btn):not(.qr-ref-link):not(.qr-ref-tab):not(.qr-ref-round-cta):not(.qr-ref-nav-btn):not(.qr-ref-center-cart):not(.qr-ref-heart):not(.qr-ref-product-image-button):not(.saleCartMobileToggle):not(.saleCartMobileActionBtn):not(.saleCartBackdrop):not(.theme-mode-option):not(.btn--primary):not(.btn--success):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
+  .btn:not(.btn--primary):not(.btn--success):not(.saleCartMobileActionBtn):not(.theme-mode-option):not(.saleCategoryButton[aria-pressed="true"]):not(.saleCartModeBtn[aria-pressed="true"]),
   .sidebar-menu-button,
   .saleCategoryButton:not([aria-pressed="true"]),
   .product-action-btn,
