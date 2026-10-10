@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import { useSafeOrderActions } from '../lib/useSafeOrderActions.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
+import { useCategorySwipe } from '../hooks/useCategorySwipe.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 import SalesProductGrid from '../components/SalesProductGrid.jsx'
 import { trStatusLabel } from '../i18n/tr.js'
@@ -488,6 +489,12 @@ export default function PosPage() {
       setActiveCategory(String(categoryId || ''))
     })
   }, [activeCategory])
+  const categorySwipeHandlers = useCategorySwipe({
+    categories,
+    activeCategoryId: activeCategory,
+    onSelect: handleCategorySelect,
+    showAllCategories: true,
+  })
 
   const loadOrderById = async (id) => {
     try {
@@ -1255,10 +1262,10 @@ export default function PosPage() {
     const startY = mobileCartTouchStartYRef.current
     mobileCartTouchStartYRef.current = null
     const endY = event.changedTouches[0]?.clientY
-    if (startY !== null && endY !== undefined && endY - startY > 60) {
+    if (startY !== null && endY !== undefined && Math.abs(endY - startY) > 60) {
       mobileCartSuppressClickRef.current = true
       window.setTimeout(() => { mobileCartSuppressClickRef.current = false }, 350)
-      setMobileCartExpanded(false)
+      setMobileCartExpanded(endY < startY)
     }
   }
 
@@ -2299,7 +2306,8 @@ export default function PosPage() {
           </div>
           <div
             ref={productScrollRef}
-            className="salePanelScroll saleProductsVirtualScroll"
+            className="salePanelScroll saleProductsVirtualScroll saleProductSwipeSurface"
+            {...categorySwipeHandlers}
             style={{ paddingTop: 10 }}
           >
             {productsVirtualized ? <div style={{ height: topProductSpacer }} aria-hidden="true" /> : null}

@@ -12,6 +12,7 @@ import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
 import { useSafeOrderActions } from '../lib/useSafeOrderActions.js'
 import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
+import { useCategorySwipe } from '../hooks/useCategorySwipe.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 import ProductCard from '../components/ProductCard.jsx'
 import SaleCartLine from '../components/SaleCartLine.jsx'
@@ -76,6 +77,11 @@ export default function DeliveryOrderDetailPage() {
   ), [items])
   const showProductImages = !isMobilePortrait || showMobileProductImages || hasProductImages
   const [activeCategory, setActiveCategory] = useState('')
+  const categorySwipeHandlers = useCategorySwipe({
+    categories,
+    activeCategoryId: activeCategory,
+    onSelect: setActiveCategory,
+  })
   const [order, setOrder] = useState(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
@@ -811,10 +817,10 @@ export default function DeliveryOrderDetailPage() {
     const startY = mobileCartTouchStartYRef.current
     mobileCartTouchStartYRef.current = null
     const endY = event.changedTouches[0]?.clientY
-    if (startY !== null && endY !== undefined && endY - startY > 60) {
+    if (startY !== null && endY !== undefined && Math.abs(endY - startY) > 60) {
       mobileCartSuppressClickRef.current = true
       window.setTimeout(() => { mobileCartSuppressClickRef.current = false }, 350)
-      setMobileCartExpanded(false)
+      setMobileCartExpanded(endY < startY)
     }
   }
 
@@ -1686,7 +1692,11 @@ export default function DeliveryOrderDetailPage() {
                   <div style={{ fontWeight: 800 }}>Ürünler</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)' }}>{items.length} ürün</div>
                 </div>
-                <div className="salePanelScroll" style={{ paddingTop: 8 }}>
+                <div
+                  className="salePanelScroll saleProductSwipeSurface"
+                  {...categorySwipeHandlers}
+                  style={{ paddingTop: 8 }}
+                >
                   <div className="posItemsGrid delivery-detail-products-grid">
                     {items.map(i => (
                       <ProductCard

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import Layout from './components/Layout.jsx'
@@ -101,20 +102,6 @@ import { getSubscriptionProfilePath, getSubscriptionUpgradePath, isSubscriptionE
 
 const ProductReportPage = _ProductReportPage
 
-const EXIT_ROUTES = new Set([
-  '/',
-  '/landing',
-  '/login',
-  '/login-selection',
-  '/login/platform',
-  '/platform-login',
-  '/login/restoran',
-  '/login/magaza',
-  '/magaza/login',
-  '/login/anaokulu',
-  '/anaokulu/login',
-])
-
 const isNativeApp = () => {
   try {
     return Capacitor.isNativePlatform()
@@ -153,16 +140,6 @@ const resolveBackFallbackPath = (pathname) => {
   if (path.startsWith('/superadmin')) return '/superadmin/tenants'
 
   return null
-}
-
-const canUseHistoryBack = () => {
-  try {
-    const idx = window.history?.state?.idx
-    if (typeof idx === 'number') return idx > 0
-    return window.history.length > 1
-  } catch {
-    return false
-  }
 }
 
 const buildRouteSnapshot = (location) => {
@@ -207,6 +184,7 @@ function CapacitorBackButtonHandler() {
   const navigate = useNavigate()
   const { user, tenantCtx, loading } = useAuth()
   const routeStackRef = useRef([])
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
 
   useEffect(() => {
     const nextEntry = buildRouteSnapshot(location)
@@ -216,95 +194,163 @@ function CapacitorBackButtonHandler() {
     const lastEntry = currentStack.length > 0 ? currentStack[currentStack.length - 1] : ''
     if (lastEntry === nextEntry) return
 
-    routeStackRef.current = [...currentStack, nextEntry].slice(-50)
+    routeStackRef.current = [...currentStack, nextEntry].slice(-5)
   }, [location])
 
   useEffect(() => {
-    let isMounted = true
+    if (!isNativeApp()) return undefined
 
-    const register = async () => {
-      try {
-        if (!Capacitor.isNativePlatform()) return null
-        const appPlugin = window?.Capacitor?.Plugins?.App
-        if (!appPlugin?.addListener) return null
+    const handleAndroidBack = (event) => {
+      if (exitConfirmOpen) {
+        setExitConfirmOpen(false)
+        return
+      }
 
-        return await appPlugin.addListener('backButton', ({ canGoBack }) => {
-          if (!isMounted) return
+      if (event.detail?.action === 'confirmExit') {
+        setExitConfirmOpen(true)
+        return
+      }
 
-          const pathname = String(location.pathname || '')
-          const currentRoute = buildRouteSnapshot(location)
-          const isPublicRoute = EXIT_ROUTES.has(pathname)
-          const hasToken = hasAnyAuthToken()
-          const isAuthenticated = !!user || hasToken
-          const homePath = user ? resolveHomePath(user) : null
+      const pathname = String(location.pathname || '')
+      const currentRoute = buildRouteSnapshot(location)
+      const hasToken = hasAnyAuthToken()
+      const homePath = user ? resolveHomePath(user) : null
 
-          const routeStack = Array.isArray(routeStackRef.current) ? [...routeStackRef.current] : []
-          if (routeStack.length > 1) {
-            const lastEntry = routeStack[routeStack.length - 1]
-            if (lastEntry === currentRoute) routeStack.pop()
-            const previousRoute = routeStack[routeStack.length - 1]
-            if (previousRoute && previousRoute !== currentRoute) {
-              routeStackRef.current = routeStack
-              navigate(previousRoute, { replace: true })
-              return
-            }
-          }
+      const routeStack = Array.isArray(routeStackRef.current) ? [...routeStackRef.current] : []
+      if (routeStack.length > 1) {
+        const lastEntry = routeStack[routeStack.length - 1]
+        if (lastEntry === currentRoute) routeStack.pop()
+        let previousRoute = routeStack[routeStack.length - 1]
+        while (previousRoute) {
+          const previousPath = previousRoute.split(/[?#]/, 1)[0]
+          if (
+            previousPath !== '/' &&
+            previousPath !== '/landing' &&
+            previousPath !== homePath
+          ) break
+          routeStack.pop()
+          previousRoute = routeStack[routeStack.length - 1]
+        }
+        if (previousRoute && previousRoute !== currentRoute) {
+          routeStackRef.current = routeStack
+          navigate(previousRoute, { replace: true })
+          return
+        }
+        routeStackRef.current = routeStack
+      }
 
-          if (!isAuthenticated && isPublicRoute) {
-            appPlugin.exitApp?.()
-            return
-          }
+      if (!user && hasToken) {
+        if (loading) return
+        if (pathname !== '/login') {
+          navigate('/login', { replace: true })
+        }
+        return
+      }
 
-          if (user && (canGoBack || canUseHistoryBack())) {
-            navigate(-1)
-            return
-          }
+      const fallbackPath = resolveBackFallbackPath(pathname)
+      if (fallbackPath && fallbackPath !== pathname) {
+        navigate(fallbackPath, { replace: true })
+        return
+      }
 
-          if (!user && hasToken) {
-            if (loading) return
-            if (pathname !== '/login') {
-              navigate('/login', { replace: true })
-            }
-            return
-          }
+      if (homePath && homePath !== pathname) {
+        navigate(homePath, { replace: true })
+        return
+      }
 
-          const fallbackPath = resolveBackFallbackPath(pathname)
-          if (fallbackPath && fallbackPath !== pathname) {
-            navigate(fallbackPath, { replace: true })
-            return
-          }
-
-          if (homePath && homePath !== pathname) {
-            navigate(homePath, { replace: true })
-            return
-          }
-
-          const defaultRoute = getDefaultRoute(user, tenantCtx)
-          if (defaultRoute && defaultRoute !== pathname) {
-            navigate(defaultRoute, { replace: true })
-            return
-          }
-
-          if (isAuthenticated && pathname !== '/login') {
-            navigate('/login', { replace: true })
-          }
-        })
-      } catch {
-        return null
+      const defaultRoute = getDefaultRoute(user, tenantCtx)
+      if (defaultRoute && defaultRoute !== pathname) {
+        navigate(defaultRoute, { replace: true })
       }
     }
 
-    const listenerPromise = register()
-
+    window.addEventListener('penposAndroidBack', handleAndroidBack)
     return () => {
-      isMounted = false
-      Promise.resolve(listenerPromise)
-        .then((listener) => listener?.remove?.())
-        .catch(() => {})
+      window.removeEventListener('penposAndroidBack', handleAndroidBack)
     }
-  }, [loading, location.pathname, navigate, tenantCtx, user])
+  }, [exitConfirmOpen, loading, location, navigate, tenantCtx, user])
 
-  return null
+  if (!exitConfirmOpen || typeof document === 'undefined') return null
+
+  return createPortal(
+    <div
+      role="presentation"
+      onClick={() => setExitConfirmOpen(false)}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        display: 'grid',
+        placeItems: 'center',
+        padding: 20,
+        background: 'rgba(3, 8, 20, 0.72)',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="native-exit-title"
+        aria-describedby="native-exit-message"
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: 'min(100%, 420px)',
+          padding: 24,
+          border: '1px solid rgba(148, 163, 184, 0.24)',
+          borderRadius: 26,
+          background: 'linear-gradient(145deg, #17233b, #0d1628)',
+          color: '#f8fafc',
+          boxShadow: '0 24px 80px rgba(0, 0, 0, 0.48)',
+        }}
+      >
+        <h2 id="native-exit-title" style={{ margin: 0, fontSize: 20, fontWeight: 850 }}>
+          Uygulamadan çıkmak istiyor musunuz?
+        </h2>
+        <p id="native-exit-message" style={{ margin: '12px 0 24px', color: '#cbd5e1', lineHeight: 1.5 }}>
+          PenPOS uygulaması kapatılacak.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setExitConfirmOpen(false)}
+            style={{
+              minHeight: 44,
+              padding: '0 18px',
+              border: '1px solid #475569',
+              borderRadius: 14,
+              background: '#263449',
+              color: '#e2e8f0',
+              font: 'inherit',
+              fontWeight: 750,
+            }}
+          >
+            İptal
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExitConfirmOpen(false)
+              window.Capacitor?.Plugins?.App?.exitApp?.()
+            }}
+            style={{
+              minHeight: 44,
+              padding: '0 20px',
+              border: 0,
+              borderRadius: 14,
+              background: 'linear-gradient(135deg, #365fd6, #2446ad)',
+              color: '#fff',
+              font: 'inherit',
+              fontWeight: 850,
+              boxShadow: '0 8px 22px rgba(54, 95, 214, 0.3)',
+            }}
+          >
+            Çıkış
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
 }
 
 const getDefaultRoute = (user, tenantCtx) => {
@@ -348,8 +394,35 @@ const RootEntryRoute = () => {
 
   const nextPath = getDefaultRoute(user, tenantCtx)
   if (nextPath) return <Navigate to={nextPath} replace />
-  if (isNativeApp()) return <Navigate to="/landing" replace />
+  if (isNativeApp()) return <Navigate to="/login" replace />
   return <Navigate to="/landing" replace />
+}
+
+function NativeAppRouteGuard({ children }) {
+  const location = useLocation()
+  const { user, loading, tenantCtx } = useAuth()
+
+  if (!isNativeApp()) return children
+
+  const pathname = String(location.pathname || '')
+  const isAppRoute = ['/restoran', '/magaza', '/anaokulu', '/platform', '/superadmin']
+    .some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  const isLoginFlowRoute = pathname === '/' ||
+    pathname === '/login' ||
+    pathname.startsWith('/login/') ||
+    [
+      '/platform-login',
+      '/anaokulu/login',
+      '/magaza/login',
+      '/forgot-password',
+      '/reset-password',
+      '/register',
+    ].includes(pathname)
+
+  if (isAppRoute || isLoginFlowRoute) return children
+  if (loading) return null
+
+  return <Navigate to={getDefaultRoute(user, tenantCtx) || '/login'} replace />
 }
 
 const KermesIndexRedirect = () => {
@@ -538,6 +611,7 @@ export default function App() {
         <TenantUsageHeartbeat />
         <NativePushBridge />
         <Toast />
+        <NativeAppRouteGuard>
         <Routes>
         <Route path="/" element={<RootEntryRoute />} />
         <Route path="/restoran-programi" element={<SeoLandingPage page="restoran-programi" />} />
@@ -689,6 +763,7 @@ export default function App() {
         <Route path="/accounts" element={<Navigate to="/restoran/app/accounts" replace />} />
         <Route path="*" element={<NotFound />} />
         </Routes>
+        </NativeAppRouteGuard>
       </BusinessSettingsProvider>
     </AuthProvider>
   )

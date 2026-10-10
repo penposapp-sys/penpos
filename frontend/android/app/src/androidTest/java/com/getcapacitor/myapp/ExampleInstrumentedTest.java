@@ -3,6 +3,7 @@ package com.getcapacitor.myapp;
 import static org.junit.Assert.*;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
@@ -21,6 +22,7 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("com.getcapacitor.app", appContext.getPackageName());
+        assertEquals("com.penpos.app", appContext.getPackageName());
+        assertEquals(0, appContext.getApplicationInfo().flags & ApplicationInfo.FLAG_ALLOW_BACKUP);
     }
 }

@@ -1,7 +1,14 @@
 package com.penpos.app;
 
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
 
+import androidx.activity.OnBackPressedCallback;
+
+import com.getcapacitor.BridgeWebViewClient;
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Logger;
@@ -15,14 +22,62 @@ import java.util.List;
 public class MainActivity extends BridgeActivity {
 
     private PenposUpdateManager updateManager;
+    private final BackPressTracker backPressTracker = new BackPressTracker();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         initialPlugins.add(PenposRuntimePlugin.class);
         super.onCreate(savedInstanceState);
 
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                boolean showExitConfirmation =
+                        backPressTracker.shouldShowExitConfirmation(SystemClock.elapsedRealtime());
+                dispatchBackEvent(showExitConfirmation ? "confirmExit" : "navigate");
+            }
+        });
+
+        restrictWebViewNavigation();
         updateManager = new PenposUpdateManager(this);
         updateManager.checkForUpdate();
+    }
+
+    private void dispatchBackEvent(String action) {
+        if (bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+
+        bridge.getWebView().evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('penposAndroidBack', { detail: { action: '" +
+                        action + "' } }));",
+                null
+        );
+    }
+
+    private void restrictWebViewNavigation() {
+        if (bridge == null) {
+            return;
+        }
+
+        bridge.getWebView().setWebViewClient(new BridgeWebViewClient(bridge) {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return shouldBlockExternalUrl(request.getUrl()) ||
+                        super.shouldOverrideUrlLoading(view, request);
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return shouldBlockExternalUrl(Uri.parse(url)) ||
+                        super.shouldOverrideUrlLoading(view, url);
+            }
+
+            private boolean shouldBlockExternalUrl(Uri uri) {
+                return !bridge.getHost().equalsIgnoreCase(uri.getHost()) ||
+                        !bridge.getScheme().equalsIgnoreCase(uri.getScheme());
+            }
+        });
     }
 
     @Override
@@ -73,4 +128,3 @@ public class MainActivity extends BridgeActivity {
         return filtered;
     }
 }
-

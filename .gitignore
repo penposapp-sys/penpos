@@ -38,3 +38,10 @@ uploads/
 frontend/.gradle-user-home/
 
 .freebuff/
+
+# Generated Android build output
+/APK-build/
+
+# Release APKs are published separately to the VPS, never stored in Git.
+/APK/
+*.apk

@@ -40,7 +40,7 @@ export const getDefaultWebsiteSettings = () => ({
   email: 'penpos.app@gmail.com',
   address: '',
   androidButtonText: 'Android Uygulamasini Indir',
-  androidApkUrl: 'https://drive.google.com/uc?id=1_QZs8wYc0mtVSfPtBllJIXt5r-e9M9iv&export=download',
+  androidApkUrl: 'https://penpos.cloud/public/updates/android/latest.apk',
   androidButtonActive: true,
   systemsSectionEyebrow: 'PenPOS Yapisi',
   systemsSectionTitle: 'Restoran ve magaza ayni cati altinda, ayri sistem mantiginda.',
@@ -146,6 +146,9 @@ const normalizeLink = (value, options = {}) => {
 export const normalizeWebsiteSettings = (input = {}) => {
   const defaults = getDefaultWebsiteSettings()
   const source = { ...defaults, ...(input || {}) }
+  const androidApkUrlInput = /^https?:\/\/(?:www\.)?drive\.google\.com\//i.test(String(source.androidApkUrl || ''))
+    ? defaults.androidApkUrl
+    : source.androidApkUrl
 
   const restaurantLoginUrl = normalizeLink(source.restaurantLoginUrl, {
     fallback: defaults.restaurantLoginUrl,
@@ -206,7 +209,7 @@ export const normalizeWebsiteSettings = (input = {}) => {
     email: normalizeString(source.email, defaults.email),
     address: normalizeString(source.address, defaults.address),
     androidButtonText: normalizeString(source.androidButtonText, defaults.androidButtonText),
-    androidApkUrl: normalizeLink(source.androidApkUrl, {
+    androidApkUrl: normalizeLink(androidApkUrlInput, {
       fallback: defaults.androidApkUrl,
       fieldLabel: 'APK indirme linki'
     }),

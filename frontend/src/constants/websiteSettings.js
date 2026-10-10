@@ -26,7 +26,7 @@ export const defaultWebsiteSettings = {
   marketLoginUrl: '/magaza/login',
   registerUrl: '/register',
   androidButtonText: 'Android Uygulamasini Indir',
-  androidApkUrl: 'https://drive.google.com/uc?id=1_QZs8wYc0mtVSfPtBllJIXt5r-e9M9iv&export=download',
+  androidApkUrl: 'https://penpos.cloud/public/updates/android/latest.apk',
   androidButtonActive: true,
   systemsSectionEyebrow: 'PenPOS Yapisi',
   systemsSectionTitle: 'Restoran ve magaza ayni cati altinda, ayri sistem mantiginda.',

@@ -17235,3 +17235,75 @@ body.pos-app-layout .pageShell.pos-layout .posItemsGrid {
     overflow-wrap: normal;
   }
 }
+.saleProductSwipeSurface {
+  touch-action: pan-y;
+}
+
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileToggle,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileToggle,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileToggle,
+body.sales-mobile-scroll .saleCartMobileToggle,
+body.mobile-sales-mode .saleCartMobileToggle {
+  background: #15803d !important;
+  color: #ffffff !important;
+}
+
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileToggle:hover,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileToggle:hover,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileToggle:hover,
+body.sales-mobile-scroll .saleCartMobileToggle:hover,
+body.mobile-sales-mode .saleCartMobileToggle:hover,
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileToggle:focus-visible,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileToggle:focus-visible,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileToggle:focus-visible,
+body.sales-mobile-scroll .saleCartMobileToggle:focus-visible,
+body.mobile-sales-mode .saleCartMobileToggle:focus-visible {
+  background: #166534 !important;
+}
+
+body.pos-app-layout .saleCartMobileToggle:focus-visible,
+body.saleCartMobileToggle:focus-visible,
+.saleCartMobileActionBtn:focus-visible {
+  outline: 3px solid #86efac !important;
+  outline-offset: 2px;
+}
+
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileActionBtn,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileActionBtn,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileActionBtn,
+body.sales-mobile-scroll .saleCartMobileActionBtn,
+body.mobile-sales-mode .saleCartMobileActionBtn,
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBtn {
+  border: 1px solid #166534 !important;
+  background: #15803d !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileActionBtn:not(:disabled):hover,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileActionBtn:not(:disabled):hover,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileActionBtn:not(:disabled):hover,
+body.sales-mobile-scroll .saleCartMobileActionBtn:not(:disabled):hover,
+body.mobile-sales-mode .saleCartMobileActionBtn:not(:disabled):hover,
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBtn:not(:disabled):hover,
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileActionBtn:not(:disabled):active,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileActionBtn:not(:disabled):active,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileActionBtn:not(:disabled):active,
+body.sales-mobile-scroll .saleCartMobileActionBtn:not(:disabled):active,
+body.mobile-sales-mode .saleCartMobileActionBtn:not(:disabled):active,
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBtn:not(:disabled):active {
+  background: #166534 !important;
+}
+
+body.pos-app-layout .pageShell.pos-layout .saleCartMobileActionBtn:disabled,
+body.pos-app-layout .pageShell.walkin-layout .saleCartMobileActionBtn:disabled,
+body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartMobileActionBtn:disabled,
+body.sales-mobile-scroll .saleCartMobileActionBtn:disabled,
+body.mobile-sales-mode .saleCartMobileActionBtn:disabled,
+.delivery-orders-page .delivery-detail-summary .saleCartMobileActionBtn:disabled {
+  border-color: #64748b !important;
+  background: #64748b !important;
+  color: #ffffff !important;
+  opacity: 0.72;
+  cursor: not-allowed;
+}
