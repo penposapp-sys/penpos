@@ -22,6 +22,7 @@ import User from '../models/User.js'
 import { error } from '../utils/errors.js'
 import { MAX_IMAGE_UPLOAD_BYTES } from '../utils/imageUpload.js'
 import { recordTenantUsageHeartbeat } from '../services/tenantUsageService.js'
+import * as dataManagementCtrl from '../controllers/dataManagementController.js'
 
 const router = Router()
 const upload = multer({
@@ -36,6 +37,12 @@ const uploadSingleImage = (req, res, next) => {
     return next(error('invalid_upload', 'Gorsel yukleme hatasi.', 400))
   })
 }
+
+router.post('/data-management/preview', requireAuth, tenantGuard, requireRole(['tenant_admin']), dataManagementCtrl.preview('restaurant'))
+router.post('/data-management/execute', requireAuth, tenantGuard, requireRole(['tenant_admin']), dataManagementCtrl.execute('restaurant'))
+router.post('/data-management/backup', requireAuth, tenantGuard, requireRole(['tenant_admin']), dataManagementCtrl.backup('restaurant'))
+router.post('/data-management/restore/preview', requireAuth, tenantGuard, requireRole(['tenant_admin']), dataManagementCtrl.receiveBackupFile, dataManagementCtrl.restorePreview('restaurant'))
+router.post('/data-management/restore/execute', requireAuth, tenantGuard, requireRole(['tenant_admin']), dataManagementCtrl.receiveBackupFile, dataManagementCtrl.restore('restaurant'))
 
 router.post('/usage/heartbeat', requireAuth, requireRole(['tenant_admin', 'staff']), async (req, res) => {
   try {

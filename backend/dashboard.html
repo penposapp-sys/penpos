@@ -52,12 +52,12 @@
                         </li>
                             <li class="left-menu-list-separator"></li>
                             <li class="left-menu-list-item">
-                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingInvoiceList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Fatura </a>
+                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingInvoiceList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Fatura </a>
                             </li>
 
                         <li class="left-menu-list-separator"></li>
                         <li class="left-menu-list-item">
-                            <a class="left-menu-link" href="/IncomingInvoice/IncomingInvoiceList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-download"></i> Gelen e-Fatura </a>
+                            <a class="left-menu-link" href="/IncomingInvoice/IncomingInvoiceList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-download"></i> Gelen e-Fatura </a>
                         </li>
                         <li class="left-menu-list-separator"></li>
                         <li class="left-menu-list-item">
@@ -81,7 +81,7 @@
 
                             <li class="left-menu-list-separator"></li>
                             <li class="left-menu-list-item">
-                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingArchiveList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Arşiv </a>
+                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingArchiveList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Arşiv </a>
                             </li>
 
                         <li class="left-menu-list-separator"></li>
@@ -172,7 +172,7 @@
                     </li>
                     <li class="left-menu-list-separator"></li>
                     <li class="left-menu-list-item">
-                        <a class="left-menu-link" href="/Payment/CommonPaymentList?minDate=2026-06-01"><i class="left-menu-link-icon icmn-file-download"></i> Fatura Ödeme Listesi </a>
+                        <a class="left-menu-link" href="/Payment/CommonPaymentList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-download"></i> Fatura Ödeme Listesi </a>
                     </li>
                 </ul>
             </li>
@@ -249,88 +249,173 @@
 
     <div class="menu">
         <div class="menu-user-block">
-            <div class="turmob-account-center">
-                <div class="turmob-announcement-slot" title="Duyurular">
-                    
-<link href="/Content/css/announcement.css" rel="stylesheet">
+            <div class="newheader-account-center">
+                <div class="newheader-announcement-slot" title="Duyurular">
+                    <link href="/Content/css/announcement.css" rel="stylesheet">
 
 <div class="dropdown">
-    <button data-toggle="dropdown" aria-expanded="true" id="Notification" style="border: none; outline: none;">
-        <i class="icmn-envelop5" style="font-size: 30px; color: #3498db;"></i>
+    <button data-toggle="dropdown" aria-expanded="false" id="Notification" style="border:none; outline:none;">
+        <i class="icmn-envelop5" style="font-size:30px; color:#3498db;"></i>
         <span class="badge zoom-in-zoom-out" id="notifyBadge" style="display: block;">
-            <span id="TotalNotify">+18</span>
+            <span id="TotalNotify">+20</span>
         </span>
     </button>
-    <ul class="dropdown-menu" aria-labelledby="" role="menu" style="width:400px; border-color: cornflowerblue; left: -250px !important; ">
-        <div class="widget-header dropdown-item" id="DuyuruSelector">
-            <i class="icmn-bullhorn" style="font-size: 20px; color: #3498db;"></i><strong> Duyurular (<span id="TotalNotifyForTitle">18</span>)</strong>
-            <a href="/Announcement/Index" style="position:absolute;right:25px;font-size:medium;" id="arsivDuyuruSelector">[Arşiv]</a>
+
+    <div class="dropdown-menu" role="menu" style="width:400px; border-color:cornflowerblue; left:-250px !important;">
+        <div class="widget-header dropdown-item" id="DuyuruSelector" style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+            <div>
+                <i class="icmn-bullhorn" style="font-size:20px; color:#3498db;"></i>
+                <strong>
+                    Duyurular (<span id="TotalNotifyForTitle">20</span>)
+                </strong>
+            </div>
+
+            <a href="/Announcement" id="arsivDuyuruSelector" color:#c62828;="" text-decoration:none;"="">
+                <i class="fa fa-archive"></i> Arşiv
+            </a>
         </div>
         <div class="widget-body dropdown-item">
             <div class="conversation-block custom-scroll" style="height: 485px; overflow: hidden; padding: 0px; width: 0px;">
                 
-
             <div class="jspContainer" style="width: 0px; height: 485px;"><div class="jspPane" style="padding: 0px; top: 0px; left: 0px; width: 0px;"><div id="NotifyDiv"></div></div></div></div>
         </div>
-    </ul>
+    </div>
 </div>
+
 <script src="/Scripts/dompurify.js"></script>
-<script src="/bundles/scripts/announcement?v=FQwLyA14OnGOOG9ZblTZVC6kZ45HNdw8aTbY8ac7RUc1"></script>
 
-
+<script src="/bundles/scripts/announcement?v=bwASYM4FF7CfPU2EAIKvw5u9_xMD8YpsAUbelOJH9_41"></script>
 
 
                 </div>
 
                 <div class="dropdown" id="UserMenuInfo">
-                <a href="javascript: void(0);" class="dropdown-toggle dropdown-inline-button turmob-user-trigger" data-toggle="dropdown" aria-expanded="false">
-                    <span class="turmob-user-trigger__avatar"><i class="icmn-user"></i></span>
-                    <span class="turmob-user-trigger__content hidden-lg-down">
-                        <span class="turmob-user-trigger__label">Kullanıcı</span>
-                        <span class="turmob-user-trigger__name">İBRAHİM AKMAN</span>
-                    </span>
-                    <span class="caret"></span>
-                </a>
-                <ul class="dropdown-menu" aria-labelledby="" role="menu" style="left: -60px !important;">
-                        <a class="dropdown-item" href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank"><i class="dropdown-icon icmn-cart"></i> Kontör Satın Al </a>
-                        <div class="dropdown-divider"></div>
+                    <a href="javascript: void(0);" class="dropdown-toggle dropdown-inline-button newheader-user-trigger" data-toggle="dropdown" aria-expanded="false">
+                        <span class="newheader-user-trigger__avatar"><i class="icmn-user"></i></span>
+                        <span class="newheader-user-trigger__content hidden-lg-down">
+                            <span class="newheader-user-trigger__label">Kullanıcı</span>
+                            <span class="newheader-user-trigger__name">İBRAHİM AKMAN</span>
+                        </span>
+                        <span class="caret"></span>
+                    </a>
 
-                    <a class="dropdown-item " href="#" id="OpenChangePassword"> <i class="dropdown-icon icmn-key"></i> Şifre Değiştir </a>
+                    <ul class="dropdown-menu" aria-labelledby="" role="menu" style="left: -60px !important;">
 
-                    <div class="dropdown-divider"></div>
+                            <li>
+                                <a class="dropdown-item" href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank">
+                                    <i class="dropdown-icon icmn-cart"></i>
+                                    Kontör Satın Al
+                                </a>
+                            </li>
+                            <li class="dropdown-divider"></li>
 
-                    <a class="dropdown-item " href="#" id="OpenSettingsAndSecurity"> <i class="dropdown-icon icmn-power"></i> Ayarlar / Güvenlik </a>
+                        <li>
+                            <a class="dropdown-item" href="#" id="OpenChangePassword">
+                                <i class="dropdown-icon icmn-key"></i>
+                                Şifre Değiştir
+                            </a>
+                        </li>
 
-                    <div class="dropdown-divider"></div>
+                        <li class="dropdown-divider"></li>
 
-                    <a class="dropdown-item " href="#" id="OpenUserInformation"> <i class="dropdown-icon icmn-power"></i> Kullanıcı Bilgilerim </a>
+                        <li>
+                            <a class="dropdown-item" href="#" id="OpenSettingsAndSecurity">
+                                <i class="dropdown-icon icmn-power"></i>
+                                Ayarlar / Güvenlik
+                            </a>
+                        </li>
 
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="/Company/"><i class="dropdown-icon icmn-office"></i> Firma Bilgileri </a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" target="_blank" href="http://www.efatura.gov.tr/duyurular.html"><i class="dropdown-icon icmn-circle-right"></i> Gib Duyuruları </a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="/TransactionHistory/"><i class="dropdown-icon icmn-office"></i> Bakiye Bilgileri </a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#"><i class="dropdown-icon icmn-earth"></i> turmob-20 </a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" target="_blank" href="/Files/Pdf/HizmetKatalogu.pdf"><i class="dropdown-icon icmn-circle-right"></i> Servis Kataloğu </a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" target="_blank" href="https://lucayazilim.freshdesk.com/support/solutions/folders/67000484240/page/1?url_locale="><i class="dropdown-icon icmn-question"></i> Sıkça Sorulan Sorular</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" target="_blank" href="https://youtube.com/playlist?list=PLwGePyTd7vJG3WPCEJRxd3l-vZ2Erb_Xq"><i class="dropdown-icon icmn-question"></i> Yardım Videoları</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#" onclick="triggerModal(); return false;"><i class="dropdown-icon icmn-question"></i> Klavye Kısayol Tuşları</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="/Account/LogOff"><i class="dropdown-icon icmn-exit"></i> Güvenli Çıkış </a>
-                </ul>
+                        <li class="dropdown-divider"></li>
+
+                        <li>
+                            <a class="dropdown-item" href="#" id="OpenUserInformation">
+                                <i class="dropdown-icon icmn-power"></i>
+                                Kullanıcı Bilgilerim
+                            </a>
+                        </li>
+
+                        <li class="dropdown-divider"></li>
+
+                        <li>
+                            <a class="dropdown-item" href="/Company/">
+                                <i class="dropdown-icon icmn-office"></i>
+                                Firma Bilgileri
+                            </a>
+                        </li>
+
+                        <li class="dropdown-divider"></li>
+
+                        <li>
+                            <a class="dropdown-item" target="_blank" href="http://www.efatura.gov.tr/duyurular.html">
+                                <i class="dropdown-icon icmn-circle-right"></i>
+                                Gib Duyuruları
+                            </a>
+                        </li>
+
+                        <li class="dropdown-divider"></li>
+
+                        <li>
+                            <a class="dropdown-item" href="/TransactionHistory/">
+                                <i class="dropdown-icon icmn-office"></i>
+                                Bakiye Bilgileri
+                            </a>
+                        </li>
+
+                        <li class="dropdown-divider"></li>
+
+                        <li>
+                            <a class="dropdown-item" href="#">
+                                <i class="dropdown-icon icmn-earth"></i>
+                                turmob-19
+                            </a>
+                        </li>
+
+                            <li class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" target="_blank" href="/Files/Pdf/HizmetKatalogu.pdf">
+                                    <i class="dropdown-icon icmn-circle-right"></i>
+                                    Servis Kataloğu
+                                </a>
+                            </li>
+                            <li class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" target="_blank" href="https://lucayazilim.freshdesk.com/support/solutions/folders/67000484240/page/1?url_locale=">
+                                    <i class="dropdown-icon icmn-question"></i>
+                                    Sıkça Sorulan Sorular
+                                </a>
+                            </li>
+                            <li class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" target="_blank" href="https://youtube.com/playlist?list=PLwGePyTd7vJG3WPCEJRxd3l-vZ2Erb_Xq">
+                                    <i class="dropdown-icon icmn-question"></i>
+                                    Yardım Videoları
+                                </a>
+                            </li>
+                            <li class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#" onclick="triggerModal(); return false;">
+                                    <i class="dropdown-icon icmn-question"></i>
+                                    Klavye Kısayol Tuşları
+                                </a>
+                            </li>
+
+                        <li class="dropdown-divider"></li>
+
+                        <li>
+                            <a class="dropdown-item" href="/Account/LogOff">
+                                <i class="dropdown-icon icmn-exit"></i>
+                                Güvenli Çıkış
+                            </a>
+                        </li>
+
+                    </ul>
                 </div>
             </div>
         </div>
         <div class="menu-info-block">
             <div class="pull-left">
                 <div class="header-buttons">
-                    <div class="dropdown turmob-company-select">
+                    <div class="dropdown newheader-company-select">
                             <div class="form-group width-300  firma">
         <select class="form-control select2  select2-hidden-accessible" id="CompanyId" name="CompanyId" required="" tabindex="-1" aria-hidden="true">
                         <option selected="" value="180214">PENDİK EĞİTİM KURUMLARI TİC. LTD. ŞTİ.</option>
@@ -356,48 +441,48 @@
             
 
 
-                <div class="turmob-top-actions">
-                    <a href="/TransactionHistory/" class="turmob-top-action turmob-top-action--balance " id="kontorInfo" title="Bakiye hareketlerini görüntüle">
-                        <span class="turmob-top-action__icon"><i class="fa fa-ticket"></i></span>
-                        <span class="turmob-top-action__content">
-                            <span class="turmob-top-action__label">KALAN KONTÖR</span>
-                            <span class="turmob-top-action__value">1781</span>
+                <div class="newheader-top-actions">
+                    <a href="/TransactionHistory/" class="newheader-top-action newheader-top-action--balance " id="kontorInfo" title="Bakiye hareketlerini görüntüle">
+                        <span class="newheader-top-action__icon"><i class="fa fa-ticket"></i></span>
+                        <span class="newheader-top-action__content">
+                            <span class="newheader-top-action__label">KALAN KONTÖR</span>
+                            <span class="newheader-top-action__value">1730</span>
                         </span>
                     </a>
 
-                    <a href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--buy" id="buyKontorTurmob" title="Kontör satın al">
-                        <span class="turmob-top-action__icon"><i class="fa fa-credit-card-alt"></i></span>
-                        <span class="turmob-top-action__content">
-                            <span class="turmob-top-action__label">KONTÖR</span>
-                            <span class="turmob-top-action__value">SATIN AL</span>
+                    <a href="https://internet.luca.com.tr/odeme/index.php/turmob_urunler/kampanyali_urunler?id=7820647929" target="_blank" rel="noopener noreferrer" class="newheader-top-action newheader-top-action--buy" id="buyKontorTurmob" title="Kontör satın al">
+                        <span class="newheader-top-action__icon"><i class="fa fa-credit-card-alt"></i></span>
+                        <span class="newheader-top-action__content">
+                            <span class="newheader-top-action__label">KONTÖR</span>
+                            <span class="newheader-top-action__value">SATIN AL</span>
                         </span>
                     </a>
 
-                    <a href="https://lucayazilim.freshdesk.com/support/solutions/folders/67000484240/page/1?url_locale=" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--help turmob-top-action--faq" id="faqTurmob" title="SIKÇA SORULAN SORULAR">
-                        <span class="turmob-top-action__icon"><i class="icmn-question"></i></span>
-                        <span class="turmob-top-action__content">
-                            <span class="turmob-top-action__label">YARDIM</span>
-                            <span class="turmob-top-action__value">SSO</span>
+                    <a href="https://lucayazilim.freshdesk.com/support/solutions/folders/67000484240/page/1?url_locale=" target="_blank" rel="noopener noreferrer" class="newheader-top-action newheader-top-action--help newheader-top-action--faq" id="faq" title="SIKÇA SORULAN SORULAR">
+                        <span class="newheader-top-action__icon"><i class="icmn-question"></i></span>
+                        <span class="newheader-top-action__content">
+                            <span class="newheader-top-action__label">YARDIM</span>
+                            <span class="newheader-top-action__value">SSO</span>
                         </span>
                     </a>
 
-                    <a href="https://youtube.com/playlist?list=PLwGePyTd7vJG3WPCEJRxd3l-vZ2Erb_Xq" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--help turmob-top-action--education" id="helpVideoTurmob" title="VİDEO YARDIM">
-                        <span class="turmob-top-action__icon"><i class="fa fa-play"></i></span>
-                        <span class="turmob-top-action__content">
-                            <span class="turmob-top-action__label">EĞİTİM</span>
-                            <span class="turmob-top-action__value">VİDEO YARDIM</span>
+                    <a href="https://youtube.com/playlist?list=PLwGePyTd7vJG3WPCEJRxd3l-vZ2Erb_Xq" target="_blank" rel="noopener noreferrer" class="newheader-top-action newheader-top-action--help newheader-top-action--education" id="helpVideoTurmob" title="VİDEO YARDIM">
+                        <span class="newheader-top-action__icon"><i class="fa fa-play"></i></span>
+                        <span class="newheader-top-action__content">
+                            <span class="newheader-top-action__label">EĞİTİM</span>
+                            <span class="newheader-top-action__value">VİDEO YARDIM</span>
                         </span>
                     </a>
-                     <a href="/Company/" target="_blank" rel="noopener noreferrer" class="turmob-top-action turmob-top-action--help" id="companyInfoTurmob" title="FİRMA BİLGİLERİ">
-                        <span class="turmob-top-action__icon"><i class="fa fa-info"></i></span>
-                        <span class="turmob-top-action__content">
-                            <span class="turmob-top-action__label">FİRMA BİLGİLERİ</span>
-                            <span class="turmob-top-action__value">7820647929</span>
-                            
+                    <a href="/Company/" rel="noopener noreferrer" class="newheader-top-action newheader-top-action--help" id="companyInfoTurmob" title="FİRMA BİLGİLERİ">
+                        <span class="newheader-top-action__icon"><i class="fa fa-info"></i></span>
+                        <span class="newheader-top-action__content">
+                            <span class="newheader-top-action__label">FİRMA BİLGİLERİ</span>
+                            <span class="newheader-top-action__value">7820647929</span>
+
                         </span>
                     </a>
 
- 
+
 
                 </div>
                     </div>
@@ -444,7 +529,7 @@
                     <h4 style="display: inline; margin:-2px; padding: inherit">Anasayfa</h4>
                 </div>
                 <div class="panel-body">
-                    <input name="__RequestVerificationToken" type="hidden" value="XYO2LWt_KALyPuIrVoSDLHSzvJuiBHWeLBniwYJkmyaicGijfr71nZicVaINUGTpMx6SWrg_RjytwCgBAx_loKOWI88vN_ZrKtLGhqougrVKDoA-eyq6Iwh5DUOcOgzB0">
+                    <input name="__RequestVerificationToken" type="hidden" value="WQeUJjP6jQpfEWkGQXGbYdOgOTGFJAeqk8Z0NE533lWgJkbAjuje2jE-ih2SDk17PCtJLerGd29S0h_nHkjKbf2L-2e430LwlyjFrN7YsQFd2WBlqMidPC1E1jPEscpe0">
                     
 
 
@@ -482,7 +567,7 @@
                     <h5 style="font-weight:bold !important" class="text-uppercase">Gelen Okunmayan E-Fatura</h5>
                     <i class="counter-icon icmn-file-download"></i>
                     <span class="counter-count">
-                        <span class="unread-invoice-counter">74</span>
+                        <span class="unread-invoice-counter">19</span>
 
                     </span>
                 </div>
@@ -512,7 +597,7 @@
                     <h5 style="font-weight:bold !important" class="text-uppercase">Gelen E-Fatura</h5>
                     <i class="counter-icon icmn-file-download"></i>
                     <span class="counter-count">
-                        <span class="incoming-invoice-counter">86</span>
+                        <span class="incoming-invoice-counter">22</span>
 
                     </span>
                 </div>
@@ -534,7 +619,7 @@
             </div>
         </div>
     </div>
-</a><a href="../OutgoingInvoice/OutgoingInvoiceList?minDate=2026-09-01">
+</a><a href="../OutgoingInvoice/OutgoingInvoiceList?minDate=2026-10-01">
     <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
         <div class="widget widget-seven background-2" id="outGoingInvoiceCount" style="position: relative;">
             <div class="widget-body">
@@ -549,7 +634,7 @@
             </div>
         </div>
     </div>
-</a><a href="../OutgoingInvoice/OutgoingInvoiceList?scenario=2&amp;state=25&amp;minDate=2026-09-01">
+</a><a href="../OutgoingInvoice/OutgoingInvoiceList?scenario=2&amp;state=25&amp;minDate=2026-10-01">
     <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
         <div class="widget widget-seven background-danger" id="outGoingRejectedInvoiceCount" style="position: relative;">
             <div class="widget-body">
@@ -564,7 +649,7 @@
             </div>
         </div>
     </div>
-</a><a href="../OutgoingInvoice/OutgoingInvoiceList?state=16|22|37&amp;multiSelect=1&amp;minDate=2026-09-01">
+</a><a href="../OutgoingInvoice/OutgoingInvoiceList?state=16|22|37&amp;multiSelect=1&amp;minDate=2026-10-01">
     <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
         <div class="widget widget-seven background-warning" id="faultyInvoiceCount" style="position: relative;">
             <div class="widget-body">
@@ -639,7 +724,7 @@
             </div>
         </div>
     </div>
-</a><a href="../OutgoingInvoice/OutgoingArchiveList?minDate=2026-09-01">
+</a><a href="../OutgoingInvoice/OutgoingArchiveList?minDate=2026-10-01">
     <div class="col-xl-4 col-lg-6 col-sm-6 col-xs-12">
         <div class="widget widget-seven background-info" id="outGoingArchiveCount" style="position: relative;">
             <div class="widget-body">
@@ -692,7 +777,7 @@
                     <h5 style="font-weight:bold !important" class="text-uppercase">Silinmiş E-Arşiv Faturalar</h5>
                     <i class="counter-icon icmn-bin"></i>
                     <span class="counter-count">
-                        <span class="deleted-archive-invoice-counter">5</span>
+                        <span class="deleted-archive-invoice-counter">2</span>
 
                     </span>
                 </div>

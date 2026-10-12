@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Armchair, Bike, Building2, CreditCard, Package, Printer, QrCode, ReceiptText, Search, Store, UserRound, Users } from 'lucide-react'
+import { Armchair, Bike, Building2, CreditCard, Database, Package, Printer, QrCode, ReceiptText, Search, Store, UserRound, Users } from 'lucide-react'
 import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
@@ -69,6 +69,7 @@ const BUSINESS_SETTINGS_SECTIONS = {
 
 const SETTINGS_ICONS = {
   search: Search,
+  data: Database,
   account: UserRound,
   business: Store,
   branches: Building2,
@@ -611,6 +612,16 @@ export default function SettingsPage() {
         group: 'İşletme',
         description: 'Firma bilgileri ve yetkili şube yönetimi'
       },
+      ...(user?.role === 'tenant_admin'
+        ? [{
+            key: 'data-management',
+            to: '/restoran/settings/data-management',
+            label: 'Veri Yönetimi',
+            icon: 'data',
+            group: 'İşletme',
+            description: 'Firma verilerini yedekleyin, yönetin veya güvenli biçimde sıfırlayın'
+          }]
+        : []),
       ...(canManageMenu && !isExpired
         ? [{
             key: 'catalog',

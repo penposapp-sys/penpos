@@ -15,7 +15,21 @@ export default function ProtectedRoute({ roles, permissions, permissionsMode = '
   const { pathname } = useLocation()
 
   if (loading) {
-    return null
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          display: 'grid',
+          minHeight: 180,
+          placeItems: 'center',
+          color: 'var(--muted, #6b7280)',
+          fontWeight: 700
+        }}
+      >
+        Oturum kontrol ediliyor…
+      </div>
+    )
   }
 
   if (!user) return <Navigate to="/login" replace />

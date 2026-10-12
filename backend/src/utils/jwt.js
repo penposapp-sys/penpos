@@ -11,9 +11,9 @@ const getSecret = () => {
   return secret
 }
 
-export const signToken = (payload) => {
+export const signToken = (payload, options = {}) => {
   const secret = getSecret()
-  const expiresIn = process.env.JWT_EXPIRES_IN || '7d'
+  const expiresIn = options.expiresIn || process.env.JWT_EXPIRES_IN || '7d'
   return jwt.sign(payload, secret, { expiresIn })
 }
 

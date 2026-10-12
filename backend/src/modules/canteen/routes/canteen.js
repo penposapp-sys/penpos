@@ -24,6 +24,7 @@ import * as stockCtrl from '../controllers/canteenStockController.js'
 import * as meCtrl from '../controllers/canteenMeController.js'
 import * as bulkProductsCtrl from '../controllers/canteenProductsBulkController.js'
 import * as qrOrdersCtrl from '../controllers/canteenQrOrdersController.js'
+import * as dataManagementCtrl from '../../../controllers/dataManagementController.js'
 import multer from 'multer'
 import { error } from '../../../utils/errors.js'
 import { requireActiveSubscription } from '../../../middlewares/requireActiveSubscription.js'
@@ -53,6 +54,12 @@ router.get('/me', requireRole(['tenant_admin', 'staff']), meCtrl.getMe)
 router.put('/me/email', requireRole(['tenant_admin', 'staff']), meCtrl.updateEmail)
 router.put('/me/password', requireRole(['tenant_admin', 'staff']), meCtrl.updatePassword)
 router.put('/me/username', requireRole(['tenant_admin', 'staff']), meCtrl.updateUsername)
+
+router.post('/data-management/preview', requireRole(['tenant_admin']), dataManagementCtrl.preview('canteen'))
+router.post('/data-management/execute', requireRole(['tenant_admin']), dataManagementCtrl.execute('canteen'))
+router.post('/data-management/backup', requireRole(['tenant_admin']), dataManagementCtrl.backup('canteen'))
+router.post('/data-management/restore/preview', requireRole(['tenant_admin']), dataManagementCtrl.receiveBackupFile, dataManagementCtrl.restorePreview('canteen'))
+router.post('/data-management/restore/execute', requireRole(['tenant_admin']), dataManagementCtrl.receiveBackupFile, dataManagementCtrl.restore('canteen'))
 
 router.get('/branches', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), branchesCtrl.list)
 router.post('/branches', requireRole(['tenant_admin', 'staff']), requirePermission([PERMISSIONS.MANAGE_SETTINGS]), branchesCtrl.create)

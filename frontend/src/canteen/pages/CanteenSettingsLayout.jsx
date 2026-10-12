@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
-import { CreditCard, Globe, Package, Printer, QrCode, Settings, Store, UserRound, Users, Warehouse } from 'lucide-react'
+import { CreditCard, Database, Globe, Package, Printer, QrCode, Settings, Store, UserRound, Users, Warehouse } from 'lucide-react'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { isSubscriptionExpired } from '../../lib/subscription.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
@@ -19,6 +19,7 @@ const SETTINGS_ICONS = {
   products: Package,
   qr: QrCode,
   settings: Settings,
+  data: Database,
 }
 
 function SettingsGlyph({ icon, size = 20, strokeWidth = 2.1 }) {
@@ -60,17 +61,19 @@ function buildSettingsThemeVars(theme) {
   }
 }
 
-function getSettingsItems(isExpired) {
+function getSettingsItems(isExpired, isAdmin) {
   if (isExpired) {
     return [
       { key: 'website', path: '/magaza/ayarlar/website', label: 'Web Sitesi Ayarları', icon: 'website', filterGroup: 'Dijital', section: 'Dijital', desc: 'Web sitesi yayın ve görünüm ayarları' },
       { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarları', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, görünüm ve şube yönetimi tek sayfada' },
+      ...(isAdmin ? [{ key: 'data-management', path: '/magaza/ayarlar/veri-yonetimi', label: 'Veri Yönetimi', icon: 'data', filterGroup: 'İşletme', section: 'İşletme', desc: 'Satış verilerini yedekleyin veya firmayı güvenli biçimde sıfırlayın' }] : []),
       { key: 'plan', path: '/magaza/ayarlar/paket', label: 'Üyelik ve Paket', icon: 'billing', filterGroup: 'Finans', section: 'Finans', desc: 'Paket bilgileri, tahsilat ve fatura takibi' },
     ]
   }
 
   return [
     { key: 'system', path: '/magaza/ayarlar/sistem', label: 'Sistem Ayarları', icon: 'system', filterGroup: 'İşletme', section: 'İşletme', desc: 'Hesap, görünüm ve şube yönetimi tek sayfada' },
+    ...(isAdmin ? [{ key: 'data-management', path: '/magaza/ayarlar/veri-yonetimi', label: 'Veri Yönetimi', icon: 'data', filterGroup: 'İşletme', section: 'İşletme', desc: 'Satış verilerini yedekleyin veya firmayı güvenli biçimde sıfırlayın' }] : []),
     { key: 'products', path: '/magaza/ayarlar/urunler', label: 'Ürün Ayarları', icon: 'products', filterGroup: 'Ürün', section: 'Ürün', desc: 'Ürün, kategori, stok ve görünüm düzeni' },
     { key: 'staff', path: '/magaza/ayarlar/personel', label: 'Personel Ayarları', icon: 'staff', filterGroup: 'Personel', section: 'İşletme', desc: 'Personel, şifre, yetki ve aktiflik yönetimi' },
     { key: 'qr', path: '/magaza/ayarlar/qr', label: 'Online Siparişler', icon: 'qr', filterGroup: 'Dijital', section: 'Dijital', desc: 'Müşteri online sipariş sayfası ve yayın ayarları' },
@@ -700,7 +703,8 @@ export default function CanteenSettingsLayout() {
   const canSettings = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && me.permissions.includes('manage_settings'))
   if (!canSettings) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
-  const items = useMemo(() => getSettingsItems(isExpired), [isExpired])
+  const isAdmin = me?.role === 'tenant_admin'
+  const items = useMemo(() => getSettingsItems(isExpired, isAdmin), [isExpired, isAdmin])
   const current = items
     .filter((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
     .sort((left, right) => right.path.length - left.path.length)[0]

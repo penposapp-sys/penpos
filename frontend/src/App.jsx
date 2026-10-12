@@ -29,6 +29,7 @@ import TenantUsageHeartbeat from './components/TenantUsageHeartbeat.jsx'
 import { BusinessSettingsProvider } from './context/BusinessSettingsContext.jsx'
 import StaffPage from './pages/StaffPage.jsx'
 import SettingsPage, { SettingsTablesContent, SettingsPaymentsContent, SettingsSystemContent } from './pages/SettingsPage.jsx'
+import DataManagementPage from './pages/DataManagementPage.jsx'
 import SettingsMePage from './pages/SettingsMePage.jsx'
 import UserAppearancePage from './pages/UserAppearancePage.jsx'
 import SettingsDeliveryPage from './pages/SettingsDeliveryPage.jsx'
@@ -676,6 +677,7 @@ export default function App() {
             <Route path="website" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="canteen" allowExpired><RestaurantWebsiteSettingsPage systemType="canteen" /></ProtectedRoute>} />
             <Route path="me" element={<Navigate to="/magaza/ayarlar/sistem" replace />} />
             <Route path="sistem" element={<CanteenSettingsSystemPage />} />
+            <Route path="veri-yonetimi" element={<ProtectedRoute roles={['tenant_admin']} system="canteen" allowExpired><DataManagementPage system="canteen" /></ProtectedRoute>} />
             <Route path="subeler" element={<Navigate to="/magaza/ayarlar/sistem" replace />} />
             <Route path="personel" element={<CanteenSettingsStaffPage />} />
             <Route path="urunler" element={<CanteenSettingsProductsPage />} />
@@ -735,6 +737,7 @@ export default function App() {
           <Route path="settings" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes" allowExpired><SettingsPage /></ProtectedRoute>}>
             <Route path="me" element={<Navigate to="/restoran/settings/system" replace />} />
             <Route path="system" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings', 'manage_menu']} permissionsMode="any" system="kermes"><SettingsSystemContent /></ProtectedRoute>} />
+            <Route path="data-management" element={<ProtectedRoute roles={['tenant_admin']} system="kermes" allowExpired><DataManagementPage /></ProtectedRoute>} />
             <Route path="branches" element={<Navigate to="/restoran/settings/system" replace />} />
             <Route path="staff" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><StaffPage systemType="kermes" /></ProtectedRoute>} />
             <Route path="catalog" element={<Navigate to="/restoran/settings/catalog/items" replace />} />
