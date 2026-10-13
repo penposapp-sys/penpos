@@ -458,7 +458,15 @@ function AppearancePreferencesSync() {
 
   useEffect(() => {
     if (loading) return undefined
+    const isAnaokuluRoute = location.pathname.startsWith('/anaokulu')
     let cancelled = false
+    if (isAnaokuluRoute) {
+      loadedPreferencesRef.current = { userId: '', preferences: null }
+      setThemeKey('white')
+      setDarkMode(false)
+      resetPreference()
+      return undefined
+    }
     if (!userId) {
       loadedPreferencesRef.current = { userId: '', preferences: null }
       setThemeKey('white')
@@ -650,7 +658,6 @@ export default function App() {
 
         <Route path="/anaokulu" element={<AnaokuluDataProvider><ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu"><AnaokuluLayout /></ProtectedRoute></AnaokuluDataProvider>}>
           <Route index element={<AnaokuluIndexRoute />} />
-          <Route path="tercihlerim" element={<ProtectedRoute roles={['tenant_admin', 'staff', 'anaokulu_region_admin', 'platform_admin', 'superadmin']} system="anaokulu" allowExpired><UserAppearancePage /></ProtectedRoute>} />
           <Route path="genel-bakis" element={<DashboardPage />} />
           <Route path="ogrenciler" element={<OgrencilerPage />} />
           <Route path="ucret-taksit" element={<UcretPlaniPage />} />

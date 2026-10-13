@@ -71,6 +71,8 @@ export default function WalkInPosPage() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
+  const [paymentNoteOpen, setPaymentNoteOpen] = useState(false)
+  const paymentAmountKeypadEditedRef = useRef(false)
   const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
   const [savedEntryDate, setSavedEntryDate] = useState('')
   const [paymentEntryDate, setPaymentEntryDate] = useState(() => todayYmd())
@@ -1447,7 +1449,8 @@ export default function WalkInPosPage() {
     setAccountResults([])
     setSelectedAccount(null)
     searchAccounts('')
-    setVeresiyeAmount(balanceDue > 0 ? String(balanceDue) : '')
+    const enteredAmount = Number(String(paymentAmount || '').trim().replace(',', '.'))
+    setVeresiyeAmount(enteredAmount > 0 ? String(enteredAmount) : balanceDue > 0 ? String(balanceDue) : '')
     setVeresiyeNote('')
   }
 
@@ -1628,7 +1631,24 @@ export default function WalkInPosPage() {
     setDiscountDraft(Number(order?.discountPercent || 0))
     setPaymentAmount(signedBalance > 0.01 ? String(signedBalance) : '')
     setPaymentNote('')
+    setPaymentNoteOpen(false)
+    paymentAmountKeypadEditedRef.current = false
     setPayOpen(true)
+  }
+
+  const applyPaymentKey = (key) => {
+    const currentAmount = paymentAmountKeypadEditedRef.current ? String(paymentAmount || '') : ''
+    paymentAmountKeypadEditedRef.current = true
+    if (key === 'back') {
+      setPaymentAmount(currentAmount.slice(0, -1))
+      return
+    }
+    if (key === '.') {
+      if (currentAmount.includes('.')) return
+      setPaymentAmount(currentAmount ? `${currentAmount}.` : '0.')
+      return
+    }
+    setPaymentAmount(currentAmount === '0' ? key : `${currentAmount}${key}`)
   }
 
   const selectedPaymentMethod = payMethods.find((method) => String(method?.key || method?.id || '') === String(paymentMethod || '')) || null
@@ -2004,12 +2024,6 @@ export default function WalkInPosPage() {
                 </div>
               </div>
 
-              {order?.servingType && servingType !== order.servingType && (
-                <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
-                  Seçim bir sonraki gönderimde geçerli
-                </div>
-              )}
-
               {canSendToKitchen && (
                 <div className="saleCartMobileActionBar">
                   <button
@@ -2307,7 +2321,7 @@ export default function WalkInPosPage() {
                   </div>
                   <div className="saleCartFooterActions">
                     <button
-                      className="btn saleCartFooterActionBtn"
+                      className="btn saleCartFooterActionBtn saleCartFooterActionBtn--note"
                       type="button"
                       onClick={openOrderNoteModal}
                       disabled={!getOrderId(order)}
@@ -2315,14 +2329,14 @@ export default function WalkInPosPage() {
                       Sipariş Notu
                     </button>
                     <button
-                      className="btn saleCartFooterActionBtn"
+                      className="btn saleCartFooterActionBtn saleCartFooterActionBtn--payment"
                       onClick={openPaymentModal}
                       disabled={!getOrderId(order)}
                     >Ödeme Al</button>
-                    <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
+                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
 
-                    <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-                    <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--print" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--preview" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
                   </div>
                   </div>
                 </div>
@@ -2334,92 +2348,99 @@ export default function WalkInPosPage() {
 
     <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Ödeme Al" dialogStyle={{ width: 'min(700px, calc(100vw - 32px))' }} bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}>
       <div className="payment-modal-stack">
+        <div className="payment-amount-banner">
+          <span className="payment-amount-icon" aria-hidden="true">▣</span>
+          <span className="payment-amount-copy">
+            <span>Ödenecek Tutar</span>
+            <strong>{Math.max(0, signedBalance).toFixed(2)} TL</strong>
+          </span>
+          {canEditEntryDate ? (
+            <div className="payment-amount-date">
+              <span className="payment-amount-date-label">Ödeme Tarihi</span>
+              <SalesEntryDateButton
+                value={paymentEntryDate}
+                onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+                title="Ödeme tarihini seç"
+                showValue
+              />
+            </div>
+          ) : null}
+        </div>
         <div className="payment-meta-line">
           Masasız Satış — {order?.customerName || 'Misafir'} • {order?.orderNo ? `Sipariş ${order.orderNo}` : `Sipariş #${(order?.id || '').slice(-6)}`}
         </div>
 
-        <div className="payment-panel">
+        <div className="payment-panel payment-entry-pane">
           <div className="payment-panel-body payment-summary-card">
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>Brüt</div>
-              <div style={{ fontWeight: 600 }}>{grossTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row payment-summary-row--editor">
-              <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
-              <div className="payment-summary-actions">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="input"
-                  value={discountDraft}
-                  onChange={(e) => setDiscountDraft(e.target.value)}
-                  disabled={!canTakePayment || busy}
-                />
-                <button className="btn btn--compact" onClick={applyDiscount} disabled={!canTakePayment || busy}>
-                  Uygula
-                </button>
+            <div className="payment-split-order-summary">
+              <div className="payment-summary-row">
+                <span>Ara Toplam</span><strong>{grossTotal.toFixed(2)} TL</strong>
+              </div>
+              <div className="payment-summary-row payment-summary-row--editor">
+                <label className="payment-field-label">İndirim (%)</label>
+                <div className="payment-summary-actions">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="input"
+                    value={discountDraft}
+                    onChange={(e) => setDiscountDraft(e.target.value)}
+                    disabled={!canTakePayment || busy}
+                  />
+                  <button className="btn btn--compact" onClick={applyDiscount} disabled={!canTakePayment || busy}>
+                    Uygula
+                  </button>
+                </div>
+              </div>
+              <div className="payment-summary-totals">
+                <div className="payment-summary-row">
+                  <span>İndirim Tutarı</span><strong>{discountTotal.toFixed(2)} TL</strong>
+                </div>
+                <div className="payment-summary-row payment-summary-row--net">
+                  <span>Net</span><strong>{netTotal.toFixed(2)} TL</strong>
+                </div>
               </div>
             </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
-              <div style={{ fontWeight: 600 }}>{discountTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>Net</div>
-              <div style={{ fontWeight: 700 }}>{netTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>Ödenen</div>
-              <div style={{ fontWeight: 600 }}>{paidTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>{signedBalanceLabel}</div>
-              <div style={{ fontWeight: 700 }}>{signedBalanceValue.toFixed(2)} TL</div>
-            </div>
-          </div>
-        </div>
 
         {previousLines.length > 0 && (
           <div className="payment-panel">
             <div className="payment-panel-body">
-            <div style={{ fontWeight: 600, marginBottom: 2 }}>Önceki Ödemeler</div>
-            <div className="payment-history-list">
-              {previousLines.map((r) => (
-                <div key={`${r.kind}:${r.id}`} className="payment-history-row">
-                  <div style={{ display: 'grid' }}>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
-                    <div style={{ fontWeight: 600 }}>
-                      {Number(r.amount || 0).toFixed(2)} TL • {r.label}
-                      {(r.accountName && r.accountName !== '-') ? ` • ${r.accountName}` : ''}
+              <div className="payment-split-title">Önceki Ödemeler</div>
+              <div className="payment-history-list">
+                {previousLines.map((r) => (
+                  <div key={`${r.kind}:${r.id}`} className="payment-history-row">
+                    <div style={{ display: 'grid' }}>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
+                      <div style={{ fontWeight: 600 }}>
+                        {Number(r.amount || 0).toFixed(2)} TL • {r.label}
+                        {(r.accountName && r.accountName !== '-') ? ` • ${r.accountName}` : ''}
+                      </div>
+                      {!!r.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div>}
                     </div>
-                    {!!r.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div>}
+                    {r.canDelete && (
+                      <button
+                        className="btn btn--compact"
+                        onClick={() => {
+                          if (r.kind === 'payment') return deletePayment(r.id)
+                          if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
+                          if (r.kind === 'collection') return deleteCollection(r.id)
+                          if (r.kind === 'discount') return deleteDiscount()
+                        }}
+                        disabled={busy}
+                      >
+                        Sil
+                      </button>
+                    )}
                   </div>
-                  {r.canDelete && (
-                    <button
-                      className="btn btn--compact"
-                      onClick={() => {
-                        if (r.kind === 'payment') return deletePayment(r.id)
-                        if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
-                        if (r.kind === 'collection') return deleteCollection(r.id)
-                        if (r.kind === 'discount') return deleteDiscount()
-                      }}
-                      disabled={busy}
-                    >
-                      Sil
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        <div className="payment-panel">
-          <div className="payment-panel-body">
             <div>
-              <div className="payment-field-label">Yöntem</div>
+              <div className="payment-field-label">Ödeme Yöntemi</div>
               <div className="payment-method-grid">
                 {payMethods.map((m) => {
                   const active = paymentMethod === m.key
@@ -2438,49 +2459,76 @@ export default function WalkInPosPage() {
               </div>
             </div>
             <label>
-              <div className="payment-field-label">Tutar</div>
+              <div className="payment-field-label">Alınan Tutar</div>
               <input
                 type="number"
                 className="input"
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
+                onChange={(e) => {
+                  paymentAmountKeypadEditedRef.current = true
+                  setPaymentAmount(e.target.value)
+                }}
                 placeholder="Tutar giriniz"
                 disabled={!canTakePayment || busy}
               />
             </label>
-            <label>
-              <div className="payment-field-label">Not (opsiyonel)</div>
-              <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
-            </label>
-            {selectedPaymentIsCash && (
-              <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                <div>Paraüstü</div>
-                <div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {canEditEntryDate ? (
-                  <SalesEntryDateButton
-                    value={paymentEntryDate}
-                    onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
-                    title="Ödeme tarihini seç"
-                    showValue
-                  />
-                ) : null}
-              </div>
-              <div className="payment-actions">
-                <button className="btn btn--compact" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
-                  Ödeme Ekle
+            <div className="payment-quick-values" aria-label="Hızlı tutarlar">
+              <button type="button" className="payment-quick-all" onClick={() => { paymentAmountKeypadEditedRef.current = true; setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '') }} disabled={!canTakePayment || busy}>
+                Tamamını Al<span>{balanceDue.toFixed(2)} TL</span>
+              </button>
+              {[1000, 500, 200, 100].map((amount) => (
+                <button key={amount} type="button" onClick={() => { paymentAmountKeypadEditedRef.current = true; setPaymentAmount(String(amount)) }} disabled={!canTakePayment || busy}>
+                  {amount.toLocaleString('tr-TR')} TL
                 </button>
-                <button className="btn btn--compact" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
-                  Veresiye Yap
+              ))}
+            </div>
+            <div className="payment-keypad" aria-label="Sayısal tuş takımı">
+              {['1', '2', '3', 'back', '4', '5', '6', '7', '8', '9', '0', '.'].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`payment-key${key === 'back' ? ' payment-key--back' : ''}${key === '0' ? ' payment-key--zero' : ''}`}
+                  data-key={key}
+                  aria-label={key === 'back' ? 'Son rakamı sil' : undefined}
+                  onClick={() => applyPaymentKey(key)}
+                  disabled={!canTakePayment || busy}
+                >
+                  {key === 'back' ? '⌫' : key === '.' ? ',' : key}
                 </button>
-                <button className="btn btn--compact" onClick={() => setPayOpen(false)} disabled={busy}>
-                  Kapat
-                </button>
+              ))}
+              <button className="payment-key payment-key--submit" type="button" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
+                <span aria-hidden="true">✓</span>Ödeme Ekle
+              </button>
+              <button className="payment-key payment-key--credit" type="button" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
+                Veresiye Yap
+              </button>
+            </div>
+            <div className="payment-panel payment-balance-summary">
+              <div className="payment-panel-body payment-summary-card">
+                <div className="payment-summary-row"><span>Ödenen</span><strong>{paidTotal.toFixed(2)} TL</strong></div>
+                <div className="payment-summary-row"><span>{signedBalanceLabel}</span><strong>{signedBalanceValue.toFixed(2)} TL</strong></div>
               </div>
             </div>
+            <button
+              className="btn payment-note-toggle"
+              type="button"
+              aria-expanded={paymentNoteOpen}
+              aria-controls="walkin-payment-note-field"
+              onClick={() => setPaymentNoteOpen((open) => !open)}
+            >
+              {paymentNoteOpen ? 'Notu Kapat' : 'Not Ekle (Opsiyonel)'}
+            </button>
+            <div id="walkin-payment-note-field" hidden={!paymentNoteOpen}>
+              <label>
+                <div className="payment-field-label">Not (opsiyonel)</div>
+                <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
+              </label>
+            </div>
+            {selectedPaymentIsCash && (
+              <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
+                <div>Paraüstü</div><div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2535,10 +2583,10 @@ export default function WalkInPosPage() {
           ))}
           {!accountsLoading && (accountResults || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Sonuç yok</div>}
         </div>
-        <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
-          <input type="number" className="input" value={veresiyeAmount} onChange={(e) => setVeresiyeAmount(e.target.value)} disabled={busy} />
-        </label>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 10 }}>
+          <span style={{ color: 'var(--muted)' }}>Veresiye Tutarı</span>
+          <strong>{(Number(veresiyeAmount) || 0).toFixed(2)} TL</strong>
+        </div>
         <label>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
           <input className="input" value={veresiyeNote} onChange={(e) => setVeresiyeNote(e.target.value)} disabled={busy} />

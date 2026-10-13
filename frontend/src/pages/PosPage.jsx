@@ -60,7 +60,9 @@ export default function PosPage() {
   const [payOpen, setPayOpen] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
+  const paymentAmountKeypadEditedRef = useRef(false)
   const [paymentNote, setPaymentNote] = useState('')
+  const [paymentNoteOpen, setPaymentNoteOpen] = useState(false)
   const [entryDate, setEntryDate] = useState(() => (canEditEntryDate ? readSalesEntryDate() : todayYmd()))
   const [savedEntryDate, setSavedEntryDate] = useState('')
   const [paymentEntryDate, setPaymentEntryDate] = useState(() => todayYmd())
@@ -86,6 +88,7 @@ export default function PosPage() {
   const [mergedBadge, setMergedBadge] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [splitSelection, setSplitSelection] = useState({})
+  const [splitDraftCounts, setSplitDraftCounts] = useState({})
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [orderNoteModalOpen, setOrderNoteModalOpen] = useState(false)
   const [tableNoteModalOpen, setTableNoteModalOpen] = useState(false)
@@ -1353,13 +1356,16 @@ export default function PosPage() {
       setNote(fresh.note || '')
       const due = Number(fresh.balanceDue ?? fresh.totals?.balanceDue ?? 0)
       setPaymentAmount(due > 0 ? String(due) : '')
+      paymentAmountKeypadEditedRef.current = false
       setPaymentNote('')
+      setPaymentNoteOpen(false)
       setSplitSelection({})
+      setSplitDraftCounts({})
       setSplitOpen(false)
     }
   }
 
-  const applyDiscount = async () => {
+  const applyDiscount = async (percent = discountDraft) => {
     if (!canTakePayment) {
       toast.error('İndirim yetkiniz yok')
       return
@@ -1372,7 +1378,7 @@ export default function PosPage() {
     }
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/discount`, {
       method: 'PUT',
-      body: JSON.stringify({ discountPercent: Number(discountDraft) }),
+      body: JSON.stringify({ discountPercent: Number(percent) }),
       signal,
       silent: true
     }))
@@ -1381,6 +1387,7 @@ export default function PosPage() {
       setNote(fresh.note || '')
       const due = Number(fresh.balanceDue ?? fresh.totals?.balanceDue ?? 0)
       setPaymentAmount(due > 0 ? String(due) : '')
+      paymentAmountKeypadEditedRef.current = false
     }
   }
 
@@ -1436,8 +1443,9 @@ export default function PosPage() {
     setAccountResults([])
     setSelectedAccount(null)
     searchAccounts('')
-    const due = Number(order?.balanceDue ?? order?.totals?.balanceDue ?? 0)
-    setVeresiyeAmount(due > 0 ? String(due) : '')
+    const due = Number(order?.balanceDue ?? order?.totals?.balanceDue ?? balanceDue ?? 0)
+    const enteredAmount = Number(String(paymentAmount || '').trim())
+    setVeresiyeAmount(enteredAmount > 0 ? String(enteredAmount) : due > 0 ? String(due) : '')
     setVeresiyeNote('')
   }
 
@@ -1612,12 +1620,11 @@ export default function PosPage() {
 
   const openSplit = async () => {
     setError('')
-    const initial = {}
-    payableSplitRows.forEach((row) => {
-      initial[row.key] = false
+    setSplitSelection((current) => {
+      if (Object.keys(current || {}).length > 0) return current
+      return Object.fromEntries(payableSplitRows.map((row) => [row.key, false]))
     })
-    setSplitSelection(initial)
-    setSplitOpen(true)
+    setSplitOpen((current) => !current)
   }
 
   const submitSplit = async () => {
@@ -1625,8 +1632,24 @@ export default function PosPage() {
       toast.error('En az bir ürün seçin')
       return
     }
-    setSplitOpen(false)
     setPaymentAmount(splitSelectedAmount > 0 ? String(splitSelectedAmount) : '')
+    paymentAmountKeypadEditedRef.current = false
+    setSplitOpen(false)
+  }
+
+  const applyPaymentKey = (key) => {
+    const currentAmount = paymentAmountKeypadEditedRef.current ? String(paymentAmount || '') : ''
+    paymentAmountKeypadEditedRef.current = true
+    if (key === 'back') {
+      setPaymentAmount(currentAmount.slice(0, -1))
+      return
+    }
+    if (key === '.') {
+      if (currentAmount.includes('.')) return
+      setPaymentAmount(currentAmount ? `${currentAmount}.` : '0.')
+      return
+    }
+    setPaymentAmount(currentAmount === '0' ? key : `${currentAmount}${key}`)
   }
 
   const hasOpenItems = (order?.items || []).some(it => it.status === 'open')
@@ -1678,6 +1701,36 @@ export default function PosPage() {
       return seenQty >= alreadyPaidQty
     })
   }, [splitRows, paidSplitUnitCounts])
+  const splitCardGroups = useMemo(() => {
+    const groups = new Map()
+    for (const row of splitRows) {
+      const item = row?.repr || {}
+      const recordId = String(row?.itemId || item?._id || item?.id || '')
+      const productId = String(item?.menuItemId || item?.productId || item?.product?._id || '').trim()
+      const productName = String(item?.nameSnapshot || item?.name || '').trim().toLocaleLowerCase('tr-TR')
+      const quantity = Math.max(1, Math.floor(Number(item?.qty || 0) || 1))
+      const unitPrice = Number(item?.priceSnapshot ?? (quantity > 0 ? Number(item?.subtotal || 0) / quantity : 0))
+      const groupKey = JSON.stringify([
+        productId || productName || recordId || String(row?.key || ''),
+        unitPrice,
+        String(item?.servingType || ''),
+        String(item?.note || '').trim(),
+        Boolean(item?.isWeightBased)
+      ])
+      const itemId = groupKey
+      if (!groups.has(itemId)) {
+        groups.set(itemId, { itemId, recordId, item, rows: [], records: [], quantity: 0, lineTotal: 0 })
+      }
+      const group = groups.get(itemId)
+      group.rows.push(row)
+      if (recordId && !group.records.some((record) => record.recordId === recordId)) {
+        group.records.push({ recordId, item })
+        group.quantity += quantity
+        group.lineTotal += Number(item?.subtotal ?? unitPrice * quantity)
+      }
+    }
+    return Array.from(groups.values())
+  }, [splitRows])
   const splitSelectedRows = useMemo(
     () => payableSplitRows.filter((row) => splitSelection?.[row.key] === true),
     [payableSplitRows, splitSelection]
@@ -1793,8 +1846,12 @@ export default function PosPage() {
     if (params.get('pay') !== '1' || !getOrderId(order) || payOpen) return
     setDiscountDraft(Number(order?.discountPercent || 0))
     setPaymentAmount(signedBalance > 0.01 ? String(signedBalance) : '')
+    paymentAmountKeypadEditedRef.current = false
     setPaymentNote('')
+    setPaymentNoteOpen(false)
     setPaymentEntryDate(todayYmd())
+    setSplitSelection({})
+    setSplitDraftCounts({})
     setPayOpen(true)
     params.delete('pay')
     const nextQuery = params.toString()
@@ -1814,9 +1871,12 @@ export default function PosPage() {
     } catch {}
     setDiscountDraft(Number(order?.discountPercent || 0))
     setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '')
+    paymentAmountKeypadEditedRef.current = false
     setPaymentNote('')
+    setPaymentNoteOpen(false)
     setSplitOpen(false)
     setSplitSelection({})
+    setSplitDraftCounts({})
     setPayOpen(true)
   }
 
@@ -1888,12 +1948,6 @@ export default function PosPage() {
           </div>
         </div>
       </div>
-
-      {order?.servingType && servingType !== order.servingType && (
-        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
-          Seçim bir sonraki gönderimde geçerli
-        </div>
-      )}
 
       {canSendToKitchen && (
         <div className="saleCartMobileActionBar">
@@ -2213,38 +2267,38 @@ export default function PosPage() {
             {isMobilePortrait ? (
               <div className="saleCartFooterActions saleCartFooterActions--mobile">
                 <button
-                  className="btn saleCartFooterActionBtn"
+                  className="btn saleCartFooterActionBtn saleCartFooterActionBtn--payment"
                   onClick={openPaymentModal}
                   disabled={!getOrderId(order)}
                 >Ödeme Al</button>
-                <button className="btn saleCartFooterActionBtn" type="button" onClick={openTableNoteModal} disabled={!tableId}>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--note" type="button" onClick={openTableNoteModal} disabled={!tableId}>
                   Masa Notu
                 </button>
-                <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
-                <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--note" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
                   Sipariş Notu
                 </button>
-                <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
-                <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-                <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--transfer" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--print" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--preview" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
               </div>
             ) : (
               <div className="saleCartFooterActions">
-                <button className="btn saleCartFooterActionBtn" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--note" type="button" onClick={openOrderNoteModal} disabled={!getOrderId(order)}>
                   Sipariş Notu
                 </button>
-                <button className="btn saleCartFooterActionBtn" type="button" onClick={openTableNoteModal} disabled={!tableId}>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--note" type="button" onClick={openTableNoteModal} disabled={!tableId}>
                   Masa Notu
                 </button>
                 <button
-                  className="btn saleCartFooterActionBtn"
+                  className="btn saleCartFooterActionBtn saleCartFooterActionBtn--payment"
                   onClick={openPaymentModal}
                   disabled={!getOrderId(order)}
                 >Ödeme Al</button>
-                <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
-                <button className="btn saleCartFooterActionBtn" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
-                <button className="btn saleCartFooterActionBtn" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
-                <button className="btn saleCartFooterActionBtn" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={(order?.paidTotal > 0) || order.status === 'cancelled'}>İptal</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--transfer" onClick={openTransfer} disabled={!order.tableId || (order.status !== 'open' && order.status !== 'sent')}>Masa Taşı</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--print" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
+                <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--preview" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
               </div>
             )}
           </div>
@@ -2348,180 +2402,400 @@ export default function PosPage() {
         </div>
       </div>
 
-    <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Ödeme Al" dialogStyle={{ width: 'min(700px, calc(100vw - 32px))' }} bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}>
+    <Modal
+      open={payOpen}
+      onClose={() => setPayOpen(false)}
+      title="Ödeme Al"
+      headerActions={(
+        <span className="payment-modal-header-meta">
+          {tableName ? `Masa: ${tableName}` : 'Masasız'} · {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş —'}
+        </span>
+      )}
+      dialogStyle={{ width: 'min(1120px, calc(100vw - 32px))' }}
+      bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}
+    >
       <div className="payment-modal-stack">
-        <div className="payment-meta-line">
-          {tableName ? `Masa: ${tableName}` : 'Masasız'} • {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş —'}
+        <div className="payment-amount-banner">
+          <span className="payment-amount-icon" aria-hidden="true">▣</span>
+          <span className="payment-amount-copy">
+            <span>Ödenecek Tutar</span>
+            <strong>{balanceDue.toFixed(2)} TL</strong>
+          </span>
+          {canEditEntryDate ? (
+            <div className="payment-amount-date">
+              <span className="payment-amount-date-label">Ödeme Tarihi</span>
+              <SalesEntryDateButton
+                value={paymentEntryDate}
+                onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+                title="Ödeme tarihini seç"
+                showValue
+              />
+            </div>
+          ) : null}
         </div>
-
-        <div className="payment-panel">
-          <div className="payment-panel-body payment-summary-card">
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>Brüt</div>
-              <div style={{ fontWeight: 600 }}>{grossTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row payment-summary-row--editor">
-              <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
-              <div className="payment-summary-actions">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="input"
-                  value={discountDraft}
-                  onChange={(e) => setDiscountDraft(e.target.value)}
-                  disabled={!canTakePayment || busy}
-                />
-                <button className="btn btn--compact" onClick={applyDiscount} disabled={!canTakePayment || busy}>
-                  Uygula
-                </button>
-              </div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
-              <div style={{ fontWeight: 600 }}>{discountTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>Net</div>
-              <div style={{ fontWeight: 700 }}>{netTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>Ödenen</div>
-              <div style={{ fontWeight: 600 }}>{paidTotal.toFixed(2)} TL</div>
-            </div>
-            <div className="payment-summary-row">
-              <div style={{ color: 'var(--muted)' }}>{signedBalanceLabel}</div>
-              <div style={{ fontWeight: 700 }}>{signedBalanceValue.toFixed(2)} TL</div>
-            </div>
-          </div>
-        </div>
-
-        {previousLines.length > 0 && (
-          <div className="payment-panel">
-            <div className="payment-panel-body">
-            <div style={{ fontWeight: 600, marginBottom: 2 }}>Önceki Ödemeler</div>
-            <div className="payment-history-list">
-              {previousLines.map((r) => (
-                <div key={`${r.kind}:${r.id}`} className="payment-history-row">
-                  <div style={{ display: 'grid' }}>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
-                    <div style={{ fontWeight: 600 }}>
-                      {Number(r.amount || 0).toFixed(2)} TL • {r.label}
-                      {(r.accountName && r.accountName !== '-') ? ` • ${r.accountName}` : ''}
-                    </div>
-                    {!!r.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div>}
+        <div className="payment-modal-layout">
+          <section className="payment-panel payment-split-pane">
+            {previousLines.length > 0 && (
+              <div className="payment-panel payment-history-panel">
+                <div className="payment-panel-body">
+                  <div className="payment-split-title">Önceki Ödemeler</div>
+                  <div className="payment-history-list">
+                    {previousLines.map((r) => (
+                      <div key={`${r.kind}:${r.id}`} className="payment-history-row">
+                        <div style={{ display: 'grid' }}>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {Number(r.amount || 0).toFixed(2)} TL • {r.label}
+                            {(r.accountName && r.accountName !== '-') ? ` • ${r.accountName}` : ''}
+                          </div>
+                          {!!r.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div>}
+                        </div>
+                        {r.canDelete && (
+                          <button
+                            className="btn btn--compact"
+                            onClick={() => {
+                              if (r.kind === 'payment') return deletePayment(r.id)
+                              if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
+                              if (r.kind === 'collection') return deleteCollection(r.id)
+                              if (r.kind === 'discount') return deleteDiscount()
+                            }}
+                            disabled={busy}
+                          >
+                            Sil
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {r.canDelete && (
-                    <button
-                      className="btn btn--compact"
-                      onClick={() => {
-                        if (r.kind === 'payment') return deletePayment(r.id)
-                        if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
-                        if (r.kind === 'collection') return deleteCollection(r.id)
-                        if (r.kind === 'discount') return deleteDiscount()
-                      }}
-                      disabled={busy}
-                    >
-                      Sil
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            </div>
-          </div>
-        )}
-
-        <div className="payment-panel">
-          <div className="payment-panel-body">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div>
-                <div className="payment-field-label">Ödeme Böl</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  {splitSelectedRows.length > 0
-                    ? `${splitSelectedRows.length} ürün seçildi • ${splitSelectedAmount.toFixed(2)} TL`
-                    : 'Aynı fiş içinde ürün bazlı ödeme seçebilirsiniz.'}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {canEditEntryDate ? (
-                  <SalesEntryDateButton
-                    value={paymentEntryDate}
-                    onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
-                    title="Ödeme tarihini seç"
-                    showValue
-                  />
-                ) : null}
-                <button className="btn btn--compact" type="button" onClick={openSplit} disabled={!canSplitOrder || busy}>
-                  Ödeme Böl
+            )}
+            <div className="payment-panel-body">
+              <div className="payment-split-heading">
+                <div>
+                  <div className="payment-split-title">Ödeme Bölme</div>
+                  <div className="payment-split-caption">
+                    {splitSelectedRows.length > 0
+                      ? `${splitSelectedRows.length} adet seçildi • ${splitSelectedAmount.toFixed(2)} TL`
+                      : 'Ödenecek ürün ve adetleri seçin.'}
+                  </div>
+                </div>
+                <button
+                  className="btn btn--compact payment-split-toggle"
+                  type="button"
+                  onClick={openSplit}
+                  aria-expanded={splitOpen}
+                  aria-controls="payment-split-content"
+                  disabled={!canSplitOrder || busy}
+                >
+                  {splitOpen ? 'Bölmeyi Kapat' : 'Bölme Düzeni'}
                 </button>
-                {splitSelectedRows.length > 0 && (
-                  <button
-                    className="btn btn--compact"
-                    type="button"
-                    onClick={() => {
-                      setSplitSelection({})
-                      setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '')
+              </div>
+              <div id="payment-split-content" className={`payment-split-content${splitOpen ? ' is-open' : ''}`}>
+                <div className="payment-split-list">
+                  {splitCardGroups.map((group) => {
+                    const item = group.item || {}
+                    const itemId = group.itemId
+                    const groupRecordIds = new Set(group.records.map((record) => record.recordId))
+                    const splitRowsForItem = payableSplitRows.filter((row) => groupRecordIds.has(String(row?.itemId || row?.repr?._id || row?.repr?.id || row?.key || '')))
+                    const selectedQty = splitRowsForItem.filter((row) => splitSelection?.[row.key] === true).length
+                    const draftQty = Math.min(splitRowsForItem.length, Math.max(0, Math.floor(Number(splitDraftCounts?.[itemId] || 0))))
+                    const paidQty = group.records.reduce((sum, record) => sum + (paidSplitUnitCounts.get(record.recordId) || 0), 0)
+                    const itemQty = group.quantity
+                    const selected = draftQty > 0 && selectedQty === draftQty
+                    const catalogProduct = items.find((product) => String(product?._id || product?.id || '') === String(item?.menuItemId || '')) || item
+                    const servingLabel = servingTypeLabelTR(item?.servingType || order?.servingType, { fallback: '' })
+                    const unitPrice = Number(item?.priceSnapshot ?? (itemQty > 0 ? Number(item?.subtotal || 0) / itemQty : 0))
+                    const lineTotal = group.lineTotal
+                    const note = String(item?.note || '').trim()
+                    return (
+                      <article key={itemId} className="payment-split-product">
+                        <div className="payment-split-product-main">
+                          <div className="payment-split-product-info-row">
+                            <ProductImage
+                              className="payment-split-product-image"
+                              product={catalogProduct}
+                              alt={item?.nameSnapshot || catalogProduct?.name || 'Ürün'}
+                              loading="lazy"
+                            />
+                            <div className="payment-split-product-heading">
+                              <div className="payment-split-item">
+                                <div className="payment-split-item-name">{item?.nameSnapshot || catalogProduct?.name || 'Ürün'}</div>
+                                <div className="payment-split-item-meta">
+                                  {unitPrice.toFixed(2)} TL{item?.isWeightBased ? '/KG' : ''}
+                                  {servingLabel ? ` • ${servingLabel}` : ''}
+                                </div>
+                                {note ? <div className="payment-split-item-meta">Not: {note}</div> : null}
+                              </div>
+                              <strong className="payment-split-product-total">{lineTotal.toFixed(2)} TL</strong>
+                            </div>
+                          </div>
+                          <div className="payment-split-product-actions-row">
+                            <div className="payment-split-product-controls">
+                              <div className="payment-split-quantity" aria-label={`Bölünecek adet ${draftQty}`}>
+                              <button
+                                type="button"
+                                aria-label={`${item?.nameSnapshot || 'Ürün'} bölünecek adedini azalt`}
+                                onClick={() => {
+                                  setSplitDraftCounts((prev) => ({ ...(prev || {}), [itemId]: Math.max(0, draftQty - 1) }))
+                                  setSplitSelection((prev) => {
+                                    const next = { ...(prev || {}) }
+                                    for (const row of group.rows) delete next[row.key]
+                                    return next
+                                  })
+                                }}
+                                disabled={draftQty <= 0 || busy}
+                              >
+                                −
+                              </button>
+                              <span>{draftQty}</span>
+                              <button
+                                type="button"
+                                aria-label={`${item?.nameSnapshot || 'Ürün'} bölünecek adedini artır`}
+                                onClick={() => {
+                                  setSplitDraftCounts((prev) => ({ ...(prev || {}), [itemId]: Math.min(splitRowsForItem.length, draftQty + 1) }))
+                                  setSplitSelection((prev) => {
+                                    const next = { ...(prev || {}) }
+                                    for (const row of group.rows) delete next[row.key]
+                                    return next
+                                  })
+                                }}
+                                disabled={draftQty >= splitRowsForItem.length || busy}
+                              >
+                                +
+                              </button>
+                              </div>
+                              <span className="payment-split-allocation">
+                                Bölünen {Math.min(paidQty, itemQty)}/{itemQty}
+                                {selectedQty > 0 ? ` · Seçilen ${selectedQty}` : ''}
+                              </span>
+                            </div>
+                            <div className="payment-split-unit-list">
+                            <button
+                              type="button"
+                              className={`payment-split-select${selected ? ' is-selected' : ''}`}
+                              aria-pressed={selected}
+                              onClick={() => {
+                                setSplitSelection((prev) => {
+                                  const next = { ...(prev || {}) }
+                                  for (const row of group.rows) delete next[row.key]
+                                  if (!selected) {
+                                    for (const row of splitRowsForItem.slice(0, draftQty)) next[row.key] = true
+                                  }
+                                  return next
+                                })
+                              }}
+                              disabled={!canSplitOrder || busy || draftQty === 0}
+                            >
+                              {selected ? 'Seçildi' : `Böl ${draftQty}`}
+                            </button>
+                            {splitRowsForItem.length === 0 ? (
+                              <span className="payment-split-paid-label">Tüm adetler ödendi</span>
+                            ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  })}
+                  {splitCardGroups.length === 0 ? (
+                    <div className="payment-split-empty">Siparişte ürün bulunmuyor.</div>
+                  ) : null}
+                </div>
+                <div className="payment-split-footer">
+                  <div className="payment-split-total">
+                    <span>Seçilen ürünlerin net tutarı</span>
+                    <strong>{splitSelectedAmount.toFixed(2)} TL</strong>
+                  </div>
+                  <div className="payment-split-actions">
+                    {splitSelectedRows.length > 0 ? (
+                      <button
+                        className="btn btn--compact"
+                        type="button"
+                        onClick={() => {
+                          setSplitSelection({})
+                          setSplitDraftCounts({})
+                          setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '')
+                          paymentAmountKeypadEditedRef.current = false
+                        }}
+                        disabled={busy}
+                      >
+                        Seçimi Temizle
+                      </button>
+                    ) : null}
+                    <button className="btn btn--compact" type="button" onClick={submitSplit} disabled={payableSplitRows.length === 0 || busy}>
+                      Tutarı Uygula
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="payment-entry-pane">
+            <div className="payment-panel">
+              <div className="payment-panel-body">
+                <div className="payment-split-order-summary">
+                  <div className="payment-summary-row">
+                    <span>Ara Toplam</span>
+                    <strong>{grossTotal.toFixed(2)} TL</strong>
+                  </div>
+                  <div className="payment-summary-row payment-summary-row--editor">
+                    <label htmlFor="payment-discount-percent">İndirim (%)</label>
+                    <div className="payment-summary-actions">
+                      <input
+                        id="payment-discount-percent"
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="input"
+                        value={discountDraft}
+                        onChange={(e) => setDiscountDraft(e.target.value)}
+                        disabled={!canTakePayment || busy}
+                      />
+                      <button className="btn btn--compact" onClick={() => applyDiscount()} disabled={!canTakePayment || busy}>
+                        Uygula
+                      </button>
+                    </div>
+                  </div>
+                  <div className="payment-discount-presets" aria-label="Hazır indirim oranları">
+                    {[1, 5, 10, 15, 20, 25, 30].map((percent) => (
+                      <button
+                        key={percent}
+                        type="button"
+                        onClick={() => {
+                          setDiscountDraft(String(percent))
+                          applyDiscount(percent)
+                        }}
+                        disabled={!canTakePayment || busy}
+                      >
+                        %{percent}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="payment-summary-totals">
+                    <div className="payment-summary-row">
+                      <span>İndirim Tutarı</span>
+                      <strong>{discountTotal.toFixed(2)} TL</strong>
+                    </div>
+                    <div className="payment-summary-row payment-summary-row--net">
+                      <span>Net</span>
+                      <strong>{netTotal.toFixed(2)} TL</strong>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="payment-field-label">Ödeme Yöntemi</div>
+                  <div id="payment-method-grid" className="payment-method-grid">
+                    {payMethods.map((m) => {
+                      const active = paymentMethod === m.key
+                      return (
+                        <button
+                          key={m.key}
+                          type="button"
+                          className={`btn payment-method-btn ${active ? 'is-active' : ''}`}
+                          disabled={!canTakePayment || busy}
+                          onClick={() => setPaymentMethod(m.key)}
+                        >
+                          {m.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <label>
+                  <div className="payment-field-label">Alınan Tutar</div>
+                  <input
+                    type="number"
+                    className="input"
+                    value={paymentAmount}
+                    onChange={(e) => {
+                      paymentAmountKeypadEditedRef.current = true
+                      setPaymentAmount(e.target.value)
                     }}
-                    disabled={busy}
-                  >
-                    Seçimi Temizle
+                    placeholder="Tutar giriniz"
+                    disabled={!canTakePayment || busy}
+                  />
+                </label>
+                <div className="payment-quick-values" aria-label="Hızlı tutarlar">
+                  <button type="button" className="payment-quick-all" onClick={() => { paymentAmountKeypadEditedRef.current = true; setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '') }} disabled={!canTakePayment || busy}>
+                    Tamamını Al
+                    <span>{balanceDue.toFixed(2)} TL</span>
                   </button>
+                  {[1000, 500, 200, 100].map((amount) => (
+                    <button key={amount} type="button" onClick={() => { paymentAmountKeypadEditedRef.current = true; setPaymentAmount(String(amount)) }} disabled={!canTakePayment || busy}>
+                      {amount.toLocaleString('tr-TR')} TL
+                    </button>
+                  ))}
+                </div>
+                <div className="payment-keypad" aria-label="Sayısal tuş takımı">
+                  {['1', '2', '3', 'back', '4', '5', '6', '7', '8', '9', '0', '.'].map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`payment-key${key === 'back' ? ' payment-key--back' : ''}${key === '0' ? ' payment-key--zero' : ''}`}
+                      data-key={key}
+                      aria-label={key === 'back' ? 'Son rakamı sil' : undefined}
+                      onClick={() => applyPaymentKey(key)}
+                      disabled={!canTakePayment || busy}
+                    >
+                      {key === 'back' ? '⌫' : key === '.' ? ',' : key}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="payment-key payment-key--submit"
+                    onClick={payOrder}
+                    disabled={!canTakePayment || busy || balanceDue <= 0.01}
+                  >
+                    <span aria-hidden="true">✓</span>
+                    Ödeme Ekle
+                  </button>
+                  <button
+                    type="button"
+                    className="payment-key payment-key--credit"
+                    onClick={openVeresiye}
+                    disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}
+                  >
+                    Veresiye Yap
+                  </button>
+                </div>
+                <div className="payment-panel payment-balance-summary">
+                  <div className="payment-panel-body payment-summary-card">
+                    <div className="payment-summary-row">
+                      <div style={{ color: 'var(--muted)' }}>Ödenen</div>
+                      <div style={{ fontWeight: 600 }}>{paidTotal.toFixed(2)} TL</div>
+                    </div>
+                    <div className="payment-summary-row">
+                      <div style={{ color: 'var(--muted)' }}>{signedBalanceLabel}</div>
+                      <div style={{ fontWeight: 700 }}>{signedBalanceValue.toFixed(2)} TL</div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="btn payment-note-toggle"
+                  type="button"
+                  aria-expanded={paymentNoteOpen}
+                  aria-controls="payment-note-field"
+                  onClick={() => setPaymentNoteOpen((open) => !open)}
+                >
+                  {paymentNoteOpen ? 'Notu Kapat' : 'Not Ekle (Opsiyonel)'}
+                </button>
+                <div id="payment-note-field" hidden={!paymentNoteOpen}>
+                  <label>
+                    <div className="payment-field-label">Not (opsiyonel)</div>
+                    <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
+                  </label>
+                </div>
+                {selectedPaymentIsCash && (
+                  <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    <div>Paraüstü</div>
+                    <div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
+                  </div>
                 )}
               </div>
             </div>
-            <div>
-              <div className="payment-field-label">Yöntem</div>
-              <div className="payment-method-grid">
-                {payMethods.map((m) => {
-                  const active = paymentMethod === m.key
-                  return (
-                    <button
-                      key={m.key}
-                      type="button"
-                      className={`btn payment-method-btn ${active ? 'is-active' : ''}`}
-                      disabled={!canTakePayment || busy}
-                      onClick={() => setPaymentMethod(m.key)}
-                    >
-                      {m.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <label>
-              <div className="payment-field-label">Tutar</div>
-              <input
-                type="number"
-                className="input"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                placeholder="Tutar giriniz"
-                disabled={!canTakePayment || busy}
-              />
-            </label>
-            <label>
-              <div className="payment-field-label">Not (opsiyonel)</div>
-              <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
-            </label>
-            {selectedPaymentIsCash && (
-              <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                <div>Paraüstü</div>
-                <div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
-              </div>
-            )}
-            <div className="payment-actions">
-              <button className="btn btn--compact" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
-                Ödeme Ekle
-              </button>
-              <button className="btn btn--compact" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
-                Veresiye Yap
-              </button>
-              <button className="btn btn--compact" onClick={() => setPayOpen(false)} disabled={busy}>
-                Kapat
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       </div>
     </Modal>
@@ -2569,10 +2843,10 @@ export default function PosPage() {
           ))}
           {!accountsLoading && (accountResults || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Sonuç yok</div>}
         </div>
-        <label>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
-          <input type="number" className="input" value={veresiyeAmount} onChange={(e) => setVeresiyeAmount(e.target.value)} disabled={busy} />
-        </label>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 10 }}>
+          <span style={{ color: 'var(--muted)' }}>Veresiye Tutarı</span>
+          <strong>{(Number(veresiyeAmount) || 0).toFixed(2)} TL</strong>
+        </div>
         <label>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
           <input className="input" value={veresiyeNote} onChange={(e) => setVeresiyeNote(e.target.value)} disabled={busy} />
@@ -2614,55 +2888,6 @@ export default function PosPage() {
           <button className="btn" onClick={() => setIsCreateAccountOpen(false)} disabled={busy}>
             Vazgeç
           </button>
-        </div>
-      </div>
-    </Modal>
-
-
-    <Modal open={splitOpen} onClose={() => setSplitOpen(false)} title="Ödeme Böl">
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>Aynı sipariş içinden ödemesi alınacak ürünleri seçin. Ürünler sepette kalır, sadece ödeme tutarı bölünür.</div>
-        <div style={{ display: 'grid', gap: 8, maxHeight: '50vh', overflowY: 'auto', paddingRight: 4 }}>
-          {payableSplitRows.map((row) => {
-            const item = row?.repr || {}
-            const itemId = String(row?.itemId || item?._id || item?.id || '')
-            const servingLabel = servingTypeLabelTR(item?.servingType || order?.servingType, { fallback: '' })
-            const unitPrice = Number(item?.priceSnapshot ?? row?.subtotal ?? 0)
-            const note = String(row?.note || item?.note || '').trim()
-            const selected = splitSelection?.[row.key] === true
-            return (
-              <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', border: '1px solid var(--border)', borderRadius: 14, padding: '10px 12px' }}>
-                <div style={{ minWidth: 0, display: 'grid', gap: 3 }}>
-                  <div style={{ fontWeight: 700 }}>{item?.nameSnapshot || 'Ürün'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {unitPrice.toFixed(2)} TL
-                    {servingLabel ? ` • ${servingLabel}` : ''}
-                    {itemId ? ` • #${itemId.slice(-4)}` : ''}
-                  </div>
-                  {note ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not: {note}</div> : null}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn--toggle"
-                  aria-pressed={selected}
-                  onClick={() => setSplitSelection((prev) => ({ ...(prev || {}), [row.key]: !selected }))}
-                >
-                  {selected ? 'Seçildi' : 'Seç'}
-                </button>
-              </div>
-            )
-          })}
-          {payableSplitRows.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ödeme böl için seçilebilir ürün kalmadı.</div>
-          ) : null}
-        </div>
-        {splitSelectedRows.length > 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-            Seçilen ürünlerin net ödeme tutarı: <strong style={{ color: 'var(--text)' }}>{splitSelectedAmount.toFixed(2)} TL</strong>
-          </div>
-        ) : null}
-        <div className="app-modal-footer">
-          <button className="btn" onClick={submitSplit} disabled={payableSplitRows.length === 0}>Tutari Uygula</button>
         </div>
       </div>
     </Modal>

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import SalesEntryDateButton from './SalesEntryDateButton.jsx'
 import { inferPaymentMethodType } from '../lib/paymentMethods.js'
@@ -36,6 +36,8 @@ export default function PaymentCollectionModal({
   onOpenVeresiye,
   dialogStyle = null
 }) {
+  const [paymentNoteOpen, setPaymentNoteOpen] = useState(false)
+  const paymentAmountKeypadEditedRef = useRef(false)
   const grossTotal = Number(order?.total ?? order?.totals?.total ?? order?.totals?.grandTotal ?? 0)
   const discountTotal = Number(order?.discountTotal ?? order?.totals?.discountTotal ?? 0)
   const netTotal = Number(order?.netTotal ?? order?.totals?.netTotal ?? grossTotal)
@@ -57,6 +59,27 @@ export default function PaymentCollectionModal({
   const historyLines = discountHistoryLine ? [discountHistoryLine, ...previousLines] : previousLines
   const visiblePayMethods = (Array.isArray(payMethods) ? payMethods : []).filter((method) => inferPaymentMethodType(method) !== 'credit')
 
+  useEffect(() => {
+    if (!open) return
+    paymentAmountKeypadEditedRef.current = false
+    setPaymentNoteOpen(false)
+  }, [open])
+
+  const applyPaymentKey = (key) => {
+    const currentAmount = paymentAmountKeypadEditedRef.current ? String(paymentAmount || '') : ''
+    paymentAmountKeypadEditedRef.current = true
+    if (key === 'back') {
+      onPaymentAmountChange?.(currentAmount.slice(0, -1))
+      return
+    }
+    if (key === '.') {
+      if (currentAmount.includes('.')) return
+      onPaymentAmountChange?.(currentAmount ? `${currentAmount}.` : '0.')
+      return
+    }
+    onPaymentAmountChange?.(currentAmount === '0' ? key : `${currentAmount}${key}`)
+  }
+
   return (
     <Modal
       open={open}
@@ -68,19 +91,38 @@ export default function PaymentCollectionModal({
     >
       {!order ? <div>Yükleniyor...</div> : (
         <div className="payment-modal-stack">
+          <div className="payment-amount-banner">
+            <span className="payment-amount-icon" aria-hidden="true">▣</span>
+            <span className="payment-amount-copy">
+              <span>Ödenecek Tutar</span>
+              <strong>{money(balanceDue)}</strong>
+            </span>
+            {showPaymentDate ? (
+              <div className="payment-amount-date">
+                <span className="payment-amount-date-label">Ödeme Tarihi</span>
+                <SalesEntryDateButton
+                  value={paymentDate}
+                  onChange={onPaymentDateChange}
+                  title="Ödeme tarihini seç"
+                  showValue
+                />
+              </div>
+            ) : null}
+          </div>
           <div className="payment-meta-line">
             {customerLabel} - {order?.customerName || 'Müşteri'} - {metaLabel}
           </div>
 
-          <div className="payment-panel">
-            <div className="payment-panel-body payment-summary-card">
-              <div className="payment-summary-row">
-                <div style={{ color: 'var(--muted)' }}>Brüt</div>
-                <div style={{ fontWeight: 600 }}>{money(grossTotal)}</div>
-              </div>
-              {showDiscount ? (
+          <div className="payment-panel payment-entry-pane">
+            <div className="payment-panel-body">
+              <div className="payment-split-order-summary">
+                <div className="payment-summary-row">
+                  <span>Ara Toplam</span>
+                  <strong>{money(grossTotal)}</strong>
+                </div>
+                {showDiscount ? (
                 <div className="payment-summary-row payment-summary-row--editor">
-                  <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
+                  <label className="payment-field-label">İndirim (%)</label>
                   <div className="payment-summary-actions">
                     <input
                       type="number"
@@ -91,37 +133,35 @@ export default function PaymentCollectionModal({
                       onChange={(event) => onDiscountDraftChange?.(event.target.value)}
                       disabled={!canTakePayment || busy}
                     />
-                    <button className="btn btn--compact" onClick={onApplyDiscount} disabled={!canTakePayment || busy}>
+                    <button className="btn btn--compact" type="button" onClick={onApplyDiscount} disabled={!canTakePayment || busy}>
                       Uygula
                     </button>
                   </div>
                 </div>
-              ) : null}
-              {showDiscount ? (
-                <div className="payment-summary-row">
-                  <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
-                  <div style={{ fontWeight: 600 }}>{money(discountTotal)}</div>
-                </div>
-              ) : null}
-              <div className="payment-summary-row">
-                <div style={{ color: 'var(--muted)' }}>Net</div>
-                <div style={{ fontWeight: 700 }}>{money(netTotal)}</div>
+                ) : null}
+                {showDiscount ? (
+                  <div className="payment-summary-totals">
+                    <div className="payment-summary-row">
+                      <span>İndirim Tutarı</span>
+                      <strong>{money(discountTotal)}</strong>
+                    </div>
+                    <div className="payment-summary-row payment-summary-row--net">
+                      <span>Net</span>
+                      <strong>{money(netTotal)}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="payment-summary-row payment-summary-row--net">
+                    <span>Net</span>
+                    <strong>{money(netTotal)}</strong>
+                  </div>
+                )}
               </div>
-              <div className="payment-summary-row">
-                <div style={{ color: 'var(--muted)' }}>Ödenen</div>
-                <div style={{ fontWeight: 600 }}>{money(paidTotal)}</div>
-              </div>
-              <div className="payment-summary-row">
-                <div style={{ color: 'var(--muted)' }}>Kalan</div>
-                <div style={{ fontWeight: 700 }}>{money(balanceDue)}</div>
-              </div>
-            </div>
-          </div>
 
-          {historyLines.length > 0 ? (
-            <div className="payment-panel">
-              <div className="payment-panel-body">
-                <div style={{ fontWeight: 600, marginBottom: 2 }}>Önceki Ödemeler</div>
+              {historyLines.length > 0 ? (
+                <div className="payment-panel payment-history-panel">
+                  <div className="payment-panel-body">
+                    <div className="payment-split-title">Önceki Ödemeler</div>
                 <div className="payment-history-list">
                   {historyLines.map((line) => (
                     <div key={`${line.kind}:${line.id}`} className="payment-history-row">
@@ -139,14 +179,12 @@ export default function PaymentCollectionModal({
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
-          ) : null}
+                  </div>
+                </div>
+              ) : null}
 
-          <div className="payment-panel">
-            <div className="payment-panel-body">
               <div>
-                <div className="payment-field-label">Yöntem</div>
+                <div className="payment-field-label">Ödeme Yöntemi</div>
                 <div className="payment-method-grid">
                   {visiblePayMethods.map((method) => {
                     const key = String(method?.key || method?.id || '')
@@ -166,52 +204,86 @@ export default function PaymentCollectionModal({
                   })}
                 </div>
               </div>
+
               <label>
-                <div className="payment-field-label">Tutar</div>
+                <div className="payment-field-label">Alınan Tutar</div>
                 <input
                   type="number"
                   className="input"
                   value={paymentAmount}
-                  onChange={(event) => onPaymentAmountChange?.(event.target.value)}
+                  onChange={(event) => {
+                    paymentAmountKeypadEditedRef.current = true
+                    onPaymentAmountChange?.(event.target.value)
+                  }}
                   placeholder="Tutar giriniz"
                   disabled={!canTakePayment || busy}
                 />
               </label>
-              <label>
-                <div className="payment-field-label">Not (opsiyonel)</div>
-                <input className="input" value={paymentNote} onChange={(event) => onPaymentNoteChange?.(event.target.value)} disabled={!canTakePayment || busy} />
-              </label>
+              <div className="payment-quick-values" aria-label="Hızlı tutarlar">
+                <button type="button" className="payment-quick-all" onClick={() => { paymentAmountKeypadEditedRef.current = true; onPaymentAmountChange?.(balanceDue > 0 ? String(balanceDue) : '') }} disabled={!canTakePayment || busy}>
+                  Tamamını Al
+                  <span>{money(balanceDue)}</span>
+                </button>
+                {[1000, 500, 200, 100].map((amount) => (
+                  <button key={amount} type="button" onClick={() => { paymentAmountKeypadEditedRef.current = true; onPaymentAmountChange?.(String(amount)) }} disabled={!canTakePayment || busy}>
+                    {amount.toLocaleString('tr-TR')} TL
+                  </button>
+                ))}
+              </div>
+              <div className="payment-keypad" aria-label="Sayısal tuş takımı">
+                {['1', '2', '3', 'back', '4', '5', '6', '7', '8', '9', '0', '.'].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`payment-key${key === 'back' ? ' payment-key--back' : ''}${key === '0' ? ' payment-key--zero' : ''}`}
+                    data-key={key}
+                    aria-label={key === 'back' ? 'Son rakamı sil' : undefined}
+                    onClick={() => applyPaymentKey(key)}
+                    disabled={!canTakePayment || busy}
+                  >
+                    {key === 'back' ? '⌫' : key === '.' ? ',' : key}
+                  </button>
+                ))}
+                <button className="payment-key payment-key--submit" type="button" onClick={onSubmit} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
+                  <span aria-hidden="true">✓</span>{submitLabel}
+                </button>
+                {showVeresiye ? (
+                  <button className="payment-key payment-key--credit" type="button" onClick={onOpenVeresiye} disabled={busy || balanceDue <= 0.01}>
+                    Veresiye Yap
+                  </button>
+                ) : null}
+              </div>
+              <div className="payment-panel payment-balance-summary">
+                <div className="payment-panel-body payment-summary-card">
+                  <div className="payment-summary-row">
+                    <span>Ödenen</span><strong>{money(paidTotal)}</strong>
+                  </div>
+                  <div className="payment-summary-row">
+                    <span>Kalan</span><strong>{money(balanceDue)}</strong>
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn payment-note-toggle"
+                type="button"
+                aria-expanded={paymentNoteOpen}
+                aria-controls="payment-note-field"
+                onClick={() => setPaymentNoteOpen((current) => !current)}
+              >
+                {paymentNoteOpen ? 'Notu Kapat' : 'Not Ekle (Opsiyonel)'}
+              </button>
+              <div id="payment-note-field" hidden={!paymentNoteOpen}>
+                <label>
+                  <div className="payment-field-label">Not (opsiyonel)</div>
+                  <input className="input" value={paymentNote} onChange={(event) => onPaymentNoteChange?.(event.target.value)} disabled={!canTakePayment || busy} />
+                </label>
+              </div>
               {selectedPaymentIsCash ? (
                 <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
                   <div>Para üstü</div>
                   <div style={{ fontWeight: 600 }}>{money(changeDue)}</div>
                 </div>
               ) : null}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {showPaymentDate ? (
-                    <SalesEntryDateButton
-                      value={paymentDate}
-                      onChange={onPaymentDateChange}
-                      title="Ödeme tarihini seç"
-                      showValue
-                    />
-                  ) : null}
-                </div>
-                <div className="payment-actions app-modal-footer">
-                  <button className="btn btn--compact" onClick={onSubmit} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
-                    {submitLabel}
-                  </button>
-                  {showVeresiye ? (
-                    <button className="btn btn--compact" onClick={onOpenVeresiye} disabled={busy || balanceDue <= 0.01}>
-                      Veresiye Yap
-                    </button>
-                  ) : null}
-                  <button className="btn btn--compact" onClick={onClose} disabled={busy}>
-                    Kapat
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

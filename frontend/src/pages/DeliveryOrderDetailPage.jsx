@@ -1068,7 +1068,8 @@ export default function DeliveryOrderDetailPage() {
     setAccountResults([])
     setSelectedAccount(null)
     searchAccounts('')
-    setVeresiyeAmount(balanceDue > 0 ? String(balanceDue) : '')
+    const enteredAmount = Number(String(paymentAmount || '').trim().replace(',', '.'))
+    setVeresiyeAmount(enteredAmount > 0 ? String(enteredAmount) : balanceDue > 0 ? String(balanceDue) : '')
     setVeresiyeNote('')
   }
 
@@ -1961,7 +1962,7 @@ export default function DeliveryOrderDetailPage() {
 
                   <div className="delivery-detail-footer-actions saleCartFooterActions" style={{ display: 'grid', gap: 8 }}>
                     <button
-                      className="btn saleCartFooterActionBtn"
+                      className="btn saleCartFooterActionBtn saleCartFooterActionBtn--payment"
                       onClick={() => {
                         setDiscountDraft(Number(order?.discountPercent || 0))
                         setPaymentAmount(signedBalance > 0.01 ? String(signedBalance) : '')
@@ -1970,7 +1971,7 @@ export default function DeliveryOrderDetailPage() {
                       }}
                       disabled={!getOrderId(order)}
                     >Ödeme Al</button>
-                    <button className="btn saleCartFooterActionBtn" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal Et</button>
+                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal Et</button>
                   </div>
                   </div>
                 </div>
@@ -2395,10 +2396,10 @@ export default function DeliveryOrderDetailPage() {
             ))}
             {!accountsLoading && (accountResults || []).length === 0 && <div style={{ color: 'var(--muted)' }}>Sonuç yok</div>}
           </div>
-          <label>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
-            <input type="number" className="input" value={veresiyeAmount} onChange={(e) => setVeresiyeAmount(e.target.value)} disabled={busy} />
-          </label>
+          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 10 }}>
+            <span style={{ color: 'var(--muted)' }}>Veresiye Tutarı</span>
+            <strong>{(Number(veresiyeAmount) || 0).toFixed(2)} TL</strong>
+          </div>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not</div>
             <input className="input" value={veresiyeNote} onChange={(e) => setVeresiyeNote(e.target.value)} disabled={busy} />

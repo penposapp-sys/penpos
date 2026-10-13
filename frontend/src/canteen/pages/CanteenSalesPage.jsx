@@ -127,8 +127,8 @@ function SaleDetailModal({ sale, open, onClose, onCancel, onReopen, loading, det
               {sale.cancelReason ? <div>İptal nedeni: <b>{sale.cancelReason}</b></div> : null}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <button type="button" className="btn" onClick={onReopen} disabled={loading}>Geri Aç</button>
-              <button type="button" className="btn btn--danger" onClick={onCancel} disabled={loading}>Sil / İptal Et</button>
+              <button type="button" className="btn canteen-sale-action canteen-sale-action--reopen" onClick={onReopen} disabled={loading}>Geri Aç</button>
+              <button type="button" className="btn btn--danger canteen-sale-action canteen-sale-action--cancel" onClick={onCancel} disabled={loading}>Sil / İptal Et</button>
             </div>
           </div>
         </div>
@@ -142,6 +142,11 @@ export default function CanteenSalesPage() {
   const navigate = useNavigate()
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const isCompact = isMobilePortrait || isTablet
+
+  useEffect(() => {
+    document.body.classList.add('canteen-sales-page-active')
+    return () => document.body.classList.remove('canteen-sales-page-active')
+  }, [])
 
   const canView = me?.role === 'tenant_admin' || (Array.isArray(me?.permissions) && (me.permissions.includes('canteen_sales_view') || me.permissions.includes('canteen_reports_view')))
 
@@ -403,7 +408,7 @@ export default function CanteenSalesPage() {
   if (!canView) return <div className="card">403 - Bu sayfaya yetkin yok</div>
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div className="canteen-sales-page" style={{ display: 'grid', gap: 18 }}>
       <div style={{ borderRadius: 28, border: '1px solid var(--app-border, var(--border))', background: 'var(--app-surface, var(--card-bg))', padding: 20, boxShadow: 'var(--card-shadow)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
@@ -478,9 +483,9 @@ export default function CanteenSalesPage() {
                       <span style={{ borderRadius: 999, padding: '6px 10px', background: meta.bg, color: meta.fg, fontSize: 12, fontWeight: 900 }}>{meta.label}</span>
                     </td>
                     <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button type="button" className="btn" onClick={() => openDetail(sale)} style={{ marginRight: 8 }}>Detay Gör</button>
-                      <button type="button" className="btn" onClick={() => requestReopen(sale)} style={{ marginRight: 8 }}>Geri Aç</button>
-                      <button type="button" className="btn btn--danger" onClick={() => requestCancel(sale)}>İptal</button>
+                      <button type="button" className="btn canteen-sale-action canteen-sale-action--detail" onClick={() => openDetail(sale)} style={{ marginRight: 8 }}>Detay Gör</button>
+                      <button type="button" className="btn canteen-sale-action canteen-sale-action--reopen" onClick={() => requestReopen(sale)} style={{ marginRight: 8 }}>Geri Aç</button>
+                      <button type="button" className="btn btn--danger canteen-sale-action canteen-sale-action--cancel" onClick={() => requestCancel(sale)}>İptal</button>
                     </td>
                   </tr>
                 )

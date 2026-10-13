@@ -46,6 +46,15 @@ export default function Layout() {
   }, [])
 
   useEffect(() => {
+    try {
+      document.body.classList.toggle('restaurant-app-layout', pathname.startsWith('/restoran'))
+    } catch {}
+    return () => {
+      try { document.body.classList.remove('restaurant-app-layout') } catch {}
+    }
+  }, [pathname])
+
+  useEffect(() => {
     setMobileMenuOpen(false)
   }, [pathname])
 

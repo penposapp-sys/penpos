@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
@@ -51,6 +51,8 @@ export default function AccountDetailPage() {
   const [collectForm, setCollectForm] = useState({ amount: '', method: '', note: '' })
   const [collectMethods, setCollectMethods] = useState([])
   const [collectDiscountDraft, setCollectDiscountDraft] = useState('0')
+  const [collectNoteOpen, setCollectNoteOpen] = useState(false)
+  const collectAmountKeypadEditedRef = useRef(false)
   const [manualOpen, setManualOpen] = useState(false)
   const [manualForm, setManualForm] = useState({ amount: '', type: 'debit', note: '' })
 
@@ -215,6 +217,27 @@ export default function AccountDetailPage() {
 
   const txRows = useMemo(() => (Array.isArray(tx) ? tx : []), [tx])
 
+  const updateCollectAmount = (amount) => {
+    collectAmountKeypadEditedRef.current = true
+    setCollectForm((previous) => ({ ...previous, amount }))
+  }
+
+  const applyCollectKey = (key) => {
+    const currentAmount = collectAmountKeypadEditedRef.current ? String(collectForm.amount || '') : ''
+    collectAmountKeypadEditedRef.current = true
+    if (key === 'back') {
+      setCollectForm((previous) => ({ ...previous, amount: currentAmount.slice(0, -1) }))
+      return
+    }
+    if (key === '.') {
+      if (currentAmount.includes('.')) return
+      setCollectForm((previous) => ({ ...previous, amount: currentAmount ? `${currentAmount}.` : '0.' }))
+      return
+    }
+    const amount = currentAmount === '0' ? key : `${currentAmount}${key}`
+    setCollectForm((previous) => ({ ...previous, amount }))
+  }
+
   const reloadAccount = async (accountId) => {
     const cleanId = String(accountId || '').trim()
     if (!cleanId) return
@@ -259,10 +282,11 @@ export default function AccountDetailPage() {
     }
   }
 
-  const applyCollectDiscount = async () => {
+  const applyCollectDiscount = async (percent = collectDiscountPercent) => {
     const accountId = String(account?.id || '').trim()
     if (!accountId) return
-    if (collectDiscountAmount <= 0) {
+    const discountAmount = Number(((collectGross * percent) / 100).toFixed(2))
+    if (discountAmount <= 0) {
       toast.error('İndirim tutarı geçersiz')
       return
     }
@@ -271,7 +295,7 @@ export default function AccountDetailPage() {
         method: 'POST',
         body: JSON.stringify({
           amount: 0,
-          discountAmount: collectDiscountAmount,
+          discountAmount,
           method: collectForm.method || 'other',
           note: collectForm.note || 'Cari indirimi',
           orderId: orderIdFromUrl || undefined
@@ -279,7 +303,7 @@ export default function AccountDetailPage() {
       })
       toast.success('İndirim uygulandı')
       setCollectDiscountDraft('0')
-      setCollectForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(account?.balance || 0) - collectDiscountAmount).toFixed(2)), note: '' }))
+      setCollectForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(account?.balance || 0) - discountAmount).toFixed(2)), note: '' }))
       await reloadAccount(accountId)
     } catch (err) {
       toast.error(err?.message || 'İndirim uygulanamadı')
@@ -442,6 +466,8 @@ export default function AccountDetailPage() {
               className="btn account-collect-btn"
               onClick={() => {
                 setCollectDiscountDraft('0')
+                collectAmountKeypadEditedRef.current = false
+                setCollectNoteOpen(false)
                 setCollectForm((prev) => ({
                   ...prev,
                   amount: String(Math.max(0, Number(account?.balance || 0)).toFixed(2)),
@@ -841,79 +867,74 @@ export default function AccountDetailPage() {
       )}
 
       <Modal open={collectOpen} onClose={() => setCollectOpen(false)} title="Tahsilat Al">
-        <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Cari: {account?.name || '-'} • Güncel Bakiye: {money(account?.balance || 0)}
+        <div className="payment-modal-stack">
+          <div className="payment-amount-banner">
+            <span className="payment-amount-icon" aria-hidden="true">▣</span>
+            <span className="payment-amount-copy">
+              <span>Cari Bakiyesi</span>
+              <strong>{money(collectGross)}</strong>
+            </span>
           </div>
-
-          <div className="card" style={{ borderColor: 'var(--border)' }}>
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Brüt</div>
-                <div style={{ fontWeight: 600 }}>{money(collectGross)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <div style={{ color: 'var(--muted)' }}>İndirim (%)</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="input"
-                    style={{ width: 120 }}
-                    value={collectDiscountDraft}
-                    onChange={(e) => setCollectDiscountDraft(e.target.value)}
-                  />
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={applyCollectDiscount}
-                  >
-                    Uygula
-                  </button>
+          <div className="payment-meta-line">Cari: {account?.name || '-'}</div>
+          <div className="payment-panel payment-entry-pane">
+            <div className="payment-panel-body">
+              <div className="payment-split-order-summary">
+                <div className="payment-summary-row">
+                  <span>Ara Toplam</span><strong>{money(collectGross)}</strong>
+                </div>
+                <div className="payment-summary-row payment-summary-row--editor">
+                  <label className="payment-field-label" htmlFor="collect-discount-percent">İndirim (%)</label>
+                  <div className="payment-summary-actions">
+                    <input
+                      id="collect-discount-percent"
+                      type="number"
+                      min="0"
+                      max="100"
+                      className="input"
+                      value={collectDiscountDraft}
+                      onChange={(e) => setCollectDiscountDraft(e.target.value)}
+                    />
+                    <button className="btn btn--compact" type="button" onClick={applyCollectDiscount}>Uygula</button>
+                  </div>
+                </div>
+                <div className="payment-discount-presets" aria-label="Hazır indirim oranları">
+                  {[1, 5, 10, 15, 20, 25, 30].map((percent) => (
+                    <button
+                      key={percent}
+                      type="button"
+                      onClick={() => {
+                        setCollectDiscountDraft(String(percent))
+                        applyCollectDiscount(percent)
+                      }}
+                    >
+                      %{percent}
+                    </button>
+                  ))}
+                </div>
+                <div className="payment-summary-totals">
+                  <div className="payment-summary-row">
+                    <span>İndirim Tutarı</span><strong>{money(collectDiscountAmount)}</strong>
+                  </div>
+                  <div className="payment-summary-row payment-summary-row--net">
+                    <span>Net</span><strong>{money(collectNet)}</strong>
+                  </div>
+                </div>
+                <div className="payment-summary-row">
+                  <span>Tahsilat sonrası kalan</span><strong>{money(collectRemaining)}</strong>
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>İndirim Tutarı</div>
-                <div style={{ fontWeight: 600 }}>{money(collectDiscountAmount)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Net</div>
-                <div style={{ fontWeight: 700 }}>{money(collectNet)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Bakiye</div>
-                <div style={{ fontWeight: 700 }}>{money(collectGross)}</div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ color: 'var(--muted)' }}>Kalan</div>
-                <div style={{ fontWeight: 700 }}>{money(collectRemaining)}</div>
-              </div>
-            </div>
-          </div>
 
-          <div className="card" style={{ borderColor: 'var(--border)' }}>
-            <div style={{ display: 'grid', gap: 10 }}>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Yöntem</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {collectMethods.map((m) => { /*
-                    { key: 'other', label: 'Diğer' }
-                  
-                    */ const active = collectForm.method === m.key
+                <div className="payment-field-label">Ödeme Yöntemi</div>
+                <div className="payment-method-grid">
+                  {collectMethods.map((m) => {
+                    const active = collectForm.method === m.key
                     return (
                       <button
                         key={m.key}
                         type="button"
-                        className="btn"
+                        className={`btn payment-method-btn ${active ? 'is-active' : ''}`}
                         onClick={() => setCollectForm({ ...collectForm, method: m.key })}
-                        style={{
-                          minWidth: 96,
-                          fontWeight: active ? 800 : 600,
-                          background: active ? '#111827' : undefined,
-                          color: active ? '#fff' : undefined,
-                          borderColor: active ? '#111827' : undefined
-                        }}
                       >
                         {m.label}
                       </button>
@@ -923,18 +944,56 @@ export default function AccountDetailPage() {
               </div>
 
               <label>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Tutar</div>
-                <input type="number" className="input" value={collectForm.amount} onChange={(e) => setCollectForm({ ...collectForm, amount: e.target.value })} placeholder="Tutar giriniz" />
+                <div className="payment-field-label">Alınan Tutar</div>
+                <input
+                  type="number"
+                  className="input"
+                  value={collectForm.amount}
+                  onChange={(e) => updateCollectAmount(e.target.value)}
+                  placeholder="Tutar giriniz"
+                />
               </label>
-
-              <label>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not (opsiyonel)</div>
-                <input className="input" value={collectForm.note} onChange={(e) => setCollectForm({ ...collectForm, note: e.target.value })} />
-              </label>
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" onClick={collect}>Tahsilat Ekle</button>
-                <button className="btn" onClick={() => setCollectOpen(false)}>Kapat</button>
+              <div className="payment-quick-values" aria-label="Hızlı tutarlar">
+                <button type="button" className="payment-quick-all" onClick={() => updateCollectAmount(String(collectNet))}>
+                  Tamamını Al<span>{money(collectNet)}</span>
+                </button>
+                {[1000, 500, 200, 100].map((amount) => (
+                  <button key={amount} type="button" onClick={() => updateCollectAmount(String(amount))}>
+                    {amount.toLocaleString('tr-TR')} TL
+                  </button>
+                ))}
+              </div>
+              <div className="payment-keypad" aria-label="Sayısal tuş takımı">
+                {['1', '2', '3', 'back', '4', '5', '6', '7', '8', '9', '0', '.'].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`payment-key${key === 'back' ? ' payment-key--back' : ''}${key === '0' ? ' payment-key--zero' : ''}`}
+                    data-key={key}
+                    aria-label={key === 'back' ? 'Son rakamı sil' : undefined}
+                    onClick={() => applyCollectKey(key)}
+                  >
+                    {key === 'back' ? '⌫' : key === '.' ? ',' : key}
+                  </button>
+                ))}
+                <button className="payment-key payment-key--submit" type="button" onClick={collect}>
+                  <span aria-hidden="true">✓</span>Tahsilat Ekle
+                </button>
+              </div>
+              <button
+                className="btn payment-note-toggle"
+                type="button"
+                aria-expanded={collectNoteOpen}
+                aria-controls="collect-payment-note-field"
+                onClick={() => setCollectNoteOpen((open) => !open)}
+              >
+                {collectNoteOpen ? 'Notu Kapat' : 'Not Ekle (Opsiyonel)'}
+              </button>
+              <div id="collect-payment-note-field" hidden={!collectNoteOpen}>
+                <label>
+                  <div className="payment-field-label">Not (opsiyonel)</div>
+                  <input className="input" value={collectForm.note} onChange={(e) => setCollectForm({ ...collectForm, note: e.target.value })} />
+                </label>
               </div>
             </div>
           </div>

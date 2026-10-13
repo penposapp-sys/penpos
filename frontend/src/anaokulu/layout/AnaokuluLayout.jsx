@@ -101,7 +101,6 @@ export default function AnaokuluLayout() {
   } else if (isStaff) {
     NAV.push({ to: '/anaokulu/ayarlar', label: 'Ayarlar', icon: '⚙️' })
   }
-  NAV.push({ to: '/anaokulu/tercihlerim', label: 'Kişisel Ayarlar', icon: '🎨' })
 
   const currentTenantForTitle = isManager
     ? (accessibleTenants.find((t) => String(t.id) === String(regionCurrentTenantId)))
@@ -316,7 +315,7 @@ export default function AnaokuluLayout() {
                   transition: 'all 0.15s ease'
                 })}
               >
-                <span>{item.label}</span>
+                <span style={{ fontSize: 12, lineHeight: 1.2 }}>{item.label}</span>
               </NavLink>
             ))}
           </nav>
@@ -557,13 +556,13 @@ export default function AnaokuluLayout() {
                     borderRadius: 12,
                     color: isActive ? '#fff' : '#cbd5e1',
                     textDecoration: 'none',
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: isActive ? 800 : 600,
                     background: isActive ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.04)',
                     boxShadow: isActive ? '0 6px 18px rgba(99,102,241,0.28)' : 'none'
                   })}
                 >
-                  <span>{item.label}</span>
+                  <span style={{ fontSize: 12, lineHeight: 1.2 }}>{item.label}</span>
                 </NavLink>
               ))}
             </nav>
