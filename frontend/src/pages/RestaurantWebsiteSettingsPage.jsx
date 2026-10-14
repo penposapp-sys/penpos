@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import ProductImageUploadField from '../components/ProductImageUploadField.jsx'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
+import { buildPublicAppUrl } from '../lib/publicAppUrl.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 
 const DEFAULT_SECTIONS = {
@@ -395,11 +396,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
   const livePath = useMemo(() => buildWebsitePath(settings.slug, systemType), [settings.slug, systemType])
   const liveUrl = useMemo(() => {
     if (!livePath) return ''
-    try {
-      return new URL(livePath, window.location.origin).toString()
-    } catch {
-      return livePath
-    }
+    return buildPublicAppUrl(livePath)
   }, [livePath])
 
   const productsSection = getSection(settings, 'products') || DEFAULT_SECTIONS.products
