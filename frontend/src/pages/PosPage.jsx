@@ -2535,6 +2535,7 @@ export default function PosPage() {
                               <div className="payment-split-quantity" aria-label={`Bölünecek adet ${draftQty}`}>
                               <button
                                 type="button"
+                                className="payment-split-quantity-decrease"
                                 aria-label={`${item?.nameSnapshot || 'Ürün'} bölünecek adedini azalt`}
                                 onClick={() => {
                                   setSplitDraftCounts((prev) => ({ ...(prev || {}), [itemId]: Math.max(0, draftQty - 1) }))
@@ -2551,6 +2552,7 @@ export default function PosPage() {
                               <span>{draftQty}</span>
                               <button
                                 type="button"
+                                className="payment-split-quantity-increase"
                                 aria-label={`${item?.nameSnapshot || 'Ürün'} bölünecek adedini artır`}
                                 onClick={() => {
                                   setSplitDraftCounts((prev) => ({ ...(prev || {}), [itemId]: Math.min(splitRowsForItem.length, draftQty + 1) }))

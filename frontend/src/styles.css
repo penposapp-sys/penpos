@@ -19066,8 +19066,8 @@ body.restaurant-app-layout .payment-split-unit-list .payment-split-select {
   body.restaurant-app-layout .payment-split-product-main {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 36px 22px;
-    gap: 3px;
+    grid-template-rows: 36px 34px;
+    gap: 4px;
     min-width: 0;
   }
 
@@ -19110,29 +19110,42 @@ body.restaurant-app-layout .payment-split-unit-list .payment-split-select {
   }
 
   body.restaurant-app-layout .payment-split-product-actions-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 10px;
     min-width: 0;
   }
 
   body.restaurant-app-layout .payment-split-product-controls {
-    grid-column: 1;
-    grid-row: 1;
-    width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: max-content;
     align-self: center;
-    justify-content: flex-start;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  body.restaurant-app-layout .payment-split-quantity {
+    min-height: 32px;
     gap: 4px;
+    padding: 2px 5px;
+  }
+
+  body.restaurant-app-layout .payment-split-quantity button {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+
+  body.restaurant-app-layout .payment-split-quantity span {
+    min-width: 18px;
+    font-size: 12px;
   }
 
   body.restaurant-app-layout .payment-split-allocation {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     max-width: none;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -19142,10 +19155,16 @@ body.restaurant-app-layout .payment-split-unit-list .payment-split-select {
   }
 
   body.restaurant-app-layout .payment-split-unit-list {
-    grid-column: 2;
-    grid-row: 1;
+    flex: 0 0 auto;
     justify-content: flex-end;
     align-self: center;
+  }
+
+  body.restaurant-app-layout .payment-split-unit-list .payment-split-select {
+    min-width: 64px;
+    min-height: 30px;
+    padding: 3px 8px;
+    font-size: 10px;
   }
 }
 
@@ -19252,4 +19271,403 @@ body.restaurant-app-layout #payment-note-field[hidden] {
     height: 36px;
     padding: 0 8px;
   }
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane,
+body.tenant-dark-mode .payment-entry-pane {
+  color: var(--app-text, #f4f1ec);
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-order-summary,
+html.tenant-dark-mode body.restaurant-app-layout .payment-split-order-summary,
+body.tenant-dark-mode .payment-split-order-summary,
+html[data-theme="dark"] body.restaurant-app-layout .payment-balance-summary,
+html.tenant-dark-mode body.restaurant-app-layout .payment-balance-summary,
+body.tenant-dark-mode .payment-balance-summary,
+html[data-theme="dark"] body.restaurant-app-layout .payment-history-panel,
+html.tenant-dark-mode body.restaurant-app-layout .payment-history-panel,
+body.tenant-dark-mode .payment-history-panel {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #171a18;
+  color: #f4f1ec;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-order-summary .payment-summary-row > :first-child,
+html.tenant-dark-mode body.restaurant-app-layout .payment-split-order-summary .payment-summary-row > :first-child,
+body.tenant-dark-mode .payment-split-order-summary .payment-summary-row > :first-child,
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-field-label,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-field-label,
+body.tenant-dark-mode .payment-entry-pane .payment-field-label {
+  color: #b8b4ad;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-order-summary .payment-summary-row strong,
+html.tenant-dark-mode body.restaurant-app-layout .payment-split-order-summary .payment-summary-row strong,
+body.tenant-dark-mode .payment-split-order-summary .payment-summary-row strong {
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-order-summary .payment-summary-row--net,
+html.tenant-dark-mode body.restaurant-app-layout .payment-split-order-summary .payment-summary-row--net,
+body.tenant-dark-mode .payment-split-order-summary .payment-summary-row--net {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-order-summary .payment-summary-row--net strong,
+html.tenant-dark-mode body.restaurant-app-layout .payment-split-order-summary .payment-summary-row--net strong,
+body.tenant-dark-mode .payment-split-order-summary .payment-summary-row--net strong {
+  color: #86efac;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-summary-actions .input,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-summary-actions .input,
+body.tenant-dark-mode .payment-entry-pane .payment-summary-actions .input,
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane label > .input,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane label > .input,
+body.tenant-dark-mode .payment-entry-pane label > .input {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #111311;
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-summary-actions .input::placeholder,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-summary-actions .input::placeholder,
+body.tenant-dark-mode .payment-entry-pane .payment-summary-actions .input::placeholder,
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane label > .input::placeholder,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane label > .input::placeholder,
+body.tenant-dark-mode .payment-entry-pane label > .input::placeholder {
+  color: #77736d;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-discount-presets button,
+html.tenant-dark-mode body.restaurant-app-layout .payment-discount-presets button,
+body.tenant-dark-mode .payment-discount-presets button {
+  color: #b8c8bc;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-method-btn,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-method-btn,
+body.tenant-dark-mode .payment-entry-pane .payment-method-btn {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: #222522;
+  color: #e8e5df;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane #payment-method-grid .payment-method-btn.is-active,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane #payment-method-grid .payment-method-btn.is-active,
+body.tenant-dark-mode .payment-entry-pane #payment-method-grid .payment-method-btn.is-active,
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-method-btn.is-active,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-method-btn.is-active,
+body.tenant-dark-mode .payment-entry-pane .payment-method-btn.is-active {
+  border-color: #3d9a65 !important;
+  background: #173b29 !important;
+  color: #a7f3c0 !important;
+  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.12);
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-quick-values button,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-quick-values button,
+body.tenant-dark-mode .payment-entry-pane .payment-quick-values button {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #202320;
+  color: #eeeae4;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-quick-values button:hover:not(:disabled),
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-quick-values button:hover:not(:disabled),
+body.tenant-dark-mode .payment-entry-pane .payment-quick-values button:hover:not(:disabled) {
+  border-color: #3d9a65;
+  background: #29352c;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-quick-values .payment-quick-all,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-quick-values .payment-quick-all,
+body.tenant-dark-mode .payment-entry-pane .payment-quick-values .payment-quick-all {
+  border-color: #285d3b;
+  background: #173b29;
+  color: #a7f3c0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-key,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-key,
+body.tenant-dark-mode .payment-entry-pane .payment-key {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #222522;
+  color: #f4f1ec;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-key:hover:not(:disabled),
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-key:hover:not(:disabled),
+body.tenant-dark-mode .payment-entry-pane .payment-key:hover:not(:disabled) {
+  border-color: #3d9a65;
+  background: #29352c;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-key--back,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-key--back,
+body.tenant-dark-mode .payment-entry-pane .payment-key--back {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #343632;
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-key--submit,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-key--submit,
+body.tenant-dark-mode .payment-entry-pane .payment-key--submit {
+  border-color: #16864c;
+  background: linear-gradient(160deg, #16864c, #10683d);
+  color: #ffffff;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-key--credit,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-key--credit,
+body.tenant-dark-mode .payment-entry-pane .payment-key--credit {
+  border-color: #326c47;
+  background: #173b29;
+  color: #a7f3c0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-history-row,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-history-row,
+body.tenant-dark-mode .payment-entry-pane .payment-history-row {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #202320;
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-history-row [style*="var(--muted)"],
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-history-row [style*="var(--muted)"],
+body.tenant-dark-mode .payment-entry-pane .payment-history-row [style*="var(--muted)"] {
+  color: #b8b4ad !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-note-toggle,
+html.tenant-dark-mode body.restaurant-app-layout .payment-entry-pane .payment-note-toggle,
+body.tenant-dark-mode .payment-entry-pane .payment-note-toggle {
+  border-color: #326c47;
+  background: #173b29;
+  color: #a7f3c0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-modal-stack > .payment-amount-banner .payment-amount-date .btn,
+html.tenant-dark-mode body.restaurant-app-layout .payment-modal-stack > .payment-amount-banner .payment-amount-date .btn,
+body.tenant-dark-mode .payment-modal-stack > .payment-amount-banner .payment-amount-date .btn {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: #173b29;
+  color: #d1fae0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Ödeme Al"],
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Ödeme Al"] {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: #101210 !important;
+  color: #f4f1ec !important;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.55) !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalHeader,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(120deg, #1b241e, #171a18) !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalTitle,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalTitle {
+  color: #e5f5e9 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalTitle::before,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalTitle::before {
+  background: #214b32;
+  color: #a7f3c0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalCloseButton,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalCloseButton {
+  border-color: #3b6648 !important;
+  background: #1b3022 !important;
+  color: #c4f2d1 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalBody,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Ödeme Al"] .modalBody {
+  background: #101210 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-modal-header-meta,
+body.tenant-dark-mode .payment-modal-header-meta {
+  color: #b8c8bc;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-pane,
+body.tenant-dark-mode .payment-split-pane {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #171a18 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane.payment-panel,
+body.tenant-dark-mode .payment-entry-pane.payment-panel,
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane > .payment-panel,
+body.tenant-dark-mode .payment-entry-pane > .payment-panel {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #171a18 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-row,
+body.tenant-dark-mode .payment-split-row,
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-row:nth-child(odd),
+body.tenant-dark-mode .payment-split-row:nth-child(odd) {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #202320;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-row.is-selected,
+body.tenant-dark-mode .payment-split-row.is-selected {
+  border-color: #3d9a65;
+  background: #173b29;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-product,
+body.tenant-dark-mode .payment-split-product,
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-product:nth-child(even),
+body.tenant-dark-mode .payment-split-product:nth-child(even) {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #202320;
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-product-image,
+body.tenant-dark-mode .payment-split-product-image {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #292d29;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-item-name,
+body.tenant-dark-mode .payment-split-item-name,
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-product-total,
+body.tenant-dark-mode .payment-split-product-total {
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-item-meta,
+body.tenant-dark-mode .payment-split-item-meta,
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-allocation,
+body.tenant-dark-mode .payment-split-allocation,
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-paid-label,
+body.tenant-dark-mode .payment-split-paid-label {
+  color: #b8c8bc;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-quantity,
+body.tenant-dark-mode .payment-split-quantity {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #171a18;
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-quantity span,
+body.tenant-dark-mode .payment-split-quantity span {
+  color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-quantity button,
+body.tenant-dark-mode .payment-split-quantity button {
+  background: #303530;
+  color: #e5f5e9;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-quantity .payment-split-quantity-decrease,
+body.tenant-dark-mode .payment-split-quantity .payment-split-quantity-decrease {
+  background: #4a2928;
+  color: #ffaaa4;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-quantity .payment-split-quantity-increase,
+body.tenant-dark-mode .payment-split-quantity .payment-split-quantity-increase {
+  background: #1b4930;
+  color: #9cf0b5;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-quantity button:hover:not(:disabled),
+body.tenant-dark-mode .payment-split-quantity button:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-select,
+body.tenant-dark-mode .payment-split-select {
+  border-color: #326c47;
+  background: #173b29;
+  color: #a7f3c0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-unit-list .payment-split-select.is-selected,
+body.tenant-dark-mode .payment-split-unit-list .payment-split-select.is-selected {
+  border-color: #16864c;
+  background: #16864c;
+  color: #ffffff;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-delete,
+body.tenant-dark-mode .payment-split-delete {
+  border-color: rgba(255, 111, 111, 0.3);
+  background: #3a2020;
+  color: #ff9999;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout #payment-split-content .payment-split-select[aria-pressed="true"],
+body.tenant-dark-mode #payment-split-content .payment-split-select[aria-pressed="true"] {
+  border-color: #16864c !important;
+  background: #16864c !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-total strong,
+body.tenant-dark-mode .payment-split-total strong {
+  color: #86efac;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-footer,
+body.tenant-dark-mode .payment-split-footer {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-split-toggle,
+body.tenant-dark-mode .payment-split-toggle {
+  border-color: #326c47;
+  background: #173b29;
+  color: #a7f3c0;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane label > input.input,
+body.tenant-dark-mode .payment-entry-pane label > input.input,
+html[data-theme="dark"] body.restaurant-app-layout .payment-entry-pane .payment-summary-actions input.input,
+body.tenant-dark-mode .payment-entry-pane .payment-summary-actions input.input {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: #111311 !important;
+  color: #f4f1ec !important;
+  -webkit-text-fill-color: #f4f1ec;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .modalHeader,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .modalHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(120deg, #1b241e, #171a18) !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .modalTitle,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .modalTitle {
+  color: #e5f5e9 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .modalCloseButton,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .modalCloseButton {
+  border-color: #3b6648 !important;
+  background: #1b3022 !important;
+  color: #c4f2d1 !important;
 }
