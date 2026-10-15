@@ -35,7 +35,8 @@ export default function PosPage() {
   const nav = useNavigate()
   const location = useLocation()
   const { user, allowedBranchIds } = useAuth()
-  const { isMobilePortrait } = useResponsiveFlags()
+  const { isMobilePortrait: isPhonePortrait, isPortraitTablet } = useResponsiveFlags()
+  const isMobilePortrait = isPhonePortrait || isPortraitTablet
   const canEditEntryDate = user?.role === 'tenant_admin'
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canTakePayment = hasPerm('take_payment')

@@ -3,18 +3,21 @@ import { useEffect, useState } from 'react'
 export function useResponsiveFlags() {
   const [flags, setFlags] = useState(() => ({
     isMobilePortrait: false,
+    isPortraitTablet: false,
     isTablet: false,
     isDesktop: false
   }))
 
   useEffect(() => {
-    const mobilePortraitMql = window.matchMedia('(max-width: 520px) and (orientation: portrait)')
+    const phonePortraitMql = window.matchMedia('(max-width: 520px) and (orientation: portrait)')
+    const portraitTabletMql = window.matchMedia('(min-width: 521px) and (max-width: 1024px) and (orientation: portrait)')
     const tabletMql = window.matchMedia('(min-width: 521px) and (max-width: 1024px)')
     const desktopMql = window.matchMedia('(min-width: 1025px)')
 
     const apply = () => {
       setFlags({
-        isMobilePortrait: !!mobilePortraitMql.matches,
+        isMobilePortrait: !!phonePortraitMql.matches,
+        isPortraitTablet: !!portraitTabletMql.matches,
         isTablet: !!tabletMql.matches,
         isDesktop: !!desktopMql.matches
       })
@@ -31,12 +34,14 @@ export function useResponsiveFlags() {
       else mql.removeListener(fn)
     }
 
-    add(mobilePortraitMql, apply)
+    add(phonePortraitMql, apply)
+    add(portraitTabletMql, apply)
     add(tabletMql, apply)
     add(desktopMql, apply)
 
     return () => {
-      remove(mobilePortraitMql, apply)
+      remove(phonePortraitMql, apply)
+      remove(portraitTabletMql, apply)
       remove(tabletMql, apply)
       remove(desktopMql, apply)
     }

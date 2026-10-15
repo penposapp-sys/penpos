@@ -32,7 +32,8 @@ export default function DeliveryOrderDetailPage() {
   }
 
   const { user, allowedBranchIds } = useAuth()
-  const { isMobilePortrait } = useResponsiveFlags()
+  const { isMobilePortrait: isPhonePortrait, isPortraitTablet } = useResponsiveFlags()
+  const isMobilePortrait = isPhonePortrait || isPortraitTablet
   const nav = useNavigate()
   const { orderId: routeOrderId } = useParams()
   const canEditEntryDate = user?.role === 'tenant_admin'

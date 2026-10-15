@@ -35,7 +35,8 @@ export default function WalkInPosPage() {
   const nav = useNavigate()
   const location = useLocation()
   const params = useParams()
-  const { isMobilePortrait } = useResponsiveFlags()
+  const { isMobilePortrait: isPhonePortrait, isPortraitTablet } = useResponsiveFlags()
+  const isMobilePortrait = isPhonePortrait || isPortraitTablet
   const routeOrderId = params?.orderId || null
   const isOrderView = !!routeOrderId && isValidObjectId(routeOrderId)
   const { user, allowedBranchIds } = useAuth()

@@ -25,7 +25,15 @@ export default function Layout() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const { user, logout, tenantCtx } = useAuth()
-  const { isMobilePortrait, isTablet } = useResponsiveFlags()
+  const { isMobilePortrait: isPhonePortrait, isPortraitTablet, isTablet } = useResponsiveFlags()
+  const isMobilePortrait = isPhonePortrait || (
+    isPortraitTablet && (
+      pathname.startsWith('/restoran/app/tables')
+      || pathname.startsWith('/restoran/app/pos')
+      || pathname.startsWith('/restoran/app/walkin')
+      || pathname.startsWith('/restoran/app/delivery')
+    )
+  )
   const { themeKey, theme, isMobileRuntime } = useTheme()
   const { getSetting } = useBusinessSettings()
   const { selectedDate, setSelectedDate } = useAppDate()

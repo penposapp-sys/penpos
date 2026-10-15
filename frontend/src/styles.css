@@ -7408,7 +7408,7 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .reportsSummaryRow { flex-direction: column }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
   body.sales-mobile-scroll,
   body.mobile-sales-mode {
     overflow: hidden;
@@ -7878,7 +7878,11 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   }
 }
 
-@media (min-width: 769px) and (max-width: 1500px) {
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
+  .tablesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+
+@media (min-width: 769px) and (max-width: 1500px) and (orientation: landscape) {
   .saleStandard3Col {
     --pos-font-base: 7.6px;
     --pos-font-title: 8.1px;
@@ -16792,7 +16796,7 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
   font-size: var(--app-font-size) !important;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
   body.pos-app-layout .pageShell.walkin-layout .walkin-sales-page__body,
   body.pos-app-layout .delivery-layout .delivery-detail-shell {
     min-height: 0;
@@ -16816,6 +16820,85 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
 
   body.pos-app-layout .pageShell.walkin-layout .saleStandard3Col > :first-child {
     display: none;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-detail-info-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 6px;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-detail-info-row > .delivery-detail-btn:first-child {
+    display: none;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-detail-customer-edit-btn {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-customer-summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 3px 8px;
+    font-size: 12px;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-customer-summary__name,
+  body.pos-app-layout .delivery-layout .delivery-customer-summary__address,
+  body.pos-app-layout .delivery-layout .delivery-customer-summary__note,
+  body.pos-app-layout .delivery-layout .delivery-customer-summary__meta {
+    grid-column: 1 / -1;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-detail-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-detail-actions .delivery-detail-btn {
+    min-height: 32px;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-detail-meta-note {
+    display: none;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartHeader {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartCountLabel {
+    flex: 0 0 auto;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartModeRow {
+    flex: 1 1 0%;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartModeRowInner {
+    width: 100%;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  body.pos-app-layout .delivery-layout .delivery-cart-panel .saleCartModeGroup {
+    min-width: 0;
+    gap: 4px;
   }
 
   body.pos-app-layout .pageShell.walkin-layout .saleStandard3Col > .saleCategoryPanel,
@@ -17046,6 +17129,8 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
     min-height: 0;
     overflow: hidden;
     padding: 8px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   body.pos-app-layout .delivery-layout .delivery-detail-header-card {
@@ -17061,7 +17146,7 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
   }
 }
 
-@media (min-width: 768px) and (max-width: 980px) {
+@media (min-width: 768px) and (max-width: 980px) and (orientation: landscape) {
   body.pos-app-layout .pageShell.walkin-layout .posItemsGrid,
   body.pos-app-layout .delivery-layout .delivery-detail-products-grid {
     grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)) !important;
@@ -17078,7 +17163,7 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
   }
 }
 
-@media (min-width: 481px) and (max-width: 980px) {
+@media (min-width: 481px) and (max-width: 980px) and (orientation: landscape) {
   body.pos-app-layout .pageShell.walkin-layout .saleCategoryButton,
   body.pos-app-layout .delivery-layout .delivery-detail-categories .saleCategoryButton {
     padding-right: 6px;
@@ -17270,7 +17355,7 @@ body.pos-app-layout .pageShell.pos-layout .sale-cart-line__price {
   overflow: visible;
 }
 
-@media (min-width: 768px) and (max-width: 900px) {
+@media (min-width: 768px) and (max-width: 900px) and (orientation: landscape) {
   body.pos-app-layout .pos-main > .page-scroll {
     display: flex;
     flex-direction: column;
@@ -17336,7 +17421,7 @@ body.pos-app-layout .pageShell.pos-layout .sale-cart-line__price {
   }
 }
 
-@media (min-width: 901px) and (max-width: 1024px) {
+@media (min-width: 901px) and (max-width: 1024px) and (orientation: landscape) {
   body.pos-app-layout .pos-main > .page-scroll {
     display: flex;
     flex-direction: column;
@@ -17379,7 +17464,7 @@ body.pos-app-layout .pageShell.pos-layout .sale-cart-line__price {
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
   body.pos-app-layout.sales-mobile-scroll .pos-main > .page-scroll {
     display: flex;
     flex-direction: column;
@@ -17642,7 +17727,7 @@ body.pos-app-layout .pageShell.pos-layout .posItemsGrid {
   display: none;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
   .saleCartBackdrop {
     position: fixed;
     z-index: 79;
