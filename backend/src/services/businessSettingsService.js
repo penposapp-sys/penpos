@@ -8,7 +8,10 @@ import { error } from '../utils/errors.js'
 import { buildIncomingBusinessSettings, mergeBusinessSettings } from '../utils/businessSettings.js'
 import { resolveUploadDir } from '../utils/uploads.js'
 import { listTablesService } from './tableService.js'
-import { normalizeTenantWebsiteSlug } from './tenantWebsiteService.js'
+import {
+  normalizeTenantWebsiteSlug,
+  syncTenantWebsiteSlugForBusinessName
+} from './tenantWebsiteService.js'
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -18,6 +21,28 @@ const pickDefaultBranchIds = (activeBranches = [], allBranches = []) => {
   const activeIds = dedupeIds(activeBranches.map((branch) => branch.id || branch._id))
   if (activeIds.length > 0) return activeIds
   return dedupeIds(allBranches.map((branch) => branch.id || branch._id))
+}
+
+const syncTenantPublicSlug = async (tenant, businessName) => {
+  const desiredSlug = normalizeTenantWebsiteSlug(businessName)
+  const [tenantConflict, websiteConflict] = await Promise.all([
+    Tenant.findOne({
+      _id: { $ne: tenant._id },
+      $or: [{ slug: desiredSlug }, { publicSlug: desiredSlug }]
+    }).select('_id').lean(),
+    TenantWebsiteSettings.findOne({
+      tenantId: { $ne: tenant._id },
+      $or: [{ slug: desiredSlug }, { legacySlugs: desiredSlug }]
+    }).select('_id').lean()
+  ])
+  const nextSlug = tenantConflict || websiteConflict
+    ? normalizeTenantWebsiteSlug(tenant.slug)
+    : desiredSlug
+  if (tenant.publicSlug !== nextSlug) {
+    tenant.publicSlug = nextSlug
+    await tenant.save()
+  }
+  return nextSlug
 }
 
 const normalizeLogoMeta = (tenant, settings) => {
@@ -66,13 +91,16 @@ export const listBusinessQrTables = async (tenantId) => {
 }
 
 export const getBusinessSettings = async (tenantId) => {
-  const tenant = await Tenant.findById(tenantId).lean()
+  const tenant = await Tenant.findById(tenantId)
   if (!tenant) throw error('not_found', 'Tenant not found', 404)
+  const currentBusinessName = String(tenant.settings?.business?.businessName || tenant.name || '').trim()
+  const currentPublicSlug = await syncTenantPublicSlug(tenant, currentBusinessName)
 
   const [activeBranches, allBranches] = await Promise.all([
     listBusinessBranches(tenantId),
     Branch.find({ tenantId, isDeleted: { $ne: true }, status: { $ne: 'deleted' } }).sort({ name: 1 }).lean(),
   ])
+  await syncTenantWebsiteSlugForBusinessName(tenant)
 
   const fallbackBranchIds = pickDefaultBranchIds(activeBranches, allBranches)
   const mergedSettings = mergeBusinessSettings({
@@ -93,6 +121,7 @@ export const getBusinessSettings = async (tenantId) => {
       _id: String(tenant._id),
       id: String(tenant._id),
       name: tenant.name || '',
+      publicSlug: currentPublicSlug,
       description: tenant.description || '',
       logoUrl: tenant.logoUrl || '',
       allowedBranchIds: mergedSettings.authorizedBranches.branchIds,
@@ -147,6 +176,9 @@ export const updateBusinessSettings = async (tenantId, payload = {}, actorUserId
   }, { activeBranchIds: fallbackBranchIds })
 
   tenant.name = nextTenantName || tenant.name
+  await syncTenantPublicSlug(tenant,
+    mergedSettings.business.businessName || nextTenantName || tenant.name
+  )
   tenant.description = nextDescription
   tenant.settings = {
     ...(tenant.settings || {}),
@@ -156,20 +188,43 @@ export const updateBusinessSettings = async (tenantId, payload = {}, actorUserId
   await tenant.save()
 
   const nextAutoSlug = normalizeTenantWebsiteSlug(nextTenantName)
-  if (previousTenantName && nextTenantName && payload?.name !== undefined && tenant.slug !== nextAutoSlug) {
-    const slugConflict = await Tenant.findOne({ slug: nextAutoSlug, _id: { $ne: tenant._id } }).select('_id').lean()
-    const websiteSlugConflict = await TenantWebsiteSettings.findOne({
-      slug: nextAutoSlug,
-      tenantId: { $ne: tenant._id }
-    }).select('_id').lean()
-    if (!slugConflict && !websiteSlugConflict) {
-      const currentTenantSlug = String(tenant.slug || '').trim()
-      tenant.slug = nextAutoSlug
-      await tenant.save()
-      await TenantWebsiteSettings.updateOne(
-        { tenantId: tenant._id, slug: currentTenantSlug },
-        { $set: { slug: nextAutoSlug } }
-      )
+  if (previousTenantName && nextTenantName && previousTenantName !== nextTenantName && payload?.name !== undefined) {
+    const currentWebsite = await TenantWebsiteSettings.findOne({ tenantId: tenant._id })
+      .select('slug seo.title storeVariant.seo.title')
+      .lean()
+    const update = { $set: {} }
+    const websiteSlug = String(currentWebsite?.slug || '').trim()
+    const currentTenantSlug = String(tenant.slug || '').trim()
+    const previousAutoSlug = normalizeTenantWebsiteSlug(previousTenantName)
+    const websiteSlugFollowsName = normalizeTenantWebsiteSlug(websiteSlug) === normalizeTenantWebsiteSlug(currentTenantSlug)
+      || normalizeTenantWebsiteSlug(websiteSlug) === previousAutoSlug
+
+    if (String(currentWebsite?.seo?.title || '').trim() === previousTenantName) {
+      update.$set['seo.title'] = nextTenantName
+    }
+    if (String(currentWebsite?.storeVariant?.seo?.title || '').trim() === previousTenantName) {
+      update.$set['storeVariant.seo.title'] = nextTenantName
+    }
+
+    if (websiteSlugFollowsName && nextAutoSlug !== previousAutoSlug) {
+      const slugConflict = await Tenant.findOne({
+        _id: { $ne: tenant._id },
+        $or: [{ slug: nextAutoSlug }, { publicSlug: nextAutoSlug }]
+      }).select('_id').lean()
+      const websiteSlugConflict = await TenantWebsiteSettings.findOne({
+        tenantId: { $ne: tenant._id },
+        $or: [{ slug: nextAutoSlug }, { legacySlugs: nextAutoSlug }]
+      }).select('_id').lean()
+      if (!slugConflict && !websiteSlugConflict) {
+        if (currentWebsite && websiteSlug !== nextAutoSlug) {
+          update.$set.slug = nextAutoSlug
+          update.$addToSet = { legacySlugs: normalizeTenantWebsiteSlug(websiteSlug) }
+        }
+      }
+    }
+
+    if (currentWebsite && Object.keys(update.$set).length > 0) {
+      await TenantWebsiteSettings.updateOne({ tenantId: tenant._id, slug: websiteSlug }, update)
     }
   }
 

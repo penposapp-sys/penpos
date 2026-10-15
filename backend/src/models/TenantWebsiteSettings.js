@@ -17,6 +17,7 @@ const sectionSchema = new mongoose.Schema({
 const schema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, unique: true, index: true },
   slug: { type: String, required: true, unique: true, index: true },
+  legacySlugs: { type: [String], default: [] },
   enabled: { type: Boolean, default: true },
   published: { type: Boolean, default: false },
   theme: {

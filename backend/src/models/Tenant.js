@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 const tenantSchema = new mongoose.Schema({
   name: { type: String, required: true },
   slug: { type: String, required: true, unique: true },
+  publicSlug: { type: String, default: '', index: true },
   description: { type: String, default: '' },
   phone: { type: String, default: '' },
   logoUrl: { type: String, default: '' },

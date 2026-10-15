@@ -175,7 +175,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     || (payload && (site.settings?.enabled !== true || site.settings?.published !== true))
   )
   const tenantName = String(site.tenant?.name || (isStore ? 'Magaza' : 'Restoran'))
-  const publicSiteSlug = String(slug || site.tenant?.slug || '').trim()
+  const publicSiteSlug = String(site.settings?.slug || site.tenant?.publicSlug || slug || site.tenant?.slug || '').trim()
   const storedQrMenuUrl = String(integrations?.qrMenuUrl || '').trim()
   const storedOnlineOrderUrl = String(integrations?.onlineOrderUrl || '').trim()
   const qrMenuUrl = /^(?:https?:\/\/[^/]+)?\/?menu\//i.test(storedQrMenuUrl)

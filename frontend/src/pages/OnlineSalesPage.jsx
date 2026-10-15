@@ -103,7 +103,7 @@ const mapCartRows = (cartLines, items) => (Array.isArray(cartLines) ? cartLines 
   .filter(Boolean)
 
 export default function OnlineSalesPage() {
-  const { tenantSlug } = useParams()
+  const { tenantSlug, branchSlug } = useParams()
   const location = useLocation()
   const [loading, setLoading] = useState(true)
   const [placing, setPlacing] = useState(false)
@@ -187,6 +187,7 @@ export default function OnlineSalesPage() {
       try {
         const query = new URLSearchParams({ tenantSlug: String(tenantSlug || '').trim() })
         if (requestedBranchId) query.set('branchId', requestedBranchId)
+        if (branchSlug) query.set('branchSlug', branchSlug)
         const res = await api(`/api/public/online-store?${query.toString()}`, {
           silent: true,
           skipBranchHeader: true
@@ -206,7 +207,7 @@ export default function OnlineSalesPage() {
     }
     load()
     return () => { mounted = false }
-  }, [requestedBranchId, tenantSlug])
+  }, [branchSlug, requestedBranchId, tenantSlug])
 
   const tenantId = String(tenant?.id || '')
   const branchId = String(branch?.id || tenant?.settings?.onlineSales?.branchId || '')

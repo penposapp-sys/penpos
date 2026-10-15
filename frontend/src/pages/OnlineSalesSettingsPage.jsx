@@ -20,6 +20,18 @@ const baseCardStyle = {
   boxShadow: '0 18px 50px rgba(15, 23, 42, 0.12)',
 }
 
+const normalizeBranchSlug = (value) => String(value || '')
+  .trim()
+  .toLocaleLowerCase('tr-TR')
+  .replace(/ç/g, 'c')
+  .replace(/ğ/g, 'g')
+  .replace(/ı/g, 'i')
+  .replace(/ö/g, 'o')
+  .replace(/ş/g, 's')
+  .replace(/ü/g, 'u')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+
 function ToggleCard({ label, description, checked, onChange, compact = false, disabled = false }) {
   return (
     <label
@@ -103,7 +115,10 @@ export default function OnlineSalesSettingsPage() {
       if (profileRes?.success === false) throw new Error(profileRes?.message || 'Ayarlar yuklenemedi')
       if (businessRes?.success === false) throw new Error(businessRes?.message || 'Ayarlar yuklenemedi')
 
-      setTenant(profileRes?.tenant || null)
+      setTenant({
+        ...(profileRes?.tenant || {}),
+        publicSlug: businessRes?.tenant?.publicSlug || profileRes?.tenant?.slug || '',
+      })
       setSettings(mergeBusinessSettings(businessRes?.settings || profileRes?.tenant?.settings || {}))
       setBranches(Array.isArray(branchesRes?.branches) ? branchesRes.branches : [])
       setProducts(Array.isArray(productsRes?.items) ? productsRes.items : [])
@@ -120,18 +135,19 @@ export default function OnlineSalesSettingsPage() {
 
   const onlineSales = settings?.onlineSales || {}
   const publicBaseLink = useMemo(() => {
-    const slug = String(tenant?.slug || '').trim()
+    const slug = String(tenant?.publicSlug || tenant?.slug || '').trim()
     if (!slug) return ''
     return buildPublicAppUrl(`/online/${slug}`)
-  }, [tenant?.slug])
+  }, [tenant?.publicSlug, tenant?.slug])
   const branchLinks = useMemo(() => (
     (branches || []).map((branch) => {
       const id = String(branch?.id || branch?._id || '').trim()
       const name = String(branch?.name || 'Sube').trim() || 'Sube'
+      const branchSlug = normalizeBranchSlug(name)
       return {
         id,
         name,
-        url: publicBaseLink && id ? `${publicBaseLink}?branchId=${encodeURIComponent(id)}` : ''
+        url: publicBaseLink && id && branchSlug ? `${publicBaseLink}/${encodeURIComponent(branchSlug)}` : ''
       }
     }).filter((entry) => entry.id && entry.url)
   ), [branches, publicBaseLink])

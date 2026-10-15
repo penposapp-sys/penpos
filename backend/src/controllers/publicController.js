@@ -17,6 +17,7 @@ import CanteenProduct from '../modules/canteen/models/CanteenProduct.js'
 import { createPublicQrOrder } from '../modules/canteen/services/canteenQrOrderService.js'
 import { listPublicQrOrdersByCustomer } from '../modules/canteen/services/canteenQrOrderService.js'
 import { createPublicOnlineOrderService } from '../services/orderService.js'
+import { normalizeTenantWebsiteSlug } from '../services/tenantWebsiteService.js'
 import {
   getCustomer,
   getCustomerFavoriteProductIds,
@@ -50,6 +51,33 @@ const buildBaseUrl = (req) => {
   } catch {
     return ''
   }
+}
+
+export const findActiveTenantByPublicSlug = async (slug) => {
+  const normalizedSlug = String(slug || '').trim()
+  if (!normalizedSlug) return null
+
+  const tenant = await Tenant.findOne({
+    $or: [{ slug: normalizedSlug }, { publicSlug: normalizedSlug }],
+    isActive: true,
+    status: 'active'
+  }).lean()
+  if (tenant) return tenant
+
+  const website = await TenantWebsiteSettings.findOne({
+    $or: [{ slug: normalizedSlug }, { legacySlugs: normalizedSlug }]
+  }).select('tenantId').lean()
+  if (!website?.tenantId) return null
+
+  return Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
+}
+
+export const findPublicOnlineBranchBySlug = (branches, branchSlug) => {
+  const normalizedSlug = normalizeTenantWebsiteSlug(branchSlug, '')
+  if (!normalizedSlug) return null
+  const matches = (Array.isArray(branches) ? branches : [])
+    .filter((branch) => normalizeTenantWebsiteSlug(branch?.name, '') === normalizedSlug)
+  return matches.length === 1 ? matches[0] : null
 }
 
 const getPrintAgentVersion = () => {
@@ -151,18 +179,11 @@ export const getPublicMenu = async (req, res) => {
   const requestedTableId = String(req.query?.tableId || '').trim()
   const requestedTableName = String(req.query?.table || req.query?.tableName || '').trim()
 
-  let tenant = tenantSlug
-    ? await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
+  const tenant = tenantSlug
+    ? await findActiveTenantByPublicSlug(tenantSlug)
     : (mongoose.Types.ObjectId.isValid(tenantIdRaw)
       ? await Tenant.findOne({ _id: tenantIdRaw, isActive: true, status: 'active' }).lean()
       : null)
-
-  if (!tenant && tenantSlug) {
-    const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
-    if (website?.tenantId) {
-      tenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
-    }
-  }
 
   if (!tenant) {
     return res.status(404).json({ success: false, code: 'not_found', error: 'not_found', message: 'Tenant not found' })
@@ -251,19 +272,13 @@ export const getPublicOnlineStore = async (req, res) => {
   const tenantSlug = String(req.query?.tenantSlug || '').trim()
   const tenantIdRaw = String(req.query?.tenantId || '').trim()
   const requestedBranchId = String(req.query?.branchId || '').trim()
+  const requestedBranchSlug = String(req.query?.branchSlug || '').trim()
 
-  let tenant = tenantSlug
-    ? await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
+  const tenant = tenantSlug
+    ? await findActiveTenantByPublicSlug(tenantSlug)
     : (mongoose.Types.ObjectId.isValid(tenantIdRaw)
       ? await Tenant.findOne({ _id: tenantIdRaw, isActive: true, status: 'active' }).lean()
       : null)
-
-  if (!tenant && tenantSlug) {
-    const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
-    if (website?.tenantId) {
-      tenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
-    }
-  }
 
   if (!tenant) {
     return res.status(404).json({ success: false, code: 'not_found', error: 'not_found', message: 'Tenant not found' })
@@ -283,8 +298,19 @@ export const getPublicOnlineStore = async (req, res) => {
   const visibleCategoryIds = new Set((categories || []).map((category) => String(category._id)))
   const visibleItems = (items || []).filter((item) => visibleCategoryIds.has(String(item?.categoryId || '')))
   const branchById = new Map((branches || []).map((branch) => [String(branch?._id || ''), String(branch?.name || '')]))
+  const requestedBranch = requestedBranchSlug
+    ? findPublicOnlineBranchBySlug(branches, requestedBranchSlug)
+    : null
+  if (requestedBranchSlug && !requestedBranch) {
+    return res.status(404).json({
+      success: false,
+      code: 'branch_not_found',
+      error: 'branch_not_found',
+      message: 'Branch not found'
+    })
+  }
   const fallbackBranchId = String(mergedSettings?.onlineSales?.branchId || '').trim()
-  const selectedBranchId = [requestedBranchId, fallbackBranchId, String(branches?.[0]?._id || '')]
+  const selectedBranchId = [String(requestedBranch?._id || ''), requestedBranchId, fallbackBranchId, String(branches?.[0]?._id || '')]
     .find((branchId) => branchById.has(String(branchId || ''))) || ''
   const featuredProductId = String(mergedSettings?.onlineSales?.featuredProductId || '').trim()
 
@@ -354,13 +380,7 @@ export const createPublicOnlineStoreOrder = async (req, res) => {
       return res.status(400).json({ success: false, code: 'tenant_required', message: 'Isletme bilgisi gerekli' })
     }
 
-    let tenant = await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
-    if (!tenant) {
-      const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
-      if (website?.tenantId) {
-        tenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
-      }
-    }
+    const tenant = await findActiveTenantByPublicSlug(tenantSlug)
     if (!tenant) {
       return res.status(404).json({ success: false, code: 'not_found', message: 'Isletme bulunamadi' })
     }
@@ -545,19 +565,11 @@ export const createPublicWaiterCall = async (req, res) => {
   const requestedTableId = String(req.body?.tableId || '').trim()
   const requestedTableName = String(req.body?.tableName || req.body?.table || '').trim()
 
-  const tenant = tenantSlug
-    ? await Tenant.findOne({ slug: tenantSlug, isActive: true, status: 'active' }).lean()
+  const resolvedTenant = tenantSlug
+    ? await findActiveTenantByPublicSlug(tenantSlug)
     : (mongoose.Types.ObjectId.isValid(tenantIdRaw)
       ? await Tenant.findOne({ _id: tenantIdRaw, isActive: true, status: 'active' }).lean()
       : null)
-
-  let resolvedTenant = tenant
-  if (!resolvedTenant && tenantSlug) {
-    const website = await TenantWebsiteSettings.findOne({ slug: tenantSlug }).select('tenantId').lean()
-    if (website?.tenantId) {
-      resolvedTenant = await Tenant.findOne({ _id: website.tenantId, isActive: true, status: 'active' }).lean()
-    }
-  }
 
   if (!resolvedTenant) {
     return res.status(404).json({ success: false, code: 'not_found', error: 'not_found', message: 'Tenant not found' })

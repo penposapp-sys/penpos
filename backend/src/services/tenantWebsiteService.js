@@ -187,6 +187,47 @@ export const normalizeTenantWebsiteSlug = (value, fallback = 'isletme') => {
   return normalized || fallback
 }
 
+export const syncTenantWebsiteSlugForBusinessName = async (tenant) => {
+  const currentWebsite = await TenantWebsiteSettings.findOne({ tenantId: tenant._id })
+    .select('_id slug')
+    .lean()
+  const currentSlug = String(currentWebsite?.slug || '').trim()
+  const tenantSlug = String(tenant.slug || '').trim()
+  const businessSlug = normalizeTenantWebsiteSlug(
+    tenant.settings?.business?.businessName || tenant.name
+  )
+  if (
+    !currentWebsite
+    || !currentSlug
+    || !tenantSlug
+    || normalizeTenantWebsiteSlug(currentSlug) !== normalizeTenantWebsiteSlug(tenantSlug)
+    || normalizeTenantWebsiteSlug(currentSlug) === businessSlug
+  ) {
+    return currentSlug
+  }
+
+  const [tenantConflict, websiteConflict] = await Promise.all([
+    Tenant.findOne({
+      _id: { $ne: tenant._id },
+      $or: [{ slug: businessSlug }, { publicSlug: businessSlug }]
+    }).select('_id').lean(),
+    TenantWebsiteSettings.findOne({
+      tenantId: { $ne: tenant._id },
+      $or: [{ slug: businessSlug }, { legacySlugs: businessSlug }]
+    }).select('_id').lean()
+  ])
+  if (tenantConflict || websiteConflict) return currentSlug
+
+  await TenantWebsiteSettings.updateOne(
+    { _id: currentWebsite._id },
+    {
+      $set: { slug: businessSlug },
+      $addToSet: { legacySlugs: normalizeTenantWebsiteSlug(currentSlug) }
+    }
+  )
+  return businessSlug
+}
+
 const normalizeObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {})
 
 const normalizeWebsiteActionUrl = (value, type, slug) => {
@@ -217,6 +258,26 @@ const pickWebsiteSettingsForSiteType = (doc, tenant, siteType = '') => {
     return normalizeTenantWebsiteSettings(normalizeObject(doc?.storeVariant), tenantContext)
   }
   return normalizeTenantWebsiteSettings(doc || {}, tenantContext)
+}
+
+const findPublicTenantWebsiteDocBySlug = async (slug, siteType = '') => {
+  const normalizedSlug = normalizeTenantWebsiteSlug(slug)
+  if (isStoreSiteType(siteType)) {
+    return TenantWebsiteSettings.findOne({ 'storeVariant.slug': normalizedSlug }).lean()
+  }
+
+  const doc = await TenantWebsiteSettings.findOne({
+    $or: [{ slug: normalizedSlug }, { legacySlugs: normalizedSlug }]
+  }).lean()
+  if (doc) return doc
+
+  const tenant = await Tenant.findOne({
+    slug: normalizedSlug,
+    isActive: true,
+    status: 'active'
+  }).select('_id').lean()
+  if (!tenant) return null
+  return TenantWebsiteSettings.findOne({ tenantId: tenant._id }).lean()
 }
 
 const buildDefaultTenantWebsiteSettings = (tenant = {}) => {
@@ -382,6 +443,10 @@ const getOrCreateTenantWebsiteDoc = async (tenantId, siteType = '') => {
     const created = await TenantWebsiteSettings.create(normalizeTenantWebsiteSettings({}, getTenantContextForSiteType(tenant, 'restaurant')))
     doc = created?.toObject ? created.toObject() : created
   }
+  const syncedSlug = await syncTenantWebsiteSlugForBusinessName(tenant)
+  if (syncedSlug && syncedSlug !== doc.slug) {
+    doc = { ...doc, slug: syncedSlug }
+  }
   const normalized = pickWebsiteSettingsForSiteType(doc || {}, tenant, siteType)
   if (!isStoreSiteType(siteType) && (
     String(doc?.slug || '') !== normalized.slug
@@ -513,6 +578,7 @@ const buildTenantPublicSitePayload = async (tenant, settings, siteType = '') => 
       id: String(tenant._id),
       name: String(tenant.name || ''),
       slug: String(tenant.slug || ''),
+      publicSlug: normalizeTenantWebsiteSlug(tenant.settings?.business?.businessName || tenant.name),
       systemType: String(tenantContext.systemType || tenant.systemType || 'kermes'),
       logoUrl: String(tenant.logoUrl || '')
     },
@@ -608,10 +674,7 @@ export const unpublishTenantWebsiteService = async ({ tenantId, actorUserId, sit
 }
 
 export const getPublicTenantWebsiteBySlugService = async (slug, siteType = '') => {
-  const normalizedSlug = normalizeTenantWebsiteSlug(slug)
-  const doc = isStoreSiteType(siteType)
-    ? await TenantWebsiteSettings.findOne({ 'storeVariant.slug': normalizedSlug }).lean()
-    : await TenantWebsiteSettings.findOne({ slug: normalizedSlug }).lean()
+  const doc = await findPublicTenantWebsiteDocBySlug(slug, siteType)
   if (!doc) throw error('not_found', 'Bu web sitesi bulunamadı.', 404)
   const tenant = await Tenant.findOne({ _id: doc.tenantId, isActive: true, status: 'active' }).lean()
   if (!tenant) throw error('not_found', 'Bu web sitesi bulunamadı.', 404)
@@ -624,9 +687,7 @@ export const getPublicTenantWebsiteBySlugService = async (slug, siteType = '') =
 
 export const getPublicTenantWebsiteMetadataBySlugService = async (slug, siteType = '') => {
   const normalizedSlug = normalizeTenantWebsiteSlug(slug)
-  const doc = isStoreSiteType(siteType)
-    ? await TenantWebsiteSettings.findOne({ 'storeVariant.slug': normalizedSlug }).lean()
-    : await TenantWebsiteSettings.findOne({ slug: normalizedSlug }).lean()
+  const doc = await findPublicTenantWebsiteDocBySlug(normalizedSlug, siteType)
   if (!doc) throw error('not_found', 'Bu web sitesi bulunamadı.', 404)
 
   const tenant = await Tenant.findOne({ _id: doc.tenantId, isActive: true, status: 'active' }).lean()
@@ -636,12 +697,18 @@ export const getPublicTenantWebsiteMetadataBySlugService = async (slug, siteType
   if (!settings.enabled || !settings.published) {
     throw error('site_unpublished', 'Bu web sitesi henüz yayında değil.', 404)
   }
+  const tenantLogo = tenant.settings?.logo
+  const publicLogoUrl = tenantLogo && Object.prototype.hasOwnProperty.call(tenantLogo, 'url')
+    ? String(tenantLogo.url || '')
+    : String(tenant.logoUrl || '')
 
   return {
     tenant: {
       name: String(tenant.name || ''),
+      businessName: String(tenant.settings?.business?.businessName || tenant.name || ''),
+      slug: String(tenant.slug || ''),
       description: String(tenant.description || ''),
-      logoUrl: String(tenant.logoUrl || '')
+      logoUrl: publicLogoUrl
     },
     settings: {
       slug: String(settings.slug || normalizedSlug),

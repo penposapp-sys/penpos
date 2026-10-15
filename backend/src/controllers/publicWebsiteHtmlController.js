@@ -29,7 +29,7 @@ export const renderPublicTenantWebsiteHtml = async (req, res) => {
       canonicalPath
     })
 
-    res.set('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300')
+    res.set('Cache-Control', 'no-store, max-age=0')
     res.type('html').send(injectTenantWebsiteSocialMetadata(template, metadata))
   } catch (err) {
     sendError(res, err)

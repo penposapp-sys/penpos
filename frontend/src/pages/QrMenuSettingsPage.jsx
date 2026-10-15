@@ -150,7 +150,7 @@ export default function QrMenuSettingsPage() {
 
   const liveLink = useMemo(() => {
     const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
-    const slug = normalizePublicSlug(businessName) || String(websiteSlug || tenant?.slug || '').trim()
+    const slug = String(tenant?.publicSlug || normalizePublicSlug(businessName) || websiteSlug || tenant?.slug || '').trim()
     if (!slug) return ''
     const next = new URL(buildPublicAppUrl(`/menu/${slug}`))
     if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
@@ -158,11 +158,11 @@ export default function QrMenuSettingsPage() {
       next.searchParams.set('table', String(selectedTable.name || ''))
     }
     return next.toString()
-  }, [websiteSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
+  }, [websiteSlug, tenant?.publicSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   const previewLink = useMemo(() => {
     const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
-    const slug = normalizePublicSlug(businessName) || String(websiteSlug || tenant?.slug || '').trim()
+    const slug = String(tenant?.publicSlug || normalizePublicSlug(businessName) || websiteSlug || tenant?.slug || '').trim()
     if (!slug) return ''
     const next = new URL(buildPublicAppUrl(`/menu/${slug}`, null, { originMode: 'current' }))
     if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
@@ -170,7 +170,7 @@ export default function QrMenuSettingsPage() {
       next.searchParams.set('table', String(selectedTable.name || ''))
     }
     return next.toString()
-  }, [websiteSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
+  }, [websiteSlug, tenant?.publicSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   const hasSeparateLocalPreview = import.meta.env.DEV && !!previewLink && !!liveLink && previewLink !== liveLink
 
@@ -207,7 +207,10 @@ export default function QrMenuSettingsPage() {
         setError(businessRes?.message || 'QR ayarları yüklenemedi')
         return
       }
-      const nextTenant = profileRes?.tenant || null
+      const nextTenant = {
+        ...(profileRes?.tenant || {}),
+        publicSlug: businessRes?.tenant?.publicSlug || profileRes?.tenant?.slug || '',
+      }
       setTenant(nextTenant)
       setWebsiteSlug(String(websiteRes?.settings?.slug || '').trim())
       setSettings(mergeBusinessSettings(businessRes?.settings || nextTenant?.settings || {}))
@@ -503,5 +506,4 @@ export default function QrMenuSettingsPage() {
     </div>
   )
 }
-
 

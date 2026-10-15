@@ -11,6 +11,18 @@ const cleanText = (value, fallback = '') => String(value || fallback)
   .replace(/\s+/g, ' ')
   .trim()
 
+const normalizeSlug = (value) => String(value || '')
+  .trim()
+  .toLocaleLowerCase('tr-TR')
+  .replace(/ç/g, 'c')
+  .replace(/ğ/g, 'g')
+  .replace(/ı/g, 'i')
+  .replace(/ö/g, 'o')
+  .replace(/ş/g, 's')
+  .replace(/ü/g, 'u')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+
 const getPublicOrigin = (value = process.env.PUBLIC_APP_URL) => {
   try {
     const url = new URL(String(value || DEFAULT_PUBLIC_ORIGIN))
@@ -64,8 +76,13 @@ export const buildTenantWebsiteSocialMetadata = ({
   publicOrigin
 } = {}) => {
   const origin = getPublicOrigin(publicOrigin)
-  const name = cleanText(tenant.name, 'PenPOS')
-  const title = cleanText(settings?.seo?.title, name) || name
+  const name = cleanText(tenant.businessName || tenant.name, 'PenPOS')
+  const configuredTitle = cleanText(settings?.seo?.title)
+  const storedTitleIsOldBusinessName = configuredTitle
+    && tenant.slug
+    && normalizeSlug(configuredTitle) === normalizeSlug(tenant.slug)
+    && normalizeSlug(configuredTitle) !== normalizeSlug(name)
+  const title = storedTitleIsOldBusinessName ? name : (configuredTitle || name)
   const about = (Array.isArray(settings.sections) ? settings.sections : [])
     .find((section) => String(section?.type || '') === 'about')
   const seoDescription = cleanText(settings?.seo?.description)
