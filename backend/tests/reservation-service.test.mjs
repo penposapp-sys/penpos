@@ -7,11 +7,13 @@ import ReservationNotification from '../src/models/ReservationNotification.js'
 import Table from '../src/models/Table.js'
 import Tenant from '../src/models/Tenant.js'
 import TenantWebsiteSettings from '../src/models/TenantWebsiteSettings.js'
+import User from '../src/models/User.js'
 import {
   changeReservationStatus,
   createPublicReservation,
   createStaffReservation,
   getPendingReservationCount,
+  listReservations,
   markReservationNotificationsRead,
   updateReservation,
   updateReservationSettings,
@@ -74,9 +76,18 @@ const customerPayload = (date = tomorrow(), time = '12:00') => ({
   time
 })
 
-const mockCommonAvailability = (t, { availableTables = [table()], activeOrders = [], site = false } = {}) => {
-  t.mock.method(Branch, 'findOne', () => query(branch))
-  t.mock.method(Branch, 'find', () => query([branch]))
+const mockCommonAvailability = (t, {
+  availableTables = [table()],
+  activeOrders = [],
+  site = false,
+  enabledBranches = [branch],
+  activeBranches = enabledBranches,
+  selectedBranch = branch
+} = {}) => {
+  t.mock.method(Branch, 'findOne', () => query(selectedBranch))
+  t.mock.method(Branch, 'find', (filter) => query(
+    filter?.['reservationSettings.onlineEnabled'] === true ? enabledBranches : activeBranches
+  ))
   t.mock.method(Reservation, 'updateMany', async () => ({ modifiedCount: 0 }))
   t.mock.method(Reservation, 'find', () => query([]))
   t.mock.method(Table, 'find', () => query(availableTables))
@@ -160,6 +171,125 @@ test('online creation rejects a time whose only table has an open order', async 
     (err) => err.status === 409 && err.payload.error === 'reservation_conflict'
   )
   assert.equal(createCalled, false)
+})
+
+test('public reservation creation uses the only reservation-enabled branch when no default branch is selected', async (t) => {
+  const otherBranch = {
+    _id: '64b000000000000000000008',
+    tenantId,
+    name: 'İkinci Şube',
+    isActive: true,
+    reservationSettings: { onlineEnabled: false }
+  }
+  mockCommonAvailability(t, {
+    site: true,
+    enabledBranches: [branch],
+    activeBranches: [branch, otherBranch]
+  })
+  t.mock.method(User, 'find', () => query([]))
+  let stored
+  t.mock.method(Reservation, 'create', async (input) => {
+    stored = input
+    return { ...input, _id: reservationId, createdAt: new Date() }
+  })
+
+  const result = await createPublicReservation({
+    slug: 'example',
+    payload: customerPayload()
+  })
+
+  assert.equal(result.reservation.status, 'pending')
+  assert.equal(String(stored.tenantId), tenantId)
+  assert.equal(String(stored.branchId), branchId)
+})
+
+test('public reservation creation keeps automatic confirmation for the enabled branch', async (t) => {
+  const autoConfirmBranch = {
+    ...branch,
+    reservationSettings: { onlineEnabled: true, autoConfirm: true }
+  }
+  mockCommonAvailability(t, {
+    site: true,
+    enabledBranches: [autoConfirmBranch],
+    activeBranches: [autoConfirmBranch],
+    selectedBranch: autoConfirmBranch
+  })
+  t.mock.method(User, 'find', () => query([]))
+  let stored
+  t.mock.method(Reservation, 'create', async (input) => {
+    stored = input
+    return { ...input, _id: reservationId, createdAt: new Date() }
+  })
+
+  const result = await createPublicReservation({
+    slug: 'example',
+    payload: customerPayload()
+  })
+
+  assert.equal(result.reservation.status, 'confirmed')
+  assert.equal(stored.status, 'confirmed')
+  assert.equal(stored.holdExpiresAt, null)
+})
+
+test('public reservation creation rejects a branch whose online reservation service is disabled', async (t) => {
+  const disabledBranch = {
+    ...branch,
+    reservationSettings: { onlineEnabled: false }
+  }
+  mockCommonAvailability(t, {
+    site: true,
+    enabledBranches: [],
+    activeBranches: [disabledBranch],
+    selectedBranch: disabledBranch
+  })
+
+  await assert.rejects(
+    createPublicReservation({
+      slug: 'example',
+      payload: customerPayload()
+    }),
+    (err) => err.status === 403 && err.payload.error === 'online_reservations_disabled'
+  )
+})
+
+test('staff cannot update reservation settings through the service API', async () => {
+  await assert.rejects(
+    updateReservationSettings({
+      tenantId,
+      branchId,
+      actor: { id: 'staff-1', role: 'staff', branchId },
+      input: { onlineEnabled: true }
+    }),
+    (err) => err.status === 403
+  )
+})
+
+test('reservation listing always scopes tenant and branch ids to the authorized input', async (t) => {
+  let reservationFilter
+  t.mock.method(Reservation, 'find', (filter) => {
+    reservationFilter = filter
+    return query([])
+  })
+  t.mock.method(ReservationNotification, 'countDocuments', async () => 0)
+
+  const result = await listReservations({
+    tenantId,
+    branchIds: [branchId],
+    actor: { id: 'manager-1' },
+    date: '2026-10-16',
+    status: 'pending'
+  })
+
+  assert.deepEqual(reservationFilter, {
+    tenantId,
+    branchId: { $in: [branchId] },
+    startAt: {
+      $gte: new Date('2026-10-16T00:00:00.000Z'),
+      $lt: new Date('2026-10-17T00:00:00.000Z')
+    },
+    status: 'pending'
+  })
+  assert.deepEqual(result.reservations, [])
 })
 
 test('a unique-slot race retries another available table', async (t) => {

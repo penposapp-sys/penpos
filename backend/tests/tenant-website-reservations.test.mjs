@@ -25,6 +25,7 @@ const query = (value) => {
 const mockWebsite = (t, { tenant = {}, branch, branches = [], website: websiteOverrides = {} } = {}) => {
   const branchQueries = { one: [], many: [] }
   const websiteQueries = []
+  const allBranches = branches.length > 0 ? branches : (branch ? [branch] : [])
   const website = {
     tenantId,
     slug: 'example-restaurant',
@@ -53,7 +54,9 @@ const mockWebsite = (t, { tenant = {}, branch, branches = [], website: websiteOv
   })
   t.mock.method(Branch, 'find', (filter) => {
     branchQueries.many.push(filter)
-    return query(branches)
+    return query(filter?.['reservationSettings.onlineEnabled'] === true
+      ? allBranches.filter((item) => item.reservationSettings?.onlineEnabled === true)
+      : allBranches)
   })
   return { website, resolvedTenant, branchQueries, websiteQueries }
 }
@@ -66,7 +69,12 @@ test('Pendik Tanıtım Etkinlikleri slug resolves only for its explicitly publis
 
   const payload = await getPublicTenantWebsiteBySlugService('Pendik-Tanitim-Etkinlikleri', 'restaurant')
 
-  assert.deepEqual(websiteQueries[0], { slug: 'pendik-tanitim-etkinlikleri' })
+  assert.deepEqual(websiteQueries[0], {
+    $or: [
+      { slug: 'pendik-tanitim-etkinlikleri' },
+      { legacySlugs: 'pendik-tanitim-etkinlikleri' }
+    ]
+  })
   assert.equal(payload.tenant.name, 'Pendik Tanıtım Etkinlikleri')
   assert.equal(payload.settings.slug, 'pendik-tanitim-etkinlikleri')
   assert.equal(payload.settings.enabled, true)
@@ -82,26 +90,34 @@ test('Pendik Tanıtım Etkinlikleri remains unavailable when its persisted publi
     getPublicTenantWebsiteBySlugService('pendik-tanitim-etkinlikleri', 'restaurant'),
     (err) => err?.status === 404 && err?.payload?.error === 'site_unpublished'
   )
-  assert.deepEqual(websiteQueries[0], { slug: 'pendik-tanitim-etkinlikleri' })
+  assert.deepEqual(websiteQueries[0], {
+    $or: [
+      { slug: 'pendik-tanitim-etkinlikleri' },
+      { legacySlugs: 'pendik-tanitim-etkinlikleri' }
+    ]
+  })
 })
 
-test('public site enables reservations on the configured branch belonging to its tenant', async (t) => {
+test('public site enables reservations on the reservation-enabled branch belonging to its tenant', async (t) => {
   const { branchQueries } = mockWebsite(t, {
-    tenant: { settings: { onlineSales: { branchId } } },
     branch: { _id: branchId, tenantId, isActive: true, reservationSettings: { onlineEnabled: true } }
   })
 
   const payload = await getPublicTenantWebsiteBySlugService('example-restaurant')
 
   assert.equal(payload.reservationsEnabled, true)
-  assert.equal(String(branchQueries.one[0]._id), branchId)
-  assert.equal(String(branchQueries.one[0].tenantId), tenantId)
-  assert.equal(branchQueries.one[0].isActive, true)
+  assert.equal(branchQueries.one.length, 0)
+  assert.deepEqual(branchQueries.many[0], {
+    tenantId,
+    isActive: true,
+    isDeleted: { $ne: true },
+    status: { $ne: 'deleted' },
+    'reservationSettings.onlineEnabled': true
+  })
 })
 
 test('public site keeps reservations hidden when the resolved branch setting is disabled', async (t) => {
   mockWebsite(t, {
-    tenant: { settings: { onlineSales: { branchId } } },
     branch: { _id: branchId, tenantId, isActive: true, reservationSettings: { onlineEnabled: false } }
   })
 
@@ -181,7 +197,94 @@ test('public site uses the only active tenant branch when no online-sales branch
   assert.equal(payload.reservationsEnabled, true)
 })
 
+test('online-sales default branch does not override a different reservation-enabled branch', async (t) => {
+  const enabledBranch = {
+    _id: branchId,
+    tenantId,
+    isActive: true,
+    reservationSettings: { onlineEnabled: true }
+  }
+  const onlineSalesBranch = {
+    _id: '64b000000000000000000008',
+    tenantId,
+    isActive: true,
+    reservationSettings: { onlineEnabled: false }
+  }
+  mockWebsite(t, {
+    tenant: { settings: { onlineSales: { branchId: String(onlineSalesBranch._id) } } },
+    branches: [enabledBranch, onlineSalesBranch]
+  })
+
+  const payload = await getPublicTenantWebsiteBySlugService('example-restaurant')
+
+  assert.equal(payload.reservationsEnabled, true)
+})
+
+test('online-sales default branch selects among reservation-enabled branches only', async (t) => {
+  const enabledBranch = {
+    _id: branchId,
+    tenantId,
+    isActive: true,
+    reservationSettings: { onlineEnabled: true }
+  }
+  const otherEnabledBranch = {
+    _id: '64b000000000000000000008',
+    tenantId,
+    isActive: true,
+    reservationSettings: { onlineEnabled: true }
+  }
+  mockWebsite(t, {
+    tenant: { settings: { onlineSales: { branchId: String(otherEnabledBranch._id) } } },
+    branches: [enabledBranch, otherEnabledBranch],
+    branch: otherEnabledBranch
+  })
+
+  const payload = await getPublicTenantWebsiteBySlugService('example-restaurant')
+
+  assert.equal(payload.reservationsEnabled, true)
+})
+
 test('public site does not guess a reservation branch when multiple branches are unconfigured', async (t) => {
+  mockWebsite(t, {
+    branches: [
+      { _id: branchId, tenantId, isActive: true, reservationSettings: { onlineEnabled: true } },
+      { _id: '64b000000000000000000008', tenantId, isActive: true, reservationSettings: { onlineEnabled: true } }
+    ]
+  })
+
+  const payload = await getPublicTenantWebsiteBySlugService('example-restaurant')
+
+  assert.equal(payload.reservationsEnabled, false)
+})
+
+test('public site uses the single branch with online reservations enabled when no default branch is configured', async (t) => {
+  const enabledBranch = {
+    _id: branchId,
+    tenantId,
+    isActive: true,
+    reservationSettings: { onlineEnabled: true }
+  }
+  const disabledBranch = {
+    _id: '64b000000000000000000008',
+    tenantId,
+    isActive: true,
+    reservationSettings: { onlineEnabled: false }
+  }
+  const { branchQueries } = mockWebsite(t, { branches: [enabledBranch, disabledBranch] })
+
+  const payload = await getPublicTenantWebsiteBySlugService('example-restaurant')
+
+  assert.equal(payload.reservationsEnabled, true)
+  assert.deepEqual(branchQueries.many[0], {
+    tenantId,
+    isActive: true,
+    isDeleted: { $ne: true },
+    status: { $ne: 'deleted' },
+    'reservationSettings.onlineEnabled': true
+  })
+})
+
+test('public site does not guess between multiple reservation-enabled branches', async (t) => {
   mockWebsite(t, {
     branches: [
       { _id: branchId, tenantId, isActive: true, reservationSettings: { onlineEnabled: true } },

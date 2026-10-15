@@ -21,6 +21,7 @@ const STATUS_COLORS = {
   no_show: '#7c3aed'
 }
 const WEEKDAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+const ALL_BRANCHES = '__all__'
 const localDate = () => {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -78,11 +79,19 @@ export default function ReservationsPage() {
   const [busyId, setBusyId] = useState('')
   const [saving, setSaving] = useState(false)
   const isAdmin = user?.role === 'tenant_admin'
+  const isStaff = user?.role === 'staff'
+  const activeStaffBranchId = String(user?.branchId || (allowedIds.length === 1 ? allowedIds[0] : '')).trim()
+  const isAllBranches = isAdmin && branchId === ALL_BRANCHES
+  const scopedBranchIds = useMemo(() => isAllBranches
+    ? branches.map((branch) => String(branch._id))
+    : branchId && branchId !== ALL_BRANCHES ? [branchId] : [], [branchId, branches, isAllBranches])
 
   const selectBranch = useCallback((id) => {
     const next = String(id || '')
     setBranchId(next)
-    try { if (next) localStorage.setItem('selectedBranchId', next) } catch {}
+    try {
+      if (next && next !== ALL_BRANCHES) localStorage.setItem('selectedBranchId', next)
+    } catch {}
   }, [])
 
   const loadBranches = useCallback(async () => {
@@ -90,10 +99,16 @@ export default function ReservationsPage() {
       const result = await api('/api/branches', { silent: true, cacheMode: 'no-store' })
       if (result?.success !== true) throw new Error(result?.message || 'Şubeler yüklenemedi')
       const permitted = (Array.isArray(result?.branches) ? result.branches : [])
-        .filter((branch) => branch.isActive !== false && (allowedIds.length === 0 || allowedIds.includes(String(branch._id))))
+        .filter((branch) => branch.isActive !== false
+          && (allowedIds.length === 0 || allowedIds.includes(String(branch._id)))
+          && (!isStaff || String(branch._id) === activeStaffBranchId))
       setBranches(permitted)
       setBranchesError('')
       setBranchId((previous) => {
+        if (isStaff) return permitted.some((branch) => String(branch._id) === activeStaffBranchId)
+          ? activeStaffBranchId
+          : ''
+        if (previous === ALL_BRANCHES && isAdmin && permitted.length > 1) return ALL_BRANCHES
         const saved = (() => { try { return localStorage.getItem('selectedBranchId') || '' } catch { return '' } })()
         const chosen = [previous, saved, permitted[0]?._id].find((value) => value && permitted.some((branch) => String(branch._id) === String(value)))
         if (chosen) {
@@ -105,11 +120,10 @@ export default function ReservationsPage() {
       setBranchesError(err?.message || 'Şubeler yüklenemedi')
       toast.error(err?.message || 'Şubeler yüklenemedi')
     }
-  }, [allowedIds])
+  }, [activeStaffBranchId, allowedIds, isAdmin, isStaff])
 
-  const branchQuery = branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''
   const loadBranchSettings = useCallback(async () => {
-    if (!branchId) {
+    if (!isAdmin || !branchId || isAllBranches) {
       setSettingsLoaded(false)
       setSettingsError('')
       return
@@ -131,10 +145,10 @@ export default function ReservationsPage() {
       setSettingsError(err?.message || 'Rezervasyon ayarları yüklenemedi')
       toast.error(err?.message || 'Rezervasyon ayarları yüklenemedi')
     }
-  }, [branchId])
+  }, [branchId, isAdmin, isAllBranches])
 
   const loadReservations = useCallback(async () => {
-    if (!branchId) {
+    if (!branchId || (isAllBranches && scopedBranchIds.length === 0)) {
       setReservations([])
       setPendingCount(0)
       setUnreadCount(0)
@@ -146,12 +160,17 @@ export default function ReservationsPage() {
     setReservationsError('')
     setReservationNotice('')
     try {
-      const params = new URLSearchParams({ branchId, date })
-      if (status) params.set('status', status)
+      const scopeParams = new URLSearchParams(isAllBranches
+        ? { branchIds: scopedBranchIds.join(','), date }
+        : { branchId, date })
+      const notificationParams = new URLSearchParams(isAllBranches
+        ? { branchIds: scopedBranchIds.join(',') }
+        : { branchId })
+      if (status) scopeParams.set('status', status)
       const [listResult, countResult, notificationResult] = await Promise.all([
-        api(`/api/reservations?${params}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
-        api(`/api/reservations/pending-count?branchId=${encodeURIComponent(branchId)}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
-        api(`/api/reservations/notifications?branchId=${encodeURIComponent(branchId)}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
+        api(`/api/reservations?${scopeParams}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api(`/api/reservations/pending-count?${notificationParams}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api(`/api/reservations/notifications?${notificationParams}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
       ])
       if (listResult?.success !== true) {
         throw new Error(listResult?.message || listResult?.data?.message || 'Rezervasyonlar yüklenemedi')
@@ -176,7 +195,7 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [branchId, date, status])
+  }, [branchId, date, isAllBranches, scopedBranchIds, status])
 
   useEffect(() => { loadBranches() }, [loadBranches])
   useEffect(() => { loadReservations() }, [loadReservations])
@@ -189,30 +208,35 @@ export default function ReservationsPage() {
     return () => window.clearInterval(timer)
   }, [branchId, loadReservations])
 
-  const loadTablesAndSettings = async () => {
-    if (!branchId) return
+  const loadTablesAndSettings = async (targetBranchId = branchId) => {
+    if (!targetBranchId || targetBranchId === ALL_BRANCHES) return
     try {
+      const tableRequest = api(`/api/tenant/tables?branchId=${encodeURIComponent(targetBranchId)}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
       const [tableResult, settingsResult] = await Promise.all([
-        api(`/api/tenant/tables?branchId=${encodeURIComponent(branchId)}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
-        api(`/api/reservations/settings${branchQuery}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
+        tableRequest,
+        isAdmin
+          ? api(`/api/reservations/settings?branchId=${encodeURIComponent(targetBranchId)}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
+          : Promise.resolve(null)
       ])
-      if (tableResult?.success !== true || settingsResult?.success !== true || !settingsResult?.settings) {
+      if (tableResult?.success !== true || (isAdmin && (settingsResult?.success !== true || !settingsResult?.settings))) {
         throw new Error(tableResult?.message || settingsResult?.message || 'Masa ve rezervasyon ayarları yüklenemedi')
       }
       setTables(Array.isArray(tableResult?.tables) ? tableResult.tables : [])
-      setSettings(settingsResult?.settings || initialSettings())
-      setSettingsLoaded(true)
-      setSettingsError('')
+      if (isAdmin) {
+        setSettings(settingsResult.settings)
+        setSettingsLoaded(true)
+        setSettingsError('')
+      }
     } catch (err) {
       toast.error(err?.data?.message || err?.message || 'Masa ve rezervasyon ayarları yüklenemedi')
     }
   }
 
-  const loadAvailability = async (nextForm = form) => {
-    if (!branchId || !nextForm.date || !nextForm.guestCount) return
+  const loadAvailability = async (nextForm = form, targetBranchId = branchId) => {
+    if (!targetBranchId || targetBranchId === ALL_BRANCHES || !nextForm.date || !nextForm.guestCount) return
     setAvailabilityError('')
     try {
-      const params = new URLSearchParams({ branchId, date: nextForm.date, guestCount: String(nextForm.guestCount) })
+      const params = new URLSearchParams({ branchId: targetBranchId, date: nextForm.date, guestCount: String(nextForm.guestCount) })
       const result = await api(`/api/reservations/availability?${params}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
       if (result?.success !== true) throw new Error(result?.message || 'Uygunluk bilgisi yüklenemedi')
       setAvailableSlots(Array.isArray(result?.slots) ? result.slots : [])
@@ -224,6 +248,7 @@ export default function ReservationsPage() {
   }
 
   const openCreate = async () => {
+    if (!branchId || branchId === ALL_BRANCHES) return
     const next = initialForm(date)
     setFormError('')
     setAvailabilityError('')
@@ -235,6 +260,8 @@ export default function ReservationsPage() {
   }
 
   const openEdit = async (reservation) => {
+    if (isStaff && reservation.branchId !== activeStaffBranchId) return
+    selectBranch(reservation.branchId)
     const next = {
       customerName: reservation.customerName,
       phone: reservation.phone,
@@ -251,18 +278,19 @@ export default function ReservationsPage() {
     setForm(next)
     setAvailableSlots([])
     setModalOpen(true)
-    await Promise.all([loadTablesAndSettings(), loadAvailability(next)])
+    await Promise.all([loadTablesAndSettings(reservation.branchId), loadAvailability(next, reservation.branchId)])
   }
 
   const save = async (event) => {
     event.preventDefault()
-    if (!branchId || saving) return
+    const targetBranchId = String(editing?.branchId || branchId || '')
+    if (!targetBranchId || targetBranchId === ALL_BRANCHES || saving) return
     setSaving(true)
     try {
-      selectBranch(branchId)
+      selectBranch(targetBranchId)
       const result = await api(editing
-        ? `/api/reservations/${editing.id}?branchId=${encodeURIComponent(branchId)}`
-        : '/api/reservations', {
+        ? `/api/reservations/${editing.id}?branchId=${encodeURIComponent(targetBranchId)}`
+        : `/api/reservations?branchId=${encodeURIComponent(targetBranchId)}`, {
         method: editing ? 'PUT' : 'POST',
         body: JSON.stringify(form),
         silent: true,
@@ -286,9 +314,10 @@ export default function ReservationsPage() {
 
   const changeStatus = async (reservation, nextStatus) => {
     if (busyId) return
+    if (isStaff && reservation.branchId !== activeStaffBranchId) return
     setBusyId(reservation.id)
     try {
-      const result = await api(`/api/reservations/${reservation.id}/status?branchId=${encodeURIComponent(branchId)}`, {
+      const result = await api(`/api/reservations/${reservation.id}/status?branchId=${encodeURIComponent(reservation.branchId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
         silent: true,
@@ -306,10 +335,11 @@ export default function ReservationsPage() {
 
   const arriveAndOpen = async (reservation) => {
     if (busyId) return
+    if (isStaff && reservation.branchId !== activeStaffBranchId) return
     setBusyId(reservation.id)
     try {
       selectBranch(reservation.branchId)
-      const result = await api(`/api/reservations/${reservation.id}/arrive?branchId=${encodeURIComponent(branchId)}`, {
+      const result = await api(`/api/reservations/${reservation.id}/arrive?branchId=${encodeURIComponent(reservation.branchId)}`, {
         method: 'POST',
         body: JSON.stringify({}),
         silent: true,
@@ -327,7 +357,12 @@ export default function ReservationsPage() {
 
   const markRead = async (id = '') => {
     try {
-      const endpoint = id ? `/api/reservations/notifications/${id}/read?branchId=${encodeURIComponent(branchId)}` : `/api/reservations/notifications/read?branchId=${encodeURIComponent(branchId)}`
+      const notificationParams = new URLSearchParams(isAllBranches
+        ? { branchIds: scopedBranchIds.join(',') }
+        : { branchId })
+      const endpoint = id
+        ? `/api/reservations/notifications/${id}/read?${notificationParams}`
+        : `/api/reservations/notifications/read?${notificationParams}`
       await api(endpoint, { method: 'PUT', body: JSON.stringify({}), silent: true, skipBranchHeader: true })
       await loadReservations()
     } catch (err) {
@@ -337,7 +372,7 @@ export default function ReservationsPage() {
 
   const saveSettings = async (event) => {
     event.preventDefault()
-    if (settingsSaving || !branchId) return
+    if (!isAdmin || isAllBranches || settingsSaving || !branchId) return
     setSettingsSaving(true)
     try {
       selectBranch(branchId)
@@ -378,8 +413,8 @@ export default function ReservationsPage() {
           <div style={{ color: 'rgba(226,232,240,0.8)', marginTop: 6 }}>Online ve personel rezervasyonlarını şube bazında yönetin.</div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <button className="btn" type="button" onClick={() => { loadTablesAndSettings(); setSettingsOpen(true) }} style={headerButtonStyle}>Rezervasyon Ayarları</button>
-          <button className="btn" type="button" onClick={openCreate} style={{ ...headerButtonStyle, background: '#22c55e', borderColor: '#22c55e', color: '#062b22' }}>+ Rezervasyon Ekle</button>
+          {isAdmin && !isAllBranches ? <button className="btn" type="button" onClick={() => { loadTablesAndSettings(); setSettingsOpen(true) }} style={headerButtonStyle}>Rezervasyon Ayarları</button> : null}
+          <button className="btn" type="button" onClick={openCreate} disabled={!branchId || isAllBranches} style={{ ...headerButtonStyle, background: '#22c55e', borderColor: '#22c55e', color: '#062b22' }}>+ Rezervasyon Ekle</button>
           <button className="btn" type="button" onClick={() => navigate('/restoran/app/tables')} style={headerButtonStyle}>Masalara Dön</button>
         </div>
       </header>
@@ -388,6 +423,7 @@ export default function ReservationsPage() {
         <label style={fieldLabelStyle}>Şube
           <select value={branchId} onChange={(e) => selectBranch(e.target.value)} style={fieldControlStyle}>
             <option value="">Şube seçin</option>
+            {isAdmin && branches.length > 0 ? <option value={ALL_BRANCHES}>Tüm Şubeler</option> : null}
             {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
           </select>
         </label>
@@ -407,7 +443,7 @@ export default function ReservationsPage() {
 
       {branchesError ? <div role="alert" className="card" style={alertStyle}>{branchesError}</div> : null}
       {!branchId && !branchesError ? <div className="card" style={emptyStateStyle}>{branches.length ? 'Rezervasyonları görmek için bir şube seçin.' : 'Bu kullanıcı için erişilebilir aktif şube bulunamadı.'}</div> : null}
-      {branchId ? (
+      {isAdmin && branchId && !isAllBranches ? (
         <section className="card" role={settingsError || (settingsLoaded && !settings.onlineEnabled) ? 'status' : undefined} style={settingsError || (settingsLoaded && !settings.onlineEnabled) ? alertStyle : noticeStyle}>
           {settingsError
             ? `Online rezervasyon durumu doğrulanamadı: ${settingsError}`
@@ -429,7 +465,7 @@ export default function ReservationsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 19 }}>{viewMode === 'list' ? 'Rezervasyon listesi' : 'Günlük rezervasyon takvimi'}</h2>
-            <div style={{ color: 'var(--muted)', marginTop: 4 }}>{branches.find((item) => String(item._id) === branchId)?.name || 'Şube seçilmedi'} · {date} · {status ? STATUS_LABELS[status] : 'Tüm durumlar'}</div>
+            <div style={{ color: 'var(--muted)', marginTop: 4 }}>{isAllBranches ? 'Tüm Şubeler' : branches.find((item) => String(item._id) === branchId)?.name || 'Şube seçilmedi'} · {date} · {status ? STATUS_LABELS[status] : 'Tüm durumlar'}</div>
           </div>
           {status ? <button className="btn" type="button" onClick={() => setStatus('')} style={viewButtonStyle(false)}>Tüm durumları göster</button> : null}
         </div>
@@ -519,7 +555,7 @@ export default function ReservationsPage() {
         </div>
       ) : null}
 
-      {settingsOpen ? (
+      {settingsOpen && isAdmin ? (
         <div className="reservation-settings-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false) }}>
           <form className="card reservation-settings-modal" onSubmit={saveSettings} role="dialog" aria-modal="true" aria-labelledby="reservation-settings-title">
             <header className="reservation-settings-header">

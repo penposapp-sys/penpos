@@ -546,14 +546,30 @@ const toCanteenProducts = async (tenant) => {
 
 export const resolveTenantWebsiteReservationBranch = async (tenant) => {
   const preferredBranchId = String(mergeBusinessSettings(tenant.settings || {})?.onlineSales?.branchId || '').trim()
-  let branch = preferredBranchId
-    ? await Branch.findOne({ _id: preferredBranchId, tenantId: tenant._id, isActive: true }).lean()
-    : null
-  if (!branch) {
-    const branches = await Branch.find({ tenantId: tenant._id, isActive: true }).sort({ name: 1 }).limit(2).lean()
-    if (branches.length === 1) branch = branches[0]
+  const activeFilter = {
+    tenantId: tenant._id,
+    isActive: true,
+    isDeleted: { $ne: true },
+    status: { $ne: 'deleted' }
   }
-  return branch
+  if (preferredBranchId) {
+    const preferredBranch = await Branch.findOne({
+      ...activeFilter,
+      _id: preferredBranchId,
+      'reservationSettings.onlineEnabled': true
+    }).lean()
+    if (preferredBranch) return preferredBranch
+  }
+
+  const enabledBranches = await Branch.find({
+    ...activeFilter,
+    'reservationSettings.onlineEnabled': true
+  }).sort({ name: 1 }).limit(2).lean()
+  if (enabledBranches.length === 1) return enabledBranches[0]
+  if (enabledBranches.length > 1) return null
+
+  const branches = await Branch.find(activeFilter).sort({ name: 1 }).limit(2).lean()
+  return branches.length === 1 ? branches[0] : null
 }
 
 const buildTenantPublicSitePayload = async (tenant, settings, siteType = '') => {

@@ -103,7 +103,7 @@ export const branchAvailability = async (req, res) => {
       date: req.query?.date,
       guestCount: Number(req.query?.guestCount || 1)
     })
-    res.json({ success: true, ...result })
+    res.json({ success: true, slots: result.slots })
   } catch (err) { sendError(res, err) }
 }
 

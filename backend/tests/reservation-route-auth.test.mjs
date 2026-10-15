@@ -64,3 +64,50 @@ test('reservation route authenticates before checking subscription and preserves
   assert.equal(body.pendingCount, 0)
   assert.equal(body.unreadCount, 0)
 })
+
+test('staff cannot read or update reservation settings through the API', async (t) => {
+  const tenant = {
+    _id: tenantId,
+    id: tenantId,
+    name: 'Test Tenant',
+    status: 'active',
+    subscriptionStatus: 'active',
+    allowedBranchIds: [branchId]
+  }
+  const user = {
+    _id: userId,
+    name: 'Test Staff',
+    role: 'staff',
+    tenantId,
+    branchId,
+    branchIds: [branchId],
+    permissions: ['manage_tables'],
+    isActive: true
+  }
+
+  t.mock.method(User, 'findById', () => query(user))
+  t.mock.method(Tenant, 'findById', () => query(tenant))
+  t.mock.method(Tenant, 'findOne', () => query(tenant))
+
+  const app = createServer()
+  const server = app.listen(0)
+  t.after(() => new Promise((resolve, reject) => {
+    server.close((err) => err ? reject(err) : resolve())
+  }))
+  await new Promise((resolve, reject) => {
+    server.once('listening', resolve)
+    server.once('error', reject)
+  })
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}/api/reservations/settings?branchId=${branchId}`
+  const headers = { Authorization: `Bearer ${signToken({ sub: userId, tenantId })}` }
+  const getResponse = await fetch(baseUrl, { headers })
+  const putResponse = await fetch(baseUrl, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ onlineEnabled: true })
+  })
+
+  assert.equal(getResponse.status, 403)
+  assert.equal(putResponse.status, 403)
+})
