@@ -2104,6 +2104,13 @@ html[data-theme="dark"] .sale-order-status--open {
   overflow-x: hidden;
 }
 
+html[data-theme="light"].theme-white body.public-site-layout button.public-reservation-action {
+  border-radius: 0 !important;
+  background: var(--public-reservation-bg) !important;
+  border-color: var(--public-reservation-bg) !important;
+  color: var(--public-reservation-text) !important;
+}
+
 .page-content {
   width: 100%;
   min-height: 100%;
@@ -6647,7 +6654,7 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]) {
+):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]):not(.public-reservation-action) {
   background: #ffffff !important;
   color: #111111 !important;
   border-color: #d1d5db !important;
@@ -6675,7 +6682,7 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]) :is(
+):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]):not(.public-reservation-action) :is(
   *:not(.responsive-card-badge),
   span:not(.responsive-card-badge),
   svg:not(.responsive-card-badge),
@@ -15244,6 +15251,484 @@ body.mobile-performance-mode.public-site-layout .system-login.system-login--cant
   background: #f8fafc;
 }
 
+.reservation-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: clamp(12px, 3vh, 28px);
+  background: rgba(8, 20, 38, 0.68);
+  backdrop-filter: blur(5px);
+}
+
+.reservation-settings-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(960px, 100%);
+  max-height: min(92vh, 900px);
+  max-height: min(92dvh, 900px);
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 20px !important;
+  background: var(--surface, #fff);
+  color: var(--text, #14243a);
+  box-shadow: 0 28px 90px rgba(5, 15, 30, 0.32);
+}
+
+.reservation-settings-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(120deg, #10233f, #173d50);
+  color: #fff;
+}
+
+.reservation-settings-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #a7f3d0;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.11em;
+}
+
+.reservation-settings-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 23px !important;
+  font-weight: 750 !important;
+  line-height: 1.25;
+}
+
+.reservation-settings-header p {
+  margin: 5px 0 0;
+  color: rgba(235, 244, 250, 0.76);
+  font-size: 13px !important;
+}
+
+.reservation-settings-close {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  font-size: 26px !important;
+  line-height: 1;
+}
+
+.reservation-settings-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.reservation-settings-scroll {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 20px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 24px 28px;
+}
+
+.reservation-settings-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.reservation-settings-section-heading h3 {
+  margin: 0;
+  color: var(--text, #14243a);
+  font-size: 16px !important;
+  font-weight: 750 !important;
+}
+
+.reservation-settings-section-heading p {
+  margin: 4px 0 0;
+  color: var(--muted, #64748b);
+  font-size: 12px !important;
+}
+
+.reservation-settings-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reservation-settings-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--border, #dce4ee);
+  border-radius: 14px;
+  background: var(--surface-soft, #f7fafc);
+  cursor: pointer;
+}
+
+.reservation-settings-toggle input,
+.reservation-hours-toggle input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: #16845b;
+}
+
+.reservation-settings-toggle span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.reservation-settings-toggle strong {
+  color: var(--text, #14243a);
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.reservation-settings-toggle small,
+.reservation-settings-group > small,
+.reservation-settings-loading {
+  color: var(--muted, #64748b);
+  font-size: 11px !important;
+  line-height: 1.45;
+}
+
+.reservation-settings-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reservation-settings-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border, #dce4ee);
+  border-radius: 14px;
+  background: var(--surface-soft, #f8fafc);
+}
+
+.reservation-settings-group--single {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr);
+  align-items: center;
+}
+
+.reservation-numeric-setting {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text, #26364a);
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 1.35;
+}
+
+.reservation-numeric-setting input,
+.reservation-time-field input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text, #14243a);
+  font: inherit;
+  font-size: 14px !important;
+}
+
+.reservation-numeric-setting input:focus,
+.reservation-time-field input:focus {
+  outline: none;
+  border-color: #16845b;
+  box-shadow: 0 0 0 3px rgba(22, 132, 91, 0.14);
+}
+
+.reservation-hours-grid {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reservation-hours-heading,
+.reservation-hours-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.2fr) minmax(95px, 0.8fr) repeat(2, minmax(130px, 1fr));
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.reservation-hours-heading {
+  padding: 0 14px 5px;
+  color: var(--muted, #64748b);
+  font-size: 10px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reservation-hours-row {
+  min-height: 58px;
+  padding: 8px 14px;
+  border: 1px solid var(--border, #e1e7ef);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.reservation-hours-row > strong {
+  color: var(--text, #26364a);
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.reservation-hours-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text, #334155);
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  cursor: pointer;
+}
+
+.reservation-time-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted, #64748b);
+  font-size: 11px !important;
+}
+
+.reservation-time-field input {
+  min-height: 38px;
+  padding: 6px 8px;
+}
+
+.reservation-time-field input:disabled {
+  background: var(--surface-soft, #f1f5f9);
+  color: var(--muted, #94a3b8);
+  opacity: 0.7;
+}
+
+.reservation-settings-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 15px 28px;
+  border-top: 1px solid var(--border, #e2e8f0);
+  background: var(--surface, #fff);
+}
+
+.reservation-settings-footer > small {
+  flex: 1 1 auto;
+  color: var(--muted, #64748b);
+  font-size: 12px !important;
+}
+
+.reservation-settings-footer .btn {
+  min-height: 42px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.reservation-settings-footer .reservation-settings-cancel {
+  border-color: var(--border, #cbd5e1);
+  background: var(--surface, #fff);
+  color: var(--text, #334155);
+}
+
+.reservation-card {
+  min-width: 0;
+}
+
+.reservation-card__details {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.reservation-card__actions {
+  min-width: 0;
+}
+
+.reservation-card__actions .btn {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px !important;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.reservation-settings-footer .reservation-settings-save {
+  border-color: #16845b;
+  background: #16845b;
+  color: #fff;
+}
+
+.reservation-settings-footer .reservation-settings-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+html[data-theme="dark"] .reservation-settings-modal,
+html.tenant-dark-mode .reservation-settings-modal,
+body.tenant-dark-mode .reservation-settings-modal,
+.mobile-system-dark .reservation-settings-modal {
+  border-color: #3c4653 !important;
+  background: #20242a !important;
+  color: #f4f6f8 !important;
+}
+
+html[data-theme="dark"] .reservation-settings-toggle,
+html[data-theme="dark"] .reservation-settings-group,
+html[data-theme="dark"] .reservation-hours-row,
+html.tenant-dark-mode .reservation-settings-toggle,
+html.tenant-dark-mode .reservation-settings-group,
+html.tenant-dark-mode .reservation-hours-row,
+body.tenant-dark-mode .reservation-settings-toggle,
+body.tenant-dark-mode .reservation-settings-group,
+body.tenant-dark-mode .reservation-hours-row,
+.mobile-system-dark .reservation-settings-toggle,
+.mobile-system-dark .reservation-settings-group,
+.mobile-system-dark .reservation-hours-row {
+  border-color: #424b56 !important;
+  background: #292e35 !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] .reservation-settings-header,
+html.tenant-dark-mode .reservation-settings-header,
+body.tenant-dark-mode .reservation-settings-header,
+.mobile-system-dark .reservation-settings-header {
+  border-bottom-color: #3b4856;
+  background: linear-gradient(120deg, #111e31, #173344);
+}
+
+html[data-theme="dark"] .reservation-settings-section-heading h3,
+html[data-theme="dark"] .reservation-settings-toggle strong,
+html[data-theme="dark"] .reservation-hours-row > strong,
+html[data-theme="dark"] .reservation-hours-toggle,
+html[data-theme="dark"] .reservation-numeric-setting,
+html.tenant-dark-mode .reservation-settings-section-heading h3,
+html.tenant-dark-mode .reservation-settings-toggle strong,
+html.tenant-dark-mode .reservation-hours-row > strong,
+html.tenant-dark-mode .reservation-hours-toggle,
+html.tenant-dark-mode .reservation-numeric-setting,
+body.tenant-dark-mode .reservation-settings-section-heading h3,
+body.tenant-dark-mode .reservation-settings-toggle strong,
+body.tenant-dark-mode .reservation-hours-row > strong,
+body.tenant-dark-mode .reservation-hours-toggle,
+body.tenant-dark-mode .reservation-numeric-setting,
+.mobile-system-dark .reservation-settings-section-heading h3,
+.mobile-system-dark .reservation-settings-toggle strong,
+.mobile-system-dark .reservation-hours-row > strong,
+.mobile-system-dark .reservation-hours-toggle,
+.mobile-system-dark .reservation-numeric-setting {
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] .reservation-settings-section-heading p,
+html[data-theme="dark"] .reservation-settings-toggle small,
+html[data-theme="dark"] .reservation-settings-group > small,
+html[data-theme="dark"] .reservation-settings-loading,
+html[data-theme="dark"] .reservation-time-field,
+html[data-theme="dark"] .reservation-settings-footer > small,
+html.tenant-dark-mode .reservation-settings-section-heading p,
+html.tenant-dark-mode .reservation-settings-toggle small,
+html.tenant-dark-mode .reservation-settings-group > small,
+html.tenant-dark-mode .reservation-settings-loading,
+html.tenant-dark-mode .reservation-time-field,
+html.tenant-dark-mode .reservation-settings-footer > small,
+body.tenant-dark-mode .reservation-settings-section-heading p,
+body.tenant-dark-mode .reservation-settings-toggle small,
+body.tenant-dark-mode .reservation-settings-group > small,
+body.tenant-dark-mode .reservation-settings-loading,
+body.tenant-dark-mode .reservation-time-field,
+body.tenant-dark-mode .reservation-settings-footer > small,
+.mobile-system-dark .reservation-settings-section-heading p,
+.mobile-system-dark .reservation-settings-toggle small,
+.mobile-system-dark .reservation-settings-group > small,
+.mobile-system-dark .reservation-settings-loading,
+.mobile-system-dark .reservation-time-field,
+.mobile-system-dark .reservation-settings-footer > small {
+  color: #b8c1cc !important;
+}
+
+html[data-theme="dark"] .reservation-numeric-setting input,
+html[data-theme="dark"] .reservation-time-field input,
+html.tenant-dark-mode .reservation-numeric-setting input,
+html.tenant-dark-mode .reservation-time-field input,
+body.tenant-dark-mode .reservation-numeric-setting input,
+body.tenant-dark-mode .reservation-time-field input,
+.mobile-system-dark .reservation-numeric-setting input,
+.mobile-system-dark .reservation-time-field input {
+  border-color: #4b5563 !important;
+  background: #171b20 !important;
+  color: #f4f6f8 !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .reservation-time-field input:disabled,
+html.tenant-dark-mode .reservation-time-field input:disabled,
+body.tenant-dark-mode .reservation-time-field input:disabled,
+.mobile-system-dark .reservation-time-field input:disabled {
+  background: #22272d !important;
+  color: #8792a0 !important;
+}
+
+html[data-theme="dark"] .reservation-settings-footer,
+html.tenant-dark-mode .reservation-settings-footer,
+body.tenant-dark-mode .reservation-settings-footer,
+.mobile-system-dark .reservation-settings-footer {
+  border-top-color: #3c4653 !important;
+  background: #20242a !important;
+}
+
+html[data-theme="dark"] .reservation-settings-footer .reservation-settings-cancel,
+html.tenant-dark-mode .reservation-settings-footer .reservation-settings-cancel,
+body.tenant-dark-mode .reservation-settings-footer .reservation-settings-cancel,
+.mobile-system-dark .reservation-settings-footer .reservation-settings-cancel {
+  border-color: #596575 !important;
+  background: #303740 !important;
+  color: #f1f5f9 !important;
+}
+
 @media (max-width: 720px) {
   .public-auth-page--website .public-auth-shell--website,
   .public-auth-page--website .register-form.card {
@@ -15251,6 +15736,121 @@ body.mobile-performance-mode.public-site-layout .system-login.system-login--cant
     padding: 22px 18px;
   }
 
+}
+
+@media (max-width: 700px) {
+  .reservation-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  .reservation-card__details,
+  .reservation-card__actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .reservation-card__actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch !important;
+    gap: 7px !important;
+  }
+
+  .reservation-card__actions .btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 6px;
+  }
+
+  .reservation-settings-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .reservation-settings-modal {
+    width: 100%;
+    max-height: 94vh;
+    max-height: 94dvh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  .reservation-settings-header {
+    padding: 18px 18px 16px;
+  }
+
+  .reservation-settings-header h2 {
+    font-size: 20px !important;
+  }
+
+  .reservation-settings-scroll {
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .reservation-settings-toggles,
+  .reservation-settings-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reservation-settings-group--single {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reservation-hours-heading {
+    display: none;
+  }
+
+  .reservation-hours-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 12px;
+    padding: 12px;
+  }
+
+  .reservation-hours-row > strong {
+    align-self: center;
+  }
+
+  .reservation-hours-toggle {
+    justify-self: end;
+  }
+
+  .reservation-time-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .reservation-time-field span {
+    font-size: 10px !important;
+  }
+
+  .reservation-settings-footer {
+    gap: 8px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .reservation-settings-footer .btn {
+    flex: 1 1 0;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .reservation-settings-group {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 13px;
+  }
+
+  .reservation-settings-footer .btn {
+    font-size: 12px !important;
+  }
 }
 
 /* Shared application typography and responsive layout tokens. */
@@ -19670,4 +20270,240 @@ body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Tahsilat Al"] .moda
   border-color: #3b6648 !important;
   background: #1b3022 !important;
   color: #c4f2d1 !important;
+}
+
+@media (max-width: 767px) {
+  body.sales-mobile-scroll .saleStandard3Col > .saleProductsMobileIntro {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 0 10px !important;
+  }
+
+  body.sales-mobile-scroll .saleProductsMobileIntroRow {
+    width: 100%;
+  }
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalHeader,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalHeader,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(120deg, #17243a, #172d36) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalTitle,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalTitle,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalTitle {
+  color: #e5f5e9 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalCloseButton,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalCloseButton,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] .modalCloseButton {
+  border-color: #3c6950 !important;
+  background: #1c3829 !important;
+  color: #c7f3d4 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input),
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input),
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input) {
+  border-color: #48515c !important;
+  background: #171b20 !important;
+  color: #f3f4f6 !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input)::placeholder,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input)::placeholder,
+body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input)::placeholder {
+  color: #929ba7 !important;
+  -webkit-text-fill-color: #929ba7 !important;
+}
+
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .delivery-detail-header-card,
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page .delivery-detail-header-card,
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page .delivery-detail-header-card,
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page .delivery-detail-header-card {
+  border-color: #414a55 !important;
+  background: #24282e !important;
+  box-shadow: none !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page :is(.delivery-customer-summary__phone, .delivery-customer-summary__address, .delivery-customer-summary__meta, .delivery-detail-meta-note),
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page :is(.delivery-customer-summary__phone, .delivery-customer-summary__address, .delivery-customer-summary__meta, .delivery-detail-meta-note),
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page :is(.delivery-customer-summary__phone, .delivery-customer-summary__address, .delivery-customer-summary__meta, .delivery-detail-meta-note),
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page :is(.delivery-customer-summary__phone, .delivery-customer-summary__address, .delivery-customer-summary__meta, .delivery-detail-meta-note) {
+  color: #b8c1cc !important;
+}
+
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__name,
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__name,
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__name,
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__name {
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__note,
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__note,
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__note,
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page .delivery-customer-summary__note {
+  color: #fcd34d !important;
+}
+
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .delivery-detail-status-badge,
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .delivery-detail-btn:not(.btn--close-action),
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page .delivery-detail-status-badge,
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page .delivery-detail-btn:not(.btn--close-action),
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page .delivery-detail-status-badge,
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page .delivery-detail-btn:not(.btn--close-action),
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page .delivery-detail-status-badge,
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page .delivery-detail-btn:not(.btn--close-action) {
+  border-color: #4b5563 !important;
+}
+
+html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .saleCategoryButton[aria-pressed="true"],
+html.tenant-dark-mode body.sales-mobile-scroll .delivery-orders-page .saleCategoryButton[aria-pressed="true"],
+body.tenant-dark-mode.sales-mobile-scroll .delivery-orders-page .saleCategoryButton[aria-pressed="true"],
+body.mobile-system-dark.sales-mobile-scroll .delivery-orders-page .saleCategoryButton[aria-pressed="true"] {
+  border-color: #3b7a55 !important;
+  background: #1d3b2b !important;
+  color: #c7f3d4 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalHeader,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalHeader,
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalHeader,
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(120deg, #17243a, #172d36) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalTitle,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalTitle,
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalTitle,
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalTitle {
+  color: #e5f5e9 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalCloseButton,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalCloseButton,
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalCloseButton,
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) .modalCloseButton {
+  border-color: #3c6950 !important;
+  background: #1c3829 !important;
+  color: #c7f3d4 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) :is(input.input, textarea.input, select.input),
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) :is(input.input, textarea.input, select.input),
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) :is(input.input, textarea.input, select.input),
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Masa Düzenle"], [aria-label="Masa Ekle"]) :is(input.input, textarea.input, select.input) {
+  border-color: #48515c !important;
+  background: #171b20 !important;
+  color: #f3f4f6 !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalHeader,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalHeader,
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalHeader,
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalHeader {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(120deg, #17243a, #172d36) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalTitle,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalTitle,
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalTitle,
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalTitle {
+  color: #e5f5e9 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalCloseButton,
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalCloseButton,
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalCloseButton,
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) .modalCloseButton {
+  border-color: #3c6950 !important;
+  background: #1c3829 !important;
+  color: #c7f3d4 !important;
+}
+
+html[data-theme="dark"] body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) :is(input, textarea, select, .settings-ui-input, .settings-ui-textarea),
+html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) :is(input, textarea, select, .settings-ui-input, .settings-ui-textarea),
+body.tenant-dark-mode .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) :is(input, textarea, select, .settings-ui-input, .settings-ui-textarea),
+body.mobile-system-dark .modal-backdrop .app-modal:is([aria-label="Şube Düzenle"], [aria-label="Yeni Şube"]) :is(input, textarea, select, .settings-ui-input, .settings-ui-textarea) {
+  border-color: #48515c !important;
+  background: #171b20 !important;
+  color: #f3f4f6 !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal,
+html.tenant-dark-mode .modal-backdrop > .app-modal,
+body.tenant-dark-mode .modal-backdrop > .app-modal,
+body.mobile-system-dark .modal-backdrop > .app-modal {
+  border-color: #3a414a !important;
+  background: #202428 !important;
+  color: #f3f4f6 !important;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal > .modalHeader,
+html.tenant-dark-mode .modal-backdrop > .app-modal > .modalHeader,
+body.tenant-dark-mode .modal-backdrop > .app-modal > .modalHeader,
+body.mobile-system-dark .modal-backdrop > .app-modal > .modalHeader {
+  border-bottom-color: #3a414a !important;
+  background: linear-gradient(120deg, #17243a, #172d36) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal .modalTitle,
+html.tenant-dark-mode .modal-backdrop > .app-modal .modalTitle,
+body.tenant-dark-mode .modal-backdrop > .app-modal .modalTitle,
+body.mobile-system-dark .modal-backdrop > .app-modal .modalTitle {
+  color: #e5f5e9 !important;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal .modalCloseButton,
+html.tenant-dark-mode .modal-backdrop > .app-modal .modalCloseButton,
+body.tenant-dark-mode .modal-backdrop > .app-modal .modalCloseButton,
+body.mobile-system-dark .modal-backdrop > .app-modal .modalCloseButton {
+  border-color: #3c6950 !important;
+  background: #1c3829 !important;
+  color: #c7f3d4 !important;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal .modalBody,
+html.tenant-dark-mode .modal-backdrop > .app-modal .modalBody,
+body.tenant-dark-mode .modal-backdrop > .app-modal .modalBody,
+body.mobile-system-dark .modal-backdrop > .app-modal .modalBody {
+  background-color: #202428 !important;
+  color: #e5e7eb;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select, .input, .settings-ui-input, .settings-ui-textarea, .product-input, .product-select, .product-textarea),
+html.tenant-dark-mode .modal-backdrop > .app-modal :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select, .input, .settings-ui-input, .settings-ui-textarea, .product-input, .product-select, .product-textarea),
+body.tenant-dark-mode .modal-backdrop > .app-modal :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select, .input, .settings-ui-input, .settings-ui-textarea, .product-input, .product-select, .product-textarea),
+body.mobile-system-dark .modal-backdrop > .app-modal :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select, .input, .settings-ui-input, .settings-ui-textarea, .product-input, .product-select, .product-textarea) {
+  border-color: #48515c !important;
+  background-color: #171b20 !important;
+  color: #f3f4f6 !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .modal-backdrop > .app-modal :is(input, textarea, select)::placeholder,
+html.tenant-dark-mode .modal-backdrop > .app-modal :is(input, textarea, select)::placeholder,
+body.tenant-dark-mode .modal-backdrop > .app-modal :is(input, textarea, select)::placeholder,
+body.mobile-system-dark .modal-backdrop > .app-modal :is(input, textarea, select)::placeholder {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
 }

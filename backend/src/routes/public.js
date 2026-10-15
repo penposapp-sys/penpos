@@ -24,8 +24,12 @@ import {
 import { registerPublicTenant } from '../controllers/publicRegisterController.js'
 import { getPublicWebsiteSettings } from '../controllers/websiteSettingsController.js'
 import { getPublicTenantWebsite, getPublicWebsiteByHost } from '../controllers/tenantWebsiteController.js'
+import { publicAvailability as getPublicReservationAvailability, publicCreate as createPublicReservation } from '../controllers/reservationController.js'
+import { rateLimit } from '../middlewares/rateLimit.js'
 
 const router = Router()
+const publicReservationAvailabilityLimit = rateLimit({ windowMs: 60 * 1000, max: 40, retryAfterSeconds: 60 })
+const publicReservationCreateLimit = rateLimit({ windowMs: 60 * 1000, max: 5, retryAfterSeconds: 60 })
 
 router.get('/menu', getPublicMenu)
 router.post('/menu/waiter-call', createPublicWaiterCall)
@@ -47,6 +51,8 @@ router.put('/qr-customer/profile', updatePublicQrCustomerProfile)
 router.put('/qr-customer/favorites', updatePublicQrCustomerFavorites)
 router.get('/website-settings', getPublicWebsiteSettings)
 router.get('/sites/:slug', getPublicTenantWebsite)
+router.get('/sites/:slug/reservations/availability', publicReservationAvailabilityLimit, getPublicReservationAvailability)
+router.post('/sites/:slug/reservations', publicReservationCreateLimit, createPublicReservation)
 router.get('/site-by-host', getPublicWebsiteByHost)
 router.post('/register', registerPublicTenant)
 router.get('/downloads/print-agent/windows/manifest', getPrintAgentWindowsManifest)

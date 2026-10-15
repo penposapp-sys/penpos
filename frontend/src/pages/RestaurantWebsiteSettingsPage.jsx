@@ -256,6 +256,7 @@ function ensureWebsiteShape(settings, systemType = 'kermes') {
       qrMenuUrl: normalizeWebsiteActionUrl(integrations.qrMenuUrl, 'menu', normalizedSlug),
       showProducts: integrations.showProducts !== false,
       showOnlineOrder: isStore ? integrations.showOnlineOrder !== false : integrations.showOnlineOrder === true,
+      showReservationButton: isStore ? false : integrations.showReservationButton !== false,
       onlineOrderUrl: normalizeWebsiteActionUrl(integrations.onlineOrderUrl, 'online', normalizedSlug),
     },
     seo: {
@@ -602,6 +603,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
         silent: true,
         skipBranchHeader: true,
       })
+      if (res?.success !== true) throw new Error(res?.message || 'Web sitesi ayarları kaydedilemedi')
       setTenant(res?.tenant || tenant)
       setSettings(ensureWebsiteShape(res?.settings || preparedSettings, systemType))
       setLogoFile(null)
@@ -798,6 +800,20 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
             <input type="checkbox" checked={settings.integrations.showOnlineOrder} onChange={(event) => updateIntegration('showOnlineOrder', event.target.checked)} />
             Çevrimiçi satış butonu görünsün
           </label>
+          {!isStore ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800 }}>
+              <input type="checkbox" checked={settings.integrations.showReservationButton} onChange={(event) => updateIntegration('showReservationButton', event.target.checked)} />
+              Rezervasyon butonu görünsün
+            </label>
+          ) : null}
+          {!isStore && settings.integrations.showReservationButton ? (
+            <div style={{ gridColumn: '1 / -1', padding: 12, borderRadius: 8, background: 'var(--surface-muted, rgba(245,158,11,0.1))', color: 'var(--text)', lineHeight: 1.5 }}>
+              Bu seçenek yalnızca web sitesi butonunun görünürlüğünü yönetir. Online rezervasyon hizmeti ayrıca şube bazında açılmalıdır.
+              <button type="button" className="btn" onClick={() => navigate('/restoran/app/reservations')} style={{ display: 'block', marginTop: 10 }}>
+                Rezervasyon hizmeti ve şube ayarlarına git
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
 

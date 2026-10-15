@@ -35,6 +35,7 @@ export const listTablesService = async (tenantId, branchFilter) => {
   return list.map(t => ({
     id: t.id,
     name: t.name,
+    capacity: Number(t.capacity || 4),
     note: t.note || '',
     status: t.status,
     isActive: !!t.isActive,
@@ -46,7 +47,7 @@ export const listTablesService = async (tenantId, branchFilter) => {
 export const getTableMetaService = async (tenantId, tableId) => {
   const t = await findByIdAndTenant(tableId, tenantId)
   if (!t) throw error('not_found', 'Table not found', 404)
-  return { id: t.id, name: t.name, note: t.note || '', branchId: t.branchId }
+  return { id: t.id, name: t.name, capacity: Number(t.capacity || 4), note: t.note || '', branchId: t.branchId }
 }
 
 export const setTableNoteService = async (tenantId, userId, tableId, note) => {
@@ -70,9 +71,11 @@ export const createTableService = async (tenantId, userId, dto) => {
   }
   const ok = await confirmNameAvailable(tenantId, dto.name)
   if (!ok) throw error('name_in_use', 'Name already in use', 400)
-  const t = await createTable({ tenantId, branchId: dto.branchId, name: dto.name })
-  await (await import('./auditService.js')).log(tenantId, userId, 'table_create', 'Table', t.id, { name: dto.name })
-  return { id: t.id, name: t.name, status: t.status }
+  const capacity = Number(dto.capacity ?? 4)
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100) throw error('invalid_table_capacity', 'Masa kapasitesi 1-100 arasında olmalı.', 400)
+  const t = await createTable({ tenantId, branchId: dto.branchId, name: dto.name, capacity })
+  await (await import('./auditService.js')).log(tenantId, userId, 'table_create', 'Table', t.id, { name: dto.name, capacity })
+  return { id: t.id, name: t.name, capacity: t.capacity, status: t.status }
 }
 
 export const updateTableService = async (tenantId, userId, id, dto) => {
@@ -82,9 +85,11 @@ export const updateTableService = async (tenantId, userId, id, dto) => {
     const ok = await confirmNameAvailable(tenantId, dto.name, t.id)
     if (!ok) throw error('name_in_use', 'Name already in use', 400)
   }
-  const updated = await updateById(id, { name: dto.name ?? t.name })
-  await (await import('./auditService.js')).log(tenantId, userId, 'table_update', 'Table', updated.id, { name: updated.name })
-  return { id: updated.id, name: updated.name, status: updated.status }
+  const capacity = dto.capacity === undefined ? Number(t.capacity || 4) : Number(dto.capacity)
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100) throw error('invalid_table_capacity', 'Masa kapasitesi 1-100 arasında olmalı.', 400)
+  const updated = await updateById(id, { name: dto.name ?? t.name, capacity })
+  await (await import('./auditService.js')).log(tenantId, userId, 'table_update', 'Table', updated.id, { name: updated.name, capacity: updated.capacity })
+  return { id: updated.id, name: updated.name, capacity: updated.capacity, status: updated.status }
 }
 
 export const deleteTableService = async (tenantId, userId, id) => {

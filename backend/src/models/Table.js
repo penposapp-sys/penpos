@@ -5,6 +5,7 @@ const tableSchema = new mongoose.Schema(
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
     name: { type: String, required: true },
+    capacity: { type: Number, min: 1, max: 100, default: 4 },
     note: { type: String, default: '' },
     status: { type: String, enum: ['empty', 'occupied'], default: 'empty' },
     activeOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },

@@ -219,6 +219,45 @@ export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName
   })
 }
 
+export const notifyReservationUsers = async ({
+  tenantId,
+  branchId = '',
+  reservationId = '',
+  customerName = '',
+  guestCount = 0,
+  startAt = null
+} = {}) => {
+  const users = await User.find({
+    tenantId,
+    isDeleted: { $ne: true },
+    isActive: true,
+    $or: [
+      { role: 'tenant_admin' },
+      { permissions: { $in: ['manage_tables'] } }
+    ]
+  }).select('_id role branchId branchIds accessibleBranchIds pushDevices')
+  const visibleUsers = users.filter((user) => {
+    if (String(user?.role || '') === 'tenant_admin') return true
+    const allowed = getUserAccessibleBranchIds(user)
+    return allowed.length === 0 || allowed.includes(String(branchId))
+  })
+  const date = startAt ? new Date(startAt) : null
+  const dateLabel = date && Number.isFinite(date.getTime())
+    ? `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)}`
+    : ''
+  return sendPushToUsers(visibleUsers, {
+    title: 'Yeni Rezervasyon',
+    body: `${String(customerName || 'Müşteri')} · ${Number(guestCount || 0)} kişi${dateLabel ? ` · ${dateLabel}` : ''}`,
+    channelId: 'penpos-alerts',
+    data: {
+      type: 'reservation',
+      reservationId: String(reservationId),
+      branchId: String(branchId),
+      targetPath: '/restoran/app/reservations'
+    }
+  })
+}
+
 export const notifyCourierAssigned = async ({ courierUserId, order } = {}) => {
   if (!courierUserId || !order) return { sent: 0, skipped: 'missing_data' }
   const users = await User.find({ _id: courierUserId, isDeleted: { $ne: true }, isActive: true }).select('pushDevices')

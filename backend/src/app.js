@@ -29,6 +29,7 @@ import settingsMenuRouter from './routes/settingsMenu.js'
 import userPreferencesRouter from './routes/userPreferences.js'
 import printingRouter from './routes/printing.js'
 import waiterCallsRouter from './routes/waiterCalls.js'
+import reservationsRouter from './routes/reservations.js'
 import anaokuluRouter from './routes/anaokulu.js'
 import { requireActiveSubscription } from './middlewares/requireActiveSubscription.js'
 import { requireAuth } from './middlewares/requireAuth.js'
@@ -38,6 +39,7 @@ import { UPLOADS_STATIC_DIRS } from './utils/uploads.js'
 import debugRouter from './routes/debug.js'
 import canteenRouter from './modules/canteen/routes/canteen.js'
 import { getPublicWebsiteSettings } from './controllers/websiteSettingsController.js'
+import { renderPublicTenantWebsiteHtml } from './controllers/publicWebsiteHtmlController.js'
 import { startTenantUsageCleanup } from './services/tenantUsageService.js'
 
 export const createServer = () => {
@@ -177,7 +179,12 @@ export const createServer = () => {
   app.use('/api/tenant/categories', requireAuth, tenantGuard, requireActiveSubscription, categoriesRouter)
   app.use('/api/tenant/menu-items', requireAuth, tenantGuard, requireActiveSubscription, menuItemsRouter)
   app.use('/api/pos', requireAuth, tenantGuard, requireActiveSubscription, posRouter)
+  app.use('/api/reservations', requireAuth, tenantGuard, requireActiveSubscription, reservationsRouter)
   app.use('/api/public', publicRouter)
+  app.get(
+    ['/weprestorant/:slug', '/wepmagaza/:slug', '/website/:slug'],
+    renderPublicTenantWebsiteHtml
+  )
   app.get('/api/website-settings/public', getPublicWebsiteSettings)
   app.use('/api/debug', debugRouter)
   try { console.log('[DEBUG_STAMP]', 'branch_fix_v5', process.cwd()) } catch {}

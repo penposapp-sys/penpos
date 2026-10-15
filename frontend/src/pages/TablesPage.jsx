@@ -62,6 +62,7 @@ export function TablesManagementContent({ embedded = false }) {
   const [activeByTable, setActiveByTable] = useState({})
   const [paidByTable, setPaidByTable] = useState({})
   const [waiterCallsByTable, setWaiterCallsByTable] = useState({})
+  const [pendingReservations, setPendingReservations] = useState(0)
   const [error, setError] = useState('')
   const [activeCategory, setActiveCategory] = useState('')
   const [busyTableId, setBusyTableId] = useState(null)
@@ -180,6 +181,34 @@ export function TablesManagementContent({ embedded = false }) {
       window.clearInterval(pollId)
     }
   }, [allowedBranchIds, busyGlobal, busyTableId])
+
+  useEffect(() => {
+    if (!Array.isArray(allowedBranchIds) || allowed.length === 0) {
+      setPendingReservations(0)
+      return undefined
+    }
+    let mounted = true
+    const refreshCount = async () => {
+      try {
+        const { params } = buildBranchQueryParams(allowedBranchIds)
+        const response = await api(`/api/reservations/pending-count${params ? `?${params.toString()}` : ''}`, {
+          silent: true,
+          skipBranchHeader: true,
+          cacheMode: 'no-store'
+        })
+        if (mounted) setPendingReservations(Number(response?.pendingCount || 0))
+      } catch (err) {
+        console.error('[RESERVATION_PENDING_COUNT_FAILED]', err?.message || err)
+        if (mounted) setPendingReservations(0)
+      }
+    }
+    refreshCount()
+    const timer = window.setInterval(refreshCount, 10000)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+    }
+  }, [allowedBranchIds, allowed.length])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTs(Date.now()), 60000)
@@ -359,7 +388,7 @@ export function TablesManagementContent({ embedded = false }) {
       {error && <div style={{ color: '#ef4444', marginBottom: 8 }}>{error}</div>}
       {busyGlobal && <div style={{ color: 'var(--muted)', marginBottom: 8 }}>İşlem sürüyor...</div>}
 
-      {categories.length > 0 && (
+      {(
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
             {categories.map((category) => (
@@ -389,6 +418,14 @@ export function TablesManagementContent({ embedded = false }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button className="btn" type="button" onClick={() => nav('/restoran/app/reservations')} style={{ flexShrink: 0 }}>
+              Rezervasyonlar
+              {pendingReservations > 0 ? (
+                <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, background: '#e11d48', color: '#fff', fontSize: 12, fontWeight: 900, lineHeight: 1 }}>
+                  {pendingReservations}
+                </span>
+              ) : null}
+            </button>
             <button className="btn" type="button" onClick={() => nav('/restoran/app/waiter-calls')} style={{ flexShrink: 0 }}>
               Garson Cagrilari
               {totalWaiterCalls > 0 ? (
@@ -603,4 +640,3 @@ export function TablesManagementContent({ embedded = false }) {
 export default function TablesPage() {
   return <TablesManagementContent />
 }
-

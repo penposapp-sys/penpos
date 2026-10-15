@@ -85,6 +85,8 @@ function normalizeWebsiteData(payload) {
   return {
     tenant: payload?.tenant || {},
     settings,
+    reservationsEnabled: payload?.reservationsEnabled === true,
+    reservationButtonVisible: settings?.integrations?.showReservationButton === true,
     menuProducts,
     categories,
     gallery,
@@ -111,8 +113,10 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const { isMobilePortrait, isTablet } = useResponsiveFlags()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState('')
   const [payload, setPayload] = useState(null)
   const [mobileGalleryIndex, setMobileGalleryIndex] = useState(0)
+  const [reservationOpen, setReservationOpen] = useState(false)
 
   useBodyLayoutMode('public-site-layout')
 
@@ -121,6 +125,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     const load = async () => {
       setLoading(true)
       setError('')
+      setErrorCode('')
       try {
         const query = siteType && siteType !== 'auto' ? `?siteType=${encodeURIComponent(siteType)}` : ''
         const res = await api(`/api/public/sites/${slug}${query}`, {
@@ -129,9 +134,16 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
           cacheMode: 'no-store',
         })
         if (!mounted) return
+        if (res?.success !== true) {
+          setErrorCode(String(res?.code || res?.error || res?.data?.code || res?.data?.error || ''))
+          setError(res?.message || res?.data?.message || 'Web sitesi yüklenemedi.')
+          setPayload(null)
+          return
+        }
         setPayload(res)
       } catch (err) {
         if (!mounted) return
+        setErrorCode(String(err?.code || err?.data?.code || ''))
         setError(err?.message || 'Web sitesi acilamadi')
       } finally {
         if (mounted) setLoading(false)
@@ -139,7 +151,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     }
     load()
     return () => { mounted = false }
-  }, [slug])
+  }, [slug, siteType])
 
   const site = useMemo(() => normalizeWebsiteData(payload || {}), [payload])
   const compact = isMobilePortrait || isTablet
@@ -159,10 +171,8 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     )
   )
   const siteUnavailable = Boolean(
-    payload && (
-      site.settings?.enabled === false
-      || site.settings?.published !== true
-    )
+    errorCode === 'site_unpublished'
+    || (payload && (site.settings?.enabled !== true || site.settings?.published !== true))
   )
   const tenantName = String(site.tenant?.name || (isStore ? 'Magaza' : 'Restoran'))
   const publicSiteSlug = String(slug || site.tenant?.slug || '').trim()
@@ -228,6 +238,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const mapLinkText = String(site.contactSection?.settings?.mapLinkText || 'Haritada Ac')
   const imageFallbackText = String(site.productsSection?.settings?.imageFallbackText || 'Gorsel Yok')
   const showOnlineOrderButton = integrations.showOnlineOrder === true
+  const showReservationButton = !isStore && site.reservationButtonVisible === true
   const showHeroPrimaryCta = isStore ? showOnlineOrderButton : true
 
   useEffect(() => {
@@ -249,7 +260,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
       ? 'Bu yayin adresi farkli bir sistem tipine ait oldugu icin acilamadi.'
       : siteUnavailable
         ? 'Bu web sitesi su anda yayinda degil.'
-      : (error || 'Kayit bulunamadi')
+      : (error || 'Web sitesi bilgileri yüklenemedi.')
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #d1d5db, #f3f4f6)', color: textColor, padding: 24 }}>
         <div
@@ -291,7 +302,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     <div style={{ background: rootBg, color: textColor, minHeight: '100vh', fontFamily: theme.fontFamily || 'Georgia, "Times New Roman", serif' }}>
       <nav
         style={{
-          position: 'fixed',
+          position: compact ? 'sticky' : 'fixed',
           top: 0,
           left: 0,
           right: 0,
@@ -311,27 +322,34 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
         {compact ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
-              <a href="#top" style={{ display: 'flex', alignItems: 'center', gap: 12, color: strongText, textDecoration: 'none', minWidth: 0 }}>
+              <a href="#top" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: strongText, textDecoration: 'none', minWidth: 0, flexShrink: 0 }}>
                 {resolvedLogoUrl ? <img src={resolvedLogoUrl} alt={`${tenantName} logo`} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${line}` }} /> : null}
-                <span style={{ fontSize: 18, letterSpacing: '0.16em', fontWeight: 700 }}>{tenantName.toUpperCase()}</span>
+                <span style={{ maxWidth: 120, fontSize: 12, letterSpacing: '0.1em', lineHeight: 1.25, fontWeight: 700, textAlign: 'center' }}>{tenantName.toUpperCase()}</span>
               </a>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {!isStore && integrations.showQrMenu ? (
-                  <a href={qrMenuUrl} style={{ border: `1px solid ${line}`, background: 'rgba(255,255,255,0.62)', color: textColor, padding: '10px 12px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none' }}>
-                    {qrButtonText}
-                  </a>
-                ) : null}
-                {showOnlineOrderButton ? (
-                  <a
-                    href={checkoutHref}
-                    style={{ border: `1px solid ${buttonBg}`, background: buttonBg, color: buttonText, padding: '10px 12px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none', fontWeight: 800 }}
-                  >
-                    {onlineButtonText}
-                  </a>
+              <div style={{ display: 'grid', gap: 5, justifyItems: 'stretch', width: 'max-content', maxWidth: '100%', minWidth: 0, flex: '0 1 auto' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0, maxWidth: '100%' }}>
+                  {!isStore && integrations.showQrMenu ? (
+                    <a href={qrMenuUrl} style={{ border: `1px solid ${line}`, background: 'rgba(255,255,255,0.62)', color: textColor, padding: '10px 12px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none' }}>
+                      {qrButtonText}
+                    </a>
+                  ) : null}
+                  {showOnlineOrderButton ? (
+                    <a
+                      href={checkoutHref}
+                      style={{ border: `1px solid ${buttonBg}`, background: buttonBg, color: buttonText, padding: '10px 12px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none', fontWeight: 800, textAlign: 'center' }}
+                    >
+                      {onlineButtonText}
+                    </a>
+                  ) : null}
+                </div>
+                {showReservationButton ? (
+                  <button className="public-reservation-action" type="button" onClick={() => setReservationOpen(true)} style={{ '--public-reservation-bg': buttonBg, '--public-reservation-text': buttonText, border: `1px solid ${buttonBg}`, borderRadius: 0, background: buttonBg, color: buttonText, padding: compact ? '10px 12px' : '12px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, textAlign: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    REZERVASYON OLUŞTUR
+                  </button>
                 ) : null}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 18, fontFamily: 'Arial, sans-serif', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.16em', color: strongText, flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%' }}>
+            <div style={{ display: 'none', gap: 18, fontFamily: 'Arial, sans-serif', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.16em', color: strongText, flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%' }}>
               <a href="#story" style={{ color: strongText, textDecoration: 'none' }}>{storyLabel}</a>
               <a href="#menu" style={{ color: strongText, textDecoration: 'none' }}>{menuLabel}</a>
               <a href="#contact" style={{ color: strongText, textDecoration: 'none' }}>{contactLabel}</a>
@@ -348,19 +366,26 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
               <a href="#menu" style={{ color: strongText, textDecoration: 'none' }}>{menuLabel}</a>
               <a href="#contact" style={{ color: strongText, textDecoration: 'none' }}>{contactLabel}</a>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {!isStore && integrations.showQrMenu ? (
-                <a href={qrMenuUrl} style={{ border: `1px solid ${line}`, background: 'rgba(255,255,255,0.62)', color: textColor, padding: '12px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none' }}>
-                  {qrButtonText}
-                </a>
-              ) : null}
-              {showOnlineOrderButton ? (
-                <a
-                  href={checkoutHref}
-                  style={{ border: `1px solid ${buttonBg}`, background: buttonBg, color: buttonText, padding: '12px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none', fontWeight: 800 }}
-                >
-                  {onlineButtonText}
-                </a>
+            <div style={{ display: 'grid', gap: 5, justifyItems: 'stretch', width: 'max-content', maxWidth: '100%', minWidth: 0, flex: '0 1 auto' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0, maxWidth: '100%' }}>
+                {!isStore && integrations.showQrMenu ? (
+                  <a href={qrMenuUrl} style={{ border: `1px solid ${line}`, background: 'rgba(255,255,255,0.62)', color: textColor, padding: '12px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none' }}>
+                    {qrButtonText}
+                  </a>
+                ) : null}
+                {showOnlineOrderButton ? (
+                  <a
+                    href={checkoutHref}
+                    style={{ border: `1px solid ${buttonBg}`, background: buttonBg, color: buttonText, padding: '12px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', textDecoration: 'none', fontWeight: 800, textAlign: 'center' }}
+                  >
+                    {onlineButtonText}
+                  </a>
+                ) : null}
+              </div>
+              {showReservationButton ? (
+                <button className="public-reservation-action" type="button" onClick={() => setReservationOpen(true)} style={{ '--public-reservation-bg': buttonBg, '--public-reservation-text': buttonText, border: `1px solid ${buttonBg}`, borderRadius: 0, background: buttonBg, color: buttonText, padding: '12px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, textAlign: 'center', cursor: 'pointer', width: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  REZERVASYON OLUŞTUR
+                </button>
               ) : null}
             </div>
           </>
@@ -376,7 +401,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
           placeItems: 'end start',
           overflow: 'hidden',
           borderBottom: `1px solid ${line}`,
-          paddingTop: compact ? 134 : 0,
+          paddingTop: 0,
           background: resolvedHeroImage
             ? `linear-gradient(90deg, rgba(249,250,251,0.82) 0%, rgba(249,250,251,0.62) 46%, rgba(249,250,251,0.16) 100%), url(${resolvedHeroImage}) center/cover`
             : `linear-gradient(135deg, ${softSurface}, ${pageSurface})`,
@@ -634,6 +659,121 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
           ) : null}
         </div>
       </footer>
+      {reservationOpen ? (
+        <PublicReservationDialog
+          slug={publicSiteSlug}
+          accent={buttonBg}
+          reservationsEnabled={site.reservationsEnabled}
+          onClose={() => setReservationOpen(false)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function PublicReservationDialog({ slug, accent, reservationsEnabled, onClose }) {
+  const today = new Date()
+  const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const [form, setForm] = useState({ customerName: '', phone: '', date: localToday, time: '', guestCount: 2, tableId: '', note: '' })
+  const [slots, setSlots] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [formError, setFormError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    if (!reservationsEnabled) {
+      setSlots([])
+      setLoading(false)
+      setFormError('')
+      return () => { active = false }
+    }
+    setLoading(true)
+    setFormError('')
+    api(`/api/public/sites/${encodeURIComponent(slug)}/reservations/availability?date=${encodeURIComponent(form.date)}&guestCount=${encodeURIComponent(form.guestCount)}`, {
+      silent: true,
+      skipBranchHeader: true,
+      cacheMode: 'no-store'
+    }).then((result) => {
+      if (!active) return
+      if (result?.success !== true) {
+        setSlots([])
+        setFormError(result?.message || result?.data?.message || 'Uygun saatler yüklenemedi.')
+        return
+      }
+      setSlots(Array.isArray(result?.slots) ? result.slots : [])
+    }).catch((err) => {
+      if (active) {
+        setSlots([])
+        setFormError(err?.data?.message || err?.message || 'Uygun saatler yüklenemedi.')
+      }
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [slug, form.date, form.guestCount, reservationsEnabled])
+
+  const selectedSlot = slots.find((slot) => slot.time === form.time && slot.available)
+  const availableTables = selectedSlot?.tables || []
+
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!reservationsEnabled) return
+    setBusy(true)
+    setFormError('')
+    try {
+      const result = await api(`/api/public/sites/${encodeURIComponent(slug)}/reservations`, {
+        method: 'POST',
+        body: JSON.stringify(form),
+        silent: true,
+        skipBranchHeader: true
+      })
+      if (result?.success !== true) {
+        setFormError(result?.message || result?.data?.message || 'Rezervasyon oluşturulamadı.')
+        return
+      }
+      setMessage(result?.message || 'Rezervasyon başvurunuz alındı. Restoran onayını bekliyor.')
+    } catch (err) {
+      setFormError(err?.data?.message || err?.message || 'Rezervasyon oluşturulamadı.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.65)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="public-reservation-title" style={{ width: 'min(560px, 100%)', maxHeight: '90vh', overflow: 'auto', padding: 22, borderRadius: 18, background: '#fff', color: '#111827', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 14 }}>
+          <h2 id="public-reservation-title" style={{ margin: 0 }}>Rezervasyon Oluştur</h2>
+          <button type="button" aria-label="Kapat" onClick={onClose} className="btn">✕</button>
+        </div>
+        {!reservationsEnabled ? (
+          <div role="status" style={{ padding: 14, borderRadius: 12, background: '#fffbeb', color: '#92400e', lineHeight: 1.5 }}>
+            Bu restoranda online rezervasyon şu anda kullanılamıyor. Lütfen restoranla iletişime geçin.
+          </div>
+        ) : message ? (
+          <div role="status" style={{ padding: 14, borderRadius: 12, background: '#ecfdf5', color: '#065f46', lineHeight: 1.5 }}>
+            {message}
+            <button type="button" className="btn" onClick={onClose} style={{ display: 'block', marginTop: 14 }}>Kapat</button>
+          </div>
+        ) : (
+          <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+            <label>Ad soyad<input required minLength={2} maxLength={120} autoComplete="name" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} /></label>
+            <label>Telefon<input required minLength={7} maxLength={40} type="tel" autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+            <label>Tarih<input required type="date" min={localToday} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value, time: '', tableId: '' })} /></label>
+            <label>Kişi sayısı<input required type="number" min="1" max="100" value={form.guestCount} onChange={(e) => setForm({ ...form, guestCount: Number(e.target.value), time: '', tableId: '' })} /></label>
+            <label>Saat (Türkiye saati)<select required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value, tableId: '' })}><option value="">{loading ? 'Saatler yükleniyor…' : 'Saat seçin'}</option>{slots.map((slot) => <option key={slot.time} value={slot.time} disabled={!slot.available}>{slot.time} · {slot.available ? 'Uygun' : 'Dolu'}</option>)}</select></label>
+            <label>Masa tercihi (isteğe bağlı)<select value={form.tableId} onChange={(e) => setForm({ ...form, tableId: e.target.value })}><option value="">Masa tercihim yok</option>{availableTables.map((table) => <option key={table.id} value={table.id}>{table.name} · {table.capacity} kişilik</option>)}</select></label>
+            <label style={{ gridColumn: '1 / -1' }}>Not<textarea maxLength={1000} rows={3} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+            {formError ? <div role="alert" style={{ gridColumn: '1 / -1', color: '#b91c1c' }}>{formError}</div> : null}
+            {!loading && !slots.some((slot) => slot.available) && !formError ? <div style={{ gridColumn: '1 / -1', color: '#b45309' }}>Seçilen tarihte uygun saat bulunmuyor.</div> : null}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="btn" onClick={onClose}>Vazgeç</button>
+              <button className="btn" type="submit" disabled={busy || loading || !form.time} style={{ background: accent, color: '#fff' }}>{busy ? 'Gönderiliyor…' : 'Rezervasyon İste'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+      <style>{`[role="dialog"] label{display:grid;gap:6px;font-size:13px;font-weight:700}[role="dialog"] input,[role="dialog"] select,[role="dialog"] textarea{box-sizing:border-box;width:100%;min-height:42px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;font:inherit}`}</style>
     </div>
   )
 }

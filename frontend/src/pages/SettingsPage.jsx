@@ -1627,8 +1627,8 @@ export const SettingsTablesContent = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [createForm, setCreateForm] = useState({ baseName: 'Masa', count: 1 })
-  const [editForm, setEditForm] = useState({ name: '' })
+  const [createForm, setCreateForm] = useState({ baseName: 'Masa', count: 1, capacity: 4 })
+  const [editForm, setEditForm] = useState({ name: '', capacity: 4 })
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const { user, tenantCtx } = useAuth()
@@ -1803,7 +1803,7 @@ export const SettingsTablesContent = () => {
       const errors = []
       for (let i = 0; i < names.length; i++) {
         try {
-          const body = user?.role === 'tenant_admin' ? { name: names[i], branchId } : { name: names[i] }
+          const body = user?.role === 'tenant_admin' ? { name: names[i], branchId, capacity: createForm.capacity } : { name: names[i], capacity: createForm.capacity }
           const { table } = await api('/api/tenant/tables', { method: 'POST', body: JSON.stringify(body) })
           created.push(table)
         } catch (err) {
@@ -1829,7 +1829,7 @@ export const SettingsTablesContent = () => {
 
   const openEdit = (t) => {
     setSelected(t)
-    setEditForm({ name: t.name })
+    setEditForm({ name: t.name, capacity: Number(t.capacity || 4) })
     setFormError('')
     setEditOpen(true)
   }
@@ -1957,6 +1957,10 @@ export const SettingsTablesContent = () => {
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Masa Adedi</div>
             <input className="input" type="number" min="1" value={createForm.count} onChange={(e) => setCreateForm({ ...createForm, count: Number(e.target.value) })} />
           </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Her masa için kapasite (kişi)</div>
+            <input className="input" type="number" min="1" max="100" value={createForm.capacity} onChange={(e) => setCreateForm({ ...createForm, capacity: Number(e.target.value) })} />
+          </label>
           {(selectedBranchId && selectedBranchId !== 'all') ? (
             <label>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Şube</div>
@@ -1990,6 +1994,10 @@ export const SettingsTablesContent = () => {
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Ad</div>
             <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+          </label>
+          <label>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Kapasite (kişi)</div>
+            <input className="input" type="number" min="1" max="100" value={editForm.capacity} onChange={(e) => setEditForm({ ...editForm, capacity: Number(e.target.value) })} />
           </label>
           {formError && <div style={{ color: '#ef4444', fontSize: 13 }}>{formError}</div>}
           <button className="btn" disabled={formLoading}>{formLoading ? 'Gönderiliyor...' : 'Kaydet'}</button>

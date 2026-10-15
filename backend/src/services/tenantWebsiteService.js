@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import TenantWebsiteSettings from '../models/TenantWebsiteSettings.js'
 import Tenant from '../models/Tenant.js'
+import Branch from '../models/Branch.js'
 import Category from '../models/Category.js'
 import MenuItem from '../models/MenuItem.js'
 import WebsiteSettings from '../models/WebsiteSettings.js'
@@ -10,6 +11,8 @@ import CanteenCategory from '../modules/canteen/models/CanteenCategory.js'
 import CanteenProduct from '../modules/canteen/models/CanteenProduct.js'
 import { error } from '../utils/errors.js'
 import { mergeBusinessSettings } from '../utils/businessSettings.js'
+import { normalizeReservationSettings } from '../utils/reservations.js'
+import { resolveTenantPackageType } from '../utils/systemType.js'
 import { notDeletedFilter } from '../utils/softDelete.js'
 import { getDefaultWebsiteSettings, normalizeWebsiteSettings } from './websiteSettingsService.js'
 
@@ -75,6 +78,7 @@ const DEFAULT_INTEGRATIONS = {
   qrMenuUrl: '',
   showProducts: true,
   showOnlineOrder: false,
+  showReservationButton: true,
   onlineOrderUrl: ''
 }
 
@@ -248,6 +252,7 @@ const buildDefaultTenantWebsiteSettings = (tenant = {}) => {
       ...DEFAULT_INTEGRATIONS,
       showQrMenu: isCanteen ? false : DEFAULT_INTEGRATIONS.showQrMenu,
       showOnlineOrder: isCanteen ? true : DEFAULT_INTEGRATIONS.showOnlineOrder,
+      showReservationButton: isCanteen ? false : DEFAULT_INTEGRATIONS.showReservationButton,
       qrMenuUrl: isCanteen ? '' : `/menu/${tenantSlug}`,
       onlineOrderUrl: isCanteen ? `/qr/${tenantSlug}` : DEFAULT_INTEGRATIONS.onlineOrderUrl
     },
@@ -353,6 +358,7 @@ export const normalizeTenantWebsiteSettings = (input = {}, tenant = {}) => {
       qrMenuUrl: normalizeWebsiteActionUrl(source?.integrations?.qrMenuUrl || defaults.integrations.qrMenuUrl, 'menu', normalizeTenantWebsiteSlug(source.slug || defaults.slug)),
       showProducts: normalizeBoolean(source?.integrations?.showProducts, defaults.integrations.showProducts),
       showOnlineOrder: normalizeBoolean(source?.integrations?.showOnlineOrder, defaults.integrations.showOnlineOrder),
+      showReservationButton: normalizeBoolean(source?.integrations?.showReservationButton, defaults.integrations.showReservationButton),
       onlineOrderUrl: normalizeWebsiteActionUrl(source?.integrations?.onlineOrderUrl || defaults.integrations.onlineOrderUrl, 'online', normalizeTenantWebsiteSlug(source.slug || defaults.slug))
     },
     seo: {
@@ -473,9 +479,31 @@ const toCanteenProducts = async (tenant) => {
   return { categories: categoriesOut, items: visibleItems }
 }
 
+export const resolveTenantWebsiteReservationBranch = async (tenant) => {
+  const preferredBranchId = String(mergeBusinessSettings(tenant.settings || {})?.onlineSales?.branchId || '').trim()
+  let branch = preferredBranchId
+    ? await Branch.findOne({ _id: preferredBranchId, tenantId: tenant._id, isActive: true }).lean()
+    : null
+  if (!branch) {
+    const branches = await Branch.find({ tenantId: tenant._id, isActive: true }).sort({ name: 1 }).limit(2).lean()
+    if (branches.length === 1) branch = branches[0]
+  }
+  return branch
+}
+
 const buildTenantPublicSitePayload = async (tenant, settings, siteType = '') => {
   const tenantContext = getTenantContextForSiteType(tenant, siteType)
   const normalized = normalizeTenantWebsiteSettings(settings || {}, tenantContext)
+  let reservationsEnabled = false
+  const isCanteenTenant = resolveTenantPackageType({ systemType: tenant.systemType }) === 'canteen'
+    || resolveTenantPackageType({ systemType: tenant.vertical }) === 'canteen'
+    || resolveTenantPackageType({ systemType: tenant.businessType }) === 'canteen'
+    || String(tenant.businessType || '').trim().toLowerCase() === 'store'
+  if (!isStoreSiteType(siteType) && !isCanteenTenant) {
+    const reservationBranch = await resolveTenantWebsiteReservationBranch(tenant)
+    reservationsEnabled = !!reservationBranch
+      && normalizeReservationSettings(reservationBranch.reservationSettings || {}).onlineEnabled
+  }
   const productData = normalized.integrations.showProducts
     ? (isStoreSiteType(siteType) ? await toCanteenProducts(tenant) : await toRestaurantProducts(tenant))
     : { categories: [], items: [] }
@@ -489,6 +517,7 @@ const buildTenantPublicSitePayload = async (tenant, settings, siteType = '') => 
       logoUrl: String(tenant.logoUrl || '')
     },
     settings: normalized,
+    reservationsEnabled,
     data: productData
   }
 }
@@ -591,6 +620,41 @@ export const getPublicTenantWebsiteBySlugService = async (slug, siteType = '') =
     throw error('site_unpublished', 'Bu web sitesi henüz yayında değil.', 404)
   }
   return buildTenantPublicSitePayload(tenant, normalized, siteType)
+}
+
+export const getPublicTenantWebsiteMetadataBySlugService = async (slug, siteType = '') => {
+  const normalizedSlug = normalizeTenantWebsiteSlug(slug)
+  const doc = isStoreSiteType(siteType)
+    ? await TenantWebsiteSettings.findOne({ 'storeVariant.slug': normalizedSlug }).lean()
+    : await TenantWebsiteSettings.findOne({ slug: normalizedSlug }).lean()
+  if (!doc) throw error('not_found', 'Bu web sitesi bulunamadı.', 404)
+
+  const tenant = await Tenant.findOne({ _id: doc.tenantId, isActive: true, status: 'active' }).lean()
+  if (!tenant) throw error('not_found', 'Bu web sitesi bulunamadı.', 404)
+
+  const settings = pickWebsiteSettingsForSiteType(doc, tenant, siteType)
+  if (!settings.enabled || !settings.published) {
+    throw error('site_unpublished', 'Bu web sitesi henüz yayında değil.', 404)
+  }
+
+  return {
+    tenant: {
+      name: String(tenant.name || ''),
+      description: String(tenant.description || ''),
+      logoUrl: String(tenant.logoUrl || '')
+    },
+    settings: {
+      slug: String(settings.slug || normalizedSlug),
+      seo: settings.seo || {},
+      hero: {
+        title: String(settings.hero?.title || ''),
+        subtitle: String(settings.hero?.subtitle || ''),
+        logoUrl: String(settings.hero?.logoUrl || ''),
+        coverImageUrl: String(settings.hero?.coverImageUrl || '')
+      },
+      sections: Array.isArray(settings.sections) ? settings.sections : []
+    }
+  }
 }
 
 export const getPublicWebsiteByHostService = async (hostValue) => {

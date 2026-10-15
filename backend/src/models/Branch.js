@@ -10,7 +10,8 @@ const branchSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
-    status: { type: String, default: 'active', index: true }
+    status: { type: String, default: 'active', index: true },
+    reservationSettings: { type: mongoose.Schema.Types.Mixed, default: null }
   },
   { timestamps: true }
 )

@@ -11,7 +11,7 @@ import { getTenantResetDeletionPlan } from '../src/services/dataManagementPolicy
 import { finalizeTenantBackup, parseAndVerifyTenantBackup } from '../src/services/tenantBackupService.js'
 
 const SYSTEM_COLLECTIONS = {
-  restaurant: ['orders', 'menuitems', 'branches', 'accounttransactions'],
+  restaurant: ['orders', 'menuitems', 'branches', 'accounttransactions', 'reservations', 'reservationnotifications'],
   canteen: ['canteen_sales', 'canteen_products', 'canteen_branches', 'canteen_stock_movements'],
   anaokulu: ['anaokuluschools']
 }

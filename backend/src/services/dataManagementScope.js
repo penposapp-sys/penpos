@@ -9,6 +9,8 @@ const SYSTEM_COLLECTIONS = Object.freeze({
     'orders',
     'ordercounters',
     'waitercalls',
+    'reservations',
+    'reservationnotifications',
     'kitchenbulkprepstates',
     'deliverycustomers',
     'branches',
