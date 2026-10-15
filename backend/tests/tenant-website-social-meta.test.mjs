@@ -80,7 +80,7 @@ test('tenant social metadata falls back to tenant content and a public HTTPS ima
   assert.ok(metadata.canonicalUrl.startsWith('https://'))
 })
 
-test('tenant social metadata prefers the website cover image over the tenant logo', () => {
+test('tenant social metadata uses the tenant logo instead of the website cover image', () => {
   const metadata = buildTenantWebsiteSocialMetadata({
     tenant: {
       name: 'Örnek Restoran',
@@ -94,8 +94,24 @@ test('tenant social metadata prefers the website cover image over the tenant log
     canonicalPath: '/weprestorant/ornek-restoran'
   })
 
-  assert.equal(metadata.imageUrl, 'https://penpos.cloud/api/uploads/tenant-123/website-cover.webp')
-  assert.equal(metadata.imageAlt, 'Örnek Restoran web sitesi kapak görseli')
+  assert.equal(metadata.imageUrl, 'https://penpos.cloud/api/uploads/tenant-123/logo.webp')
+  assert.equal(metadata.imageAlt, 'Örnek Restoran logosu')
+})
+
+test('tenant social metadata uses the website logo when tenant logo is unavailable, never the cover image', () => {
+  const metadata = buildTenantWebsiteSocialMetadata({
+    tenant: { name: 'Örnek Restoran' },
+    settings: {
+      hero: {
+        logoUrl: '/uploads/tenant-123/website-logo.webp',
+        coverImageUrl: '/uploads/tenant-123/website-cover.webp'
+      }
+    },
+    canonicalPath: '/weprestorant/ornek-restoran'
+  })
+
+  assert.equal(metadata.imageUrl, 'https://penpos.cloud/api/uploads/tenant-123/website-logo.webp')
+  assert.equal(metadata.imageAlt, 'Örnek Restoran logosu')
 })
 
 test('tenant social metadata replaces a stale default title with the current business name', () => {

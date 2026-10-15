@@ -98,17 +98,14 @@ export const buildTenantWebsiteSocialMetadata = ({
     `${name} resmi web sitesi.`
   ].map((candidate) => cleanText(candidate)).find(Boolean)
   const canonicalUrl = new URL(canonicalPath || '/', `${origin}/`).toString()
-  const imageUrl = getPublicImageUrl(
-    settings?.hero?.coverImageUrl || tenant.logoUrl || settings?.hero?.logoUrl,
-    origin
-  )
+  const imageUrl = getPublicImageUrl(tenant.logoUrl || settings?.hero?.logoUrl, origin)
 
   return {
     title,
     description,
     canonicalUrl,
     imageUrl,
-    imageAlt: settings?.hero?.coverImageUrl ? `${name} web sitesi kapak görseli` : `${name} logosu`
+    imageAlt: `${name} logosu`
   }
 }
 

@@ -220,16 +220,17 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const accentStrong = '#6b7280'
   const buttonBg = '#111827'
   const buttonText = '#f9fafb'
-  const quoteText = String(site.contactSection?.settings?.quoteText || site.contactSection?.subtitle || site.aboutSection?.subtitle || hero.subtitle || 'Iyi yemek acele etmez. Ama iyi siparis hizli olmalidir.')
-  const quoteAuthor = String(site.contactSection?.settings?.quoteAuthor || `${tenantName} Kitchen Philosophy`)
-  const statementText = String(site.aboutSection?.settings?.manifestoText || site.aboutSection?.subtitle || 'Her tabak bir recete degil, bir karakter tasir.')
+  const quoteText = String(site.contactSection?.settings?.quoteText || '').trim()
+  const quoteAuthor = String(site.contactSection?.settings?.quoteAuthor || '').trim()
+  const statementText = String(site.aboutSection?.settings?.manifestoText || '').trim()
   const footerAddress = contact.address || String(site.contactSection?.settings?.emptyAddressText || 'Adres bilgisi eklenmedi')
   const footerReservation = [contact.phone || null, contact.email || null].filter(Boolean).join('\n') || String(site.contactSection?.settings?.emptyReservationText || 'Iletisim bilgisi eklenmedi')
   const storyLabel = String(navigation.storyLabel || 'Hikaye')
   const menuLabel = String(navigation.menuLabel || 'Menu')
   const contactLabel = String(navigation.contactLabel || 'Iletisim')
   const qrButtonText = String(navigation.qrButtonText || 'QR Menu')
-  const heroKickerText = String(hero.kickerText || `Cafe · Restoran · ${tenantName}`)
+  const heroKickerText = String(hero.kickerText || '').trim()
+  const heroSubtitle = String(hero.subtitle || '').trim()
   const heroCircleText = String(hero.buttonText || (isStore ? 'Online Siparisi Ac' : 'Menuyu Kesfet'))
   const footerAddressLabel = String(site.contactSection?.settings?.addressLabel || 'Adres')
   const footerReservationLabel = String(site.contactSection?.settings?.reservationLabel || 'Rezervasyon')
@@ -302,11 +303,9 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
     <div style={{ background: rootBg, color: textColor, minHeight: '100vh', fontFamily: theme.fontFamily || 'Georgia, "Times New Roman", serif' }}>
       <nav
         style={{
-          position: compact ? 'sticky' : 'fixed',
+          position: 'sticky',
           top: 0,
-          left: 0,
-          right: 0,
-          minHeight: compact ? 112 : 82,
+          minHeight: compact ? 112 : 90,
           zIndex: 40,
           display: 'flex',
           alignItems: compact ? 'stretch' : 'center',
@@ -395,13 +394,14 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
       <header
         id="top"
         style={{
-          minHeight: compact ? 'auto' : '100vh',
+          minHeight: compact ? 'auto' : 'calc(100vh - 120px)',
+          marginTop: 30,
           position: 'relative',
           display: 'grid',
           placeItems: 'end start',
           overflow: 'hidden',
           borderBottom: `1px solid ${line}`,
-          paddingTop: 0,
+          paddingTop: 30,
           background: resolvedHeroImage
             ? `linear-gradient(90deg, rgba(249,250,251,0.82) 0%, rgba(249,250,251,0.62) 46%, rgba(249,250,251,0.16) 100%), url(${resolvedHeroImage}) center/cover`
             : `linear-gradient(135deg, ${softSurface}, ${pageSurface})`,
@@ -409,16 +409,20 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
       >
         <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, rgba(209,213,219,0.72), transparent 28%)`, pointerEvents: 'none' }} />
         <div style={{ position: 'relative', zIndex: 2, width: compact ? 'calc(100% - 32px)' : 'min(850px, calc(100% - 48px))', margin: compact ? '0 16px 28px' : '0 0 90px 6vw' }}>
-          <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: compact ? '0.18em' : '0.3em', fontSize: 11, color: strongText, marginBottom: compact ? 14 : 20 }}>
-            {heroKickerText}
-          </div>
-          <h1 style={{ margin: 0, fontSize: compact ? 'clamp(44px, 16vw, 72px)' : 'clamp(72px, 11vw, 170px)', lineHeight: compact ? 0.9 : 0.78, fontWeight: 400, letterSpacing: compact ? '-0.05em' : '-0.07em', whiteSpace: 'pre-line', color: strongText, maxWidth: compact ? '100%' : undefined }}>
+          {heroKickerText ? (
+            <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: compact ? '0.18em' : '0.3em', fontSize: 11, color: strongText, marginBottom: compact ? 14 : 20 }}>
+              {heroKickerText}
+            </div>
+          ) : null}
+          <h1 style={{ margin: 0, fontSize: compact ? 'clamp(44px, 16vw, 72px)' : 'clamp(72px, 11vw, 170px)', lineHeight: compact ? 0.98 : 0.95, fontWeight: 400, letterSpacing: compact ? '-0.05em' : '-0.07em', whiteSpace: 'pre-line', color: strongText, maxWidth: compact ? '100%' : undefined }}>
             {String(hero.title || tenantName).replace(/\\n/g, '\n')}
           </h1>
           <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '1fr auto', alignItems: compact ? 'start' : 'end', gap: compact ? 18 : 32, marginTop: compact ? 18 : 30, maxWidth: 760 }}>
-            <p style={{ margin: 0, color: muted, fontFamily: 'Arial, sans-serif', fontSize: compact ? 14 : 16, lineHeight: 1.7, maxWidth: 540 }}>
-              {hero.subtitle || (isStore ? 'Yeni sezon urunleri, kampanyalari ve online siparis akisiniz tek vitrinde toplansin.' : 'Atesin, dokunun ve mevsimsel urunlerin bir araya geldigi cagdas bir restoran deneyimi. Masadan QR menuye, evden online siparise tek akis.')}
-            </p>
+            {heroSubtitle ? (
+              <p style={{ margin: 0, color: muted, fontFamily: 'Arial, sans-serif', fontSize: compact ? 14 : 16, lineHeight: 1.7, maxWidth: 540 }}>
+                {heroSubtitle}
+              </p>
+            ) : null}
             {showHeroPrimaryCta ? (
               <a
                 href={isStore ? checkoutHref : '#menu'}
@@ -447,14 +451,16 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
         </div>
       </header>
 
-      <section id="story" style={{ padding: compact ? '64px 16px' : '110px 5vw', background: rootBg }}>
-        <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '220px 1fr', gap: compact ? 18 : 50 }}>
-          <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 11, color: accentStrong, paddingTop: compact ? 0 : 10 }}>{String(site.aboutSection?.settings?.manifestoLabel || '01 / Manifesto')}</div>
-          <p style={{ fontSize: compact ? 'clamp(36px, 14vw, 56px)' : 'clamp(44px, 6vw, 90px)', lineHeight: compact ? 0.96 : 0.98, maxWidth: 1050, margin: 0, fontWeight: 400, color: strongText, wordBreak: 'break-word' }}>
-            {statementText}
-          </p>
-        </div>
-      </section>
+      {statementText ? (
+        <section id="story" style={{ scrollMarginTop: compact ? 124 : 102, padding: compact ? '64px 16px' : '110px 5vw', background: rootBg }}>
+          <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '220px 1fr', gap: compact ? 18 : 50 }}>
+            <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 11, color: accentStrong, paddingTop: compact ? 0 : 10 }}>{String(site.aboutSection?.settings?.manifestoLabel || '01 / Manifesto')}</div>
+            <p style={{ fontSize: compact ? 'clamp(36px, 14vw, 56px)' : 'clamp(44px, 6vw, 90px)', lineHeight: compact ? 0.96 : 0.98, maxWidth: 1050, margin: 0, fontWeight: 400, color: strongText, wordBreak: 'break-word' }}>
+              {statementText}
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {gallerySectionImages.length > 0 ? (
         <section style={{ padding: compact ? '0 16px 64px' : '0 5vw 110px', background: rootBg }}>
@@ -468,13 +474,17 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
             <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 11, color: accentStrong }}>{String(site.productsSection?.settings?.galleryLabel || 'Galeri')}</div>
-                <h2 style={{ margin: '10px 0 0', fontSize: compact ? 'clamp(28px, 10vw, 42px)' : 'clamp(34px, 5vw, 64px)', lineHeight: 0.94, fontWeight: 400, color: strongText }}>
-                  {String(site.productsSection?.settings?.galleryTitle || 'Mekan ve detay fotograflari')}
-                </h2>
+                {site.productsSection?.settings?.galleryTitle ? (
+                  <h2 style={{ margin: '10px 0 0', fontSize: compact ? 'clamp(28px, 10vw, 42px)' : 'clamp(34px, 5vw, 64px)', lineHeight: 0.94, fontWeight: 400, color: strongText }}>
+                    {site.productsSection.settings.galleryTitle}
+                  </h2>
+                ) : null}
               </div>
-              <div style={{ fontFamily: 'Arial, sans-serif', color: muted, fontSize: 13, maxWidth: compact ? '100%' : 360 }}>
-                {String(site.productsSection?.settings?.galleryDescription || 'Ayarlardan yukledigin galeri gorselleri burada gosterilir.')}
-              </div>
+              {site.productsSection?.settings?.galleryDescription ? (
+                <div style={{ fontFamily: 'Arial, sans-serif', color: muted, fontSize: 13, maxWidth: compact ? '100%' : 360 }}>
+                  {site.productsSection.settings.galleryDescription}
+                </div>
+              ) : null}
             </div>
 
             <div style={{ overflow: 'hidden', padding: '4px 0' }}>
@@ -568,23 +578,29 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
           <h2 style={{ fontSize: compact ? 'clamp(34px, 11vw, 52px)' : 'clamp(50px, 6vw, 92px)', lineHeight: 0.9, fontWeight: 400, margin: '0 0 28px', letterSpacing: '-0.05em', whiteSpace: 'pre-line', color: strongText }}>
             {String(site.aboutSection?.title || 'Geceye\nuzanan masa.').replace(/\\n/g, '\n')}
           </h2>
-          <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: 12, color: accentStrong, marginBottom: 16 }}>
-            {String(site.aboutSection?.subtitle || 'Mekanin kisa ozeti')}
-          </div>
-          <p style={{ fontFamily: 'Arial, sans-serif', color: muted, lineHeight: 1.8, fontSize: 15, maxWidth: 560 }}>
-            {site.aboutSection?.content || 'Bu alan isletmenin hikayesini, sefini veya mekan konseptini anlatmak icin kullanilabilir.'}
-          </p>
+          {site.aboutSection?.subtitle ? (
+            <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: 12, color: accentStrong, marginBottom: 16 }}>
+              {site.aboutSection.subtitle}
+            </div>
+          ) : null}
+          {site.aboutSection?.content ? (
+            <p style={{ fontFamily: 'Arial, sans-serif', color: muted, lineHeight: 1.8, fontSize: 15, maxWidth: 560 }}>
+              {site.aboutSection.content}
+            </p>
+          ) : null}
         </div>
       </section>
 
-      <section id="menu" style={{ padding: compact ? '64px 16px' : '110px 5vw', background: rootBg }}>
+      <section id="menu" style={{ scrollMarginTop: compact ? 124 : 102, padding: compact ? '64px 16px' : '110px 5vw', background: rootBg }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 30, alignItems: 'end', marginBottom: 40, flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0, fontSize: compact ? 'clamp(36px, 12vw, 54px)' : 'clamp(58px, 8vw, 120px)', lineHeight: 0.9, fontWeight: 400, letterSpacing: '-0.07em', whiteSpace: 'pre-line', color: strongText }}>
             {String(site.productsSection?.title || 'Selected\nMenu').replace(/\\n/g, '\n')}
           </h2>
-          <p style={{ fontFamily: 'Arial, sans-serif', color: muted, maxWidth: 420, lineHeight: 1.7, margin: 0 }}>
-            {site.productsSection?.subtitle || (isStore ? 'Online siparis ekraninda yayinlanan urunler burada vitrin kartlari halinde gosterilir.' : 'QR menuden secilen urunler aninda sepete eklenir. Kategori filtreleriyle urunler hizlica bulunur.')}
-          </p>
+          {site.productsSection?.subtitle ? (
+            <p style={{ fontFamily: 'Arial, sans-serif', color: muted, maxWidth: 420, lineHeight: 1.7, margin: 0 }}>
+              {site.productsSection.subtitle}
+            </p>
+          ) : null}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(220px, 280px))', gap: 16, justifyContent: 'space-between' }}>
           {featuredProducts.map((product) => (
@@ -606,21 +622,23 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
                   <div style={{ fontSize: 16, lineHeight: 1.15, color: strongText }}>{product.name}</div>
                   <div style={{ color: strongText, fontSize: 15, whiteSpace: 'nowrap', fontWeight: 700 }}>{currency(product.price)}</div>
                 </div>
-                <div style={{ marginTop: 10, fontFamily: 'Arial, sans-serif', color: muted, fontSize: 12, lineHeight: 1.55 }}>
-                  {product.description || String(site.productsSection?.settings?.productFallbackDescription || 'Aciklama yakinda eklenecek.')}
-                </div>
+                {(product.description || site.productsSection?.settings?.productFallbackDescription) ? (
+                  <div style={{ marginTop: 10, fontFamily: 'Arial, sans-serif', color: muted, fontSize: 12, lineHeight: 1.55 }}>
+                    {product.description || site.productsSection.settings.productFallbackDescription}
+                  </div>
+                ) : null}
               </div>
             </article>
           ))}
-          {featuredProducts.length === 0 ? (
+          {featuredProducts.length === 0 && site.productsSection?.settings?.emptyStateText ? (
             <div style={{ padding: '24px 0', color: muted, fontFamily: 'Arial, sans-serif' }}>
-              {String(site.productsSection?.settings?.emptyStateText || 'Gosterilecek one cikan urun bulunamadi.')}
+              {site.productsSection.settings.emptyStateText}
             </div>
           ) : null}
         </div>
       </section>
 
-      <section
+      {quoteText ? <section
         style={{
           minHeight: compact ? 380 : 620,
           display: 'grid',
@@ -636,13 +654,15 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
       >
         <blockquote style={{ maxWidth: 900, margin: 0, fontSize: compact ? 'clamp(28px, 10vw, 44px)' : 'clamp(44px, 6vw, 88px)', lineHeight: 1, fontStyle: 'italic', color: strongText }}>
           "{quoteText}"
-          <small style={{ display: 'block', marginTop: 28, fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.2em', color: accentStrong }}>
-            {quoteAuthor}
-          </small>
+          {quoteAuthor ? (
+            <small style={{ display: 'block', marginTop: 28, fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.2em', color: accentStrong }}>
+              {quoteAuthor}
+            </small>
+          ) : null}
         </blockquote>
-      </section>
+      </section> : null}
 
-      <footer id="contact" style={{ padding: compact ? '44px 16px 28px' : '60px 5vw 30px', display: 'grid', gridTemplateColumns: compact ? '1fr' : '1.2fr 1fr 1fr', gap: compact ? 24 : 40, borderTop: `1px solid ${line}`, background: softSurface }}>
+      <footer id="contact" style={{ scrollMarginTop: compact ? 124 : 102, padding: compact ? '44px 16px 28px' : '60px 5vw 30px', display: 'grid', gridTemplateColumns: compact ? '1fr' : '1.2fr 1fr 1fr', gap: compact ? 24 : 40, borderTop: `1px solid ${line}`, background: softSurface }}>
         <div style={{ fontSize: compact ? 34 : 56, letterSpacing: '0.14em', color: strongText }}>{tenantName.toUpperCase()}</div>
         <div style={{ fontFamily: 'Arial, sans-serif', color: muted, lineHeight: 1.8, fontSize: 13, whiteSpace: 'pre-line' }}>
           <strong style={{ display: 'block', color: strongText, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: 11 }}>{footerAddressLabel}</strong>
