@@ -88,12 +88,23 @@ export const reservationIntervalsOverlap = (leftStart, leftEnd, rightStart, righ
 export const isReservationTableAvailable = ({
   table,
   guestCount,
-  activeOrder = false,
+  occupied = false,
+  now = new Date(),
+  occupiedWindowMinutes = 60,
   reservedSlotKeys = [],
   requestedSlotKeys = []
 }) => {
-  if (!table || table.isActive === false || table.status === 'occupied' || activeOrder) return false
+  if (!table || table.isActive === false) return false
   if (Number(table.capacity || 4) < Number(guestCount || 0)) return false
+  if (occupied) {
+    const nowMs = new Date(now).getTime()
+    const occupiedUntil = nowMs + occupiedWindowMinutes * 60 * 1000
+    if (requestedSlotKeys.some((slotKey) => {
+      const slotStart = Number(slotKey)
+      const slotEnd = slotStart + 15 * 60 * 1000
+      return slotStart < occupiedUntil && slotEnd > nowMs
+    })) return false
+  }
   const reserved = reservedSlotKeys instanceof Set ? reservedSlotKeys : new Set(reservedSlotKeys)
   return !requestedSlotKeys.some((slotKey) => reserved.has(slotKey))
 }

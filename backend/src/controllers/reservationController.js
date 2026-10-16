@@ -5,6 +5,7 @@ import {
   createPublicReservation,
   createStaffReservation,
   getBranchDailyAvailability,
+  getPublicReservationHistory,
   getPendingReservationCount,
   getReservationAvailability,
   getReservationNotifications,
@@ -101,7 +102,8 @@ export const branchAvailability = async (req, res) => {
       branchId: req.branch?.id || req.branchIds?.[0],
       actor: req.user,
       date: req.query?.date,
-      guestCount: Number(req.query?.guestCount || 1)
+      guestCount: Number(req.query?.guestCount || 1),
+      excludeReservationId: req.query?.excludeReservationId || ''
     })
     res.json({ success: true, slots: result.slots })
   } catch (err) { sendError(res, err) }
@@ -146,5 +148,16 @@ export const publicCreate = async (req, res) => {
   try {
     const result = await createPublicReservation({ slug: req.params.slug, payload: req.body || {} })
     res.status(201).set('Cache-Control', 'no-store').json({ success: true, ...result })
+  } catch (err) { sendError(res, err) }
+}
+
+export const publicHistory = async (req, res) => {
+  try {
+    const result = await getPublicReservationHistory({
+      slug: req.params.slug,
+      accessKey: req.body?.accessKey
+    })
+    res.set('Cache-Control', 'no-store')
+    res.json({ success: true, ...result })
   } catch (err) { sendError(res, err) }
 }

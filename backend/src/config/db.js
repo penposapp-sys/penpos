@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 import mongoose from 'mongoose'
 import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
+import Reservation from '../models/Reservation.js'
 
 dotenv.config()
 
@@ -32,6 +33,17 @@ const syncUserIndexes = async () => {
   }
 }
 
+const syncReservationSlotIndex = async () => {
+  const collection = mongoose.connection.db.collection('reservations')
+  await Reservation.createIndexes()
+  const indexes = await collection.indexes()
+  const legacyIndex = indexes.find((index) => index.name === 'reservation_table_slot_unique')
+  if (legacyIndex) {
+    await collection.dropIndex(legacyIndex.name)
+    logger.info('Dropped legacy reservation slot index')
+  }
+}
+
 export const connectDB = async () => {
   const uri = (process.env.MONGODB_URI || process.env.MONGO_URI || '').trim()
   try {
@@ -47,6 +59,7 @@ export const connectDB = async () => {
       nodeEnv: process.env.NODE_ENV || null
     })
     await syncUserIndexes()
+    await syncReservationSlotIndex()
     try {
       const admin = mongoose.connection.db.admin()
       let info

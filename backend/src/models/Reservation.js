@@ -19,6 +19,7 @@ const reservationSchema = new mongoose.Schema({
   endAt: { type: Date, required: true },
   note: { type: String, default: '', maxlength: 1000 },
   source: { type: String, enum: ['staff', 'website'], default: 'staff' },
+  customerAccessKeyHash: { type: String, default: '', select: false },
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'arrived', 'completed', 'cancelled', 'no_show'],
@@ -34,8 +35,16 @@ const reservationSchema = new mongoose.Schema({
 
 reservationSchema.index(
   { tenantId: 1, branchId: 1, tableId: 1, slotKeys: 1 },
-  { unique: true, name: 'reservation_table_slot_unique', partialFilterExpression: { tableId: { $type: 'objectId' } } }
+  {
+    unique: true,
+    name: 'reservation_table_slot_nonempty_unique',
+    partialFilterExpression: {
+      tableId: { $type: 'objectId' },
+      slotKeys: { $gt: [] }
+    }
+  }
 )
 reservationSchema.index({ tenantId: 1, branchId: 1, startAt: 1, status: 1 })
+reservationSchema.index({ tenantId: 1, branchId: 1, customerAccessKeyHash: 1, startAt: -1 })
 
 export default mongoose.models.Reservation || mongoose.model('Reservation', reservationSchema)

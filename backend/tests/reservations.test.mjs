@@ -38,11 +38,15 @@ test('reservation lock slots represent the entire requested interval and require
   assert.throws(() => buildReservationSlotKeys(wallClockToDate('2026-10-16', '10:05'), end), /15 dakikalık/)
 })
 
-test('table availability rejects open orders, insufficient capacity and slot conflicts', () => {
+test('table reservation eligibility ignores current occupancy but rejects inactive, undersized and reserved tables', () => {
   const table = { isActive: true, status: 'empty', capacity: 4 }
   assert.equal(isReservationTableAvailable({ table, guestCount: 4 }), true)
   assert.equal(isReservationTableAvailable({ table, guestCount: 5 }), false)
-  assert.equal(isReservationTableAvailable({ table, guestCount: 2, activeOrder: true }), false)
+  assert.equal(isReservationTableAvailable({
+    table: { ...table, status: 'occupied' },
+    guestCount: 2
+  }), true)
+  assert.equal(isReservationTableAvailable({ table: { ...table, isActive: false }, guestCount: 2 }), false)
   assert.equal(isReservationTableAvailable({
     table,
     guestCount: 2,
@@ -55,6 +59,34 @@ test('table availability rejects open orders, insufficient capacity and slot con
     reservedSlotKeys: new Set(['slot-1']),
     requestedSlotKeys: ['slot-2']
   }), true)
+})
+
+test('occupied tables are unavailable for a rolling hour and extend when still occupied', () => {
+  const table = { isActive: true, status: 'occupied', capacity: 4 }
+  const now = new Date('2026-10-16T10:00:00.000Z')
+  const slotAt = (minutesFromNow) => String(now.getTime() + minutesFromNow * 60 * 1000)
+
+  assert.equal(isReservationTableAvailable({
+    table,
+    guestCount: 2,
+    occupied: true,
+    now,
+    requestedSlotKeys: [slotAt(45)]
+  }), false)
+  assert.equal(isReservationTableAvailable({
+    table,
+    guestCount: 2,
+    occupied: true,
+    now,
+    requestedSlotKeys: [slotAt(60)]
+  }), true)
+  assert.equal(isReservationTableAvailable({
+    table,
+    guestCount: 2,
+    occupied: true,
+    now: new Date(now.getTime() + 60 * 60 * 1000),
+    requestedSlotKeys: [slotAt(60)]
+  }), false)
 })
 
 test('branch settings validate hours and retain safe defaults', () => {

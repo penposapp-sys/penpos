@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import Branch from '../src/models/Branch.js'
 import Order from '../src/models/Order.js'
@@ -12,6 +13,9 @@ import {
   changeReservationStatus,
   createPublicReservation,
   createStaffReservation,
+  getBranchDailyAvailability,
+  getPublicReservationHistory,
+  getReservationAvailability,
   getPendingReservationCount,
   listReservations,
   markReservationNotificationsRead,
@@ -26,6 +30,17 @@ const tableId = '64b000000000000000000003'
 const secondTableId = '64b000000000000000000004'
 const reservationId = '64b000000000000000000005'
 const orderId = '64b000000000000000000006'
+
+test('reservation slot uniqueness applies only when a table has claimed time slots', () => {
+  const slotIndex = Reservation.schema.indexes().find(([, options]) => options.name === 'reservation_table_slot_nonempty_unique')
+
+  assert.ok(slotIndex)
+  assert.equal(slotIndex[1].unique, true)
+  assert.deepEqual(slotIndex[1].partialFilterExpression, {
+    tableId: { $type: 'objectId' },
+    slotKeys: { $gt: [] }
+  })
+})
 
 const query = (value) => {
   const result = {
@@ -108,6 +123,36 @@ const mockCommonAvailability = (t, {
   }
 }
 
+test('staff availability excludes the reservation being edited from occupied slots', async (t) => {
+  let reservationFilter
+  t.mock.method(Branch, 'findOne', () => query(branch))
+  t.mock.method(Reservation, 'updateMany', async () => ({ modifiedCount: 0 }))
+  t.mock.method(Reservation, 'findOne', () => query({
+    _id: reservationId,
+    tenantId,
+    branchId,
+    status: 'pending'
+  }))
+  t.mock.method(Reservation, 'find', (filter) => {
+    reservationFilter = filter
+    return query([])
+  })
+  t.mock.method(Table, 'find', () => query([table()]))
+  t.mock.method(Order, 'find', () => query([]))
+
+  const result = await getBranchDailyAvailability({
+    tenantId,
+    branchId,
+    actor: { role: 'tenant_admin' },
+    date: tomorrow(),
+    guestCount: 2,
+    excludeReservationId: reservationId
+  })
+
+  assert.deepEqual(reservationFilter._id, { $ne: reservationId })
+  assert.ok(result.slots.some((slot) => slot.time === '12:00' && slot.tables.some((item) => item.id === tableId)))
+})
+
 test('staff reservation creation assigns an available table and stores the requested interval', async (t) => {
   mockCommonAvailability(t)
   let stored
@@ -155,22 +200,102 @@ test('staff reservation creation assigns an available table and stores the reque
   assert.equal(stored.branchId, branchId)
 })
 
-test('online creation rejects a time whose only table has an open order', async (t) => {
+test('public availability and booking allow future reservations on currently occupied tables', async (t) => {
+  const occupiedTable = { ...table(), status: 'occupied', activeOrderId: orderId }
   mockCommonAvailability(t, {
+    availableTables: [occupiedTable],
     activeOrders: [{ tableId }],
     site: true
   })
-  let createCalled = false
-  t.mock.method(Reservation, 'create', async () => {
-    createCalled = true
-    throw new Error('Reservation must not be created')
+  const date = tomorrow()
+  const availability = await getReservationAvailability({
+    slug: 'example',
+    date,
+    guestCount: 2
+  })
+  const slot = availability.slots.find((item) => item.time === '12:00')
+
+  assert.ok(slot?.available)
+  assert.deepEqual(slot.tables, [{ id: tableId, name: 'Masa 1', capacity: 4 }])
+
+  t.mock.method(User, 'find', () => query([]))
+  let stored
+  t.mock.method(Reservation, 'create', async (input) => {
+    stored = input
+    return { ...input, _id: reservationId, createdAt: new Date() }
+  })
+  const result = await createPublicReservation({
+    slug: 'example',
+    payload: { ...customerPayload(date), tableId }
   })
 
-  await assert.rejects(
-    createPublicReservation({ slug: 'example', payload: customerPayload() }),
-    (err) => err.status === 409 && err.payload.error === 'reservation_conflict'
-  )
-  assert.equal(createCalled, false)
+  assert.equal(result.reservation.time, '12:00')
+  assert.equal(String(stored.tableId), tableId)
+})
+
+test('public reservation stores only a hash of its browser access key', async (t) => {
+  mockCommonAvailability(t, { site: true })
+  t.mock.method(User, 'find', () => query([]))
+  let stored
+  t.mock.method(Reservation, 'create', async (input) => {
+    stored = input
+    return { ...input, _id: reservationId, createdAt: new Date() }
+  })
+  const accessKey = 'a'.repeat(64)
+
+  await createPublicReservation({
+    slug: 'example',
+    payload: { ...customerPayload(), customerAccessKey: accessKey }
+  })
+
+  assert.equal(stored.customerAccessKeyHash, createHash('sha256').update(accessKey).digest('hex'))
+  assert.equal(JSON.stringify(stored).includes(accessKey), false)
+})
+
+test('public reservation history returns pending details only for the matching tenant site access key', async (t) => {
+  t.mock.method(Branch, 'findOne', () => query(branch))
+  t.mock.method(Branch, 'find', () => query([branch]))
+  t.mock.method(TenantWebsiteSettings, 'findOne', () => query({ tenantId, enabled: true, published: true }))
+  t.mock.method(Tenant, 'findOne', () => query({
+    _id: tenantId,
+    systemType: 'restaurant',
+    isActive: true,
+    status: 'active',
+    settings: {}
+  }))
+  const accessKey = 'b'.repeat(64)
+  const accessKeyHash = createHash('sha256').update(accessKey).digest('hex')
+  let reservationFilter
+  t.mock.method(Reservation, 'find', (filter) => {
+    reservationFilter = filter
+    return query([{
+      _id: reservationId,
+      tableId,
+      guestCount: 3,
+      startAt: new Date('2026-10-17T12:30:00.000Z'),
+      status: 'pending',
+      createdAt: new Date('2026-10-16T08:00:00.000Z')
+    }])
+  })
+  t.mock.method(Table, 'find', () => query([{ _id: tableId, name: 'Masa 1' }]))
+
+  const result = await getPublicReservationHistory({ slug: 'example', accessKey })
+
+  assert.deepEqual(reservationFilter, {
+    tenantId,
+    branchId,
+    source: 'website',
+    customerAccessKeyHash: accessKeyHash
+  })
+  assert.deepEqual(result.reservations[0], {
+    id: reservationId,
+    date: '2026-10-17',
+    time: '12:30',
+    guestCount: 3,
+    status: 'pending',
+    tableName: 'Masa 1',
+    createdAt: new Date('2026-10-16T08:00:00.000Z')
+  })
 })
 
 test('public reservation creation uses the only reservation-enabled branch when no default branch is selected', async (t) => {

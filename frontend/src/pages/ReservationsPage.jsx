@@ -22,6 +22,7 @@ const STATUS_COLORS = {
 }
 const WEEKDAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
 const ALL_BRANCHES = '__all__'
+const tableNameCollator = new Intl.Collator('tr-TR', { numeric: true, sensitivity: 'base' })
 const localDate = () => {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -221,7 +222,9 @@ export default function ReservationsPage() {
       if (tableResult?.success !== true || (isAdmin && (settingsResult?.success !== true || !settingsResult?.settings))) {
         throw new Error(tableResult?.message || settingsResult?.message || 'Masa ve rezervasyon ayarları yüklenemedi')
       }
-      setTables(Array.isArray(tableResult?.tables) ? tableResult.tables : [])
+      setTables((Array.isArray(tableResult?.tables) ? tableResult.tables : [])
+        .slice()
+        .sort((a, b) => tableNameCollator.compare(String(a.name || ''), String(b.name || ''))))
       if (isAdmin) {
         setSettings(settingsResult.settings)
         setSettingsLoaded(true)
@@ -232,11 +235,12 @@ export default function ReservationsPage() {
     }
   }
 
-  const loadAvailability = async (nextForm = form, targetBranchId = branchId) => {
+  const loadAvailability = async (nextForm = form, targetBranchId = branchId, excludeReservationId = editing?.id || '') => {
     if (!targetBranchId || targetBranchId === ALL_BRANCHES || !nextForm.date || !nextForm.guestCount) return
     setAvailabilityError('')
     try {
       const params = new URLSearchParams({ branchId: targetBranchId, date: nextForm.date, guestCount: String(nextForm.guestCount) })
+      if (excludeReservationId) params.set('excludeReservationId', excludeReservationId)
       const result = await api(`/api/reservations/availability?${params}`, { silent: true, skipBranchHeader: true, cacheMode: 'no-store' })
       if (result?.success !== true) throw new Error(result?.message || 'Uygunluk bilgisi yüklenemedi')
       setAvailableSlots(Array.isArray(result?.slots) ? result.slots : [])
@@ -256,7 +260,7 @@ export default function ReservationsPage() {
     setForm(next)
     setAvailableSlots([])
     setModalOpen(true)
-    await Promise.all([loadTablesAndSettings(), loadAvailability(next)])
+    await Promise.all([loadTablesAndSettings(), loadAvailability(next, branchId, '')])
   }
 
   const openEdit = async (reservation) => {
@@ -278,7 +282,7 @@ export default function ReservationsPage() {
     setForm(next)
     setAvailableSlots([])
     setModalOpen(true)
-    await Promise.all([loadTablesAndSettings(reservation.branchId), loadAvailability(next, reservation.branchId)])
+    await Promise.all([loadTablesAndSettings(reservation.branchId), loadAvailability(next, reservation.branchId, reservation.id)])
   }
 
   const save = async (event) => {
@@ -323,6 +327,9 @@ export default function ReservationsPage() {
         silent: true,
         skipBranchHeader: true
       })
+      if (result?.success !== true || !result?.reservation) {
+        throw new Error(result?.message || result?.data?.message || 'Rezervasyon durumu güncellenemedi.')
+      }
       setReservations((previous) => previous.map((item) => item.id === reservation.id ? result.reservation : item))
       toast.success(`Rezervasyon: ${STATUS_LABELS[nextStatus]}`)
       await loadReservations()
@@ -398,12 +405,22 @@ export default function ReservationsPage() {
   }
 
   const setFormField = (key, value) => {
-    const next = { ...form, [key]: value }
+    const next = ['date', 'guestCount'].includes(key)
+      ? { ...form, [key]: value, tableId: '', time: '' }
+      : key === 'tableId'
+        ? { ...form, tableId: value, time: '' }
+        : { ...form, [key]: value }
     setForm(next)
-    if (['date', 'guestCount'].includes(key)) loadAvailability(next)
+    if (['date', 'guestCount'].includes(key)) loadAvailability(next, branchId, editing?.id || '')
   }
   const slot = availableSlots.find((item) => item.time === form.time)
-  const slotTables = Array.isArray(slot?.tables) ? slot.tables : []
+  const isSlotAvailableForForm = (item) => form.tableId
+    ? item.tables?.some((table) => String(table.id) === String(form.tableId)) === true
+    : item.available === true
+  const selectedTimeAvailable = slot ? isSlotAvailableForForm(slot) : false
+  const slotTables = (Array.isArray(slot?.tables) ? slot.tables : [])
+    .slice()
+    .sort((a, b) => tableNameCollator.compare(String(a.name || ''), String(b.name || '')))
 
   return (
     <div style={{ display: 'grid', gap: 18, minWidth: 0 }}>
@@ -524,32 +541,32 @@ export default function ReservationsPage() {
               <label style={fieldLabelStyle}>Telefon<input required type="tel" minLength={7} maxLength={40} value={form.phone} onChange={(e) => setFormField('phone', e.target.value)} style={fieldControlStyle} /></label>
               <label style={fieldLabelStyle}>Kişi sayısı<input required type="number" min={1} max={100} value={form.guestCount} onChange={(e) => setFormField('guestCount', Number(e.target.value))} style={fieldControlStyle} /></label>
               <label style={fieldLabelStyle}>Tarih<input required type="date" value={form.date} onChange={(e) => setFormField('date', e.target.value)} style={fieldControlStyle} /></label>
-              <label style={fieldLabelStyle}>Saat<input required type="time" step="900" value={form.time} onChange={(e) => setFormField('time', e.target.value)} style={fieldControlStyle} /></label>
               <label style={fieldLabelStyle}>Masa<select value={form.tableId} onChange={(e) => setFormField('tableId', e.target.value)} style={fieldControlStyle}><option value="">Masa atama</option>{tables.map((table) => <option key={table.id || table._id} value={table.id || table._id}>{table.name}</option>)}</select></label>
               {!editing ? <label style={fieldLabelStyle}>İlk durum<select value={form.status} onChange={(e) => setFormField('status', e.target.value)} style={fieldControlStyle}><option value="pending">Onay Bekliyor</option><option value="confirmed">Onaylandı</option></select></label> : null}
               <label style={{ ...fieldLabelStyle, gridColumn: '1 / -1' }}>Not<textarea maxLength={1000} rows={3} value={form.note} onChange={(e) => setFormField('note', e.target.value)} style={{ ...fieldControlStyle, resize: 'vertical' }} /></label>
             </div>
             <div style={{ display: 'grid', gap: 9 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                <strong>Uygun saatler</strong>
-                <small style={{ color: 'var(--muted)' }}>Yeşil: uygun · Gri: dolu · Lacivert: seçili</small>
+                <strong>{form.tableId ? 'Seçilen masa için saatler' : 'Uygun saatler'}</strong>
+                <small style={{ color: 'var(--muted)' }}>{form.tableId ? 'Yeşil: uygun · Gri: dolu · Lacivert: seçili' : 'Masa seçerseniz doluluk o masaya göre gösterilir.'}</small>
               </div>
               {availabilityError ? <div role="alert" style={alertStyle}>Uygunluk bilgisi alınamadı: {availabilityError}</div> : availableSlots.length ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8 }}>
                   {availableSlots.map((item) => {
                     const selected = form.time === item.time
-                    return <button key={item.time} type="button" disabled={!item.available} onClick={() => setFormField('time', item.time)} aria-pressed={selected} style={slotButtonStyle(item.available, selected)}>
-                      <strong>{item.time}</strong><small>{item.available ? 'Uygun' : 'Dolu'}</small>
+                    const available = isSlotAvailableForForm(item)
+                    return <button key={item.time} type="button" disabled={!available} onClick={() => setFormField('time', item.time)} aria-pressed={selected} style={slotButtonStyle(available, selected)}>
+                      <strong>{item.time}</strong><small>{available ? 'Uygun' : 'Dolu'}</small>
                     </button>
                   })}
                 </div>
               ) : <div style={{ color: 'var(--muted)' }}>Bu tarih ve kişi sayısı için uygunluk bilgisi bulunamadı.</div>}
             </div>
             {formError ? <div role="alert" style={{ color: '#b91c1c' }}>{formError}</div> : null}
-            {slotTables.length ? <small style={{ color: 'var(--muted)' }}>Seçilen saatte uygun masalar: {slotTables.map((table) => table.name).join(', ')}</small> : null}
+            {!form.tableId && slotTables.length ? <small style={{ color: 'var(--muted)' }}>Seçilen saatte uygun masalar: {slotTables.map((table) => table.name).join(', ')}</small> : null}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" type="button" onClick={() => setModalOpen(false)}>İptal</button>
-              <button className="btn" type="submit" disabled={saving}>{saving ? 'Kaydediliyor…' : 'Kaydet'}</button>
+              <button className="btn" type="submit" disabled={saving || !form.time || !selectedTimeAvailable}>{saving ? 'Kaydediliyor…' : 'Kaydet'}</button>
             </div>
           </form>
         </div>

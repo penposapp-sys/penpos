@@ -10,6 +10,30 @@ const currency = (value) => new Intl.NumberFormat('tr-TR', {
   currency: 'TRY',
   maximumFractionDigits: 0,
 }).format(Number(value || 0))
+const tableNameCollator = new Intl.Collator('tr-TR', { numeric: true, sensitivity: 'base' })
+const reservationAccessKeyStorageKey = (slug) => `penpos:reservation-access:${encodeURIComponent(String(slug || ''))}`
+
+function getReservationAccessKey(slug, create = false) {
+  const storageKey = reservationAccessKeyStorageKey(slug)
+  let accessKey = window.localStorage.getItem(storageKey) || ''
+  if (!accessKey && create) {
+    if (!window.crypto?.getRandomValues) throw new Error('Bu tarayıcı güvenli rezervasyon geçmişi anahtarı oluşturamıyor.')
+    const bytes = new Uint8Array(32)
+    window.crypto.getRandomValues(bytes)
+    accessKey = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('')
+    window.localStorage.setItem(storageKey, accessKey)
+  }
+  return accessKey
+}
+
+const reservationStatusLabels = {
+  pending: 'Onay bekliyor',
+  confirmed: 'Onaylandı',
+  arrived: 'Geldi',
+  completed: 'Tamamlandı',
+  cancelled: 'İptal edildi',
+  no_show: 'Gelmedi'
+}
 
 function getProductId(item) {
   return String(item?.id || item?._id || item?.productId || '').trim()
@@ -700,6 +724,58 @@ function PublicReservationDialog({ slug, accent, reservationsEnabled, onClose })
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [formError, setFormError] = useState('')
+  const [reservationHistory, setReservationHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+
+  const availableTables = [...new Map(
+    slots.filter((slot) => slot.available)
+      .flatMap((slot) => (Array.isArray(slot.tables) ? slot.tables : []))
+      .map((table) => [String(table.id), table])
+  ).values()].sort((a, b) => tableNameCollator.compare(String(a.name || ''), String(b.name || '')))
+  const availableSlotsForSelectedTable = form.tableId
+    ? slots.filter((slot) => slot.available && slot.tables?.some((table) => String(table.id) === form.tableId))
+    : []
+  const availableTimesForSelectedTable = new Set(availableSlotsForSelectedTable.map((slot) => slot.time))
+  const selectedSlotAvailable = availableTimesForSelectedTable.has(form.time)
+
+  useEffect(() => {
+    let active = true
+    if (!reservationsEnabled) return () => { active = false }
+    const loadHistory = async () => {
+      let accessKey
+      try {
+        accessKey = getReservationAccessKey(slug)
+      } catch (err) {
+        setHistoryError(err?.message || 'Rezervasyon geçmişi anahtarı okunamadı.')
+        return
+      }
+      if (!accessKey) {
+        setReservationHistory([])
+        setHistoryLoading(false)
+        return
+      }
+      setHistoryLoading(true)
+      setHistoryError('')
+      try {
+        const result = await api(`/api/public/sites/${encodeURIComponent(slug)}/reservations/history`, {
+          method: 'POST',
+          body: JSON.stringify({ accessKey }),
+          silent: true,
+          skipBranchHeader: true,
+          cacheMode: 'no-store'
+        })
+        if (result?.success !== true) throw new Error(result?.message || 'Rezervasyon geçmişi yüklenemedi.')
+        if (active) setReservationHistory(Array.isArray(result.reservations) ? result.reservations : [])
+      } catch (err) {
+        if (active) setHistoryError(err?.data?.message || err?.message || 'Rezervasyon geçmişi yüklenemedi.')
+      } finally {
+        if (active) setHistoryLoading(false)
+      }
+    }
+    loadHistory()
+    return () => { active = false }
+  }, [slug, reservationsEnabled])
 
   useEffect(() => {
     let active = true
@@ -709,41 +785,62 @@ function PublicReservationDialog({ slug, accent, reservationsEnabled, onClose })
       setFormError('')
       return () => { active = false }
     }
-    setLoading(true)
-    setFormError('')
-    api(`/api/public/sites/${encodeURIComponent(slug)}/reservations/availability?date=${encodeURIComponent(form.date)}&guestCount=${encodeURIComponent(form.guestCount)}`, {
-      silent: true,
-      skipBranchHeader: true,
-      cacheMode: 'no-store'
-    }).then((result) => {
-      if (!active) return
-      if (result?.success !== true) {
-        setSlots([])
-        setFormError(result?.message || result?.data?.message || 'Uygun saatler yüklenemedi.')
-        return
+    const loadAvailability = (initial = false) => {
+      if (initial) {
+        setLoading(true)
+        setFormError('')
       }
-      setSlots(Array.isArray(result?.slots) ? result.slots : [])
-    }).catch((err) => {
-      if (active) {
+      api(`/api/public/sites/${encodeURIComponent(slug)}/reservations/availability?date=${encodeURIComponent(form.date)}&guestCount=${encodeURIComponent(form.guestCount)}`, {
+        silent: true,
+        skipBranchHeader: true,
+        cacheMode: 'no-store'
+      }).then((result) => {
+        if (!active) return
+        if (result?.success !== true) {
+          setSlots([])
+          setFormError(result?.message || result?.data?.message || 'Uygun saatler yüklenemedi.')
+          return
+        }
+        const nextSlots = Array.isArray(result?.slots) ? result.slots : []
+        setSlots(nextSlots)
+        setFormError('')
+        setForm((current) => {
+          const tableStillAvailable = nextSlots.some((slot) => (
+            slot.available
+            && slot.tables?.some((table) => String(table.id) === current.tableId)
+          ))
+          if (current.tableId && !tableStillAvailable) return { ...current, tableId: '', time: '' }
+          const stillAvailable = nextSlots.some((slot) => (
+            slot.time === current.time
+            && slot.available
+            && slot.tables?.some((table) => String(table.id) === current.tableId)
+          ))
+          return current.time && !stillAvailable ? { ...current, time: '' } : current
+        })
+      }).catch((err) => {
+        if (!active) return
         setSlots([])
         setFormError(err?.data?.message || err?.message || 'Uygun saatler yüklenemedi.')
-      }
-    }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+      }).finally(() => { if (active && initial) setLoading(false) })
+    }
+    loadAvailability(true)
+    const refreshInterval = window.setInterval(() => loadAvailability(), 60_000)
+    return () => {
+      active = false
+      window.clearInterval(refreshInterval)
+    }
   }, [slug, form.date, form.guestCount, reservationsEnabled])
-
-  const selectedSlot = slots.find((slot) => slot.time === form.time && slot.available)
-  const availableTables = selectedSlot?.tables || []
 
   const submit = async (event) => {
     event.preventDefault()
-    if (!reservationsEnabled) return
+    if (!reservationsEnabled || !form.tableId || !selectedSlotAvailable) return
     setBusy(true)
     setFormError('')
     try {
+      const customerAccessKey = getReservationAccessKey(slug, true)
       const result = await api(`/api/public/sites/${encodeURIComponent(slug)}/reservations`, {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, customerAccessKey }),
         silent: true,
         skipBranchHeader: true
       })
@@ -752,6 +849,18 @@ function PublicReservationDialog({ slug, accent, reservationsEnabled, onClose })
         return
       }
       setMessage(result?.message || 'Rezervasyon başvurunuz alındı. Restoran onayını bekliyor.')
+      const historyResult = await api(`/api/public/sites/${encodeURIComponent(slug)}/reservations/history`, {
+        method: 'POST',
+        body: JSON.stringify({ accessKey: customerAccessKey }),
+        silent: true,
+        skipBranchHeader: true,
+        cacheMode: 'no-store'
+      })
+      if (historyResult?.success === true) {
+        setReservationHistory(Array.isArray(historyResult.reservations) ? historyResult.reservations : [])
+      } else {
+        setHistoryError(historyResult?.message || 'Rezervasyon geçmişi yüklenemedi.')
+      }
     } catch (err) {
       setFormError(err?.data?.message || err?.message || 'Rezervasyon oluşturulamadı.')
     } finally {
@@ -773,27 +882,89 @@ function PublicReservationDialog({ slug, accent, reservationsEnabled, onClose })
         ) : message ? (
           <div role="status" style={{ padding: 14, borderRadius: 12, background: '#ecfdf5', color: '#065f46', lineHeight: 1.5 }}>
             {message}
+            <ReservationHistory items={reservationHistory} loading={historyLoading} error={historyError} />
             <button type="button" className="btn" onClick={onClose} style={{ display: 'block', marginTop: 14 }}>Kapat</button>
           </div>
         ) : (
           <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
             <label>Ad soyad<input required minLength={2} maxLength={120} autoComplete="name" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} /></label>
             <label>Telefon<input required minLength={7} maxLength={40} type="tel" autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-            <label>Tarih<input required type="date" min={localToday} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value, time: '', tableId: '' })} /></label>
-            <label>Kişi sayısı<input required type="number" min="1" max="100" value={form.guestCount} onChange={(e) => setForm({ ...form, guestCount: Number(e.target.value), time: '', tableId: '' })} /></label>
-            <label>Saat (Türkiye saati)<select required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value, tableId: '' })}><option value="">{loading ? 'Saatler yükleniyor…' : 'Saat seçin'}</option>{slots.map((slot) => <option key={slot.time} value={slot.time} disabled={!slot.available}>{slot.time} · {slot.available ? 'Uygun' : 'Dolu'}</option>)}</select></label>
-            <label>Masa tercihi (isteğe bağlı)<select value={form.tableId} onChange={(e) => setForm({ ...form, tableId: e.target.value })}><option value="">Masa tercihim yok</option>{availableTables.map((table) => <option key={table.id} value={table.id}>{table.name} · {table.capacity} kişilik</option>)}</select></label>
+            <label>Tarih<input required type="date" min={localToday} value={form.date} onChange={(e) => { setSlots([]); setForm({ ...form, date: e.target.value, time: '', tableId: '' }) }} /></label>
+            <label>Kişi sayısı<input required type="number" min="1" max="100" value={form.guestCount} onChange={(e) => { setSlots([]); setForm({ ...form, guestCount: Number(e.target.value), time: '', tableId: '' }) }} /></label>
+            <label>Masa<select required value={form.tableId} disabled={loading || availableTables.length === 0} onChange={(e) => setForm({ ...form, tableId: e.target.value, time: '' })}><option value="">{loading ? 'Masalar yükleniyor…' : 'Masa seçin'}</option>{availableTables.map((table) => <option key={table.id} value={table.id}>{table.name} · {table.capacity} kişilik</option>)}</select></label>
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 13 }}>
+                <strong>Uygun saatler</strong>
+                <span style={{ color: '#64748b' }}>Yeşil: uygun · Gri: dolu · Lacivert: seçili</span>
+              </div>
+              {!form.tableId ? (
+                <div style={{ color: '#64748b', fontSize: 13 }}>Saatleri görmek için önce masa seçin.</div>
+              ) : loading ? (
+                <div role="status" style={{ color: '#64748b', fontSize: 13 }}>Uygun saatler yükleniyor…</div>
+              ) : (
+                <div role="group" aria-label="Uygun saatler" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))', gap: 8 }}>
+                  {slots.map((slot) => {
+                    const available = availableTimesForSelectedTable.has(slot.time)
+                    const selected = form.time === slot.time
+                    return (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        disabled={!available}
+                        aria-pressed={selected}
+                        onClick={() => setForm({ ...form, time: slot.time })}
+                        style={{
+                          minHeight: 54,
+                          display: 'grid',
+                          alignContent: 'center',
+                          gap: 3,
+                          border: `1px solid ${selected ? '#172554' : available ? '#86efac' : '#d1d5db'}`,
+                          borderRadius: 10,
+                          background: selected ? '#172554' : available ? '#f0fdf4' : '#f1f5f9',
+                          color: selected ? '#fff' : available ? '#166534' : '#64748b',
+                          cursor: available ? 'pointer' : 'not-allowed',
+                          font: 'inherit',
+                          opacity: available ? 1 : 0.82
+                        }}
+                      >
+                        <strong>{slot.time}</strong>
+                        <span style={{ fontSize: 12 }}>{available ? 'Uygun' : 'Dolu'}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {formError ? <div role="alert" style={{ color: '#b91c1c', fontSize: 13 }}>{formError}</div> : null}
+              {!loading && form.tableId && slots.length === 0 && !formError ? <div style={{ color: '#b45309', fontSize: 13 }}>Seçilen tarihte uygun saat bulunmuyor.</div> : null}
+            </div>
             <label style={{ gridColumn: '1 / -1' }}>Not<textarea maxLength={1000} rows={3} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-            {formError ? <div role="alert" style={{ gridColumn: '1 / -1', color: '#b91c1c' }}>{formError}</div> : null}
-            {!loading && !slots.some((slot) => slot.available) && !formError ? <div style={{ gridColumn: '1 / -1', color: '#b45309' }}>Seçilen tarihte uygun saat bulunmuyor.</div> : null}
+            <ReservationHistory items={reservationHistory} loading={historyLoading} error={historyError} />
+            {!loading && !availableTables.length && !formError ? <div style={{ gridColumn: '1 / -1', color: '#b45309' }}>Seçilen tarih ve kişi sayısına uygun masa bulunmuyor.</div> : null}
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button type="button" className="btn" onClick={onClose}>Vazgeç</button>
-              <button className="btn" type="submit" disabled={busy || loading || !form.time} style={{ background: accent, color: '#fff' }}>{busy ? 'Gönderiliyor…' : 'Rezervasyon İste'}</button>
+              <button className="btn" type="submit" disabled={busy || loading || !form.tableId || !selectedSlotAvailable} style={{ background: accent, color: '#fff' }}>{busy ? 'Gönderiliyor…' : 'Rezervasyon İste'}</button>
             </div>
           </form>
         )}
       </div>
       <style>{`[role="dialog"] label{display:grid;gap:6px;font-size:13px;font-weight:700}[role="dialog"] input,[role="dialog"] select,[role="dialog"] textarea{box-sizing:border-box;width:100%;min-height:42px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;font:inherit}`}</style>
     </div>
+  )
+}
+
+function ReservationHistory({ items, loading, error: historyError }) {
+  if (loading) return <div role="status" style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 13 }}>Önceki rezervasyonlar yükleniyor…</div>
+  if (historyError) return <div role="alert" style={{ gridColumn: '1 / -1', color: '#b91c1c', fontSize: 13 }}>{historyError}</div>
+  if (!items.length) return null
+  return (
+    <section aria-label="Önceki rezervasyonlarınız" style={{ gridColumn: '1 / -1', display: 'grid', gap: 7, padding: 12, borderRadius: 10, background: '#f8fafc' }}>
+      <strong>Önceki rezervasyonlarınız</strong>
+      {items.map((item) => (
+        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', fontSize: 13 }}>
+          <span>{item.date} · {item.time} · {item.guestCount} kişi{item.tableName ? ` · ${item.tableName}` : ''}</span>
+          <span>{reservationStatusLabels[item.status] || item.status}</span>
+        </div>
+      ))}
+    </section>
   )
 }

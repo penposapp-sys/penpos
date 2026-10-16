@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { createHash } from 'node:crypto'
 import Branch from '../models/Branch.js'
 import Order from '../models/Order.js'
 import Reservation from '../models/Reservation.js'
@@ -159,26 +160,30 @@ const getAvailableTableIds = async ({ tenantId, branchId, guestCount, slotKeys, 
     tenantId,
     branchId,
     isActive: true,
-    status: 'empty',
-    activeOrderId: null,
     ...capacityFilter(guestCount),
     _id: { $nin: Array.from(reservedIds, (id) => new mongoose.Types.ObjectId(id)) }
-  }).sort({ name: 1 }).select('_id name capacity').lean()
-  if (!tables.length) return []
-
-  const activeOrders = await Order.find({
-    tenantId,
-    branchId,
-    tableId: { $in: tables.map((table) => table._id) },
-    status: { $in: ACTIVE_ORDER_STATUSES }
-  }).select('tableId').lean()
-  const busyIds = new Set(activeOrders.map((order) => String(order.tableId)))
+  }).sort({ name: 1 }).select('_id name capacity status activeOrderId').lean()
+  const activeOrders = tables.length
+    ? await Order.find({
+      tenantId,
+      branchId,
+      tableId: { $in: tables.map((table) => table._id) },
+      status: { $in: ACTIVE_ORDER_STATUSES }
+    }).select('tableId').lean()
+    : []
+  const busyTableIds = new Set(activeOrders.map((order) => String(order.tableId)))
   return tables
-    .filter((table) => isReservationTableAvailable({ table, guestCount, activeOrder: busyIds.has(String(table._id)), requestedSlotKeys: slotKeys }))
+    .filter((table) => isReservationTableAvailable({
+      table,
+      guestCount,
+      occupied: table.status === 'occupied' || Boolean(table.activeOrderId) || busyTableIds.has(String(table._id)),
+      now: getNowWallClock(),
+      requestedSlotKeys: slotKeys
+    }))
     .map((table) => ({ id: String(table._id), name: String(table.name || ''), capacity: Number(table.capacity || 4) }))
 }
 
-const getDailyAvailability = async ({ tenantId, branch, date, guestCount, allowDisabled = false }) => {
+const getDailyAvailability = async ({ tenantId, branch, date, guestCount, allowDisabled = false, excludeReservationId = null }) => {
   const settings = getSettings(branch)
   if (!allowDisabled && !settings.onlineEnabled) throw error('online_reservations_disabled', 'Online rezervasyon şu anda kapalı.', 403)
   const dateStart = wallClockToDate(date, '00:00')
@@ -216,13 +221,12 @@ const getDailyAvailability = async ({ tenantId, branch, date, guestCount, allowD
       tenantId,
       branchId: branch._id,
       isActive: true,
-      status: 'empty',
-      activeOrderId: null,
       ...capacityFilter(guestCount)
-    }).sort({ name: 1 }).select('_id name capacity').lean(),
+    }).sort({ name: 1 }).select('_id name capacity status activeOrderId').lean(),
     Reservation.find({
       tenantId,
       branchId: branch._id,
+      ...(excludeReservationId ? { _id: { $ne: excludeReservationId } } : {}),
       tableId: { $ne: null },
       status: { $in: BLOCKING_STATUSES },
       slotKeys: { $in: allSlotKeys },
@@ -231,9 +235,15 @@ const getDailyAvailability = async ({ tenantId, branch, date, guestCount, allowD
   ])
   const tableIds = tables.map((table) => table._id)
   const activeOrders = tableIds.length
-    ? await Order.find({ tenantId, branchId: branch._id, tableId: { $in: tableIds }, status: { $in: ACTIVE_ORDER_STATUSES } }).select('tableId').lean()
+    ? await Order.find({
+      tenantId,
+      branchId: branch._id,
+      tableId: { $in: tableIds },
+      status: { $in: ACTIVE_ORDER_STATUSES }
+    }).select('tableId').lean()
     : []
-  const activeTableIds = new Set(activeOrders.map((order) => String(order.tableId)))
+  const busyTableIds = new Set(activeOrders.map((order) => String(order.tableId)))
+  const nowWallClock = getNowWallClock()
   const reservedSlotsByTable = new Map()
   for (const reservation of reservations) {
     const key = String(reservation.tableId)
@@ -249,7 +259,8 @@ const getDailyAvailability = async ({ tenantId, branch, date, guestCount, allowD
       return isReservationTableAvailable({
         table,
         guestCount,
-        activeOrder: activeTableIds.has(key),
+        occupied: table.status === 'occupied' || Boolean(table.activeOrderId) || busyTableIds.has(key),
+        now: nowWallClock,
         reservedSlotKeys: reserved || [],
         requestedSlotKeys: [...requestedSlots]
       })
@@ -316,7 +327,7 @@ const notifyBranchStaff = async ({ tenantId, branchId, reservation }) => {
   }
 }
 
-const reserveAndCreate = async ({ tenantId, branch, actorId, payload, source }) => {
+const reserveAndCreate = async ({ tenantId, branch, actorId, payload, source, customerAccessKeyHash = '' }) => {
   const settings = getSettings(branch)
   const customer = normalizeCustomer(payload)
   const { startAt, endAt, slotKeys } = resolveRequestedTime(payload, settings)
@@ -355,6 +366,7 @@ const reserveAndCreate = async ({ tenantId, branch, actorId, payload, source }) 
         startAt,
         endAt,
         source,
+        ...(source === 'website' && customerAccessKeyHash ? { customerAccessKeyHash } : {}),
         status,
         holdExpiresAt,
         slotKeys: tableId ? slotKeys : [],
@@ -396,7 +408,14 @@ export const getReservationAvailability = async ({ slug, date, guestCount }) => 
 export const createPublicReservation = async ({ slug, payload }) => {
   const { tenant, branch } = await resolvePublicSite(slug)
   if (!getSettings(branch).onlineEnabled) throw error('online_reservations_disabled', 'Online rezervasyon şu anda kapalı.', 403)
-  const reservation = await reserveAndCreate({ tenantId: tenant._id, branch, payload, source: 'website' })
+  const rawAccessKey = String(payload.customerAccessKey || '').trim()
+  if (rawAccessKey && !/^[a-f\d]{64}$/i.test(rawAccessKey)) {
+    throw error('invalid_reservation_access_key', 'Rezervasyon geçmişi anahtarı geçersiz.', 400)
+  }
+  const customerAccessKeyHash = rawAccessKey
+    ? createHash('sha256').update(rawAccessKey.toLowerCase()).digest('hex')
+    : ''
+  const reservation = await reserveAndCreate({ tenantId: tenant._id, branch, payload, source: 'website', customerAccessKeyHash })
   return {
     reservation: {
       id: reservation.id,
@@ -408,6 +427,42 @@ export const createPublicReservation = async ({ slug, payload }) => {
     message: reservation.status === 'confirmed'
       ? 'Rezervasyonunuz onaylandı.'
       : 'Rezervasyon başvurunuz alındı. Restoran onayını bekliyor.'
+  }
+}
+
+export const getPublicReservationHistory = async ({ slug, accessKey }) => {
+  const { tenant, branch } = await resolvePublicSite(slug)
+  const rawAccessKey = String(accessKey || '').trim()
+  if (!/^[a-f\d]{64}$/i.test(rawAccessKey)) {
+    throw error('invalid_reservation_access_key', 'Rezervasyon geçmişi anahtarı geçersiz.', 400)
+  }
+  const customerAccessKeyHash = createHash('sha256').update(rawAccessKey.toLowerCase()).digest('hex')
+  const reservations = await Reservation.find({
+    tenantId: tenant._id,
+    branchId: branch._id,
+    source: 'website',
+    customerAccessKeyHash
+  }).sort({ startAt: -1, createdAt: -1 }).limit(10)
+    .select('_id tableId guestCount startAt status createdAt')
+    .lean()
+  const tableIds = [...new Set(reservations.map((item) => item.tableId).filter(Boolean).map(String))]
+  const tables = tableIds.length
+    ? await Table.find({ tenantId: tenant._id, branchId: branch._id, _id: { $in: tableIds } }).select('_id name').lean()
+    : []
+  const tableNames = new Map(tables.map((table) => [String(table._id), String(table.name || '')]))
+  return {
+    reservations: reservations.map((item) => {
+      const { date, time } = dateToWallClock(item.startAt)
+      return {
+        id: String(item._id),
+        date,
+        time,
+        guestCount: Number(item.guestCount || 1),
+        status: String(item.status || 'pending'),
+        tableName: tableNames.get(String(item.tableId || '')) || '',
+        createdAt: item.createdAt || null
+      }
+    })
   }
 }
 
@@ -664,12 +719,21 @@ export const getReservationNotifications = async ({ tenantId, branchIds, userId 
   }))
 }
 
-export const getBranchDailyAvailability = async ({ tenantId, branchId, actor, date, guestCount }) => {
+export const getBranchDailyAvailability = async ({ tenantId, branchId, actor, date, guestCount, excludeReservationId = '' }) => {
   ensureStaffBranch(actor, branchId)
   if (!Number.isInteger(Number(guestCount)) || Number(guestCount) < 1 || Number(guestCount) > 100) {
     throw error('invalid_reservation', 'Kişi sayısı 1-100 arasında olmalı.', 400)
   }
   const branch = await requireBranch(tenantId, branchId)
-  const result = await getDailyAvailability({ tenantId, branch, date, guestCount, allowDisabled: true })
+  let excludedId = null
+  if (excludeReservationId) {
+    const reservation = await requireReservation(tenantId, excludeReservationId, [String(branch._id)])
+    ensureStaffBranch(actor, reservation.branchId)
+    if (!['pending', 'confirmed'].includes(reservation.status)) {
+      throw error('reservation_not_editable', 'Bu rezervasyon artık düzenlenemez.', 409)
+    }
+    excludedId = reservation._id
+  }
+  const result = await getDailyAvailability({ tenantId, branch, date, guestCount, allowDisabled: true, excludeReservationId: excludedId })
   return { slots: result.slots, settings: result.settings }
 }
