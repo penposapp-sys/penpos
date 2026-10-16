@@ -406,7 +406,6 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
         id="top"
         style={{
           minHeight: compact ? 'auto' : 'calc(100vh - 120px)',
-          marginTop: 30,
           position: 'relative',
           display: 'grid',
           placeItems: 'end start',

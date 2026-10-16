@@ -95,6 +95,34 @@ function menuDomId(value) {
   return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
+function getMenuScrollTarget() {
+  const appRoot = document.getElementById('root')
+  const overflowY = appRoot ? window.getComputedStyle(appRoot).overflowY : ''
+  return appRoot &&
+    /(auto|scroll)/.test(overflowY) &&
+    appRoot.scrollHeight > appRoot.clientHeight
+    ? appRoot
+    : window
+}
+
+function scrollToMenuCategory(category) {
+  if (!category) return
+
+  const scrollTarget = getMenuScrollTarget()
+  const categoryRect = category.getBoundingClientRect()
+  const scrollTargetTop = scrollTarget === window
+    ? 0
+    : scrollTarget.getBoundingClientRect().top + scrollTarget.clientTop
+  const scrollMarginTop = Number.parseFloat(window.getComputedStyle(category).scrollMarginTop) || 0
+  const scrollOffset = categoryRect.top - scrollTargetTop - scrollMarginTop
+
+  if (scrollTarget === window) {
+    window.scrollTo({ top: window.scrollY + scrollOffset, behavior: 'smooth' })
+  } else {
+    scrollTarget.scrollTo({ top: scrollTarget.scrollTop + scrollOffset, behavior: 'smooth' })
+  }
+}
+
 function formatMoney(value) {
   const amount = Number(value || 0)
   return `\u20BA${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -415,19 +443,11 @@ export default function PublicMenuLiman() {
     if (!categoryTabs.length) return undefined
 
     const appRoot = document.getElementById('root')
-    const getScrollTarget = () => {
-      const overflowY = appRoot ? window.getComputedStyle(appRoot).overflowY : ''
-      return appRoot &&
-        /(auto|scroll)/.test(overflowY) &&
-        appRoot.scrollHeight > appRoot.clientHeight
-        ? appRoot
-        : window
-    }
     let frame = 0
     const updateActiveCategory = () => {
       window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(() => {
-        const scrollTarget = getScrollTarget()
+        const scrollTarget = getMenuScrollTarget()
         const activationLine = window.innerWidth >= 1024 ? 130 : 100
         let activeId = categoryTabs[0].id
         const headings = [...document.querySelectorAll('#lm-menu-list .lm-kategori[data-category-id]')]
@@ -443,10 +463,18 @@ export default function PublicMenuLiman() {
           ? window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8
           : scrollTarget.scrollTop + scrollTarget.clientHeight >= scrollTarget.scrollHeight - 8
         if (atBottom) {
-          const lastHeading = [...headings].reverse().find((heading) =>
-            categoryTabs.some((category) => category.id === heading.dataset.categoryId)
-          )
-          if (lastHeading) activeId = lastHeading.dataset.categoryId
+          const visibleHeadings = headings.filter((heading) => {
+            const top = heading.getBoundingClientRect().top
+            return top >= 0 && top < window.innerHeight &&
+              categoryTabs.some((category) => category.id === heading.dataset.categoryId)
+          })
+          const nearestHeading = visibleHeadings.reduce((nearest, heading) => {
+            if (!nearest) return heading
+            const headingDistance = Math.abs(heading.getBoundingClientRect().top - activationLine)
+            const nearestDistance = Math.abs(nearest.getBoundingClientRect().top - activationLine)
+            return headingDistance < nearestDistance ? heading : nearest
+          }, null)
+          if (nearestHeading) activeId = nearestHeading.dataset.categoryId
         }
 
         setSelectedCategory((current) => current === activeId ? current : activeId)
@@ -557,10 +585,7 @@ export default function PublicMenuLiman() {
         navigation.scrollBy({ left: buttonRect.right - navigationRect.right, behavior: 'smooth' })
       }
     }
-    document.getElementById(`lm-category-${menuDomId(categoryId)}`)?.scrollIntoView({
-      block: 'start',
-      behavior: 'smooth'
-    })
+    scrollToMenuCategory(document.getElementById(`lm-category-${menuDomId(categoryId)}`))
   }
 
   const clearSearch = () => setSearchTerm('')

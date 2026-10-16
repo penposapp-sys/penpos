@@ -60,7 +60,8 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '' 
       tableName: resolvedTableName,
       waiterCallId: String(created?._id || '')
     })
-  } catch {
+  } catch (notificationError) {
+    console.error('Waiter call push notification failed', notificationError)
   }
 
   return toDto(created)

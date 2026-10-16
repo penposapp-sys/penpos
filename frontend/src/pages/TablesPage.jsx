@@ -62,6 +62,7 @@ export function TablesManagementContent({ embedded = false }) {
   const [activeByTable, setActiveByTable] = useState({})
   const [paidByTable, setPaidByTable] = useState({})
   const [waiterCallsByTable, setWaiterCallsByTable] = useState({})
+  const [openWaiterCallCount, setOpenWaiterCallCount] = useState(0)
   const [pendingReservations, setPendingReservations] = useState(0)
   const [error, setError] = useState('')
   const [activeCategory, setActiveCategory] = useState('')
@@ -209,6 +210,43 @@ export function TablesManagementContent({ embedded = false }) {
       window.clearInterval(timer)
     }
   }, [allowedBranchIds, allowed.length])
+
+  useEffect(() => {
+    let mounted = true
+    let loading = false
+    const refreshWaiterCallCount = async () => {
+      if (loading) return
+      loading = true
+      try {
+        const response = await api('/api/tenant/waiter-calls?status=open', {
+          silent: true,
+          skipBranchHeader: true,
+          cacheMode: 'no-store'
+        })
+        if (mounted && response?.success !== false) {
+          setOpenWaiterCallCount(Array.isArray(response?.calls) ? response.calls.length : 0)
+        }
+      } catch (requestError) {
+        console.error('[WAITER_CALL_COUNT_FAILED]', requestError?.message || requestError)
+      } finally {
+        loading = false
+      }
+    }
+
+    refreshWaiterCallCount()
+    const timer = window.setInterval(refreshWaiterCallCount, 5000)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshWaiterCallCount()
+    }
+    window.addEventListener('focus', refreshWaiterCallCount)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWaiterCallCount)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTs(Date.now()), 60000)
@@ -370,11 +408,6 @@ export function TablesManagementContent({ embedded = false }) {
     }
   }
 
-  const totalWaiterCalls = useMemo(
-    () => Object.values(waiterCallsByTable || {}).reduce((sum, item) => sum + Number(item?.count || 0), 0),
-    [waiterCallsByTable]
-  )
-
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {Array.isArray(allowedBranchIds) && allowed.length === 0 && (
@@ -428,8 +461,10 @@ export function TablesManagementContent({ embedded = false }) {
             </button>
             <button className="btn" type="button" onClick={() => nav('/restoran/app/waiter-calls')} style={{ flexShrink: 0 }}>
               Garson Cagrilari
-              {totalWaiterCalls > 0 ? (
+              {openWaiterCallCount > 0 ? (
                 <span
+                  role="status"
+                  aria-label={`${openWaiterCallCount} açık garson çağrısı`}
                   style={{
                     marginLeft: 8,
                     display: 'inline-flex',
@@ -439,14 +474,14 @@ export function TablesManagementContent({ embedded = false }) {
                     height: 22,
                     padding: '0 6px',
                     borderRadius: 999,
-                    background: '#f97316',
+                    background: '#e11d48',
                     color: '#fff',
                     fontSize: 12,
                     fontWeight: 900,
                     lineHeight: 1
                   }}
                 >
-                  {totalWaiterCalls}
+                  {openWaiterCallCount > 99 ? '99+' : openWaiterCallCount}
                 </span>
               ) : null}
             </button>
