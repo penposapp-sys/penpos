@@ -1,0 +1,354 @@
+.liman-menu-body {
+  margin: 0;
+  background: var(--lm-zemin);
+}
+
+.lm {
+  overflow-x: clip;
+}
+
+.lm-ust {
+  position: relative;
+}
+
+.lm-ust img {
+  max-width: min(100%, 260px);
+  object-fit: contain;
+}
+
+.lm-header-subtitle {
+  margin: 4px 0 0;
+  color: var(--lm-ana);
+  font-family: var(--lm-font-baslik);
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+@media (min-width: 720px) {
+  .lm-header-subtitle {
+    font-size: 42px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lm-header-subtitle {
+    font-size: 52px;
+  }
+}
+
+.lm-header-description {
+  max-width: 640px;
+  margin: 8px auto 0;
+  color: var(--lm-metin-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.lm-oneri {
+  isolation: isolate;
+}
+
+.lm-oneri::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, var(--lm-ana), color-mix(in srgb, var(--lm-ana) 68%, transparent));
+  content: "";
+}
+
+.lm-oneri-gorsel {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .36;
+}
+
+.lm-oneri-icerik {
+  position: relative;
+  z-index: 1;
+}
+
+.lm-language {
+  position: absolute;
+  top: 20px;
+  right: var(--lm-kenar);
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--lm-cizgi) !important;
+  border-radius: var(--lm-r-orta) !important;
+  color: var(--lm-ana) !important;
+  background: var(--lm-yuzey) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.lm-bas-sag {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  min-width: 0;
+}
+
+.lm-ara {
+  min-width: 0;
+}
+
+.lm-sekmeler {
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+}
+
+.lm-kategori {
+  scroll-margin-top: 72px;
+}
+
+.lm-list-column,
+.lm-list-column main,
+.lm-list-column section,
+.lm-urunler,
+.lm-urun-yazi {
+  min-width: 0;
+}
+
+.lm-urun-yazi {
+  display: block;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.lm .lm-urun:hover,
+.lm .lm-urun:focus-visible {
+  background: var(--lm-yuzey);
+  border-color: var(--lm-cizgi);
+  box-shadow: none;
+  color: var(--lm-metin);
+}
+
+.lm .lm-urun:hover::before,
+.lm .lm-urun:focus-visible::before {
+  opacity: 0;
+}
+
+.lm .lm-dugme--vurgu:hover,
+.lm .lm-dugme--vurgu:focus-visible {
+  background: var(--lm-vurgu);
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--lm-metin);
+}
+
+.lm .lm-dugme--vurgu:active {
+  background: var(--lm-vurgu);
+  border-color: transparent;
+  color: var(--lm-metin);
+  filter: brightness(.94);
+}
+
+.lm .lm-dugme--vurgu:hover::before,
+.lm .lm-dugme--vurgu:focus-visible::before {
+  opacity: 0;
+}
+
+.lm-gorsel,
+.lm-buyuk-gorsel {
+  overflow: hidden;
+}
+
+.lm-gorsel svg,
+.lm-gorsel svg * {
+  fill: none;
+  stroke: var(--lm-ikon-soluk);
+}
+
+.lm-gorsel img,
+.lm-buyuk-gorsel img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lm-urun--no-image .lm-urun-yazi {
+  margin-left: 2px;
+}
+
+.lm-fiyat {
+  flex: none;
+  color: var(--lm-ana);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lm-dialog-price {
+  margin-top: 12px;
+  color: var(--lm-ana);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.lm-masa small {
+  display: block;
+  width: 100%;
+  margin: 0;
+  color: var(--lm-metin-2);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.lm-masa span {
+  display: block;
+  width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.lm-bos {
+  overflow-wrap: anywhere;
+}
+
+.lm-state {
+  min-height: 100vh;
+  padding: 48px var(--lm-kenar);
+}
+
+.lm-state h1 {
+  color: var(--lm-ana);
+  font-family: var(--lm-font-baslik);
+  font-size: 30px;
+  font-weight: 400;
+}
+
+.lm-state p {
+  margin-top: 10px;
+  color: var(--lm-metin-2);
+}
+
+.lm-login-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 16px;
+  color: var(--lm-ana);
+}
+
+.lm-perde {
+  position: fixed;
+}
+
+.lm-pencere {
+  outline: none;
+}
+
+@media (max-width: 1023px) {
+  .lm-pencere--urun {
+    top: 50%;
+    bottom: auto;
+    width: calc(100% - 2 * var(--lm-kenar));
+    max-width: 480px;
+    max-height: 88vh;
+    max-height: 88dvh;
+    border-radius: var(--lm-r-pencere);
+    transform: translate(-50%, -46%) scale(.98);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--lm-sure-orta) var(--lm-egri),
+      opacity var(--lm-sure-orta);
+  }
+
+  .lm-pencere--urun.acik {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.lm-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 1;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% !important;
+  background: var(--lm-yuzey-2) !important;
+  color: var(--lm-metin) !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+}
+
+.lm-dialog-product-title,
+.lm-dialog-table-title {
+  margin: 16px 0 0;
+  color: var(--lm-metin);
+  font-size: 24px;
+  font-stretch: 90%;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.lm-dialog-table-title {
+  margin-top: 8px;
+}
+
+.lm-dialog-action {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.lm-no-tables {
+  margin-top: 18px;
+  color: var(--lm-metin-2);
+  text-align: center;
+}
+
+.lm-masalar {
+  max-height: min(38vh, 360px);
+  overflow-y: auto;
+}
+
+.lm-bildirim {
+  z-index: 12;
+}
+
+@media (min-width: 720px) {
+  .lm-bas-sag {
+    grid-template-rows: auto 1fr;
+    gap: 14px;
+  }
+
+  .lm-bas-sag .lm-eylem,
+  .lm-bas-sag .lm-ara {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .lm-bas-sag .lm-eylem {
+    margin-top: 0;
+  }
+
+  .lm-bas-sag .lm-ara {
+    margin-top: 0;
+  }
+
+  .lm-dialog-close {
+    top: 18px;
+    right: 18px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lm-kategori {
+    scroll-margin-top: 24px;
+  }
+}

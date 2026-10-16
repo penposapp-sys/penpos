@@ -4,6 +4,7 @@ import ProductImage from '../components/ProductImage.jsx'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import { useBodyLayoutMode } from '../hooks/useBodyLayoutMode.js'
+import PublicMenuLiman from './PublicMenuLiman.jsx'
 
 const translations = {
   tr: {
@@ -132,7 +133,7 @@ function ProductCard({ item, onOpen, showPrices, showDescriptions, labels }) {
   )
 }
 
-export default function PublicMenuPage() {
+function LegacyPublicMenuPage() {
   const { tenantSlug } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -567,4 +568,8 @@ export default function PublicMenuPage() {
       ) : null}
     </div>
   )
+}
+
+export default function PublicMenuPage() {
+  return <PublicMenuLiman />
 }

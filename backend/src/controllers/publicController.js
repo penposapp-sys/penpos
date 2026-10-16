@@ -210,29 +210,34 @@ export const getPublicMenu = async (req, res) => {
 
   let selectedTable = null
   let availableTables = []
-  if (mergedSettings.qrMenu?.tableQrEnabled === true) {
+  if (mergedSettings.qrMenu?.tableQrEnabled === true || mergedSettings.qrMenu?.waiterCall === true) {
     const activeBranches = await Branch.find({
       tenantId: tenant._id,
       isActive: true,
       isDeleted: { $ne: true },
       status: { $ne: 'deleted' }
-    }).select('_id').lean()
+    }).select('_id name').lean()
     const activeBranchIds = activeBranches.map((branch) => branch._id).filter(Boolean)
+    const branchNames = new Map(activeBranches.map((branch) => [String(branch._id), String(branch.name || '')]))
     const tables = activeBranchIds.length > 0
-      ? await Table.find({ tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name').sort({ name: 1 }).lean()
+      ? await Table.find({ tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name branchId').sort({ name: 1 }).lean()
       : []
     availableTables = tables.map((table) => ({
       id: String(table._id),
       name: String(table.name || ''),
+      branchId: String(table.branchId || ''),
+      branchName: branchNames.get(String(table.branchId || '')) || '',
     }))
     if (requestedTableId && mongoose.Types.ObjectId.isValid(requestedTableId)) {
       const table = activeBranchIds.length > 0
-        ? await Table.findOne({ _id: requestedTableId, tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name').lean()
+        ? await Table.findOne({ _id: requestedTableId, tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name branchId').lean()
         : null
       if (table) {
         selectedTable = {
           id: String(table._id),
           name: String(table.name || ''),
+          branchId: String(table.branchId || ''),
+          branchName: branchNames.get(String(table.branchId || '')) || '',
         }
       }
     } else if (requestedTableName) {

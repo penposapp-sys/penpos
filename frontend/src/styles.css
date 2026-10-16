@@ -6654,7 +6654,7 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]):not(.public-reservation-action) {
+):not(.lm button):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]):not(.public-reservation-action) {
   background: #ffffff !important;
   color: #111111 !important;
   border-color: #d1d5db !important;
@@ -6682,7 +6682,7 @@ html[data-theme="light"].theme-white :is(
   .hamburger-btn,
   .nav-link,
   [role="button"]:not(.qr-ref-product-copy)
-):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]):not(.public-reservation-action) :is(
+):not(.lm button):not(.saleCartFooterActionBtn--payment):not(.saleCartFooterActionBtn--note):not(.saleCartFooterActionBtn--danger):not(.saleCartFooterActionBtn--transfer):not(.saleCartFooterActionBtn--print):not(.saleCartFooterActionBtn--preview):not(.canteen-sale-action):not(body.pos-app-layout .app-modal-footer .btn):not(body.pos-app-layout .modalCloseButton):not(.product-toggle):not(.btn--close-action):not(:is([data-active="true"], [aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .active, .is-active, .selected, .is-selected)):not(:disabled):not([disabled]):not([aria-disabled="true"]):not(.public-reservation-action) :is(
   *:not(.responsive-card-badge),
   span:not(.responsive-card-badge),
   svg:not(.responsive-card-badge),
@@ -12167,6 +12167,15 @@ body .system-login.system-login--anaokulu .system-login__support-item b {
   padding: 12px 14px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.system-login.system-login--restaurant .system-login__error {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #7f1d1d;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .system-login__submit {

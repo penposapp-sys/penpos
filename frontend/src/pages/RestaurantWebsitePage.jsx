@@ -139,7 +139,6 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const [error, setError] = useState('')
   const [errorCode, setErrorCode] = useState('')
   const [payload, setPayload] = useState(null)
-  const [mobileGalleryIndex, setMobileGalleryIndex] = useState(0)
   const [reservationOpen, setReservationOpen] = useState(false)
 
   useBodyLayoutMode('public-site-layout')
@@ -217,18 +216,6 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
   const resolvedAboutImageUrl = resolveWebsiteImageUrl(site.aboutSection?.settings?.imageUrl) || resolvedHeroGallery[1] || resolvedHeroImage
   const gallerySectionImages = resolvedHeroGallery.slice(1)
   const featuredProducts = site.menuProducts
-
-  useEffect(() => {
-    setMobileGalleryIndex(0)
-  }, [gallerySectionImages.length, slug])
-
-  useEffect(() => {
-    if (!compact || gallerySectionImages.length < 2) return undefined
-    const timer = window.setInterval(() => {
-      setMobileGalleryIndex((current) => (current + 1) % gallerySectionImages.length)
-    }, 4000)
-    return () => window.clearInterval(timer)
-  }, [compact, gallerySectionImages.length])
 
   const rootBg = '#d1d5db'
   const pageSurface = '#e5e7eb'
@@ -493,6 +480,20 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
               from { transform: translate3d(0, 0, 0); }
               to { transform: translate3d(-50%, 0, 0); }
             }
+            .website-gallery-track { animation: website-gallery-marquee 28s linear infinite; }
+            .website-gallery-track--compact { animation-duration: 18s; }
+            html.mobile-performance-mode .website-gallery-track,
+            body.mobile-performance-mode .website-gallery-track,
+            html.tenant-no-animations .website-gallery-track,
+            body.tenant-no-animations .website-gallery-track {
+              animation: website-gallery-marquee 28s linear infinite !important;
+            }
+            html.mobile-performance-mode .website-gallery-track--compact,
+            body.mobile-performance-mode .website-gallery-track--compact,
+            html.tenant-no-animations .website-gallery-track--compact,
+            body.tenant-no-animations .website-gallery-track--compact {
+              animation-duration: 18s !important;
+            }
           `}</style>
           <div style={{ display: 'grid', gap: 18 }}>
             <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
@@ -512,30 +513,12 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
             </div>
 
             <div style={{ overflow: 'hidden', padding: '4px 0' }}>
-              {compact ? (
+              {gallerySectionImages.length > 1 ? (
                 <div
-                  style={{
-                    width: '100%',
-                    height: 'clamp(180px, 52vw, 280px)',
-                    borderRadius: 18,
-                    overflow: 'hidden',
-                    border: `1px solid ${line}`,
-                    background: pageSurface,
-                    boxShadow: '0 12px 24px rgba(17,24,39,0.05)',
-                  }}
-                >
-                  <img
-                    src={gallerySectionImages[mobileGalleryIndex % gallerySectionImages.length]}
-                    alt={`${tenantName} galeri ${mobileGalleryIndex + 1}`}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
-                </div>
-              ) : gallerySectionImages.length > 1 ? (
-                <div
+                  className={`website-gallery-track${compact ? ' website-gallery-track--compact' : ''}`}
                   style={{
                     display: 'flex',
                     width: 'max-content',
-                    animation: `website-gallery-marquee ${compact ? 18 : 28}s linear infinite`,
                     willChange: 'transform',
                     transform: 'translate3d(0, 0, 0)',
                   }}
@@ -626,7 +609,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
             </p>
           ) : null}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(220px, 280px))', gap: 16, justifyContent: 'space-between' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(3, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(220px, 280px))', gap: compact ? 8 : 16, justifyContent: 'space-between' }}>
           {featuredProducts.map((product) => (
             <article
               key={product.id}
@@ -641,13 +624,13 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
               <div style={{ width: '100%', aspectRatio: '4 / 2.45', overflow: 'hidden', background: pageSurface }}>
                 <ProductThumb product={product} fallbackLabel={product.name} emptyText={imageFallbackText} />
               </div>
-              <div style={{ padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
-                  <div style={{ fontSize: 16, lineHeight: 1.15, color: strongText }}>{product.name}</div>
-                  <div style={{ color: strongText, fontSize: 15, whiteSpace: 'nowrap', fontWeight: 700 }}>{currency(product.price)}</div>
+              <div style={{ padding: compact ? 8 : 14 }}>
+                <div style={{ display: 'flex', flexDirection: compact ? 'column' : 'row', justifyContent: 'space-between', gap: compact ? 4 : 12, alignItems: 'start' }}>
+                  <div style={{ fontSize: compact ? 11 : 16, lineHeight: 1.15, color: strongText, overflowWrap: 'anywhere' }}>{product.name}</div>
+                  <div style={{ color: strongText, fontSize: compact ? 11 : 15, whiteSpace: 'nowrap', fontWeight: 700 }}>{currency(product.price)}</div>
                 </div>
                 {(product.description || site.productsSection?.settings?.productFallbackDescription) ? (
-                  <div style={{ marginTop: 10, fontFamily: 'Arial, sans-serif', color: muted, fontSize: 12, lineHeight: 1.55 }}>
+                  <div style={{ marginTop: compact ? 6 : 10, fontFamily: 'Arial, sans-serif', color: muted, fontSize: compact ? 10 : 12, lineHeight: 1.55 }}>
                     {product.description || site.productsSection.settings.productFallbackDescription}
                   </div>
                 ) : null}

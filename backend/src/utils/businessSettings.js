@@ -73,10 +73,26 @@ export const defaultBusinessSettings = {
     enabled: true,
     showLogo: true,
     showCoverImage: true,
-    showPrices: true,
+    showPrices: false,
     showDescriptions: true,
-    themeMode: 'light',
+    showProductImages: true,
+    showCategoryCounts: true,
+    featuredEnabled: true,
+    title: '',
+    subtitle: '',
+    description: '',
+    featuredTitle: '',
+    featuredDescription: '',
     featuredProductId: '',
+    featuredImageUrl: '',
+    brandLabel: null,
+    footerGreeting: null,
+    footerText: null,
+    palette: 'liman',
+    fontFamily: 'instrument',
+    categoryOrder: [],
+    hiddenCategoryIds: [],
+    themeMode: 'light',
     waiterCall: false,
     multiLanguage: false,
     tableQrEnabled: false,
@@ -269,6 +285,12 @@ export function mergeBusinessSettings(existingSettings = {}, options = {}) {
     qrMenu: {
       ...defaultBusinessSettings.qrMenu,
       ...(isPlainObject(safeExisting.qrMenu) ? safeExisting.qrMenu : {}),
+      categoryOrder: Array.isArray(safeExisting.qrMenu?.categoryOrder)
+        ? safeExisting.qrMenu.categoryOrder.map((id) => String(id))
+        : [],
+      hiddenCategoryIds: Array.isArray(safeExisting.qrMenu?.hiddenCategoryIds)
+        ? safeExisting.qrMenu.hiddenCategoryIds.map((id) => String(id))
+        : [],
       enabled:
         typeof safeExisting.qrMenu?.enabled === 'boolean'
           ? safeExisting.qrMenu.enabled

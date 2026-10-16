@@ -72,7 +72,10 @@ export const resolveApiOrigin = () => {
     try {
       const protocol = String(window.location?.protocol || 'http:')
       const hostname = String(window.location?.hostname || '').trim()
-      if (isLocalDevHostname(hostname)) currentWindowOrigin = `${protocol}//${hostname}:4000`
+      if (isLocalDevHostname(hostname)) {
+        const apiHostname = hostname.toLowerCase() === 'localhost' ? '127.0.0.1' : hostname
+        currentWindowOrigin = `${protocol}//${apiHostname}:4000`
+      }
     } catch {}
 
     try {

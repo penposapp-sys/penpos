@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { buildSafeBusinessSettings, mergeBusinessSettings } from '../lib/businessSettings.js'
 import { useResponsiveFlags } from '../hooks/useResponsiveFlags.js'
 import { buildPublicAppUrl } from '../lib/publicAppUrl.js'
+import { resolveProductImageUrl } from '../lib/productImage.js'
 
 const pageTheme = {
   pageBg: 'radial-gradient(circle at top left, color-mix(in srgb, var(--theme-accent) 18%, transparent) 0, transparent 32%), radial-gradient(circle at bottom right, color-mix(in srgb, var(--theme-accent-hover) 14%, transparent) 0, transparent 28%), var(--app-bg)',
@@ -29,7 +30,6 @@ const normalizePublicSlug = (value) => String(value || '')
 const qrSwitches = [
   ['enabled', 'QR Menü aç/kapat', 'Public menü yayınının aktif olup olmayacağını belirler.'],
   ['showLogo', 'Logo gösterimi', 'Kapakta ve üst alanda işletme logosunu gösterir.'],
-  ['showCoverImage', 'Kapak fotoğrafı', 'Menü açılış kapağını görünür tutar.'],
   ['showPrices', 'Fiyatları göster', 'Ürün kartlarında fiyat bilgisini açar.'],
   ['showDescriptions', 'Ürün açıklaması', 'Açıklama metinlerini public menüde gösterir.'],
   ['waiterCall', 'Garson çağır', 'Desteklenen kurulumlarda garson çağır aksiyonunu açar.'],
@@ -139,14 +139,28 @@ export default function QrMenuSettingsPage() {
   const [settings, setSettings] = useState(() => mergeBusinessSettings())
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [qrTables, setQrTables] = useState([])
+  const [branches, setBranches] = useState([])
   const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
   const [selectedTableId, setSelectedTableId] = useState('')
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [featuredUploading, setFeaturedUploading] = useState(false)
+  const [previewRevision, setPreviewRevision] = useState(0)
 
   const selectedTable = useMemo(
-    () => qrTables.find((table) => String(table?.id || '') === String(selectedTableId || '')) || null,
-    [qrTables, selectedTableId]
+    () => {
+      const table = qrTables.find((item) => String(item?.id || '') === String(selectedTableId || '')) || null
+      if (!table) return null
+      const branch = branches.find((item) => String(item?.id || item?._id || '') === String(table.branchId || ''))
+      return { ...table, branchName: branch?.name || table.branchName || '' }
+    },
+    [qrTables, branches, selectedTableId]
   )
+  const getTableLabel = (table) => {
+    const branchName = branches.find((branch) => String(branch.id || branch._id) === String(table.branchId || ''))?.name
+    return branchName ? `${table.name} · ${branchName}` : table.name
+  }
 
   const liveLink = useMemo(() => {
     const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
@@ -188,12 +202,13 @@ export default function QrMenuSettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const [profileRes, businessRes, websiteRes, tablesRes, productsRes] = await Promise.all([
+      const [profileRes, businessRes, websiteRes, tablesRes, productsRes, categoriesRes] = await Promise.all([
         api('/api/tenant/profile', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/settings/business', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/tenant/website', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/settings/business/qr-tables', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
         api('/api/tenant/menu-items?active=true', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
+        api('/api/tenant/categories?active=true', { silent: true, skipBranchHeader: true, cacheMode: 'no-store' }),
       ])
       if (profileRes?.success === false) {
         setTenant(null)
@@ -207,6 +222,11 @@ export default function QrMenuSettingsPage() {
         setError(businessRes?.message || 'QR ayarları yüklenemedi')
         return
       }
+      for (const response of [tablesRes, productsRes, categoriesRes]) {
+        if (response?.success === false) {
+          throw new Error(response.message || 'QR menü içerikleri yüklenemedi')
+        }
+      }
       const nextTenant = {
         ...(profileRes?.tenant || {}),
         publicSlug: businessRes?.tenant?.publicSlug || profileRes?.tenant?.slug || '',
@@ -216,8 +236,13 @@ export default function QrMenuSettingsPage() {
       setSettings(mergeBusinessSettings(businessRes?.settings || nextTenant?.settings || {}))
       const nextTables = Array.isArray(tablesRes?.tables) ? tablesRes.tables : []
       const nextProducts = Array.isArray(productsRes?.items) ? productsRes.items : []
+      const nextCategories = Array.isArray(categoriesRes?.categories)
+        ? categoriesRes.categories.filter((category) => category?.qrMenuVisible !== false)
+        : []
       setQrTables(nextTables)
+      setBranches(Array.isArray(businessRes?.branches) ? businessRes.branches : [])
       setProducts(nextProducts)
+      setCategories(nextCategories)
       setSelectedTableId((prev) => {
         if (prev && nextTables.some((table) => String(table?.id || '') === String(prev))) return prev
         return ''
@@ -225,6 +250,9 @@ export default function QrMenuSettingsPage() {
     } catch (err) {
       setTenant(null)
       setSettings(mergeBusinessSettings())
+      setQrTables([])
+      setProducts([])
+      setCategories([])
       setError(err?.message || 'QR ayarları yüklenemedi')
     } finally {
       setLoading(false)
@@ -269,6 +297,7 @@ export default function QrMenuSettingsPage() {
       }
       clearApiCache()
       setSettings(mergeBusinessSettings(res?.settings || safeSettings))
+      setPreviewRevision((revision) => revision + 1)
       toast.success('QR ayarları kaydedildi')
     } catch (err) {
       setError(err?.message || 'QR ayarları kaydedilemedi')
@@ -281,6 +310,86 @@ export default function QrMenuSettingsPage() {
     () => products.find((item) => String(item?.id || '') === String(settings.qrMenu?.featuredProductId || '')) || null,
     [products, settings.qrMenu?.featuredProductId]
   )
+
+  const orderedCategories = useMemo(() => {
+    const configuredOrder = Array.isArray(settings.qrMenu?.categoryOrder)
+      ? settings.qrMenu.categoryOrder.map(String)
+      : []
+    const positions = new Map(configuredOrder.map((id, index) => [id, index]))
+    return [...categories].sort((left, right) => {
+      const leftId = String(left?.id || left?._id || '')
+      const rightId = String(right?.id || right?._id || '')
+      const leftPosition = positions.get(leftId)
+      const rightPosition = positions.get(rightId)
+      if (leftPosition !== undefined || rightPosition !== undefined) {
+        if (leftPosition === undefined) return 1
+        if (rightPosition === undefined) return -1
+        if (leftPosition !== rightPosition) return leftPosition - rightPosition
+      }
+      return Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0)
+    })
+  }, [categories, settings.qrMenu?.categoryOrder])
+
+  const moveCategory = (index, offset) => {
+    const next = [...orderedCategories]
+    const destination = index + offset
+    if (destination < 0 || destination >= next.length) return
+    ;[next[index], next[destination]] = [next[destination], next[index]]
+    setQrValue('categoryOrder', next.map((category) => String(category.id || category._id)))
+  }
+
+  const toggleCategoryVisibility = (categoryId) => {
+    const hidden = new Set((settings.qrMenu?.hiddenCategoryIds || []).map(String))
+    if (hidden.has(categoryId)) hidden.delete(categoryId)
+    else hidden.add(categoryId)
+    setQrValue('hiddenCategoryIds', [...hidden])
+  }
+
+  const uploadSettingsImage = async (event, type) => {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+    if (!String(file.type || '').startsWith('image/')) {
+      setError('Lütfen geçerli bir görsel dosyası seçin.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Görsel boyutu en fazla 5 MB olabilir.')
+      return
+    }
+
+    const setUploading = type === 'logo' ? setLogoUploading : setFeaturedUploading
+    setUploading(true)
+    setError('')
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const response = await api(
+        type === 'logo' ? '/api/settings/business/logo' : '/api/settings/business/qr-featured-image',
+        { method: 'POST', body, silent: true, skipBranchHeader: true }
+      )
+      if (response?.success === false) throw new Error(response?.message || 'Görsel yüklenemedi')
+      clearApiCache()
+      if (type === 'logo') {
+        const logoUrl = String(response?.logoUrl || response?.logo?.url || '').trim()
+        setTenant((current) => ({ ...current, logoUrl }))
+        setSettings((current) => ({
+          ...current,
+          logo: { ...current.logo, ...(response?.logo || {}), url: logoUrl },
+          qrMenu: { ...current.qrMenu, showLogo: true }
+        }))
+      } else {
+        setQrValue('featuredImageUrl', String(response?.imageUrl || '').trim())
+      }
+      setPreviewRevision((revision) => revision + 1)
+      toast.success(type === 'logo' ? 'İşletme logosu güncellendi' : 'Öneri görseli güncellendi')
+    } catch (uploadError) {
+      setError(uploadError?.message || 'Görsel yüklenemedi')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const copyLink = async () => {
     if (!liveLink) return
@@ -378,48 +487,136 @@ export default function QrMenuSettingsPage() {
         </section>
 
         <section style={{ ...cardStyle(), minWidth: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
-            <div style={{ borderRadius: 22, border: `1px solid ${pageTheme.cardBorder}`, background: 'linear-gradient(135deg, var(--app-surface), var(--app-surface-2, var(--app-surface-soft)))', padding: 14, display: 'grid', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>QR Tema Modu</div>
-                <div style={{ fontSize: 12, color: 'var(--app-text)' }}>
-                  Tek butonla koyu modu aktif veya pasif yapin. Koyu mod kart, cerceve ve modal yuzeylerini de koyulastirir.
-                </div>
-              </div>
-              <ToggleItem
-                label="Koyu mod"
-                description={settings.qrMenu?.themeMode === 'dark' ? 'Koyu mod aktif.' : 'Koyu mod pasif.'}
-                checked={(settings.qrMenu?.themeMode || 'light') === 'dark'}
-                onChange={(e) => setQrValue('themeMode', e.target.checked ? 'dark' : 'light')}
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>Tasarım ve Görünüm</div>
+          <div style={{ fontSize: 12, marginBottom: 16 }}>Liman QR şablonu ortak kalır; bu alanlardaki içerik ve görünüm tercihleri yalnızca işletmenize kaydedilir.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Başlık üst yazısı
+              <input value={settings.qrMenu?.brandLabel ?? tenant?.name ?? ''} onChange={(event) => setQrValue('brandLabel', event.target.value)} disabled={saving} maxLength={100} style={inputStyle()} />
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Menü başlığı
+              <input value={settings.qrMenu?.title || ''} onChange={(event) => setQrValue('title', event.target.value)} disabled={saving} maxLength={80} style={inputStyle()} />
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Alt başlık
+              <input value={settings.qrMenu?.subtitle || ''} onChange={(event) => setQrValue('subtitle', event.target.value)} disabled={saving} maxLength={80} style={inputStyle()} />
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800, gridColumn: isCompact ? undefined : '1 / -1' }}>
+              Menü açıklaması
+              <textarea value={settings.qrMenu?.description || ''} onChange={(event) => setQrValue('description', event.target.value)} disabled={saving} maxLength={500} rows={3} style={{ ...inputStyle(), padding: 14, resize: 'vertical' }} />
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Alt bilgi başlığı
+              <input value={settings.qrMenu?.footerGreeting ?? 'Afiyet olsun'} onChange={(event) => setQrValue('footerGreeting', event.target.value)} disabled={saving} maxLength={100} style={inputStyle()} />
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Alt bilgi metni
+              <input
+                value={settings.qrMenu?.footerText ?? `${tenant?.name || ''} · ${String(settings.qrMenu?.title || '').trim() || tenant?.name || 'Menü'}`}
+                onChange={(event) => setQrValue('footerText', event.target.value)}
                 disabled={saving}
-                compact={false}
+                maxLength={200}
+                style={inputStyle()}
               />
+            </label>
+            <div style={{ display: 'grid', alignContent: 'start', gap: 10 }}>
+              <div style={{ fontWeight: 800 }}>İşletme logosu</div>
+              {tenant?.logoUrl ? <img src={tenant.logoUrl} alt="İşletme logosu" style={{ width: 120, height: 72, objectFit: 'contain', borderRadius: 12, background: 'var(--app-surface-2, var(--app-surface-soft))' }} /> : <div style={{ fontSize: 13 }}>Henüz logo yüklenmedi.</div>}
+              <label className="btn" style={{ justifySelf: 'start', cursor: logoUploading ? 'wait' : 'pointer' }}>
+                {logoUploading ? 'Yükleniyor...' : 'Logo yükle / değiştir'}
+                <input type="file" accept="image/*" onChange={(event) => uploadSettingsImage(event, 'logo')} disabled={logoUploading || saving} style={{ display: 'none' }} />
+              </label>
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 12, alignContent: 'start' }}>
+              <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+                Renk paleti
+                <select value={settings.qrMenu?.palette || 'liman'} onChange={(event) => setQrValue('palette', event.target.value)} disabled={saving} style={inputStyle()}>
+                  <option value="liman">Liman — Deniz</option>
+                  <option value="olive">Zeytin</option>
+                  <option value="midnight">Gece</option>
+                </select>
+              </label>
+              <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+                Yazı tipi
+                <select value={settings.qrMenu?.fontFamily || 'instrument'} onChange={(event) => setQrValue('fontFamily', event.target.value)} disabled={saving} style={inputStyle()}>
+                  <option value="instrument">Instrument Sans / Serif</option>
+                  <option value="system">Sistem yazı tipi</option>
+                  <option value="serif">Serif</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
 
-            <div style={{ borderRadius: 22, border: `1px solid ${pageTheme.cardBorder}`, background: 'linear-gradient(135deg, var(--app-surface), var(--app-surface-2, var(--app-surface-soft)))', padding: 14, display: 'grid', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--app-text)', marginBottom: 6 }}>Bugunun Onerisi</div>
-                <div style={{ fontSize: 12, color: 'var(--app-text)' }}>
-                  QR menu acilisinda gorunen oneri urununu buradan secin.
-                </div>
-              </div>
-              <select
-                value={String(settings.qrMenu?.featuredProductId || '')}
-                onChange={(event) => setQrValue('featuredProductId', String(event.target.value || ''))}
-                disabled={saving}
-                style={{ ...inputStyle(), fontWeight: 800 }}
-              >
-                <option value="">Otomatik secim</option>
-                {products.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
+        <section style={{ ...cardStyle(), minWidth: 0 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>Öneri kartı ve menü içeriği</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+            <ToggleItem
+              label="Öneri kartını göster"
+              description="Menü başlığının altında seçtiğiniz gerçek ürün gösterilir."
+              checked={settings.qrMenu?.featuredEnabled !== false}
+              onChange={(event) => setQrValue('featuredEnabled', event.target.checked)}
+              disabled={saving}
+              compact={isCompact}
+            />
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Öneri kartı başlığı
+              <input value={settings.qrMenu?.featuredTitle || ''} onChange={(event) => setQrValue('featuredTitle', event.target.value)} disabled={saving} maxLength={80} style={inputStyle()} />
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Önerilen ürün
+              <select value={String(settings.qrMenu?.featuredProductId || '')} onChange={(event) => setQrValue('featuredProductId', String(event.target.value || ''))} disabled={saving} style={inputStyle()}>
+                <option value="">İlk aktif ürünü kullan</option>
+                {products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
-              <div style={{ fontSize: 12, color: 'var(--app-text)', fontWeight: 700 }}>
-                {featuredProduct ? `Secili urun: ${featuredProduct.name}` : 'Secim yapilmazsa listedeki ilk uygun urun kullanilir.'}
-              </div>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>{featuredProduct ? `Seçili ürün: ${featuredProduct.name}` : 'Öneri kartı açıkken ilk aktif ürün kullanılır.'}</span>
+            </label>
+            <label style={{ display: 'grid', gap: 7, fontWeight: 800 }}>
+              Öneri metni
+              <textarea value={settings.qrMenu?.featuredDescription || ''} onChange={(event) => setQrValue('featuredDescription', event.target.value)} disabled={saving} maxLength={300} rows={3} style={{ ...inputStyle(), padding: 14, resize: 'vertical' }} />
+            </label>
+            <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+              <div style={{ fontWeight: 800 }}>Öneri kartı görseli</div>
+              {settings.qrMenu?.featuredImageUrl ? <img src={resolveProductImageUrl({ imageUrl: settings.qrMenu.featuredImageUrl })} alt="Öneri kartı önizlemesi" style={{ width: 140, height: 90, objectFit: 'cover', borderRadius: 12 }} /> : <div style={{ fontSize: 13 }}>Seçili ürünün görseli kullanılır.</div>}
+              <label className="btn" style={{ justifySelf: 'start', cursor: featuredUploading ? 'wait' : 'pointer' }}>
+                {featuredUploading ? 'Yükleniyor...' : 'Görsel yükle / değiştir'}
+                <input type="file" accept="image/*" onChange={(event) => uploadSettingsImage(event, 'featured')} disabled={featuredUploading || saving} style={{ display: 'none' }} />
+              </label>
+              {settings.qrMenu?.featuredImageUrl ? <button className="btn" type="button" onClick={() => setQrValue('featuredImageUrl', '')} disabled={saving}>Özel görseli kaldır</button> : null}
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              {[
+                ['showProductImages', 'Ürün görsellerini göster'],
+                ['showDescriptions', 'Ürün açıklamalarını göster'],
+                ['showPrices', 'Ürün fiyatlarını göster'],
+                ['showCategoryCounts', 'Kategori ürün sayılarını göster'],
+              ].map(([key, label]) => (
+                <ToggleItem key={key} label={label} description="QR menüde görüntülenir." checked={settings.qrMenu?.[key] !== false} onChange={(event) => setQrValue(key, event.target.checked)} disabled={saving} compact />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section style={{ ...cardStyle(), minWidth: 0 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>Kategori sırası ve görünürlüğü</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {orderedCategories.map((category, index) => {
+              const categoryId = String(category.id || category._id)
+              const visible = !(settings.qrMenu?.hiddenCategoryIds || []).map(String).includes(categoryId)
+              return (
+                <div key={categoryId} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto auto', alignItems: 'center', gap: 8, padding: 10, border: `1px solid ${pageTheme.cardBorder}`, borderRadius: 14 }}>
+                  <span style={{ fontWeight: 800 }}>{category.name}</span>
+                  <button className="btn" type="button" aria-label={`${category.name} kategorisini yukarı taşı`} disabled={saving || index === 0} onClick={() => moveCategory(index, -1)}>↑</button>
+                  <button className="btn" type="button" aria-label={`${category.name} kategorisini aşağı taşı`} disabled={saving || index === orderedCategories.length - 1} onClick={() => moveCategory(index, 1)}>↓</button>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={visible} onChange={() => toggleCategoryVisibility(categoryId)} disabled={saving} />
+                    Göster
+                  </label>
+                </div>
+              )
+            })}
+            {!orderedCategories.length ? <div>Henüz kategori bulunmuyor.</div> : null}
           </div>
         </section>
 
@@ -454,7 +651,7 @@ export default function QrMenuSettingsPage() {
               <div style={{ display: 'grid', gap: 8, position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <div style={{ padding: '10px 14px', borderRadius: 16, border: `1px solid ${pageTheme.cardBorder}`, background: 'var(--app-surface-2, var(--app-surface-soft))', fontWeight: 800 }}>
-                    Masa: {selectedTable?.name || '-'}
+                    Masa: {selectedTable ? getTableLabel(selectedTable) : '-'}
                   </div>
                   <button className="btn" type="button" onClick={() => setTablePickerOpen((prev) => !prev)}>
                     Masa Seç
@@ -475,7 +672,7 @@ export default function QrMenuSettingsPage() {
                           setTablePickerOpen(false)
                         }}
                       >
-                        {table.name}
+                        {getTableLabel(table)}
                       </button>
                     ))}
                   </div>
@@ -503,7 +700,20 @@ export default function QrMenuSettingsPage() {
           </button>
         </div>
       </section>
+
+      <section style={{ ...cardStyle(), minWidth: 0 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>Gerçek menü önizlemesi</div>
+        <div style={{ fontSize: 13, marginBottom: 12 }}>Önizleme, kaydedilmiş işletme ayarlarını ve herkese açık menü API’sindeki gerçek ürün/kategori verilerini gösterir.</div>
+        {(previewLink || liveLink) ? (
+          <iframe
+            key={previewRevision}
+            title={`${tenant?.name || 'İşletme'} QR menü önizlemesi`}
+            src={previewLink || liveLink}
+            style={{ width: '100%', height: isCompact ? 620 : 760, border: `1px solid ${pageTheme.cardBorder}`, borderRadius: 18, background: '#f9f6f1' }}
+            loading="lazy"
+          />
+        ) : <div>Menü önizlemesi için public bağlantı oluşturulamadı.</div>}
+      </section>
     </div>
   )
 }
-

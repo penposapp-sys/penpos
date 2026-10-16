@@ -1,0 +1,194 @@
+/* Liman · QR menü bileşenleri (CNV-37, KRR-0016)
+   Geliştiriciye teslim: değerler bu dosyadan birebir alınır. Telefon önce; 720 ve 1024 px kırılımları §14. Ayrıntı ve kabul ölçütleri: tasarim-teslim.md
+   Sınıf öneki "lm-": PenPOS'un mevcut stilleriyle çakışmasın diye. */
+
+/* ---------- 1. Tokenlar ---------- */
+:root{
+  /* renk: Liman paleti (adlar design-system'deki ton adları) */
+  --lm-zemin:#f9f6f1;        /* kum-50   sayfa zemini */
+  --lm-yuzey:#ffffff;        /*          kart, arama, alt pencere */
+  --lm-yuzey-2:#f0ebe0;      /* kum-100  görselsiz kutu, alt bilgi, basılı satır */
+  --lm-cizgi:#dfd7c5;        /* kum-200  çerçeve, ayırıcı */
+  --lm-ikon-soluk:#aea084;   /* kum-400  yalnız süs/ikon; metin için kullanılmaz (2,2:1) */
+  --lm-metin:#14191b;        /* sis-950  ana metin */
+  --lm-metin-2:#656d71;      /* sis-600  ikincil metin */
+  --lm-ana:#005c75;          /* deniz-700 başlık, aktif sekme, birincil düğme */
+  --lm-ana-basili:#002e3d;   /* deniz-900 birincil düğme basılı */
+  --lm-vurgu:#d85737;        /* mercan-500 sayfada TEK öge: "Garson çağır". Üstünde yalnız --lm-metin */
+  --lm-perde:rgba(0,28,38,.45); /* deniz-950 %45: alt pencere arkası */
+
+  /* yazı */
+  --lm-font:"Instrument Sans",system-ui,sans-serif;
+  --lm-font-baslik:"Instrument Serif",Georgia,serif;
+
+  /* ölçü (px) */
+  --lm-kenar:20px;           /* sayfa yan boşluğu */
+  --lm-r-kucuk:10px;         /* ürün görseli */
+  --lm-r-orta:12px;          /* düğme, arama */
+  --lm-r-buyuk:16px;         /* kart, öneri kartı */
+  --lm-r-pencere:24px;       /* alt pencerenin üst köşeleri */
+  --lm-dokunma:44px;         /* en küçük dokunma alanı */
+
+  /* hareket */
+  --lm-sure-kisa:160ms;      /* basma, sekme rengi */
+  --lm-sure-orta:240ms;      /* alt pencere, bildirim */
+  --lm-egri:cubic-bezier(.2,.8,.2,1);
+  --lm-golge-pencere:0 -8px 32px rgba(20,25,27,.18);
+}
+
+/* ---------- 2. Temel ---------- */
+.lm{font-family:var(--lm-font);background:var(--lm-zemin);color:var(--lm-metin);
+  width:100%;max-width:480px;margin:0 auto;min-height:100vh;-webkit-tap-highlight-color:transparent}
+.lm *{box-sizing:border-box}
+/* sıfırlama :where() ile: özgüllüğü 0, bileşen sınıfları her zaman üstün gelir */
+:where(.lm) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.lm [hidden]{display:none !important} /* bileşenlerin display değeri hidden'ı ezmesin */
+.lm :focus-visible{outline:2px solid var(--lm-ana);outline-offset:2px;border-radius:var(--lm-r-orta)}
+
+/* ---------- 3. Üst başlık ---------- */
+.lm-ust{padding:22px var(--lm-kenar) 18px;text-align:center}
+.lm-ust img{height:44px}
+.lm-ust .lm-kurum{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--lm-metin-2);margin-top:8px}
+.lm-ust h1{font-family:var(--lm-font-baslik);font-weight:400;font-size:34px;line-height:1.05;color:var(--lm-ana);margin:10px 0 0}
+.lm-ust h1 i{font-style:italic}
+.lm-ufuk{height:1px;background:var(--lm-cizgi);margin:0 var(--lm-kenar)} /* Liman'ın tek biçim fikri: ufuk çizgisi */
+
+/* ---------- 4. Öneri kartı ---------- */
+.lm-oneri{margin:16px var(--lm-kenar) 0;border-radius:var(--lm-r-buyuk);background:var(--lm-ana);color:#fff;padding:18px 18px 16px;position:relative;overflow:hidden}
+.lm-oneri .lm-etiket{font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.85}
+.lm-oneri h2{font-size:24px;font-weight:600;margin:6px 0 0;font-stretch:90%}
+.lm-oneri p{font-family:var(--lm-font-baslik);font-style:italic;font-size:17px;margin:4px 0 0;opacity:.95}
+.lm-oneri::after{content:"";position:absolute;left:0;right:0;bottom:14px;height:1px;background:rgba(255,255,255,.25)}
+
+/* ---------- 5. Düğmeler (masa / garson) ---------- */
+.lm-eylem{display:flex;gap:10px;margin:14px var(--lm-kenar) 0}
+.lm-eylem .lm-ara{flex:1;min-width:0;margin:0}
+.lm-eylem .lm-dugme{flex:1;min-width:0}
+.lm-dugme{flex:1;min-height:46px;border-radius:var(--lm-r-orta);font-weight:600;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform var(--lm-sure-kisa) var(--lm-egri),background-color var(--lm-sure-kisa),filter var(--lm-sure-kisa)}
+.lm-dugme:active{transform:scale(.98)}
+.lm-dugme--ikincil{border:1.5px solid var(--lm-ana);color:var(--lm-ana);background:var(--lm-yuzey)}
+.lm-dugme--ikincil:active{background:var(--lm-yuzey-2)}
+.lm-dugme--ikincil[aria-pressed="true"]{background:var(--lm-ana);color:#fff} /* masa seçildi */
+.lm-dugme--vurgu{background:var(--lm-vurgu);color:var(--lm-metin)}
+.lm-dugme--vurgu:active{filter:brightness(.94)}
+.lm-dugme--birincil{background:var(--lm-ana);color:#fff}
+.lm-dugme--birincil:active{background:var(--lm-ana-basili)}
+.lm-dugme:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+/* ---------- 6. Arama ---------- */
+.lm-ara{margin:14px var(--lm-kenar) 0;min-height:46px;border-radius:var(--lm-r-orta);border:1px solid var(--lm-cizgi);background:var(--lm-yuzey);
+  display:flex;align-items:center;padding:0 6px 0 14px;gap:10px;color:var(--lm-metin-2);transition:border-color var(--lm-sure-kisa)}
+.lm-ara:focus-within{border-color:var(--lm-ana)}
+.lm-ara input{border:0;outline:0;font:inherit;font-size:16px;background:none;flex:1;min-width:0;color:var(--lm-metin)} /* 16px: iOS yakınlaştırmasın */
+.lm-ara input::placeholder{color:var(--lm-metin-2)}
+.lm-ara input:focus-visible{outline:0} /* odak kutunun çerçevesinde görünür */
+.lm-ara input::-webkit-search-cancel-button{display:none} /* tarayıcının ✕'i; yerine .lm-temizle */
+.lm-ara .lm-temizle{width:40px;height:40px;border-radius:20px;display:none;align-items:center;justify-content:center;color:var(--lm-metin-2)}
+.lm-ara.dolu .lm-temizle{display:flex}
+
+/* ---------- 7. Kategori sekmeleri (yapışkan, yatay kayar) ---------- */
+.lm-sekmeler{position:sticky;top:0;z-index:2;background:var(--lm-zemin);display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;
+  padding:14px var(--lm-kenar) 12px;margin-top:4px;border-bottom:1px solid var(--lm-cizgi);scroll-padding:0 var(--lm-kenar)}
+.lm-sekmeler::-webkit-scrollbar{display:none}
+.lm-sekme{flex:none;min-height:40px;padding:0 16px;border-radius:20px;border:1px solid var(--lm-cizgi);background:var(--lm-yuzey);
+  font-size:14px;font-weight:500;color:var(--lm-metin);transition:background-color var(--lm-sure-kisa),color var(--lm-sure-kisa),border-color var(--lm-sure-kisa)}
+.lm-sekme[aria-current="location"]{background:var(--lm-ana);border-color:var(--lm-ana);color:#fff}
+
+/* ---------- 8. Kategori başlığı ---------- */
+.lm-kategori{padding:22px var(--lm-kenar) 6px;display:flex;align-items:baseline;gap:12px}
+.lm-kategori h3{font-size:22px;font-weight:600;color:var(--lm-ana);font-stretch:90%;margin:0}
+.lm-kategori span{font-size:12px;color:var(--lm-metin-2);white-space:nowrap}
+.lm-kategori::after{content:"";flex:1;height:1px;background:var(--lm-cizgi);transform:translateY(-6px)}
+
+/* ---------- 9. Ürün kartı ---------- */
+.lm-urun{display:flex;width:calc(100% - 2 * var(--lm-kenar));text-align:left;gap:14px;align-items:center;margin:10px var(--lm-kenar);padding:10px;
+  background:var(--lm-yuzey);border-radius:var(--lm-r-buyuk);border:1px solid var(--lm-yuzey-2);
+  transition:transform var(--lm-sure-kisa) var(--lm-egri),background-color var(--lm-sure-kisa)}
+.lm-urun:active{transform:scale(.99);background:var(--lm-zemin)}
+.lm-gorsel{width:76px;height:76px;border-radius:var(--lm-r-kucuk);flex:none;background:var(--lm-yuzey-2) center/cover;display:flex;align-items:center;justify-content:center}
+.lm-gorsel svg{width:30px;height:30px;stroke:var(--lm-ikon-soluk)} /* görselsiz durum: tabak çizgisi */
+.lm-urun .lm-ad{font-size:16px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lm-urun .lm-not{font-size:13px;color:var(--lm-metin-2);margin-top:3px}
+.lm-urun .lm-ok{margin-left:auto;width:30px;height:30px;border-radius:15px;border:1px solid var(--lm-cizgi);display:flex;align-items:center;justify-content:center;color:var(--lm-ana);flex:none}
+
+/* ---------- 10. Boş durum (arama sonucu yok) ---------- */
+.lm-bos{margin:28px var(--lm-kenar);text-align:center;color:var(--lm-metin-2);font-size:15px}
+.lm-bos b{display:block;font-family:var(--lm-font-baslik);font-weight:400;font-size:24px;color:var(--lm-ana);margin-bottom:6px}
+.lm-bos button{margin-top:12px;color:var(--lm-ana);font-weight:600;text-decoration:underline;text-underline-offset:3px;min-height:var(--lm-dokunma)}
+
+/* ---------- 11. Alt bilgi ---------- */
+.lm-alt{margin-top:26px;padding:22px var(--lm-kenar) 28px;background:var(--lm-yuzey-2);text-align:center;font-size:13px;color:var(--lm-metin-2)}
+.lm-alt b{display:block;font-family:var(--lm-font-baslik);font-weight:400;font-size:22px;color:var(--lm-ana);margin-bottom:4px}
+
+/* ---------- 12. Alt pencere (ürün ayrıntısı, masa seçimi) ---------- */
+.lm-perde{position:fixed;inset:0;z-index:10;background:var(--lm-perde);opacity:0;pointer-events:none;transition:opacity var(--lm-sure-orta)}
+.lm-perde.acik{opacity:1;pointer-events:auto}
+.lm-pencere{position:fixed;left:50%;bottom:0;z-index:11;width:100%;max-width:480px;max-height:88vh;overflow:auto;
+  background:var(--lm-yuzey);border-radius:var(--lm-r-pencere) var(--lm-r-pencere) 0 0;box-shadow:var(--lm-golge-pencere);
+  padding:10px var(--lm-kenar) calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,100%);transition:transform var(--lm-sure-orta) var(--lm-egri)}
+.lm-pencere.acik{transform:translate(-50%,0)}
+.lm-pencere .lm-tutamak{width:40px;height:4px;border-radius:2px;background:var(--lm-cizgi);margin:0 auto 14px}
+.lm-pencere .lm-buyuk-gorsel{width:100%;aspect-ratio:1;border-radius:var(--lm-r-buyuk);background:var(--lm-yuzey-2) center/cover;display:flex;align-items:center;justify-content:center}
+.lm-pencere .lm-buyuk-gorsel svg{width:56px;height:56px;stroke:var(--lm-ikon-soluk)}
+.lm-pencere h4{font-size:24px;font-weight:600;margin:16px 0 0;font-stretch:90%;line-height:1.15}
+.lm-pencere .lm-kat{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--lm-metin-2);margin-top:6px}
+.lm-pencere .lm-aciklama{font-size:15px;color:var(--lm-metin-2);margin-top:10px;line-height:1.45}
+.lm-pencere .lm-dugme{width:100%;margin-top:18px}
+.lm-masalar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.lm-masa{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:64px;padding:8px;border-radius:var(--lm-r-orta);border:1px solid var(--lm-cizgi);background:var(--lm-yuzey);font-weight:600;font-size:16px;line-height:1.2;text-align:center;
+  transition:background-color var(--lm-sure-kisa),color var(--lm-sure-kisa)}
+.lm-masa span{display:block;width:100%;overflow-wrap:break-word;word-break:normal}
+.lm-masa small{display:block;width:100%;margin:0;color:var(--lm-metin-2);font-size:10px;font-weight:500;line-height:1.2;overflow-wrap:break-word;word-break:normal}
+.lm-masa[aria-pressed="true"]{background:var(--lm-ana);border-color:var(--lm-ana);color:#fff}
+
+/* ---------- 13. Bildirim (garson çağrıldı) ---------- */
+.lm-bildirim{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));z-index:12;transform:translate(-50%,16px);opacity:0;pointer-events:none;
+  background:var(--lm-metin);color:#fff;border-radius:var(--lm-r-orta);padding:12px 16px;font-size:15px;font-weight:500;
+  width:calc(100% - 2 * var(--lm-kenar));max-width:440px;display:flex;gap:10px;align-items:center;
+  transition:opacity var(--lm-sure-orta),transform var(--lm-sure-orta) var(--lm-egri)}
+.lm-bildirim.acik{opacity:1;transform:translate(-50%,0)}
+.lm-bildirim i{width:8px;height:8px;border-radius:4px;background:var(--lm-ana);flex:none}
+
+/* ---------- 14. Tablet ve masaüstü ----------
+   Telefon: tek sütun (yukarısı). 720 px+: ürünler iki sütun. 1024 px+: solda yapışkan kategori listesi,
+   üstte öneri kartı ile eylemler yan yana, alt pencere ortada iletişim kutusu, bildirim sağ altta. */
+@media (min-width:720px){
+  .lm{max-width:960px}
+  .lm{--lm-kenar:32px}
+  .lm-ust h1{font-size:42px}
+  .lm-bas{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin:20px var(--lm-kenar) 0;align-items:stretch}
+  .lm-bas .lm-oneri{margin:0;display:flex;flex-direction:column;justify-content:center}
+  .lm-bas .lm-eylem,.lm-bas .lm-ara{margin-left:0;margin-right:0}
+  .lm-bas .lm-eylem{margin-top:0}
+  .lm-urunler{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:10px var(--lm-kenar)}
+  .lm-urunler .lm-urun{width:auto;margin:0}
+  .lm-masalar{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media (min-width:1024px){
+  .lm{max-width:1160px}
+  .lm-ust{padding-top:36px}
+  .lm-ust h1{font-size:52px}
+  .lm-govde{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;padding:0 var(--lm-kenar)}
+  .lm-govde .lm-sekmeler{flex-direction:column;align-self:start;top:24px;overflow:visible;border-bottom:0;margin:0;padding:22px 0 0;gap:6px}
+  .lm-govde .lm-sekme{width:100%;text-align:left;border-color:transparent;background:none;border-radius:var(--lm-r-orta)}
+  .lm-govde .lm-sekme:hover{background:var(--lm-yuzey-2)}
+  .lm-govde .lm-sekme[aria-current="location"]{background:var(--lm-ana);color:#fff}
+  .lm-govde .lm-kategori,.lm-govde .lm-bos{padding-left:0;padding-right:0;margin-left:0;margin-right:0}
+  .lm-govde .lm-urunler{margin:10px 0;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .lm-urun:hover{border-color:var(--lm-cizgi)}
+  .lm-gorsel{width:88px;height:88px}
+  /* alt pencere → ortada iletişim kutusu */
+  .lm-pencere{left:50%;top:50%;bottom:auto;max-width:460px;max-height:86vh;border-radius:var(--lm-r-pencere);padding:24px;
+    transform:translate(-50%,-46%) scale(.98);opacity:0;pointer-events:none;transition:transform var(--lm-sure-orta) var(--lm-egri),opacity var(--lm-sure-orta)}
+  .lm-pencere.acik{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
+  .lm-pencere .lm-tutamak{display:none}
+  .lm-bildirim{left:auto;right:32px;width:auto;max-width:360px;transform:translateY(16px)}
+  .lm-bildirim.acik{transform:none}
+}
+
+/* ---------- 15. Hareket azaltma ---------- */
+@media (prefers-reduced-motion:reduce){
+  .lm *,.lm *::before,.lm *::after{transition-duration:0ms !important;scroll-behavior:auto !important}
+}
