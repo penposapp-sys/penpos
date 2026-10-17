@@ -27,6 +27,17 @@ const normalizePublicSlug = (value) => String(value || '')
   .replace(/^-+|-+$/g, '')
   .replace(/-+/g, '-')
 
+const buildMenuPath = (tenantSlug, table) => {
+  const basePath = `/menu/${encodeURIComponent(tenantSlug)}`
+  if (!table?.id || !table?.branchName) return basePath
+
+  const branchSlug = normalizePublicSlug(table.branchName)
+  const tableSlug = normalizePublicSlug(table.name)
+  return branchSlug && tableSlug
+    ? `${basePath}/${encodeURIComponent(branchSlug)}/${encodeURIComponent(tableSlug)}`
+    : basePath
+}
+
 const qrSwitches = [
   ['enabled', 'QR Menü aç/kapat', 'Public menü yayınının aktif olup olmayacağını belirler.'],
   ['showLogo', 'Logo gösterimi', 'Kapakta ve üst alanda işletme logosunu gösterir.'],
@@ -166,24 +177,21 @@ export default function QrMenuSettingsPage() {
     const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
     const slug = String(tenant?.publicSlug || normalizePublicSlug(businessName) || websiteSlug || tenant?.slug || '').trim()
     if (!slug) return ''
-    const next = new URL(buildPublicAppUrl(`/menu/${slug}`))
-    if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
-      next.searchParams.set('tableId', String(selectedTable.id))
-      next.searchParams.set('table', String(selectedTable.name || ''))
-    }
-    return next.toString()
+    return buildPublicAppUrl(buildMenuPath(
+      slug,
+      settings.qrMenu?.tableQrEnabled ? selectedTable : null
+    ))
   }, [websiteSlug, tenant?.publicSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   const previewLink = useMemo(() => {
     const businessName = String(settings?.business?.businessName || tenant?.name || '').trim()
     const slug = String(tenant?.publicSlug || normalizePublicSlug(businessName) || websiteSlug || tenant?.slug || '').trim()
     if (!slug) return ''
-    const next = new URL(buildPublicAppUrl(`/menu/${slug}`, null, { originMode: 'current' }))
-    if (settings.qrMenu?.tableQrEnabled && selectedTable?.id) {
-      next.searchParams.set('tableId', String(selectedTable.id))
-      next.searchParams.set('table', String(selectedTable.name || ''))
-    }
-    return next.toString()
+    return buildPublicAppUrl(
+      buildMenuPath(slug, settings.qrMenu?.tableQrEnabled ? selectedTable : null),
+      null,
+      { originMode: 'current' }
+    )
   }, [websiteSlug, tenant?.publicSlug, tenant?.slug, tenant?.name, settings?.business?.businessName, settings.qrMenu?.tableQrEnabled, selectedTable])
 
   const hasSeparateLocalPreview = import.meta.env.DEV && !!previewLink && !!liveLink && previewLink !== liveLink

@@ -178,6 +178,8 @@ export const getPublicMenu = async (req, res) => {
   const tenantIdRaw = String(req.query?.tenantId || '').trim()
   const requestedTableId = String(req.query?.tableId || '').trim()
   const requestedTableName = String(req.query?.table || req.query?.tableName || '').trim()
+  const requestedBranchSlug = String(req.query?.branchSlug || '').trim()
+  const requestedTableSlug = String(req.query?.tableSlug || '').trim()
 
   const tenant = tenantSlug
     ? await findActiveTenantByPublicSlug(tenantSlug)
@@ -214,8 +216,9 @@ export const getPublicMenu = async (req, res) => {
     const activeBranches = await Branch.find({
       tenantId: tenant._id,
       isActive: true,
+      active: { $ne: false },
       isDeleted: { $ne: true },
-      status: { $ne: 'deleted' }
+      status: { $nin: ['inactive', 'deleted'] }
     }).select('_id name').lean()
     const activeBranchIds = activeBranches.map((branch) => branch._id).filter(Boolean)
     const branchNames = new Map(activeBranches.map((branch) => [String(branch._id), String(branch.name || '')]))
@@ -228,7 +231,27 @@ export const getPublicMenu = async (req, res) => {
       branchId: String(table.branchId || ''),
       branchName: branchNames.get(String(table.branchId || '')) || '',
     }))
-    if (requestedTableId && mongoose.Types.ObjectId.isValid(requestedTableId)) {
+    if (requestedBranchSlug && requestedTableSlug) {
+      const matchingBranches = activeBranches.filter((branch) =>
+        normalizeTenantWebsiteSlug(branch.name, '') === requestedBranchSlug
+      )
+      if (matchingBranches.length === 1) {
+        const branch = matchingBranches[0]
+        const matchingTables = tables.filter((table) =>
+          String(table.branchId || '') === String(branch._id) &&
+          normalizeTenantWebsiteSlug(table.name, '') === requestedTableSlug
+        )
+        if (matchingTables.length === 1) {
+          const table = matchingTables[0]
+          selectedTable = {
+            id: String(table._id),
+            name: String(table.name || ''),
+            branchId: String(table.branchId || ''),
+            branchName: String(branch.name || ''),
+          }
+        }
+      }
+    } else if (requestedTableId && mongoose.Types.ObjectId.isValid(requestedTableId)) {
       const table = activeBranchIds.length > 0
         ? await Table.findOne({ _id: requestedTableId, tenantId: tenant._id, branchId: { $in: activeBranchIds }, isActive: true }).select('_id name branchId').lean()
         : null

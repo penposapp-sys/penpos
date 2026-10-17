@@ -48,6 +48,10 @@
   isolation: isolate;
 }
 
+.lm-oneri::after {
+  display: none;
+}
+
 .lm-oneri::before {
   position: absolute;
   inset: 0;
@@ -58,17 +62,23 @@
 
 .lm-oneri-gorsel {
   position: absolute;
-  inset: 0;
-  z-index: -2;
-  width: 100%;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 60%;
   height: 100%;
   object-fit: cover;
-  opacity: .36;
+  object-position: right center;
+  opacity: 1;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, .01) 0%, rgba(0, 0, 0, .25) 85%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, .01) 0%, rgba(0, 0, 0, .25) 85%);
 }
 
 .lm-oneri-icerik {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  width: 100%;
 }
 
 .lm-language {

@@ -646,6 +646,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/menu/:tenantSlug/:branchSlug/:tableSlug" element={<PublicMenuPage />} />
         <Route path="/menu/:tenantSlug" element={<PublicMenuPage />} />
         <Route path="/online/:tenantSlug" element={<OnlineSalesPage />} />
         <Route path="/online/:tenantSlug/:branchSlug" element={<OnlineSalesPage />} />

@@ -95,6 +95,21 @@ function menuDomId(value) {
   return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
+function normalizeMenuPathSegment(value) {
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-')
+}
+
 function getMenuScrollTarget() {
   const appRoot = document.getElementById('root')
   const overflowY = appRoot ? window.getComputedStyle(appRoot).overflowY : ''
@@ -213,7 +228,7 @@ function LimanMenuCard({ item, labels, onOpen, showImages, showPrices, showDescr
 }
 
 export default function PublicMenuLiman() {
-  const { tenantSlug } = useParams()
+  const { tenantSlug, branchSlug, tableSlug } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -238,6 +253,10 @@ export default function PublicMenuLiman() {
   const openerRef = useRef(null)
   const noticeTimerRef = useRef(null)
   const touchStartYRef = useRef(null)
+  const tableQrEntryRef = useRef(Boolean(
+    (branchSlug && tableSlug) ||
+    new URLSearchParams(location.search || '').get('tableId')
+  ))
 
   useBodyLayoutMode('public-site-layout')
 
@@ -263,6 +282,10 @@ export default function PublicMenuLiman() {
       try {
         const search = new URLSearchParams(location.search || '')
         const query = new URLSearchParams({ tenantSlug: String(tenantSlug || '').trim() })
+        if (branchSlug && tableSlug) {
+          query.set('branchSlug', branchSlug)
+          query.set('tableSlug', tableSlug)
+        }
         for (const key of ['tableId', 'table', 'tableName']) {
           const value = String(search.get(key) || '').trim()
           if (value) query.set(key, value)
@@ -297,7 +320,7 @@ export default function PublicMenuLiman() {
     }
     loadMenu()
     return () => { mounted = false }
-  }, [tenantSlug, location.search])
+  }, [tenantSlug, branchSlug, tableSlug, location.search])
 
   useEffect(() => {
     document.title = tenant?.name
@@ -515,9 +538,11 @@ export default function PublicMenuLiman() {
   const openDialog = (nextDialog) => {
     openerRef.current = document.activeElement
     if (nextDialog.type === 'table') {
-      setPendingTable(selectedTable?.id
-        ? availableTables.find((table) => String(table.id) === String(selectedTable.id)) || null
-        : null)
+      setPendingTable(nextDialog.action === 'waiter'
+        ? null
+        : selectedTable?.id
+          ? availableTables.find((table) => String(table.id) === String(selectedTable.id)) || null
+          : null)
     }
     setDialog(nextDialog)
   }
@@ -529,7 +554,7 @@ export default function PublicMenuLiman() {
     noticeTimerRef.current = window.setTimeout(() => setShowNotice(false), 3000)
   }
 
-  const callWaiter = async (table = selectedTable) => {
+  const callWaiter = async (table) => {
     if (!tenantSlug || !waiterCallEnabled || waiterCalling) return
     if (!table?.name) {
       openDialog({ type: 'table', action: 'waiter' })
@@ -564,11 +589,24 @@ export default function PublicMenuLiman() {
     const chosenTable = pendingTable
     const action = dialog?.action
     setSelectedTable(chosenTable)
-    const params = new URLSearchParams(location.search || '')
-    params.set('tableId', String(chosenTable.id))
-    params.set('table', String(chosenTable.name || ''))
-    params.delete('tableName')
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true })
+    const branchSlug = normalizeMenuPathSegment(chosenTable.branchName)
+    const tableSlug = normalizeMenuPathSegment(chosenTable.name)
+    if (branchSlug && tableSlug) {
+      tableQrEntryRef.current = true
+      const remainingParams = new URLSearchParams(location.search || '')
+      for (const key of ['tableId', 'table', 'tableName']) remainingParams.delete(key)
+      const search = remainingParams.toString()
+      navigate(
+        `/menu/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(branchSlug)}/${encodeURIComponent(tableSlug)}${search ? `?${search}` : ''}`,
+        { replace: true }
+      )
+    } else {
+      const params = new URLSearchParams(location.search || '')
+      params.set('tableId', String(chosenTable.id))
+      params.set('table', String(chosenTable.name || ''))
+      params.delete('tableName')
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true })
+    }
     setDialog(null)
     if (action === 'waiter') await callWaiter(chosenTable)
   }
@@ -685,7 +723,13 @@ export default function PublicMenuLiman() {
               <button
                 type="button"
                 className="lm-dugme lm-dugme--vurgu"
-                onClick={() => callWaiter()}
+                onClick={() => {
+                  if (tableQrEntryRef.current && selectedTable?.id) {
+                    void callWaiter(selectedTable)
+                    return
+                  }
+                  openDialog({ type: 'table', action: 'waiter' })
+                }}
                 disabled={waiterCalling}
               >
                 {waiterCalling ? labels.waiterSending : labels.waiter}

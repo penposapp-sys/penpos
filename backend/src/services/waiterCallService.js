@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import WaiterCall from '../models/WaiterCall.js'
 import Table from '../models/Table.js'
+import Branch from '../models/Branch.js'
 import { error } from '../utils/errors.js'
 import { notifyWaiterCallUsers } from './pushNotificationService.js'
 
@@ -26,6 +27,17 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '' 
     }
     const table = await Table.findOne({ _id: normalizedTableId, tenantId, isActive: true }).select('_id name branchId').lean()
     if (!table) {
+      throw error('not_found', 'Masa bulunamadi', 404)
+    }
+    const branch = await Branch.findOne({
+      _id: table.branchId,
+      tenantId,
+      isActive: true,
+      active: { $ne: false },
+      isDeleted: { $ne: true },
+      status: { $nin: ['inactive', 'deleted'] }
+    }).select('_id').lean()
+    if (!branch) {
       throw error('not_found', 'Masa bulunamadi', 404)
     }
     resolvedTableId = table._id
