@@ -290,7 +290,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
           <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 12, letterSpacing: '0.28em', textTransform: 'uppercase', color: subtle }}>
             PenPOS Public Website
           </div>
-          <div style={{ marginTop: 14, fontSize: compact ? 56 : 88, lineHeight: 0.95, fontWeight: 500, letterSpacing: '-0.06em', color: strongText }}>
+          <div style={{ marginTop: 14, fontSize: compact ? 56 : 88, lineHeight: 1.08, fontWeight: 500, letterSpacing: '-0.06em', color: strongText }}>
             {title}
           </div>
           <div style={{ marginTop: 18, fontSize: compact ? 20 : 28, fontWeight: 700, letterSpacing: '-0.04em', color: strongText }}>
@@ -424,7 +424,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
               {heroKickerText}
             </div>
           ) : null}
-          <h1 style={{ margin: 0, fontSize: compact ? 'clamp(44px, 16vw, 72px)' : 'clamp(72px, 11vw, 170px)', lineHeight: compact ? 0.98 : 0.95, fontWeight: 400, letterSpacing: compact ? '-0.05em' : '-0.07em', whiteSpace: 'pre-line', color: strongText, maxWidth: compact ? '100%' : undefined }}>
+          <h1 style={{ margin: 0, fontSize: compact ? 'clamp(44px, 16vw, 72px)' : 'clamp(72px, 11vw, 170px)', lineHeight: 1.08, fontWeight: 400, letterSpacing: compact ? '-0.05em' : '-0.07em', whiteSpace: 'pre-line', color: strongText, maxWidth: compact ? '100%' : undefined }}>
             {String(hero.title || tenantName).replace(/\\n/g, '\n')}
           </h1>
           <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '1fr auto', alignItems: compact ? 'start' : 'end', gap: compact ? 18 : 32, marginTop: compact ? 18 : 30, maxWidth: 760 }}>
@@ -465,7 +465,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
         <section id="story" style={{ scrollMarginTop: compact ? 124 : 102, padding: compact ? '64px 16px' : '110px 5vw', background: rootBg }}>
           <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '220px 1fr', gap: compact ? 18 : 50 }}>
             <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 11, color: accentStrong, paddingTop: compact ? 0 : 10 }}>{String(site.aboutSection?.settings?.manifestoLabel || '01 / Manifesto')}</div>
-            <p style={{ fontSize: compact ? 'clamp(36px, 14vw, 56px)' : 'clamp(44px, 6vw, 90px)', lineHeight: compact ? 0.96 : 0.98, maxWidth: 1050, margin: 0, fontWeight: 400, color: strongText, wordBreak: 'break-word' }}>
+            <p style={{ fontSize: compact ? 'clamp(36px, 14vw, 56px)' : 'clamp(44px, 6vw, 90px)', lineHeight: 1.12, maxWidth: 1050, margin: 0, fontWeight: 400, color: strongText, wordBreak: 'break-word' }}>
               {statementText}
             </p>
           </div>
@@ -499,7 +499,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
               <div>
                 <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 11, color: accentStrong }}>{String(site.productsSection?.settings?.galleryLabel || 'Galeri')}</div>
                 {site.productsSection?.settings?.galleryTitle ? (
-                  <h2 style={{ margin: '10px 0 0', fontSize: compact ? 'clamp(28px, 10vw, 42px)' : 'clamp(34px, 5vw, 64px)', lineHeight: 0.94, fontWeight: 400, color: strongText }}>
+                  <h2 style={{ margin: '10px 0 0', fontSize: compact ? 'clamp(28px, 10vw, 42px)' : 'clamp(34px, 5vw, 64px)', lineHeight: 1.08, fontWeight: 400, color: strongText }}>
                     {site.productsSection.settings.galleryTitle}
                   </h2>
                 ) : null}
@@ -581,7 +581,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
         />
         <div style={{ padding: compact ? 24 : 70, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: panel }}>
           <div style={{ fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 11, color: accentStrong, paddingTop: 10 }}>{aboutSectionLabel}</div>
-          <h2 style={{ fontSize: compact ? 'clamp(34px, 11vw, 52px)' : 'clamp(50px, 6vw, 92px)', lineHeight: 0.9, fontWeight: 400, margin: '0 0 28px', letterSpacing: '-0.05em', whiteSpace: 'pre-line', color: strongText }}>
+          <h2 style={{ fontSize: compact ? 'clamp(34px, 11vw, 52px)' : 'clamp(50px, 6vw, 92px)', lineHeight: 1.08, fontWeight: 400, margin: '0 0 28px', letterSpacing: '-0.05em', whiteSpace: 'pre-line', color: strongText }}>
             {String(site.aboutSection?.title || 'Geceye\nuzanan masa.').replace(/\\n/g, '\n')}
           </h2>
           {site.aboutSection?.subtitle ? (
@@ -599,7 +599,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
 
       <section id="menu" style={{ scrollMarginTop: compact ? 124 : 102, padding: compact ? '64px 16px' : '110px 5vw', background: rootBg }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 30, alignItems: 'end', marginBottom: 40, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: compact ? 'clamp(36px, 12vw, 54px)' : 'clamp(58px, 8vw, 120px)', lineHeight: 0.9, fontWeight: 400, letterSpacing: '-0.07em', whiteSpace: 'pre-line', color: strongText }}>
+          <h2 style={{ margin: 0, fontSize: compact ? 'clamp(36px, 12vw, 54px)' : 'clamp(58px, 8vw, 120px)', lineHeight: 1.08, fontWeight: 400, letterSpacing: '-0.07em', whiteSpace: 'pre-line', color: strongText }}>
             {String(site.productsSection?.title || 'Selected\nMenu').replace(/\\n/g, '\n')}
           </h2>
           {site.productsSection?.subtitle ? (
@@ -625,7 +625,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
               </div>
               <div style={{ padding: compact ? 8 : 14 }}>
                 <div style={{ display: 'flex', flexDirection: compact ? 'column' : 'row', justifyContent: 'space-between', gap: compact ? 4 : 12, alignItems: 'start' }}>
-                  <div style={{ fontSize: compact ? 11 : 16, lineHeight: 1.15, color: strongText, overflowWrap: 'anywhere' }}>{product.name}</div>
+                  <div style={{ fontSize: compact ? 11 : 16, lineHeight: 1.3, color: strongText, overflowWrap: 'anywhere' }}>{product.name}</div>
                   <div style={{ color: strongText, fontSize: compact ? 11 : 15, whiteSpace: 'nowrap', fontWeight: 700 }}>{currency(product.price)}</div>
                 </div>
                 {(product.description || site.productsSection?.settings?.productFallbackDescription) ? (
@@ -658,7 +658,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
           borderBottom: `1px solid ${line}`,
         }}
       >
-        <blockquote style={{ maxWidth: 900, margin: 0, fontSize: compact ? 'clamp(28px, 10vw, 44px)' : 'clamp(44px, 6vw, 88px)', lineHeight: 1, fontStyle: 'italic', color: strongText }}>
+        <blockquote style={{ maxWidth: 900, margin: 0, fontSize: compact ? 'clamp(28px, 10vw, 44px)' : 'clamp(44px, 6vw, 88px)', lineHeight: 1.14, fontStyle: 'italic', color: strongText }}>
           "{quoteText}"
           {quoteAuthor ? (
             <small style={{ display: 'block', marginTop: 28, fontFamily: 'Arial, sans-serif', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.2em', color: accentStrong }}>
@@ -669,7 +669,7 @@ export default function RestaurantWebsitePage({ siteType = 'auto' }) {
       </section> : null}
 
       <footer id="contact" style={{ scrollMarginTop: compact ? 124 : 102, padding: compact ? '44px 16px 28px' : '60px 5vw 30px', display: 'grid', gridTemplateColumns: compact ? '1fr' : '1.2fr 1fr 1fr', gap: compact ? 24 : 40, borderTop: `1px solid ${line}`, background: softSurface }}>
-        <div style={{ fontSize: compact ? 34 : 56, letterSpacing: '0.14em', color: strongText }}>{tenantName.toUpperCase()}</div>
+        <div style={{ fontSize: compact ? 34 : 56, lineHeight: 1.2, letterSpacing: '0.14em', color: strongText, overflowWrap: 'anywhere' }}>{tenantName.toUpperCase()}</div>
         <div style={{ fontFamily: 'Arial, sans-serif', color: muted, lineHeight: 1.8, fontSize: 13, whiteSpace: 'pre-line' }}>
           <strong style={{ display: 'block', color: strongText, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: 11 }}>{footerAddressLabel}</strong>
           {footerAddress}

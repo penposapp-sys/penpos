@@ -588,6 +588,18 @@ export default function PublicMenuLiman() {
     if (!pendingTable) return
     const chosenTable = pendingTable
     const action = dialog?.action
+    if (action === 'waiter' && !tableQrEntryRef.current) {
+      setDialog(null)
+      setPendingTable(null)
+      try {
+        await callWaiter(chosenTable)
+      } finally {
+        setSelectedTable(null)
+        setPendingTable(null)
+      }
+      return
+    }
+
     setSelectedTable(chosenTable)
     const branchSlug = normalizeMenuPathSegment(chosenTable.branchName)
     const tableSlug = normalizeMenuPathSegment(chosenTable.name)
