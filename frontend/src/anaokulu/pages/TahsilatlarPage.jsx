@@ -70,12 +70,11 @@ const S = {
 
 /* ─── Export: CSV ─────────────────────────────────────────── */
 function exportCSV(rows, state, isAdminPanelMode) {
-  const header = ['Tarih', ...(isAdminPanelMode ? ['Okul'] : []), 'Öğrenci', 'Sınıf', 'Kalem', 'Ödeme Türü', 'Tutar (₺)', 'KDV (₺)', 'Net (₺)', 'Fatura No', 'Açıklama']
+  const header = ['Tarih', ...(isAdminPanelMode ? ['Okul'] : []), 'Öğrenci', 'Sınıf', 'Kalem', 'Ödeme Türü', 'Tutar (₺)', 'Fatura No', 'Açıklama']
   const lines = [header.join(';')]
   rows.forEach(c => {
     const s = getStudent(state, c.studentId)
     const invoiced = isCollectionInvoiced(state, c, s)
-    const vat = invoiced ? (c.vat || 0) : 0
     lines.push([
       c.date || '',
       ...(isAdminPanelMode ? [s?._schoolName || c._schoolName || '-'] : []),
@@ -84,8 +83,6 @@ function exportCSV(rows, state, isAdminPanelMode) {
       c.item || '-',
       c.payment || '-',
       String((c.amount || 0).toFixed(2)).replace('.', ','),
-      invoiced ? String(vat.toFixed(2)).replace('.', ',') : '-',
-      String(round2((c.amount || 0) - vat).toFixed(2)).replace('.', ','),
       invoiced ? (c.invoiceNo || '') : '',
       (c.note || '').replace(/;/g, ' ')
     ].join(';'))
@@ -103,13 +100,11 @@ function exportPDF(rows, state, totals, dateFrom, dateTo, isAdminPanelMode) {
   const trRows = rows.map(c => {
     const s = getStudent(state, c.studentId)
     const invoiced = isCollectionInvoiced(state, c, s)
-    const vat = invoiced ? (c.vat || 0) : 0
     const schoolCell = isAdminPanelMode ? `<td>${s?._schoolName || c._schoolName || '-'}</td>` : ''
     return `<tr>
       <td>${c.date || ''}</td>${schoolCell}<td>${s?.name || '-'}</td><td>${c.item || '-'}</td>
       <td>${c.payment || '-'}</td>
       <td style="text-align:right">${money(c.amount)}</td>
-      <td style="text-align:right">${invoiced ? money(vat) : '—'}</td>
       <td>${invoiced ? (c.invoiceNo || '') : '—'}</td><td>${c.note || ''}</td>
     </tr>`
   }).join('')
@@ -130,14 +125,11 @@ function exportPDF(rows, state, totals, dateFrom, dateTo, isAdminPanelMode) {
 <div class="sub">Tarih Aralığı: ${range} · Oluşturulma: ${new Date().toLocaleString('tr-TR')}</div>
 <div class="summary">
   <div class="sbox"><div class="sbox-label">KAYIT SAYISI</div><div class="sbox-val">${totals.count}</div></div>
-  <div class="sbox"><div class="sbox-label">BRÜT TUTAR</div><div class="sbox-val">${money(totals.total)}</div></div>
-  <div class="sbox"><div class="sbox-label">KDV</div><div class="sbox-val">${money(totals.vat)}</div></div>
-  <div class="sbox"><div class="sbox-label">KDV HARİÇ NET</div><div class="sbox-val">${money(totals.net)}</div></div>
+  <div class="sbox"><div class="sbox-label">TOPLAM TUTAR</div><div class="sbox-val">${money(totals.total)}</div></div>
 </div>
 <table><thead><tr>
   <th>Tarih</th>${isAdminPanelMode ? '<th>Okul</th>' : ''}<th>Öğrenci</th><th>Kalem</th><th>Ödeme</th>
-  <th style="text-align:right">Tutar</th><th style="text-align:right">KDV</th>
-  <th>Fatura No</th><th>Açıklama</th>
+  <th style="text-align:right">Tutar</th><th>Fatura No</th><th>Açıklama</th>
 </tr></thead><tbody>${trRows}</tbody></table>
 </body></html>`
 
@@ -203,8 +195,6 @@ export default function TahsilatlarPage() {
         return (c.payment || '').toLocaleLowerCase('tr')
       case 'amount':
         return Number(c.amount || 0)
-      case 'vat':
-        return Number(c.vat || 0)
       case 'invoiceNo':
         return (c.invoiceNo || '').toLocaleLowerCase('tr')
       case 'note':
@@ -281,13 +271,8 @@ export default function TahsilatlarPage() {
 
   const totals = useMemo(() => {
     const total = filtered.reduce((a, c) => a + (c.amount || 0), 0)
-    const vat = filtered.reduce((a, c) => {
-      const s = getStudent(state, c.studentId)
-      const invoiced = isCollectionInvoiced(state, c, s)
-      return a + (invoiced ? (c.vat || 0) : 0)
-    }, 0)
-    return { count: filtered.length, total: round2(total), vat: round2(vat), net: round2(total - vat) }
-  }, [filtered, state])
+    return { count: filtered.length, total: round2(total) }
+  }, [filtered])
 
   const paymentTotals = useMemo(() => {
     const grouped = new Map()
@@ -383,16 +368,8 @@ export default function TahsilatlarPage() {
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{totals.count}</div>
         </div>
         <div style={S.miniBox}>
-          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Brüt Tutar</div>
+          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Toplam Tutar</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#6366f1' }}>{money(totals.total)}</div>
-        </div>
-        <div style={S.miniBox}>
-          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>KDV Tutarı</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#f59e0b' }}>{money(totals.vat)}</div>
-        </div>
-        <div style={S.miniBox}>
-          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>KDV Hariç Net</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981' }}>{money(totals.net)}</div>
         </div>
       </div>
 
@@ -454,7 +431,7 @@ export default function TahsilatlarPage() {
       {/* ── Table ── */}
       <div className="ak-panel" style={S.panel}>
         <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
             <thead>
               <tr>
                 {isAdminPanelMode && (
@@ -494,11 +471,6 @@ export default function TahsilatlarPage() {
                     Tutar {sortKey === 'amount' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </button>
                 </th>
-                <th style={{ ...S.th, textAlign: 'right' }}>
-                  <button type="button" onClick={() => toggleSort('vat')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
-                    KDV {sortKey === 'vat' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </button>
-                </th>
                 <th style={S.th}>
                   <button type="button" onClick={() => toggleSort('invoiceNo')} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>
                     Fatura No {sortKey === 'invoiceNo' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
@@ -509,6 +481,7 @@ export default function TahsilatlarPage() {
                     Açıklama {sortKey === 'note' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </button>
                 </th>
+                <th style={S.th}>İşlemi Yapan</th>
                 <th style={S.th}>Makbuz</th>
               </tr>
             </thead>
@@ -525,7 +498,6 @@ export default function TahsilatlarPage() {
               ) : filtered.map(c => {
                 const s = getStudent(state, c.studentId)
                 const invoiced = isCollectionInvoiced(state, c, s)
-                const vat = invoiced ? (c.vat || 0) : 0
 
                 return (
                   <tr key={String(c.id || c._id)}
@@ -570,9 +542,6 @@ export default function TahsilatlarPage() {
                     <td style={{ ...S.td, textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                       {money(c.amount)}
                     </td>
-                    <td style={{ ...S.td, textAlign: 'right', color: invoiced ? '#f59e0b' : '#94a3b8' }}>
-                      {invoiced ? money(vat) : <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
                     <td style={{ ...S.td, fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>
                       {invoiced && c.invoiceNo ? c.invoiceNo : <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
@@ -581,6 +550,9 @@ export default function TahsilatlarPage() {
                       maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                     }}>
                       {c.note || '—'}
+                    </td>
+                    <td style={{ ...S.td, whiteSpace: 'nowrap', color: c.createdByName ? '#334155' : '#94a3b8' }}>
+                      {c.createdByName || 'Bilgi yok'}
                     </td>
                     <td style={{ ...S.td, whiteSpace: 'nowrap' }}>
                       <button
@@ -640,7 +612,6 @@ export default function TahsilatlarPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 20, flexWrap: 'wrap' }}>
               <div style={{ color: '#4338ca', fontSize: 25, fontWeight: 900 }}>{money(totals.total)}</div>
-              <div style={{ color: '#b45309', fontSize: 13, fontWeight: 700 }}>KDV: {money(totals.vat)}</div>
             </div>
           </div>
         </section>

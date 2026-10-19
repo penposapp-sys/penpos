@@ -320,9 +320,35 @@ export const saveAnaokuluSchool = async (req, res) => {
     let school = await AnaokuluSchool.findOne({
       tenant: tenantId
     }).lean()
+    const previousCollections = Array.isArray(school?.collections) ? school.collections : []
+    const previousCollectionsById = new Map(
+      previousCollections.map(collection => [String(collection.id || collection._id), collection])
+    )
+    const actorId = req.user?.id ? String(req.user.id) : ''
+    const actorName = String(req.user?.name || req.user?.email || '').trim()
+    const collectionsWithCreator = Array.isArray(reqCollections)
+      ? reqCollections.map(collection => {
+        const safeCollection = { ...collection }
+        delete safeCollection.createdBy
+        delete safeCollection.createdByName
+        const existing = previousCollectionsById.get(String(collection.id || collection._id))
+        if (existing) {
+          return {
+            ...safeCollection,
+            ...(existing.createdBy ? { createdBy: existing.createdBy } : {}),
+            ...(existing.createdByName ? { createdByName: existing.createdByName } : {})
+          }
+        }
+        return {
+          ...safeCollection,
+          ...(actorId ? { createdBy: actorId } : {}),
+          ...(actorName ? { createdByName: actorName } : {})
+        }
+      })
+      : reqCollections
 
     const studentsChanged = JSON.stringify(reqStudents || []) !== JSON.stringify(school?.students || [])
-    const collectionsChanged = JSON.stringify(reqCollections || []) !== JSON.stringify(school?.collections || [])
+    const collectionsChanged = JSON.stringify(collectionsWithCreator || []) !== JSON.stringify(school?.collections || [])
     const invoicesChanged = JSON.stringify(reqInvoices || []) !== JSON.stringify(school?.invoices || [])
     const checksChanged = JSON.stringify(reqChecks || []) !== JSON.stringify(school?.checks || [])
 
@@ -336,7 +362,7 @@ export const saveAnaokuluSchool = async (req, res) => {
 
     if (studentsChanged || collectionsChanged) {
       try {
-        validateAnaokuluCollections(reqStudents || [], reqCollections || [], school?.students || [])
+        validateAnaokuluCollections(reqStudents || [], collectionsWithCreator || [], school?.students || [])
       } catch (validationError) {
         return res.status(400).json({
           error: validationError.message || 'Geçersiz tahsilat tutarı.'
@@ -348,7 +374,7 @@ export const saveAnaokuluSchool = async (req, res) => {
       const lockedDates = Array.isArray(school.settings?.lockedDates) ? school.settings.lockedDates : []
       if (lockedDates.length > 0) {
         const oldCols = Array.isArray(school.collections) ? school.collections : []
-        const newCols = Array.isArray(reqCollections) ? reqCollections : []
+        const newCols = Array.isArray(collectionsWithCreator) ? collectionsWithCreator : []
 
         // Kilitli güne yeni tahsilat eklenmiş mi?
         const oldIds = new Set(oldCols.map(c => String(c.id || c._id)))
@@ -384,7 +410,7 @@ export const saveAnaokuluSchool = async (req, res) => {
           vat: 10
         },
         students: reqStudents || [],
-        collections: reqCollections || [],
+        collections: collectionsWithCreator || [],
         invoices: reqInvoices || [],
         checks: reqChecks || []
       })
@@ -397,7 +423,7 @@ export const saveAnaokuluSchool = async (req, res) => {
           $set: {
             settings: reqSettings || school.settings,
             students: reqStudents || school.students,
-            collections: reqCollections || school.collections,
+            collections: collectionsWithCreator || school.collections,
             invoices: reqInvoices || school.invoices,
             checks: reqChecks || school.checks
           }
