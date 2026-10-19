@@ -9,6 +9,7 @@ import {
   findPlanFeeCategory, getPlanGrossTotal, getPlanInstallmentSchedule, getPlanInstallmentAmount,
   getInstallmentPaid
 } from '../utils/calculations.js'
+import { printCollectionReceipt } from '../utils/receiptGenerator.js'
 
 const Btn = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -247,6 +248,19 @@ export default function UcretPlaniPage() {
     if (!selStudent || !Array.isArray(selStudent.items) || selStudent.items.length === 0) return null
     return selStudent.items[selectedPlanIdx] || selStudent.items[0] || null
   }, [selStudent, selectedPlanIdx])
+
+  const printReceipt = (collection, dueDate = '') => {
+    if (!collection || !selStudent) return
+    printCollectionReceipt({
+      schoolName: selStudent._schoolName || state?.settings?.school || 'Anaokulu',
+      student: selStudent,
+      collection,
+      planName: collection.item || activePlan?.name || '',
+      installmentNo: collection.installmentNo ?? collectForm.installmentNo,
+      dueDate,
+      totalPlan: activePlan?.total || 0
+    })
+  }
 
   const filteredStudents = useMemo(() => {
     let list = orderedStudents
@@ -2862,17 +2876,14 @@ export default function UcretPlaniPage() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {collectForm.collections.map((collection, index) => (
-                      <button
+                      <div
                         key={collection.id || collection._id || index}
-                        type="button"
-                        onClick={() => openPreviousCollectionForEdit(collection)}
-                        title="Bu tahsilatı düzenle"
                         style={{
                           width: '100%', textAlign: 'left', cursor: 'pointer',
-                        display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8,
-                        alignItems: 'center', padding: '6px 7px', background: '#fff',
-                        border: '1px solid #e0e7ff', borderRadius: 6
-                      }}>
+                          display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 8,
+                          alignItems: 'center', padding: '6px 7px', background: '#fff',
+                          border: '1px solid #e0e7ff', borderRadius: 6
+                        }}>
                         <span style={{ fontSize: 10, color: '#475569' }}>
                           {index + 1}. {formatTrFullDate(collection.date)}
                         </span>
@@ -2882,7 +2893,25 @@ export default function UcretPlaniPage() {
                         <span style={{ fontSize: 10, color: '#64748b' }}>
                           {collection.payment || '—'}
                         </span>
-                      </button>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => printReceipt(collection, collectForm.dueDate)}
+                            title="Tahsilat makbuzunu yazdır"
+                            style={{ ...Btn, padding: '4px 7px', fontSize: 10, background: '#dcfce7', color: '#166534' }}
+                          >
+                            🖨 Makbuz
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openPreviousCollectionForEdit(collection)}
+                            title="Bu tahsilatı düzenle"
+                            style={{ ...Btn, padding: '4px 7px', fontSize: 10, background: '#eff6ff', color: '#1d4ed8' }}
+                          >
+                            Düzenle
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -3158,6 +3187,29 @@ export default function UcretPlaniPage() {
               </button>
 
               <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const selectedCollection = editCollectionForm.collections.find(collection =>
+                      String(collection.id || collection._id) === String(editCollectionForm.id)
+                    )
+                    printReceipt(selectedCollection || {
+                      id: editCollectionForm.id,
+                      date: editCollectionForm.date,
+                      amount: editCollectionForm.amount,
+                      payment: editCollectionForm.payment,
+                      note: editCollectionForm.note,
+                      installmentNo: editCollectionForm.installmentNo,
+                      item: editCollectionForm.planName
+                    }, editCollectionForm.dueDate)
+                  }}
+                  style={{
+                    ...Btn, background: '#dcfce7', color: '#166534', border: '1px solid #86efac',
+                    padding: '7px 12px', fontSize: 12
+                  }}
+                >
+                  🖨 Tahsilat Makbuzu Yazdır
+                </button>
                 <button
                   type="button"
                   onClick={() => setEditCollectionModalOpen(false)}

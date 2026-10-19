@@ -93,11 +93,35 @@ export function printCollectionReceipt({
   <meta charset="UTF-8" />
   <title>Tahsilat Makbuzu - ${student?.name || 'Öğrenci'}</title>
   <style>
-    @page { size: A5 landscape; margin: 10mm; }
+    @page { size: A5 landscape; margin: 8mm; }
     @media print {
-      body { margin: 0; padding: 0; background: #fff; }
+      html, body { margin: 0; padding: 0; background: #fff; }
       .no-print { display: none !important; }
-      .receipt-container { box-shadow: none !important; border: 1.5px solid #0f172a !important; }
+      .receipt-container {
+        width: 100%;
+        max-width: none !important;
+        margin: 0;
+        padding: 5mm 6mm;
+        border-radius: 0;
+        box-shadow: none !important;
+        border: 1.5px solid #0f172a !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        box-sizing: border-box;
+      }
+      .header { padding-bottom: 6px; margin-bottom: 7px; }
+      .school-title { font-size: 16px; }
+      .meta-box { font-size: 9px; }
+      .grid-2 { gap: 8px; margin-bottom: 7px; }
+      .info-card { padding: 6px 9px; }
+      .info-title { margin-bottom: 3px; padding-bottom: 2px; }
+      .row { padding: 2px 0; font-size: 10px; }
+      .payment-highlight { padding: 7px 12px; margin-bottom: 7px; }
+      .amount-num { font-size: 20px; }
+      .signatures { gap: 24px; margin-top: 10px; padding-top: 6px; }
+      .sign-box { padding-top: 5px; font-size: 9px; }
+      .sign-title { margin-bottom: 16px; }
+      .watermark { font-size: 48px; }
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -138,7 +162,7 @@ export function printCollectionReceipt({
     }
     .header {
       display: flex;
-      justifyContent: space-between;
+      justify-content: space-between;
       align-items: flex-start;
       border-bottom: 2px solid #0f172a;
       padding-bottom: 12px;
@@ -192,7 +216,7 @@ export function printCollectionReceipt({
     }
     .row {
       display: flex;
-      justifyContent: space-between;
+      justify-content: space-between;
       padding: 3px 0;
       font-size: 12px;
     }
@@ -371,5 +395,4 @@ export function printCollectionReceipt({
   win.document.write(html)
   win.document.close()
   win.focus()
-  setTimeout(() => win.print(), 400)
 }

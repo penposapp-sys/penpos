@@ -3,6 +3,7 @@ import { api } from '../../lib/apiClient.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import { money, trDate, getStudent, round2, isCollectionInvoiced } from '../utils/calculations.js'
+import { printCollectionReceipt } from '../utils/receiptGenerator.js'
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -453,7 +454,7 @@ export default function TahsilatlarPage() {
       {/* ── Table ── */}
       <div className="ak-panel" style={S.panel}>
         <div className="ak-table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
             <thead>
               <tr>
                 {isAdminPanelMode && (
@@ -508,12 +509,13 @@ export default function TahsilatlarPage() {
                     Açıklama {sortKey === 'note' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </button>
                 </th>
+                <th style={S.th}>Makbuz</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdminPanelMode ? 10 : 9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
+                  <td colSpan={isAdminPanelMode ? 11 : 10} style={{ ...S.td, textAlign: 'center', color: '#94a3b8', padding: '50px 12px' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
                     {collections.length === 0
                       ? 'Henüz hiç tahsilat kaydı yok.'
@@ -579,6 +581,29 @@ export default function TahsilatlarPage() {
                       maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                     }}>
                       {c.note || '—'}
+                    </td>
+                    <td style={{ ...S.td, whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => printCollectionReceipt({
+                          schoolName: s?._schoolName ||
+                            c._schoolName ||
+                            accessibleTenants?.find(tenant => String(tenant.id || tenant._id) === String(c._schoolId || s?._schoolId))?.name ||
+                            state?.settings?.school ||
+                            'Anaokulu',
+                          student: s || {},
+                          collection: c,
+                          planName: c.item || '',
+                          installmentNo: c.installmentNo ?? 0
+                        })}
+                        style={{
+                          ...S.btn, padding: '6px 9px', fontSize: 11,
+                          background: '#dcfce7', color: '#166534',
+                          border: '1px solid #86efac', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        🖨 Tahsilat Makbuzu Yazdır
+                      </button>
                     </td>
                   </tr>
                 )
