@@ -4,6 +4,7 @@ import { CreditCard, Database, Globe, Package, Printer, QrCode, Settings, Store,
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
 import { isSubscriptionExpired } from '../../lib/subscription.js'
 import { useTheme } from '../../theme/ThemeContext.jsx'
+import '../../components/settings/SettingsHome.css'
 
 const ROOT_PATH = '/magaza/ayarlar'
 
@@ -251,175 +252,15 @@ function SettingsTopHeader({ title, subtitle, icon, rightSlot, leftSlot = null, 
 
 function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilterChange, searchValue, onSearchChange, openSettingsPage, todayLabel, isMobile = false }) {
   return (
-    <div style={{ display: 'grid', gap: isMobile ? 10 : 18 }}>
-      <section style={{ borderRadius: isMobile ? 18 : 28, border: '1px solid var(--settings-border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))', padding: isMobile ? 10 : 18, boxShadow: 'var(--settings-shadow)' }}>
-        <style>{`
-          .canteen-settings-home-search {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 10px;
-            align-items: center;
-            padding: 10px;
-            border-radius: 18px;
-            border: 1px solid var(--settings-border);
-            background: rgba(255,255,255,0.02);
-          }
-          .canteen-settings-home-searchbox {
-            min-height: 48px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 0 14px;
-            border-radius: 16px;
-            border: 1px solid var(--settings-border);
-            background: rgba(255,255,255,0.02);
-          }
-          .canteen-settings-home-searchbox input {
-            width: 100%;
-            border: 0 !important;
-            background: transparent !important;
-            outline: 0;
-            font-size: 14px;
-            font-weight: 800;
-            box-shadow: none !important;
-          }
-          .canteen-settings-home-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-          .canteen-settings-home-chips button {
-            min-height: 38px;
-            padding: 0 15px;
-            border-radius: 999px;
-            border: 1px solid var(--settings-border);
-            background: rgba(255,255,255,0.05);
-            font-size: 12px;
-            font-weight: 900;
-            cursor: pointer;
-          }
-          .canteen-settings-home-chips button.is-active {
-            background: linear-gradient(135deg, var(--settings-accent), var(--settings-accent-2));
-            border-color: transparent;
-            color: #ffffff !important;
-            box-shadow: 0 12px 24px rgba(47,109,246,0.28);
-          }
-          .canteen-settings-home-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-          .canteen-settings-home-card {
-            width: 100%;
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            align-items: start;
-            align-content: start;
-            gap: 0;
-            text-align: left;
-            min-height: 168px;
-            border-radius: 24px;
-            border: 1px solid var(--settings-border);
-            background: radial-gradient(circle at top left, rgba(255,255,255,0.04), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
-            padding: 16px;
-            color: var(--settings-text);
-            cursor: pointer;
-            transition: border-color .2s ease, background-color .2s ease, color .2s ease;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-          }
-          .canteen-settings-home-card > * { min-width: 0; }
-          .canteen-settings-home-card:hover {
-            border-color: rgba(47,109,246,0.35);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-          }
-          .canteen-settings-home-cardtop { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: start; gap: 12px; margin-bottom: 14px; min-width: 0; min-height: 46px; }
-          .canteen-settings-home-icon {
-            width: 46px;
-            height: 46px;
-            border-radius: 15px;
-            display: grid;
-            place-items: center;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid var(--settings-border);
-            font-size: 22px;
-            flex-shrink: 0;
-          }
-          .canteen-settings-home-badge {
-            justify-self: end;
-            padding: 7px 11px;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.08);
-            color: var(--settings-text);
-            font-size: clamp(11px, 0.18vw + 10.6px, 12px);
-            font-weight: 900;
-            line-height: 1.25;
-            white-space: normal;
-            text-align: center;
-            max-width: min(100%, 132px);
-            overflow-wrap: anywhere;
-          }
-          .canteen-settings-home-cardcopy {
-            display: grid;
-            align-content: start;
-            gap: 8px;
-            min-width: 0;
-          }
-          .canteen-settings-home-card h3 { margin: 0; font-size: clamp(15px, 0.48vw + 13.2px, 17px); line-height: 1.15; font-weight: 950; overflow-wrap: anywhere; }
-          .canteen-settings-home-card p { margin: 0; color: var(--settings-text-soft); font-size: clamp(12px, 0.24vw + 11.4px, 13px); line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; }
-          .canteen-settings-home-link { align-self: end; padding-top: 16px; font-size: clamp(12px, 0.24vw + 11.4px, 13px); font-weight: 900; color: var(--settings-text); line-height: 1.4; overflow-wrap: anywhere; }
-          .canteen-settings-home-empty {
-            margin-top: 16px;
-            padding: 20px;
-            border-radius: 20px;
-            border: 1px dashed var(--settings-border-strong);
-            color: var(--settings-text-soft);
-            font-weight: 700;
-          }
-          @media (max-width: 1480px) {
-            .canteen-settings-home-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-          }
-          @media (max-width: 1240px) {
-            .canteen-settings-home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .canteen-settings-home-search { grid-template-columns: 1fr; }
-            .canteen-settings-home-chips { justify-content: flex-start; }
-          }
-          @media (max-width: 760px) {
-            .canteen-settings-home-search {
-              padding: 8px;
-              border-radius: 16px;
-            }
-            .canteen-settings-home-searchbox {
-              min-height: 44px;
-              padding: 0 12px;
-              border-radius: 14px;
-            }
-            .canteen-settings-home-chips {
-              gap: 6px;
-            }
-            .canteen-settings-home-chips button {
-              min-height: 36px;
-              padding: 0 13px;
-              font-size: 11.5px;
-            }
-            .canteen-settings-home-grid { grid-template-columns: 1fr; }
-            .canteen-settings-home-card {
-              min-height: 0;
-              padding: 14px;
-              border-radius: 18px;
-            }
-            .canteen-settings-home-cardtop {
-              margin-bottom: 12px;
-            }
-            .canteen-settings-home-link {
-              margin-top: 14px;
-            }
-            .canteen-settings-home-empty {
-              margin-top: 12px;
-              padding: 14px;
-              border-radius: 16px;
-            }
-          }
-        `}</style>
-
-        <div className="canteen-settings-home-search">
-          <div className="canteen-settings-home-searchbox">
+    <div className="settings-home settings-home--canteen" style={{ display: 'grid', gap: isMobile ? 10 : 18 }}>
+      <section className="settings-center-panel">
+        <div className="settings-search-row canteen-settings-home-search">
+          <div className="settings-search-box canteen-settings-home-searchbox">
             <span style={{ fontSize: 18 }}>🔍</span>
             <input value={searchValue} onChange={(event) => onSearchChange(event.target.value)} placeholder="Ayar adı, açıklama veya kategori ara" />
           </div>
 
-          <div className="canteen-settings-home-chips">
+          <div className="settings-filter-list canteen-settings-home-chips">
             {filterOptions.map((option) => (
               <button key={option} type="button" className={option === activeFilter ? 'is-active' : ''} onClick={() => onFilterChange(option)}>
                 {option}
@@ -428,25 +269,25 @@ function SettingsHomePage({ settingsCards, filterOptions, activeFilter, onFilter
           </div>
         </div>
 
-        <div className="canteen-settings-home-grid">
+        <div className="settings-card-grid canteen-settings-home-grid">
           {settingsCards.map((item) => (
-            <button key={item.key} type="button" className="canteen-settings-home-card" onClick={() => openSettingsPage(item.to)}>
-              <div className="canteen-settings-home-cardtop">
-                <div className="canteen-settings-home-icon"><SettingsGlyph icon={item.icon} size={22} /></div>
-                <div className="canteen-settings-home-badge">{item.badge}</div>
+            <button key={item.key} type="button" className="settings-module-card canteen-settings-home-card" onClick={() => openSettingsPage(item.to)}>
+              <div className="settings-module-top canteen-settings-home-cardtop">
+                <div className="settings-module-icon canteen-settings-home-icon"><SettingsGlyph icon={item.icon} size={22} /></div>
+                <div className="settings-module-badge canteen-settings-home-badge">{item.badge}</div>
               </div>
 
-              <div className="canteen-settings-home-cardcopy">
+              <div className="settings-module-copy canteen-settings-home-cardcopy">
                 <h3>{item.title}</h3>
                 <p>{item.desc}</p>
               </div>
 
-              <div className="canteen-settings-home-link">Ayar sayfasını aç →</div>
+              <div className="settings-module-link canteen-settings-home-link">Ayar sayfasını aç →</div>
             </button>
           ))}
         </div>
 
-        {settingsCards.length === 0 ? <div className="canteen-settings-home-empty">Arama veya filtre sonucunda eşleşen ayar bulunamadı.</div> : null}
+        {settingsCards.length === 0 ? <div className="settings-empty-state canteen-settings-home-empty">Arama veya filtre sonucunda eşleşen ayar bulunamadı.</div> : null}
       </section>
     </div>
   )
