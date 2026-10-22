@@ -201,7 +201,7 @@ export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName
   const visibleUsers = users.filter((user) => {
     if (String(user?.role || '') === 'tenant_admin') return true
     const allowed = getUserAccessibleBranchIds(user)
-    if (allowed.length === 0) return true
+    if (allowed.length === 0) return false
     return allowed.includes(String(branchId))
   })
 
@@ -225,7 +225,7 @@ export const notifyReservationUsers = async ({
   reservationId = '',
   customerName = '',
   guestCount = 0,
-  startAt = null
+  startAt = null,
 } = {}) => {
   const users = await User.find({
     tenantId,
@@ -233,13 +233,13 @@ export const notifyReservationUsers = async ({
     isActive: true,
     $or: [
       { role: 'tenant_admin' },
-      { permissions: { $in: ['manage_tables'] } }
+      { permissions: { $in: ['manage_tables', 'reservations_view'] } }
     ]
   }).select('_id role branchId branchIds accessibleBranchIds pushDevices')
   const visibleUsers = users.filter((user) => {
     if (String(user?.role || '') === 'tenant_admin') return true
     const allowed = getUserAccessibleBranchIds(user)
-    return allowed.length === 0 || allowed.includes(String(branchId))
+    return allowed.includes(String(branchId))
   })
   const date = startAt ? new Date(startAt) : null
   const dateLabel = date && Number.isFinite(date.getTime())

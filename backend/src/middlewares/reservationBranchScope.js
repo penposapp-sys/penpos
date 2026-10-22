@@ -2,7 +2,7 @@ import { error } from '../utils/errors.js'
 import { getUserAccessibleBranchIds } from '../utils/branchVisibility.js'
 import { parseBranchIds } from '../utils/branchIds.js'
 
-export const reservationBranchScope = (req, _res, next) => {
+export const reservationBranchScope = async (req, _res, next) => {
   if (String(req.user?.role || '') !== 'staff') return next()
 
   const activeBranchId = String(req.user?.branchId || '').trim()
@@ -20,5 +20,5 @@ export const reservationBranchScope = (req, _res, next) => {
   }
 
   req.branchIds = [activeBranchId]
-  next()
+  return next()
 }

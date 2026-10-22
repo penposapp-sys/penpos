@@ -38,11 +38,13 @@ export const pendingCount = async (req, res) => {
 export const create = async (req, res) => {
   try {
     if (!req.branch?.id) throw error('branch_required', 'Şube seçilmelidir.', 400)
+    const permissions = Array.isArray(req.user?.permissions) ? req.user.permissions : []
+    const canApprove = req.user?.role === 'tenant_admin' || permissions.includes('manage_tables') || permissions.includes('reservations_approve')
     const reservation = await createStaffReservation({
       tenantId: req.user.tenantId,
       branchId: req.branch.id,
       actor: req.user,
-      payload: req.body || {}
+      payload: { ...(req.body || {}), status: canApprove ? req.body?.status : 'pending' }
     })
     res.status(201).json({ success: true, reservation })
   } catch (err) { sendError(res, err) }

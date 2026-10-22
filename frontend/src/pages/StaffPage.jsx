@@ -167,7 +167,7 @@ export default function StaffPage({ systemType }) {
             </button>
           </div>
         </div>
-        {(PERMISSION_GROUPS_TR || []).map((group) => (
+        {(PERMISSION_GROUPS_TR || []).filter((group) => systemType === 'kermes' || group.title !== 'Rezervasyonlar').map((group) => (
           <SettingsCard key={group.title} title={group.title} description="Rol bazlı erişim davranışını bu gruptan yönetin." icon="Q" style={{ padding: 16 }}>
             <div style={{ display: 'grid', gap: 10 }}>
               {(group.items || []).map((item) => (

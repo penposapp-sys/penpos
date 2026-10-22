@@ -81,6 +81,10 @@ export default function ReservationsPage() {
   const [saving, setSaving] = useState(false)
   const isAdmin = user?.role === 'tenant_admin'
   const isStaff = user?.role === 'staff'
+  const permissions = Array.isArray(user?.permissions) ? user.permissions : []
+  const canViewReservations = isAdmin || permissions.includes('manage_tables') || permissions.includes('reservations_view')
+  const canCreateReservations = isAdmin || permissions.includes('manage_tables') || permissions.includes('reservations_create')
+  const canApproveReservations = isAdmin || permissions.includes('manage_tables') || permissions.includes('reservations_approve')
   const activeStaffBranchId = String(user?.branchId || (allowedIds.length === 1 ? allowedIds[0] : '')).trim()
   const isAllBranches = isAdmin && branchId === ALL_BRANCHES
   const scopedBranchIds = useMemo(() => isAllBranches
@@ -149,6 +153,13 @@ export default function ReservationsPage() {
   }, [branchId, isAdmin, isAllBranches])
 
   const loadReservations = useCallback(async () => {
+    if (!canViewReservations) {
+      setReservations([])
+      setNotifications([])
+      setPendingCount(0)
+      setUnreadCount(0)
+      return
+    }
     if (!branchId || (isAllBranches && scopedBranchIds.length === 0)) {
       setReservations([])
       setPendingCount(0)
@@ -196,7 +207,7 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [branchId, date, isAllBranches, scopedBranchIds, status])
+  }, [branchId, canViewReservations, date, isAllBranches, scopedBranchIds, status])
 
   useEffect(() => { loadBranches() }, [loadBranches])
   useEffect(() => { loadReservations() }, [loadReservations])
@@ -431,7 +442,7 @@ export default function ReservationsPage() {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {isAdmin && !isAllBranches ? <button className="btn" type="button" onClick={() => { loadTablesAndSettings(); setSettingsOpen(true) }} style={headerButtonStyle}>Rezervasyon Ayarları</button> : null}
-          <button className="btn" type="button" onClick={openCreate} disabled={!branchId || isAllBranches} style={{ ...headerButtonStyle, background: '#22c55e', borderColor: '#22c55e', color: '#062b22' }}>+ Rezervasyon Ekle</button>
+          {canCreateReservations ? <button className="btn" type="button" onClick={openCreate} disabled={!branchId || isAllBranches} style={{ ...headerButtonStyle, background: '#22c55e', borderColor: '#22c55e', color: '#062b22' }}>+ Rezervasyon Ekle</button> : null}
           <button className="btn" type="button" onClick={() => navigate('/restoran/app/tables')} style={headerButtonStyle}>Masalara Dön</button>
         </div>
       </header>
@@ -472,13 +483,14 @@ export default function ReservationsPage() {
         </section>
       ) : null}
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 12 }}>
+      {!canViewReservations ? <div className="card" style={noticeStyle}>Rezervasyon listesini görüntüleme yetkiniz yok. Yetkiniz varsa yeni rezervasyon oluşturabilirsiniz.</div> : null}
+      {canViewReservations ? <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 12 }}>
         <SummaryCard label="Gösterilen rezervasyon" value={reservations.length} color="#2563eb" />
         <SummaryCard label="Onay bekleyen" value={pendingCount} color="#d97706" />
         <SummaryCard label="Okunmamış bildirim" value={unreadCount} color="#059669" />
-      </section>
+      </section> : null}
 
-      <section className="card" style={{ display: 'grid', gap: 12, padding: 18 }}>
+      {canViewReservations ? <section className="card" style={{ display: 'grid', gap: 12, padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 19 }}>{viewMode === 'list' ? 'Rezervasyon listesi' : 'Günlük rezervasyon takvimi'}</h2>
@@ -494,7 +506,7 @@ export default function ReservationsPage() {
         ) : viewMode === 'list' ? (
           <div style={{ display: 'grid', gap: 10 }}>
             {reservations.map((reservation) => (
-              <ReservationCard key={reservation.id} reservation={reservation} busy={busyId === reservation.id} onEdit={openEdit} onStatus={changeStatus} onArrive={arriveAndOpen} />
+              <ReservationCard key={reservation.id} reservation={reservation} busy={busyId === reservation.id} onEdit={openEdit} onStatus={changeStatus} onArrive={arriveAndOpen} canApprove={canApproveReservations} />
             ))}
           </div>
         ) : (
@@ -503,14 +515,14 @@ export default function ReservationsPage() {
               const items = reservations.filter((reservation) => Number(reservation.time.split(':')[0]) === hour)
               return <div key={hour} style={{ minHeight: 48, display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr)', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <strong>{String(hour).padStart(2, '0')}:00</strong>
-                <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>{items.map((reservation) => <ReservationCard key={reservation.id} reservation={reservation} busy={busyId === reservation.id} onEdit={openEdit} onStatus={changeStatus} onArrive={arriveAndOpen} compact />)}</div>
+                <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>{items.map((reservation) => <ReservationCard key={reservation.id} reservation={reservation} busy={busyId === reservation.id} onEdit={openEdit} onStatus={changeStatus} onArrive={arriveAndOpen} canApprove={canApproveReservations} compact />)}</div>
               </div>
             })}
           </div>
         )}
-      </section>
+      </section> : null}
 
-      <section className="card" style={{ display: 'grid', gap: 10, padding: 18 }}>
+      {canViewReservations ? <section className="card" style={{ display: 'grid', gap: 10, padding: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>Rezervasyon bildirimleri</h2>
@@ -524,7 +536,7 @@ export default function ReservationsPage() {
             {!item.readAt ? <button className="btn" type="button" onClick={() => markRead(item.id)}>Okundu</button> : <small style={{ color: 'var(--muted)' }}>Okundu</small>}
           </div>
         ))}
-      </section>
+      </section> : null}
 
       {modalOpen ? (
         <div style={overlayStyle}>
@@ -542,7 +554,7 @@ export default function ReservationsPage() {
               <label style={fieldLabelStyle}>Kişi sayısı<input required type="number" min={1} max={100} value={form.guestCount} onChange={(e) => setFormField('guestCount', Number(e.target.value))} style={fieldControlStyle} /></label>
               <label style={fieldLabelStyle}>Tarih<input required type="date" value={form.date} onChange={(e) => setFormField('date', e.target.value)} style={fieldControlStyle} /></label>
               <label style={fieldLabelStyle}>Masa<select value={form.tableId} onChange={(e) => setFormField('tableId', e.target.value)} style={fieldControlStyle}><option value="">Masa atama</option>{tables.map((table) => <option key={table.id || table._id} value={table.id || table._id}>{table.name}</option>)}</select></label>
-              {!editing ? <label style={fieldLabelStyle}>İlk durum<select value={form.status} onChange={(e) => setFormField('status', e.target.value)} style={fieldControlStyle}><option value="pending">Onay Bekliyor</option><option value="confirmed">Onaylandı</option></select></label> : null}
+              {!editing && canApproveReservations ? <label style={fieldLabelStyle}>İlk durum<select value={form.status} onChange={(e) => setFormField('status', e.target.value)} style={fieldControlStyle}><option value="pending">Onay Bekliyor</option><option value="confirmed">Onaylandı</option></select></label> : null}
               <label style={{ ...fieldLabelStyle, gridColumn: '1 / -1' }}>Not<textarea maxLength={1000} rows={3} value={form.note} onChange={(e) => setFormField('note', e.target.value)} style={{ ...fieldControlStyle, resize: 'vertical' }} /></label>
             </div>
             <div style={{ display: 'grid', gap: 9 }}>
@@ -673,7 +685,7 @@ function SummaryCard({ label, value, color }) {
   )
 }
 
-function ReservationCard({ reservation, busy, onEdit, onStatus, onArrive, compact = false }) {
+function ReservationCard({ reservation, busy, onEdit, onStatus, onArrive, canApprove = false, compact = false }) {
   const canArrive = ['pending', 'confirmed', 'arrived'].includes(reservation.status) && reservation.tableId
   return (
     <article className={`card reservation-card${compact ? ' reservation-card--compact' : ''}`} style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'minmax(0,1fr) auto', gap: 12, borderLeft: `4px solid ${STATUS_COLORS[reservation.status] || '#94a3b8'}`, padding: 14 }}>
@@ -687,12 +699,12 @@ function ReservationCard({ reservation, busy, onEdit, onStatus, onArrive, compac
         {reservation.note ? <div style={{ color: 'var(--muted)' }}>{reservation.note}</div> : null}
       </div>
       <div className="reservation-card__actions" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        {canArrive ? <button className="btn" type="button" disabled={busy} onClick={() => onArrive(reservation)}>Geldi / Adisyon Aç</button> : null}
-        {['pending', 'confirmed'].includes(reservation.status) ? <button className="btn" type="button" disabled={busy} onClick={() => onEdit(reservation)}>Düzenle</button> : null}
-        {reservation.status === 'pending' ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'confirmed')}>Onayla</button> : null}
-        {['pending', 'confirmed'].includes(reservation.status) ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'cancelled')}>İptal</button> : null}
-        {reservation.status === 'arrived' ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'completed')}>Tamamlandı</button> : null}
-        {['pending', 'confirmed'].includes(reservation.status) ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'no_show')}>Gelmedi</button> : null}
+        {canApprove && canArrive ? <button className="btn" type="button" disabled={busy} onClick={() => onArrive(reservation)}>Geldi / Adisyon Aç</button> : null}
+        {canApprove && ['pending', 'confirmed'].includes(reservation.status) ? <button className="btn" type="button" disabled={busy} onClick={() => onEdit(reservation)}>Düzenle</button> : null}
+        {canApprove && reservation.status === 'pending' ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'confirmed')}>Onayla</button> : null}
+        {canApprove && ['pending', 'confirmed'].includes(reservation.status) ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'cancelled')}>İptal</button> : null}
+        {canApprove && reservation.status === 'arrived' ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'completed')}>Tamamlandı</button> : null}
+        {canApprove && ['pending', 'confirmed'].includes(reservation.status) ? <button className="btn" type="button" disabled={busy} onClick={() => onStatus(reservation, 'no_show')}>Gelmedi</button> : null}
       </div>
     </article>
   )

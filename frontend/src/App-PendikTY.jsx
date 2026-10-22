@@ -281,6 +281,7 @@ const getDefaultRoute = (user, tenantCtx) => {
   if (user.systemType === 'canteen' || user.systemType === 'kantin') return '/magaza/kasa'
 
   if (user.role === 'tenant_admin' || perms.includes('reports_dashboard_view')) return '/restoran/app/dashboard'
+  if (perms.some((permission) => ['reservations_view', 'reservations_create', 'reservations_approve'].includes(permission))) return '/restoran/app/reservations'
   if (user.role === 'tenant_admin' || perms.includes('manage_tables')) return '/restoran/app/tables'
   if (!isExpired && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) return '/restoran/app/kitchen'
   if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) return '/restoran/app/walkin'
@@ -397,7 +398,7 @@ export default function App() {
           <Route path="app/dashboard" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reports_dashboard_view']} system="kermes"><Dashboard /></ProtectedRoute>} />
           <Route path="app/tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><TablesPage /></ProtectedRoute>} />
           <Route path="app/waiter-calls" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><WaiterCallsPage /></ProtectedRoute>} />
-          <Route path="app/reservations" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables']} system="kermes"><ReservationsPage /></ProtectedRoute>} />
+          <Route path="app/reservations" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_tables', 'reservations_view', 'reservations_create', 'reservations_approve']} permissionsMode="any" system="kermes"><ReservationsPage /></ProtectedRoute>} />
           <Route path="app/kitchen" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['kitchen_access']} system="kermes"><KitchenPage /></ProtectedRoute>} />
           <Route path="app/kitchen/bulk" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['kitchen_access']} system="kermes"><KitchenBulkPage /></ProtectedRoute>} />
           <Route path="app/walkin" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />

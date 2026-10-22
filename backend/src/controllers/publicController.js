@@ -610,7 +610,7 @@ export const createPublicWaiterCall = async (req, res) => {
 
   const created = await createWaiterCall({
     tenantId: resolvedTenant._id,
-    tableId: mergedSettings.qrMenu?.tableQrEnabled === true ? requestedTableId : '',
+    tableId: requestedTableId,
     tableName: requestedTableName,
   })
 

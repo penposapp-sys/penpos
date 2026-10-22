@@ -10,6 +10,9 @@ export const PERMISSIONS = {
   CREATE_VERESIYE: 'create_veresiye',
   KITCHEN_ACCESS: 'kitchen_access',
   MANAGE_TABLES: 'manage_tables',
+  RESERVATIONS_VIEW: 'reservations_view',
+  RESERVATIONS_CREATE: 'reservations_create',
+  RESERVATIONS_APPROVE: 'reservations_approve',
   VIEW_REPORTS: 'view_reports',
   VIEW_CLOSED_TABLES: 'view_closed_tables',
   VIEW_ACCOUNTS: 'view_accounts',
@@ -107,6 +110,9 @@ export const PERMISSION_LABELS_TR = {
   [PERMISSIONS.CREATE_VERESIYE]: 'Veresiye İşlemi Yapabilme (Cariye Borç Yazma)',
   [PERMISSIONS.KITCHEN_ACCESS]: 'Mutfak Erişimi',
   [PERMISSIONS.MANAGE_TABLES]: 'Masa Yönetimi',
+  [PERMISSIONS.RESERVATIONS_VIEW]: 'Rezervasyonları Görüntüleme',
+  [PERMISSIONS.RESERVATIONS_CREATE]: 'Rezervasyon Oluşturma',
+  [PERMISSIONS.RESERVATIONS_APPROVE]: 'Rezervasyon Onaylama',
   [PERMISSIONS.VIEW_REPORTS]: 'Rapor Görüntüleme',
   [PERMISSIONS.VIEW_CLOSED_TABLES]: 'Kapanan Masalar',
   [PERMISSIONS.VIEW_ACCOUNTS]: 'Cari Hesaplar Görüntüleme',
@@ -259,6 +265,14 @@ export const PERMISSION_GROUPS_TR = [
         label: 'Masa Yönetimi',
         description: 'Masalara girer, sipariş başlatır, masa kapat/taşı/merge (yetkiye göre)'
       }
+    ]
+  },
+  {
+    title: 'Rezervasyonlar',
+    items: [
+      { permission: PERMISSIONS.RESERVATIONS_VIEW, label: 'Rezervasyonları Görüntüleme', description: 'Yetkili olduğu şubelerde rezervasyon listesini ve bildirimleri görür.' },
+      { permission: PERMISSIONS.RESERVATIONS_CREATE, label: 'Rezervasyon Oluşturma', description: 'Personel panelinden yeni rezervasyon oluşturur.' },
+      { permission: PERMISSIONS.RESERVATIONS_APPROVE, label: 'Rezervasyon Onaylama', description: 'Rezervasyonları onaylar, durumunu günceller ve gelen müşteriyi işaretler.' }
     ]
   },
   {

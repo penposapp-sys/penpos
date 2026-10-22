@@ -113,6 +113,8 @@ const isPublicAuthPath = (pathname) => {
   )
 }
 
+const isPublicCustomerRoute = (pathname) => /^\/(?:menu|online|weprestorant|wepmagaza|website|qr|qr-menu|digital-menu)(?:\/|$)/i.test(String(pathname || ''))
+
 const shouldSkipAuthRedirect = (targetPath) => {
   try {
     const currentPath = String(window.location?.pathname || '').trim().toLowerCase()
@@ -253,7 +255,7 @@ export const api = async (path, options = {}) => {
         const code = data.code || data.error || 'error'
         const message = data.message || data.error || data.detail || 'Islem basarisiz'
 
-        if (res.status === 401 && !suppressAuthRedirect) {
+        if (res.status === 401 && !suppressAuthRedirect && !isPublicCustomerRoute(pathname)) {
           try {
             removeAuthToken(tokenKey)
           } catch {}
@@ -390,7 +392,7 @@ export const apiDownload = async (path, options = {}) => {
     const code = data.code || data.error || 'error'
     const message = data.message || 'Islem basarisiz'
 
-    if (res.status === 401 && !suppressAuthRedirect) {
+    if (res.status === 401 && !suppressAuthRedirect && !isPublicCustomerRoute(pathname)) {
       try {
         removeAuthToken(tokenKey)
       } catch {}

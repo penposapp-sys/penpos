@@ -276,6 +276,9 @@ export default function Layout() {
     if (!isExpired && (user.role === 'tenant_admin' || perms.includes('manage_tables'))) {
       items.push({ path: '/restoran/app/tables', label: 'Masalar', icon: IconTableRestaurant, show: true })
     }
+    if (!isExpired && (user.role === 'tenant_admin' || perms.some((permission) => ['manage_tables', 'reservations_view', 'reservations_create', 'reservations_approve'].includes(permission)))) {
+      items.push({ path: '/restoran/app/reservations', label: 'Rezervasyonlar', icon: IconTableRestaurant, show: true })
+    }
     if (!isExpired && kitchenPagesEnabled && (user.role === 'tenant_admin' || perms.includes('kitchen_access'))) {
       items.push({ path: '/restoran/app/kitchen', label: 'Hazırlanacaklar', icon: IconUtensils, show: true })
       items.push({ path: '/restoran/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })

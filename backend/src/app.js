@@ -39,7 +39,7 @@ import { UPLOADS_STATIC_DIRS } from './utils/uploads.js'
 import debugRouter from './routes/debug.js'
 import canteenRouter from './modules/canteen/routes/canteen.js'
 import { getPublicWebsiteSettings } from './controllers/websiteSettingsController.js'
-import { renderPublicTenantWebsiteHtml } from './controllers/publicWebsiteHtmlController.js'
+import { renderPublicQrMenuHtml, renderPublicTenantWebsiteHtml } from './controllers/publicWebsiteHtmlController.js'
 import { startTenantUsageCleanup } from './services/tenantUsageService.js'
 
 export const createServer = () => {
@@ -181,6 +181,10 @@ export const createServer = () => {
   app.use('/api/pos', requireAuth, tenantGuard, requireActiveSubscription, posRouter)
   app.use('/api/reservations', requireAuth, tenantGuard, requireActiveSubscription, reservationsRouter)
   app.use('/api/public', publicRouter)
+  app.get(
+    ['/menu/:tenantSlug', '/menu/:tenantSlug/:branchSlug/:tableSlug'],
+    renderPublicQrMenuHtml
+  )
   app.get(
     ['/weprestorant/:slug', '/wepmagaza/:slug', '/website/:slug'],
     renderPublicTenantWebsiteHtml

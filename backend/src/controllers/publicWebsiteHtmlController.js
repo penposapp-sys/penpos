@@ -7,6 +7,7 @@ import {
   injectTenantWebsiteSocialMetadata
 } from '../utils/tenantWebsiteSocialMeta.js'
 import { getPublicTenantWebsiteMetadataBySlugService } from '../services/tenantWebsiteService.js'
+import { findActiveTenantByPublicSlug } from './publicController.js'
 
 const controllerDir = path.dirname(fileURLToPath(import.meta.url))
 const getFrontendIndexPath = () => path.resolve(
@@ -29,6 +30,31 @@ export const renderPublicTenantWebsiteHtml = async (req, res) => {
       canonicalPath
     })
 
+    res.set('Cache-Control', 'no-store, max-age=0')
+    res.type('html').send(injectTenantWebsiteSocialMetadata(template, metadata))
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+export const renderPublicQrMenuHtml = async (req, res) => {
+  try {
+    const tenantSlug = String(req.params.tenantSlug || '').trim()
+    const [template, tenant] = await Promise.all([
+      readFile(getFrontendIndexPath(), 'utf8'),
+      findActiveTenantByPublicSlug(tenantSlug)
+    ])
+    if (!tenant) return res.status(404).send('Menu bulunamadı.')
+    const tenantName = String(tenant.businessName || tenant.name || 'İşletme').trim()
+    const metadata = buildTenantWebsiteSocialMetadata({
+      tenant,
+      settings: {
+        seo: {
+          title: `${tenantName} | QR Menü`,
+          description: `${tenantName} QR menüsünü görüntüleyin.`
+        }
+      },
+      canonicalPath: `/menu/${encodeURIComponent(tenantSlug)}`
+    })
     res.set('Cache-Control', 'no-store, max-age=0')
     res.type('html').send(injectTenantWebsiteSocialMetadata(template, metadata))
   } catch (err) {

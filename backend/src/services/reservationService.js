@@ -293,12 +293,12 @@ const notifyBranchStaff = async ({ tenantId, branchId, reservation }) => {
     tenantId,
     isDeleted: { $ne: true },
     isActive: true,
-    $or: [{ role: 'tenant_admin' }, { permissions: 'manage_tables' }]
+    $or: [{ role: 'tenant_admin' }, { permissions: { $in: ['manage_tables', 'reservations_view'] } }]
   }).select('_id role branchId branchIds accessibleBranchIds')
   const visible = users.filter((user) => {
     if (String(user.role) === 'tenant_admin') return true
     const accessible = getUserAccessibleBranchIds(user)
-    return accessible.length === 0 || accessible.includes(String(branchId))
+    return accessible.includes(String(branchId))
   })
   if (visible.length) {
     await ReservationNotification.insertMany(visible.map((user) => ({
@@ -315,7 +315,7 @@ const notifyBranchStaff = async ({ tenantId, branchId, reservation }) => {
       reservationId: String(reservation._id),
       customerName: reservation.customerName,
       guestCount: reservation.guestCount,
-      startAt: reservation.startAt
+      startAt: reservation.startAt,
     })
   } catch (err) {
     logError('[RESERVATION_PUSH_NOTIFICATION_FAILED]', {
