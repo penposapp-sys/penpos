@@ -463,8 +463,9 @@ function AppearancePreferencesSync() {
   useEffect(() => {
     if (loading) return undefined
     const isAnaokuluRoute = location.pathname.startsWith('/anaokulu')
+    const isPublicCustomerRoute = /^\/(?:menu|online|weprestorant|wepmagaza|website|qr|qr-menu|digital-menu)(?:\/|$)/i.test(location.pathname)
     let cancelled = false
-    if (isAnaokuluRoute) {
+    if (isAnaokuluRoute || isPublicCustomerRoute) {
       loadedPreferencesRef.current = { userId: '', preferences: null }
       setThemeKey('white')
       setDarkMode(false)

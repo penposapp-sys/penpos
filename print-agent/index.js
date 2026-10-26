@@ -6,7 +6,7 @@ import https from 'https'
 import dns from 'dns'
 import { spawn } from 'child_process'
 
-const AGENT_VERSION = '0.1.0'
+const AGENT_VERSION = '0.1.1'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {
@@ -286,30 +286,118 @@ const centerDots = (text, pageWidthDots, fontWidthDots) => {
   return Math.max(8, Math.floor((pageWidthDots - width) / 2))
 }
 
-const buildLabelBlocks = ({ top, productLines, note, amount }) => {
-  const blocks = []
-  if (top) blocks.push({ text: top, font: '3', fontWidth: 24, height: 26 })
-  for (const line of productLines) blocks.push({ text: line, font: '4', fontWidth: 32, height: 32 })
-  if (note) blocks.push({ text: note, font: '3', fontWidth: 24, height: 24 })
-  blocks.push({ text: amount, font: '3', fontWidth: 24, height: 26 })
-  return blocks.filter((block) => String(block.text || '').trim())
+const renderArialBoldLabelBitmap = async ({ top, product, note, amount, widthDots, heightDots }) => {
+  const inputBase64 = Buffer.from(JSON.stringify({ top, product, note, amount, widthDots, heightDots }), 'utf8').toString('base64')
+  const script = String.raw`
+Add-Type -AssemblyName System.Drawing
+$labelData = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${inputBase64}')) | ConvertFrom-Json
+$width = [int]$labelData.widthDots
+$height = [int]$labelData.heightDots
+$margin = [int][Math]::Max(8, [Math]::Round([Math]::Min($width, $height) * 0.055))
+$innerWidth = [Math]::Max(24, $width - (2 * $margin))
+$innerHeight = [Math]::Max(24, $height - (2 * $margin))
+$bitmap = [System.Drawing.Bitmap]::new($width, $height, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$graphics.Clear([System.Drawing.Color]::White)
+$graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+$graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+$format = [System.Drawing.StringFormat]::new()
+$format.Alignment = [System.Drawing.StringAlignment]::Center
+$format.LineAlignment = [System.Drawing.StringAlignment]::Center
+$brush = [System.Drawing.Brushes]::Black
+function New-ArialBold([float]$size) {
+  return [System.Drawing.Font]::new('Arial', $size, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
+}
+function Wrap-LabelText([string]$text, [System.Drawing.Font]$font, [System.Drawing.Graphics]$g, [int]$maxWidth) {
+  $result = [System.Collections.Generic.List[string]]::new()
+  $current = ''
+  foreach ($word in ($text -split '\s+' | Where-Object { $_ })) {
+    $candidate = if ($current) { "$current $word" } else { $word }
+    if ($g.MeasureString($candidate, $font).Width -le $maxWidth) { $current = $candidate; continue }
+    if ($current) { $result.Add($current); $current = '' }
+    if ($g.MeasureString($word, $font).Width -le $maxWidth) { $current = $word; continue }
+    $part = ''
+    foreach ($character in $word.ToCharArray()) {
+      if ($part -and $g.MeasureString(($part + $character), $font).Width -gt $maxWidth) { $result.Add($part); $part = '' }
+      $part += [string]$character
+    }
+    $current = $part
+  }
+  if ($current) { $result.Add($current) }
+  return $result.ToArray()
+}
+$productSize = [float][Math]::Max(16, [Math]::Min(42, [Math]::Round($width * 0.09)))
+$topSize = [float][Math]::Max(13, [Math]::Min(25, [Math]::Round($width * 0.052)))
+$noteSize = [float][Math]::Max(12, [Math]::Min(21, [Math]::Round($width * 0.045)))
+$amountSize = [float][Math]::Max(14, [Math]::Min(28, [Math]::Round($width * 0.058)))
+$blocks = @()
+for ($attempt = 0; $attempt -lt 12; $attempt++) {
+  $topFont = New-ArialBold $topSize
+  $productFont = New-ArialBold $productSize
+  $noteFont = New-ArialBold $noteSize
+  $amountFont = New-ArialBold $amountSize
+  $productLines = @(Wrap-LabelText ([string]$labelData.product) $productFont $graphics $innerWidth)
+  $blocks = @()
+  if ([string]$labelData.top) { $blocks += @{ text = [string]$labelData.top; font = $topFont } }
+  foreach ($line in $productLines) { $blocks += @{ text = [string]$line; font = $productFont } }
+  if ([string]$labelData.note) { $blocks += @{ text = [string]$labelData.note; font = $noteFont } }
+  $blocks += @{ text = [string]$labelData.amount; font = $amountFont }
+  $heights = @($blocks | ForEach-Object { [int][Math]::Ceiling($_.font.GetHeight($graphics) + 3) })
+  $gap = [int][Math]::Max(3, [Math]::Round($height * 0.025))
+  $neededHeight = ($heights | Measure-Object -Sum).Sum + ($gap * [Math]::Max(0, $blocks.Count - 1))
+  if ($neededHeight -le $innerHeight) { break }
+  $productSize = [float][Math]::Max(12, $productSize - 2)
+  $topSize = [float][Math]::Max(10, $topSize - 1)
+  $noteSize = [float][Math]::Max(10, $noteSize - 1)
+  $amountSize = [float][Math]::Max(11, $amountSize - 1)
+}
+$heights = @($blocks | ForEach-Object { [int][Math]::Ceiling($_.font.GetHeight($graphics) + 3) })
+$gap = [int][Math]::Max(2, [Math]::Round($height * 0.02))
+$neededHeight = ($heights | Measure-Object -Sum).Sum + ($gap * [Math]::Max(0, $blocks.Count - 1))
+if ($neededHeight -gt $innerHeight) { $gap = 0 }
+$neededHeight = ($heights | Measure-Object -Sum).Sum + ($gap * [Math]::Max(0, $blocks.Count - 1))
+$y = [float][Math]::Max($margin, ($height - $neededHeight) / 2)
+for ($i = 0; $i -lt $blocks.Count; $i++) {
+  $rowHeight = [float]$heights[$i]
+  $rect = [System.Drawing.RectangleF]::new([float]$margin, $y, [float]$innerWidth, $rowHeight)
+  $graphics.DrawString([string]$blocks[$i].text, $blocks[$i].font, $brush, $rect, $format)
+  $y += $rowHeight + $gap
+}
+$rowBytes = [int][Math]::Ceiling($width / 8.0)
+$packed = [byte[]]::new($rowBytes * $height)
+for ($py = 0; $py -lt $height; $py++) {
+  for ($px = 0; $px -lt $width; $px++) {
+    $pixel = $bitmap.GetPixel($px, $py)
+    if (($pixel.R + $pixel.G + $pixel.B) -lt 420) {
+      $index = ($py * $rowBytes) + [int][Math]::Floor($px / 8.0)
+      $packed[$index] = [byte]($packed[$index] -bor (1 -shl (7 - ($px % 8))))
+    }
+  }
+}
+[Console]::Write([Convert]::ToBase64String($packed))
+foreach ($block in $blocks) { $block.font.Dispose() }
+$format.Dispose(); $graphics.Dispose(); $bitmap.Dispose()
+`
+  const { out } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeoutMs: 30000 })
+  const bitmap = Buffer.from(String(out || '').trim(), 'base64')
+  const expectedBytes = Math.ceil(widthDots / 8) * heightDots
+  if (bitmap.length !== expectedBytes) throw new Error(`Label bitmap generation failed (${bitmap.length}/${expectedBytes} bytes)`)
+  return bitmap
 }
 
-const buildTsplLabelPayload = (content, options = {}) => {
+const buildTsplLabelPayload = async (content, options = {}) => {
   const lines = String(content || '').split(/\r?\n/g).map((line) => line.trim()).filter(Boolean)
-  const top = toTsplAscii(lines[0] || '')
-  const productLines = splitLabelLine(lines[1] || '-', 20)
-  const amount = toTsplAscii(lines[2] || '1 ADET')
-  const note = toTsplAscii(lines[3] || '')
+  const top = lines[0] || ''
+  const product = lines[1] || '-'
+  const amount = lines[2] || '1 ADET'
+  const note = lines[3] || ''
   const widthMm = Math.max(20, Number(options?.widthMm || 60))
   const heightMm = Math.max(20, Number(options?.heightMm || 40))
   const widthDots = Math.round(widthMm * 8)
   const heightDots = Math.round(heightMm * 8)
   const gapMm = Math.max(0, Number(options?.gapMm || 2))
-  const marginDots = Math.max(8, Math.round(2 * 8))
-  const innerWidthDots = Math.max(40, widthDots - (marginDots * 2))
-  const innerHeightDots = Math.max(40, heightDots - (marginDots * 2))
-  const cmd = [
+  const bitmap = await renderArialBoldLabelBitmap({ top, product, note, amount, widthDots, heightDots })
+  const prefix = [
     `SIZE ${widthMm} mm,${heightMm} mm`,
     `GAP ${gapMm} mm,0 mm`,
     'DIRECTION 1',
@@ -317,26 +405,10 @@ const buildTsplLabelPayload = (content, options = {}) => {
     'OFFSET 0 mm',
     'DENSITY 8',
     'SPEED 4',
-    'CLS'
-  ]
-
-  const blocks = buildLabelBlocks({ top, productLines, note, amount })
-  const totalHeight = blocks.reduce((sum, block) => sum + block.height, 0)
-  const gapDots = blocks.length > 1
-    ? Math.max(8, Math.floor((innerHeightDots - totalHeight) / (blocks.length - 1)))
-    : 0
-  const usedHeight = totalHeight + (gapDots * Math.max(0, blocks.length - 1))
-  let y = marginDots + Math.max(0, Math.floor((innerHeightDots - usedHeight) / 2))
-
-  for (const block of blocks) {
-    const x = marginDots + centerDots(block.text, innerWidthDots, block.fontWidth) - 8
-    cmd.push(`TEXT ${Math.max(marginDots, x)},${y},"${block.font}",0,1,1,"${block.text}"`)
-    y += block.height + gapDots
-  }
-
-  cmd.push('PRINT 1,1')
-  cmd.push('')
-  return cmd.join('\r\n')
+    'CLS',
+    `BITMAP 0,0,${Math.ceil(widthDots / 8)},${heightDots},0,`
+  ].join('\r\n')
+  return Buffer.concat([Buffer.from(prefix, 'ascii'), bitmap, Buffer.from('\r\nPRINT 1,1\r\n', 'ascii')])
 }
 
 const describeError = (error) => {
@@ -440,9 +512,10 @@ const selectThermalReceiptContent = (job) => {
 const printRawText = async ({ printerName, content, txtPath, encoding = 'cp857' }) => {
   const prn = String(printerName || '').trim()
   if (!prn) throw new Error('printerName missing')
+  const rawBinary = Buffer.isBuffer(content)
   const normalizedEncoding = String(encoding || 'cp857').trim().toLowerCase()
   const codePage = normalizedEncoding === 'cp1254' ? 1254 : 857
-  const contentBase64 = Buffer.from(String(content || ''), 'utf8').toString('base64')
+  const contentBase64 = (rawBinary ? content : Buffer.from(String(content || ''), 'utf8')).toString('base64')
   const script = [
     '$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()',
     '[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()',
@@ -450,6 +523,7 @@ const printRawText = async ({ printerName, content, txtPath, encoding = 'cp857' 
     '$contentBase64 = ' + psQuote(contentBase64),
     '$txtPath = ' + psQuote(txtPath),
     `$codePage = ${String(codePage)}`,
+    `$rawBinary = $${rawBinary ? 'true' : 'false'}`,
     '$normalizeName = {',
     '  param([string]$value)',
     '  if ([string]::IsNullOrWhiteSpace($value)) { return "" }',
@@ -477,16 +551,17 @@ const printRawText = async ({ printerName, content, txtPath, encoding = 'cp857' 
     '$printerName = [string]$matchedPrinterName',
     '$printed = $false',
     'try {',
-    '  $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($contentBase64))',
-    '  $encoding = [System.Text.Encoding]::GetEncoding($codePage)',
-    '  $bytes = $encoding.GetBytes($content)',
+    '  $bytes = [System.Convert]::FromBase64String($contentBase64)',
+    '  if (-not $rawBinary) { $content = [System.Text.Encoding]::UTF8.GetString($bytes); $encoding = [System.Text.Encoding]::GetEncoding($codePage); $bytes = $encoding.GetBytes($content) }',
     '  $rawPrinterType = \'using System; using System.Runtime.InteropServices; public static class RawPrinterHelper { [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public class DOCINFO { [MarshalAs(UnmanagedType.LPWStr)] public string pDocName; [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile; [MarshalAs(UnmanagedType.LPWStr)] public string pDataType; } [DllImport("winspool.drv", EntryPoint = "OpenPrinterW", SetLastError = true, CharSet = CharSet.Unicode)] public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault); [DllImport("winspool.drv", SetLastError = true)] public static extern bool ClosePrinter(IntPtr hPrinter); [DllImport("winspool.drv", EntryPoint = "StartDocPrinterW", SetLastError = true, CharSet = CharSet.Unicode)] public static extern int StartDocPrinter(IntPtr hPrinter, int level, DOCINFO di); [DllImport("winspool.drv", SetLastError = true)] public static extern bool EndDocPrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool StartPagePrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool EndPagePrinter(IntPtr hPrinter); [DllImport("winspool.drv", SetLastError = true)] public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten); public static bool SendBytes(string printerName, byte[] bytes) { IntPtr hPrinter; if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false; try { var doc = new DOCINFO(); doc.pDocName = "PenPOS Raw Receipt"; doc.pDataType = "RAW"; if (StartDocPrinter(hPrinter, 1, doc) == 0) return false; try { if (!StartPagePrinter(hPrinter)) return false; IntPtr pUnmanaged = Marshal.AllocCoTaskMem(bytes.Length); try { Marshal.Copy(bytes, 0, pUnmanaged, bytes.Length); int written = 0; return WritePrinter(hPrinter, pUnmanaged, bytes.Length, out written) && written == bytes.Length; } finally { Marshal.FreeCoTaskMem(pUnmanaged); EndPagePrinter(hPrinter); } } finally { EndDocPrinter(hPrinter); } } finally { ClosePrinter(hPrinter); } } }\'',
     '  Add-Type -TypeDefinition $rawPrinterType -Language CSharp -ErrorAction Stop',
     '  [System.IO.File]::WriteAllBytes($txtPath, $bytes)',
     '  if ([RawPrinterHelper]::SendBytes($printerName, $bytes)) { $printed = $true }',
     '} catch {',
+    '  if ($rawBinary) { throw }',
     '}',
     'if (-not $printed) {',
+    '  if ($rawBinary) { throw "Raw bitmap label could not be sent to printer" }',
     '  $plainText = ($content -replace "[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "")',
     '  [System.IO.File]::WriteAllText($txtPath, $plainText, [System.Text.UTF8Encoding]::new($false))',
     '  $text = [System.IO.File]::ReadAllText($txtPath, [System.Text.UTF8Encoding]::new($false))',
@@ -824,7 +899,7 @@ const main = async () => {
         }
       } else if (String(job?.type || '').trim().toLowerCase() === 'label' && payloadType === 'raw' && rawContent) {
         const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
-        const tsplPayload = buildTsplLabelPayload(rawContent, printOptions)
+        const tsplPayload = await buildTsplLabelPayload(rawContent, printOptions)
         try {
           for (let i = 0; i < copies; i++) {
             await printRawText({ printerName, content: tsplPayload, txtPath: txtTmp })

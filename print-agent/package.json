@@ -1,12 +1,12 @@
 {
   "name": "penpos-print-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "bin": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build:exe": "npx pkg . --targets node24-win-x64 --output dist/PenPOS_PrintAgent.exe",
+    "build:exe": "node node_modules/@yao-pkg/pkg/lib-es5/bin.js . --targets node24-win-x64 --output dist/PenPOS_PrintAgent.exe",
     "build:backend": "npm run build:exe && node build-release.mjs"
   },
   "pkg": {
@@ -19,6 +19,6 @@
     "outputPath": "dist"
   },
   "devDependencies": {
-    "pkg": "^5.8.1"
+    "@yao-pkg/pkg": "^6.24.0"
   }
 }
