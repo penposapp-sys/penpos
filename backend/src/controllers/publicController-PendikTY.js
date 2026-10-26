@@ -58,9 +58,9 @@ const getPrintAgentVersion = () => {
   try {
     const packageJsonPath = path.join(process.cwd(), 'print-agent', 'package.json')
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-    return String(packageJson?.version || '0.1.0').trim() || '0.1.0'
+    return String(packageJson?.version || '0.1.1').trim() || '0.1.1'
   } catch {
-    return '0.1.0'
+    return '0.1.1'
   }
 }
 

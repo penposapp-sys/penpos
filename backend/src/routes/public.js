@@ -6,6 +6,7 @@ import {
   requestPublicOnlineStoreOrderCancellation,
   createPublicWaiterCall,
   downloadPrintAgentSetup,
+  downloadPrintAgentSetupInstaller,
   getPrintAgentWindowsManifest,
   getPublicCanteenQr,
   getPublicMenu,
@@ -59,5 +60,6 @@ router.get('/site-by-host', getPublicWebsiteByHost)
 router.post('/register', registerPublicTenant)
 router.get('/downloads/print-agent/windows/manifest', getPrintAgentWindowsManifest)
 router.get('/downloads/print-agent/windows', downloadPrintAgentSetup)
+router.get('/downloads/print-agent/windows/setup', downloadPrintAgentSetupInstaller)
 
 export default router

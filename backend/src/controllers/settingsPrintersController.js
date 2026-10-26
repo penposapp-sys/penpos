@@ -16,15 +16,18 @@ export const getPrintersSettings = async (req, res) => {
 
   const fallbackPath = '/api/public/downloads/print-agent/windows'
   const manifestPath = '/api/public/downloads/print-agent/windows/manifest'
+  const setupPath = '/api/public/downloads/print-agent/windows/setup'
   const base = buildBaseUrl()
   const downloadUrl = String(process.env.PRINT_AGENT_WINDOWS_URL || (base ? new URL(fallbackPath, base).toString() : fallbackPath)).trim()
   const manifestUrl = String(process.env.PRINT_AGENT_WINDOWS_MANIFEST_URL || (base ? new URL(manifestPath, base).toString() : manifestPath)).trim()
+  const setupDownloadUrl = String(process.env.PRINT_AGENT_WINDOWS_SETUP_URL || (base ? new URL(setupPath, base).toString() : setupPath)).trim()
   res.json({
     success: true,
     printAgent: {
       pcPrinter: {
         platform: 'windows',
         downloadUrl,
+        setupDownloadUrl,
         manifestUrl
       }
     }

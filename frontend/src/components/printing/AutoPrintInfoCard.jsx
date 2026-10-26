@@ -8,6 +8,8 @@ export default function AutoPrintInfoCard({
   version,
   latestVersion,
   updateAvailable,
+  versionComparable,
+  installedVersionNewer,
   lastSeenSec,
   onReload,
   error,
@@ -48,7 +50,13 @@ export default function AutoPrintInfoCard({
           ) : null}
           {!!String(latestVersion || '').trim() && (
             <div style={{ marginTop: 4, fontSize: 12, color: updateAvailable ? 'var(--warning-text)' : 'var(--muted)', fontWeight: updateAvailable ? 700 : 500 }}>
-              {updateAvailable ? `Güncelleme var: ${latestVersion}` : `Güncel sürüm: ${latestVersion}`}
+              {updateAvailable
+                ? `Güncelleme var: ${latestVersion}`
+                : !versionComparable
+                  ? `Sürüm karşılaştırılamadı (yüklü sürüm: ${version || 'bilinmiyor'}) · Sunucudaki sürüm: ${latestVersion}`
+                  : installedVersionNewer
+                    ? `Yüklü sürüm: ${version} · Sunucudaki sürüm: ${latestVersion}`
+                    : `Güncel sürüm: ${latestVersion}`}
             </div>
           )}
         </div>

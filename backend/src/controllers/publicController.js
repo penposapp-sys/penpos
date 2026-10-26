@@ -86,9 +86,9 @@ const getPrintAgentVersion = () => {
   try {
     const packageJsonPath = path.join(process.cwd(), 'print-agent', 'package.json')
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-    return String(packageJson?.version || '0.1.0').trim() || '0.1.0'
+    return String(packageJson?.version || '0.1.1').trim() || '0.1.1'
   } catch {
-    return '0.1.0'
+    return '0.1.1'
   }
 }
 
@@ -929,6 +929,34 @@ export const downloadPrintAgentSetup = async (req, res) => {
   }
 
   return res.download(resolved.filePath, resolved.fileName)
+}
+
+export const downloadPrintAgentSetupInstaller = async (_req, res) => {
+  const envPath = String(process.env.PRINT_AGENT_WINDOWS_SETUP_FILE || '').trim()
+  const directories = [
+    path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows'),
+    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows')
+  ]
+  const candidates = [envPath, ...directories.flatMap((directory) => {
+    try {
+      const files = fs.readdirSync(directory).filter((name) => /^PenPOS_PrintAgent_Setup(?:_\d+(?:\.\d+)*)?\.exe$/i.test(name))
+      return files.sort((left, right) => right.localeCompare(left, undefined, { numeric: true })).map((name) => path.join(directory, name))
+    } catch {
+      return []
+    }
+  })].filter(Boolean)
+  const filePath = candidates.find((candidate) => {
+    try { return fs.statSync(candidate).isFile() } catch { return false }
+  })
+
+  if (!filePath) {
+    return res.status(404).json({
+      success: false,
+      code: 'print_agent_setup_not_found',
+      message: 'Windows kurulum dosyası henüz yayınlanmadı.'
+    })
+  }
+  return res.download(filePath, path.basename(filePath))
 }
 
 export const getPrintAgentWindowsManifest = async (req, res) => {

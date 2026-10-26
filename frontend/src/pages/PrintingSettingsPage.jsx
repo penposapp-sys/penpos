@@ -5,6 +5,21 @@ import AutoPrintInfoCard from '../components/printing/AutoPrintInfoCard.jsx'
 import PrintStationsCard from '../components/printing/PrintStationsCard.jsx'
 import PrintJobsCard from '../components/printing/PrintJobsCard.jsx'
 
+const parseAgentVersion = (value) => {
+  const match = String(value || '').trim().match(/^v?(\d+(?:\.\d+){0,3})(?:[-+][0-9A-Za-z.-]+)?$/)
+  return match ? match[1].split('.').map((part) => Number(part)) : null
+}
+
+const compareAgentVersions = (left, right) => {
+  const a = parseAgentVersion(left)
+  const b = parseAgentVersion(right)
+  if (!a || !b) return null
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const difference = (a[i] || 0) - (b[i] || 0)
+    if (difference !== 0) return difference > 0 ? 1 : -1
+  }
+  return 0
+}
 const mmNum = (v, fallback) => {
   const s = String(v || '').trim().replace(',', '.')
   const n = Number(s)
@@ -94,7 +109,7 @@ export default function PrintingSettingsPage({ system }) {
       setProfiles(Array.isArray(p2?.profiles) ? p2.profiles : [])
       setStations(Array.isArray(p3?.stations) ? p3.stations : [])
       setJobs(Array.isArray(p4?.jobs) ? p4.jobs : [])
-      setPcPrinterDownloadUrl(String(p5?.printAgent?.pcPrinter?.downloadUrl || '').trim())
+      setPcPrinterDownloadUrl(String(p5?.printAgent?.pcPrinter?.setupDownloadUrl || p5?.printAgent?.pcPrinter?.downloadUrl || '').trim())
       setPcPrinterManifestUrl(String(p5?.printAgent?.pcPrinter?.manifestUrl || '').trim())
       setMenuCategories(Array.isArray(p6?.categories) ? p6.categories.map((c) => ({ id: String(c?._id || c?.id || ''), name: String(c?.name || '') })).filter((c) => c.id && c.name) : [])
     } finally {
@@ -446,7 +461,9 @@ export default function PrintingSettingsPage({ system }) {
         hostname={agentHostname}
         version={agentVersion}
         latestVersion={latestAgentVersion}
-        updateAvailable={!!latestAgentVersion && !!agentVersion && latestAgentVersion !== agentVersion}
+        updateAvailable={compareAgentVersions(latestAgentVersion, agentVersion) === 1}
+        versionComparable={compareAgentVersions(latestAgentVersion, agentVersion) !== null}
+        installedVersionNewer={compareAgentVersions(latestAgentVersion, agentVersion) === -1}
         lastSeenSec={heartbeatAgeMs !== null ? heartbeatAgeMs / 1000 : null}
         onReload={loadAll}
         error={agentError}
