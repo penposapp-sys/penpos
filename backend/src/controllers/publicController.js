@@ -137,42 +137,26 @@ const computeCanteenSalePrice = (price, vatRate, vatIncluded) => {
 
 const resolvePrintAgentWindowsBinary = () => {
   const envPath = String(process.env.PRINT_AGENT_WINDOWS_FILE || '').trim()
+  const requestedFileName = String(process.env.PRINT_AGENT_WINDOWS_FILENAME || 'PenPOS_PrintAgent.exe').trim() || 'PenPOS_PrintAgent.exe'
+  const exeFileName = /^PenPOS_PrintAgent_Setup(?:_|\.exe$)/i.test(requestedFileName) ? 'PenPOS_PrintAgent.exe' : requestedFileName
+  const envIsSetup = /^PenPOS_PrintAgent_Setup(?:_|\.exe$)/i.test(path.basename(envPath))
   const version = getPrintAgentVersion()
-  const exeFileName = String(process.env.PRINT_AGENT_WINDOWS_FILENAME || 'PenPOS_PrintAgent.exe').trim() || 'PenPOS_PrintAgent.exe'
-  const setupFileName = `PenPOS_PrintAgent_Setup_${version}.exe`
   const candidates = [
-    envPath,
+    ...(!envIsSetup && envPath ? [envPath] : []),
+    path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows', 'PenPOS_PrintAgent.exe'),
+    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows', 'PenPOS_PrintAgent.exe'),
     path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows', exeFileName),
-    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows', exeFileName),
-    path.join(process.cwd(), 'backend', 'public', 'downloads', setupFileName),
-    path.join(process.cwd(), 'public', 'downloads', setupFileName)
-  ].filter(Boolean)
-
+    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows', exeFileName)
+  ]
   const existing = candidates.find((candidate) => {
-    try {
-      return fs.existsSync(candidate)
-    } catch {
-      return false
-    }
+    try { return fs.statSync(candidate).isFile() } catch { return false }
   })
-
   let publishedAt = null
   if (existing) {
-    try {
-      publishedAt = fs.statSync(existing).mtime.toISOString()
-    } catch {
-      publishedAt = null
-    }
+    try { publishedAt = fs.statSync(existing).mtime.toISOString() } catch { publishedAt = null }
   }
-
-  return {
-    version,
-    fileName: existing ? path.basename(existing) : exeFileName,
-    filePath: existing || '',
-    publishedAt
-  }
+  return { version, fileName: existing ? path.basename(existing) : 'PenPOS_PrintAgent.exe', filePath: existing || '', publishedAt }
 }
-
 export const getPublicMenu = async (req, res) => {
   const tenantSlug = String(req.query?.tenantSlug || '').trim()
   const tenantIdRaw = String(req.query?.tenantId || '').trim()
@@ -937,28 +921,27 @@ export const downloadPrintAgentSetupInstaller = async (_req, res) => {
     path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows'),
     path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows')
   ]
-  const candidates = [envPath, ...directories.flatMap((directory) => {
+  const candidates = []
+  for (const directory of directories) {
     try {
-      const files = fs.readdirSync(directory).filter((name) => /^PenPOS_PrintAgent_Setup(?:_\d+(?:\.\d+)*)?\.exe$/i.test(name))
-      return files.sort((left, right) => right.localeCompare(left, undefined, { numeric: true })).map((name) => path.join(directory, name))
+      const names = fs.readdirSync(directory).filter((name) => /^PenPOS_PrintAgent_Setup(?:_\d+(?:\.\d+)*)?\.exe$/i.test(name))
+      const versioned = names.filter((name) => /_\d+(?:\.\d+)*\.exe$/i.test(name))
+      versioned.sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))
+      candidates.push(...versioned.map((name) => path.join(directory, name)))
+      const stableName = names.find((name) => /^PenPOS_PrintAgent_Setup\.exe$/i.test(name))
+      if (stableName) candidates.push(path.join(directory, stableName))
     } catch {
-      return []
     }
-  })].filter(Boolean)
+  }
+  if (envPath) candidates.push(envPath)
   const filePath = candidates.find((candidate) => {
     try { return fs.statSync(candidate).isFile() } catch { return false }
   })
-
   if (!filePath) {
-    return res.status(404).json({
-      success: false,
-      code: 'print_agent_setup_not_found',
-      message: 'Windows kurulum dosyası henüz yayınlanmadı.'
-    })
+    return res.status(404).json({ success: false, code: 'print_agent_setup_not_found', message: 'Windows kurulum dosyası henüz yayınlanmadı.' })
   }
   return res.download(filePath, path.basename(filePath))
 }
-
 export const getPrintAgentWindowsManifest = async (req, res) => {
   const resolved = resolvePrintAgentWindowsBinary()
   if (!resolved.filePath) {

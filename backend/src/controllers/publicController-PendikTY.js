@@ -109,42 +109,26 @@ const computeCanteenSalePrice = (price, vatRate, vatIncluded) => {
 
 const resolvePrintAgentWindowsBinary = () => {
   const envPath = String(process.env.PRINT_AGENT_WINDOWS_FILE || '').trim()
+  const requestedFileName = String(process.env.PRINT_AGENT_WINDOWS_FILENAME || 'PenPOS_PrintAgent.exe').trim() || 'PenPOS_PrintAgent.exe'
+  const exeFileName = /^PenPOS_PrintAgent_Setup(?:_|\.exe$)/i.test(requestedFileName) ? 'PenPOS_PrintAgent.exe' : requestedFileName
+  const envIsSetup = /^PenPOS_PrintAgent_Setup(?:_|\.exe$)/i.test(path.basename(envPath))
   const version = getPrintAgentVersion()
-  const exeFileName = String(process.env.PRINT_AGENT_WINDOWS_FILENAME || 'PenPOS_PrintAgent.exe').trim() || 'PenPOS_PrintAgent.exe'
-  const setupFileName = `PenPOS_PrintAgent_Setup_${version}.exe`
   const candidates = [
-    envPath,
+    ...(!envIsSetup && envPath ? [envPath] : []),
+    path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows', 'PenPOS_PrintAgent.exe'),
+    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows', 'PenPOS_PrintAgent.exe'),
     path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows', exeFileName),
-    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows', exeFileName),
-    path.join(process.cwd(), 'backend', 'public', 'downloads', setupFileName),
-    path.join(process.cwd(), 'public', 'downloads', setupFileName)
-  ].filter(Boolean)
-
+    path.join(process.cwd(), 'public', 'downloads', 'print-agent', 'windows', exeFileName)
+  ]
   const existing = candidates.find((candidate) => {
-    try {
-      return fs.existsSync(candidate)
-    } catch {
-      return false
-    }
+    try { return fs.statSync(candidate).isFile() } catch { return false }
   })
-
   let publishedAt = null
   if (existing) {
-    try {
-      publishedAt = fs.statSync(existing).mtime.toISOString()
-    } catch {
-      publishedAt = null
-    }
+    try { publishedAt = fs.statSync(existing).mtime.toISOString() } catch { publishedAt = null }
   }
-
-  return {
-    version,
-    fileName: existing ? path.basename(existing) : exeFileName,
-    filePath: existing || '',
-    publishedAt
-  }
+  return { version, fileName: existing ? path.basename(existing) : 'PenPOS_PrintAgent.exe', filePath: existing || '', publishedAt }
 }
-
 export const getPublicMenu = async (req, res) => {
   const tenantSlug = String(req.query?.tenantSlug || '').trim()
   const tenantIdRaw = String(req.query?.tenantId || '').trim()
