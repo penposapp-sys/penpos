@@ -18,6 +18,8 @@ router.put('/orders/:id/items/group-cooking', requireAuth, tenantGuard, branchGu
 router.put('/orders/:id/items/group-complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemGroupComplete)
 router.put('/orders/:id/items/group-cancel', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemGroupCancel)
 router.put('/orders/:id/items/:itemId/cooking', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemCooking)
+router.post('/orders/:id/items/:itemId/label', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.reprintItemLabels)
+router.post('/orders/:id/items/labels', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.reprintItemLabels)
 router.put('/orders/:id/items/:itemId/complete', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemComplete)
 router.put('/orders/:id/items/:itemId/cancel', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['kitchen_access']), ctrl.itemCancel)
 

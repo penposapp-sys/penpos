@@ -7,7 +7,7 @@ import MenuItem from '../models/MenuItem.js'
 import KitchenBulkPrepState from '../models/KitchenBulkPrepState.js'
 import mongoose from 'mongoose'
 import { ensureFeature, ensureNotExpired } from '../services/planService.js'
-import { completeItemByItemIdService, cancelItemByItemIdService, completeKitchenBatchByIdService, completeKitchenBatchService, completeKitchenItemGroupService, cancelKitchenItemGroupService, listKitchenOrdersService, setItemCookingByItemIdService, setKitchenItemGroupCookingService } from '../services/orderService.js'
+import { completeItemByItemIdService, cancelItemByItemIdService, completeKitchenBatchByIdService, completeKitchenBatchService, completeKitchenItemGroupService, cancelKitchenItemGroupService, listKitchenOrdersService, reprintOrderItemLabelsService, setItemCookingByItemIdService, setKitchenItemGroupCookingService } from '../services/orderService.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 
 const SIGN = 'kitchen_v4_12h_2026-01-16'
@@ -323,6 +323,22 @@ export const itemCooking = async (req, res) => {
     }
     const { order } = await setItemCookingByItemIdService(req.user.tenantId, id, itemId, { unitIndex: req.body?.unitIndex })
     res.json({ order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const reprintItemLabels = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'kitchen')
+    const { id } = req.params
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : [req.params.itemId]
+    if (!mongoose.Types.ObjectId.isValid(id) || itemIds.some((itemId) => !mongoose.Types.ObjectId.isValid(String(itemId || '')))) {
+      throw error('invalid_request', 'Invalid order or item id', 400)
+    }
+    const result = await reprintOrderItemLabelsService(req.user.tenantId, id, itemIds)
+    res.json({ success: true, ...result })
   } catch (err) {
     sendError(res, err)
   }

@@ -495,6 +495,18 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
   return queuedCount
 }
 
+export const reprintOrderItemLabelsService = async (tenantId, orderId, itemIds = []) => {
+  const order = await findByIdAndTenant(orderId, tenantId)
+  if (!order) throw error('not_found', 'Order not found', 404)
+  const requestedIds = Array.from(new Set((Array.isArray(itemIds) ? itemIds : []).map((id) => String(id || '').trim()).filter(Boolean)))
+  if (requestedIds.length === 0) throw error('invalid_request', 'Ürün seçilmedi', 400)
+  const items = (Array.isArray(order.items) ? order.items : []).filter((item) => requestedIds.includes(String(item?._id || '')))
+  if (items.length !== requestedIds.length) throw error('not_found', 'Ürün bulunamadı', 404)
+  const queuedCount = await enqueueOrderItemLabels({ tenantId, order, items, mode: 'manual_reprint' })
+  if (!queuedCount) throw error('not_found', 'Bu ürün için etiket yazıcısı veya etiket ayarı bulunamadı', 404)
+  return { queuedCount }
+}
+
 const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '', batchId = null }) => {
   const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
   if (!order || safeItems.length === 0) return 0

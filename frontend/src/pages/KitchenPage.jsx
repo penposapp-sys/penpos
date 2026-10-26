@@ -105,6 +105,9 @@ export default function KitchenPage() {
   const [cancelSelection, setCancelSelection] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
+  const [openLabelMenuKey, setOpenLabelMenuKey] = useState('')
+  const [printingItemKey, setPrintingItemKey] = useState('')
+  const [notice, setNotice] = useState('')
   const lastIdsRef = useRef([])
   const initialLoadedRef = useRef(false)
   const restoreMainScrollTopRef = useRef(null)
@@ -285,6 +288,31 @@ export default function KitchenPage() {
       await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  const reprintItemLabel = async (orderId, itemIds, rowKey) => {
+    const ids = (Array.isArray(itemIds) ? itemIds : []).map((id) => String(id || '').trim()).filter(Boolean)
+    if (!orderId || ids.length === 0) return
+    setPrintingItemKey(rowKey)
+    setError('')
+    setNotice('')
+    try {
+      const isSingle = ids.length === 1
+      const url = isSingle
+        ? `/api/kitchen/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(ids[0])}/label`
+        : `/api/kitchen/orders/${encodeURIComponent(orderId)}/items/labels`
+      const res = await api(url, {
+        method: 'POST',
+        ...(isSingle ? {} : { body: JSON.stringify({ itemIds: ids }) })
+      })
+      if (!res?.success) throw new Error(res?.message || 'Etiket yazdırma kuyruğa alınamadı')
+      setOpenLabelMenuKey('')
+      setNotice('Etiket yazdırma kuyruğa alındı')
+    } catch (err) {
+      setError(err.message || 'Etiket yazdırılamadı')
+    } finally {
+      setPrintingItemKey('')
     }
   }
 
@@ -518,6 +546,40 @@ export default function KitchenPage() {
                           >
                             İptal
                           </button>
+                          <div className="kitchenItemMoreWrap">
+                            <button
+                              type="button"
+                              className="btn btn--xs kitchenItemBtn kitchenItemMoreBtn"
+                              aria-label="Ürün işlemleri"
+                              aria-haspopup="menu"
+                              aria-expanded={openLabelMenuKey === String(it.__rowKey || it._id || '')}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const key = String(it.__rowKey || it._id || '')
+                                setOpenLabelMenuKey((current) => current === key ? '' : key)
+                              }}
+                            >
+                              ⋮
+                            </button>
+                            {openLabelMenuKey === String(it.__rowKey || it._id || '') && (
+                              <div className="kitchenItemMoreMenu" role="menu">
+                                <button
+                                  type="button"
+                                  className="btn btn--xs"
+                                  role="menuitem"
+                                  disabled={printingItemKey === String(it.__rowKey || it._id || '') || actionItemIds.length === 0}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    reprintItemLabel(o.orderId || o.id, actionItemIds, String(it.__rowKey || it._id || ''))
+                                  }}
+                                >
+                                  {printingItemKey === String(it.__rowKey || it._id || '') ? 'Yazdırılıyor…' : 'Tekrar Etiket Yazdır'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         </div>
                       </div>
@@ -573,6 +635,7 @@ export default function KitchenPage() {
       </div>
 
       {error && <div className="theme-card-soft" style={{ color: '#fca5a5', borderRadius: 16, padding: 12 }}>{error}</div>}
+      {notice && <div className="theme-card-soft" role="status" style={{ color: 'var(--success, #22c55e)', borderRadius: 16, padding: 12 }}>{notice}</div>}
 
       {filteredOut && (
         <div className="card theme-card-soft" style={{ borderColor: '#f59e0b', color: 'var(--app-text)' }}>
