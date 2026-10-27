@@ -296,7 +296,7 @@ export default function PrintStationsCard({
                   type="button"
                   aria-expanded={isExpanded}
                   onClick={() => setExpandedStationId(isExpanded ? '' : String(s.id))}
-                  style={{ display: 'flex', flex: '1 1 320px', minWidth: 0, gap: 12, alignItems: 'center', textAlign: 'left', border: 0, padding: 0, color: 'var(--app-text)', background: 'transparent', cursor: 'pointer' }}
+                  style={{ display: 'flex', flex: '1 1 320px', minWidth: 0, gap: 12, alignItems: 'center', justifyContent: 'flex-start', textAlign: 'left', border: 0, padding: 0, color: 'var(--app-text)', background: 'transparent', cursor: 'pointer' }}
                 >
                   <span aria-hidden="true" style={{ width: 30, height: 30, flex: '0 0 30px', display: 'grid', placeItems: 'center', borderRadius: 9, color: 'var(--theme-accent)', background: 'var(--app-surface)', fontSize: 20, fontWeight: 900 }}>{isExpanded ? '−' : '+'}</span>
                   <span style={{ display: 'grid', gap: 4, minWidth: 0 }}>

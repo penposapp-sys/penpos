@@ -5,21 +5,6 @@ import AutoPrintInfoCard from '../components/printing/AutoPrintInfoCard.jsx'
 import PrintStationsCard from '../components/printing/PrintStationsCard.jsx'
 import PrintJobsCard from '../components/printing/PrintJobsCard.jsx'
 
-const parseAgentVersion = (value) => {
-  const match = String(value || '').trim().match(/^v?(\d+(?:\.\d+){0,3})(?:[-+][0-9A-Za-z.-]+)?$/)
-  return match ? match[1].split('.').map((part) => Number(part)) : null
-}
-
-const compareAgentVersions = (left, right) => {
-  const a = parseAgentVersion(left)
-  const b = parseAgentVersion(right)
-  if (!a || !b) return null
-  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
-    const difference = (a[i] || 0) - (b[i] || 0)
-    if (difference !== 0) return difference > 0 ? 1 : -1
-  }
-  return 0
-}
 const mmNum = (v, fallback) => {
   const s = String(v || '').trim().replace(',', '.')
   const n = Number(s)
@@ -29,8 +14,6 @@ const mmNum = (v, fallback) => {
 export default function PrintingSettingsPage({ system }) {
   const sys = String(system || 'kermes') === 'canteen' ? 'canteen' : 'kermes'
   const [busy, setBusy] = useState(false)
-  const [agentError, setAgentError] = useState('')
-  const [agentHint, setAgentHint] = useState('')
   const [agentPrinters, setAgentPrinters] = useState([])
 
   const [printers, setPrinters] = useState([])
@@ -58,26 +41,6 @@ export default function PrintingSettingsPage({ system }) {
   const receiptProfile = useMemo(() => (profiles || []).find(p => p.code === 'receipt') || null, [profiles])
 
   const activeStation = useMemo(() => (stations || []).find(s => s.isActive === true) || null, [stations])
-  const heartbeatAt = activeStation?.lastHeartbeatAt
-  const heartbeatAgeMs = useMemo(() => {
-    if (!heartbeatAt) return null
-    const t = new Date(heartbeatAt).getTime()
-    if (!Number.isFinite(t)) return null
-    return Date.now() - t
-  }, [heartbeatAt])
-
-  const agentStatus = useMemo(() => {
-    if ((stations || []).length === 0) return 'no_station'
-    if (!activeStation?.id) return 'no_active_station'
-    if (heartbeatAgeMs === null) return 'no_heartbeat'
-    if (heartbeatAgeMs <= 15000) return 'online'
-    if (heartbeatAgeMs <= 60000) return 'stale'
-    return 'offline'
-  }, [stations, activeStation?.id, heartbeatAgeMs])
-
-  const agentHostname = String(activeStation?.lastHeartbeatMeta?.hostname || '').trim()
-  const agentVersion = String(activeStation?.lastHeartbeatMeta?.version || '').trim()
-  const agentOnline = agentStatus === 'online'
 
   const labelPrinter = useMemo(() => {
     const pr = printers.find(p => p.id === String(labelProfile?.printerId || ''))
@@ -137,29 +100,11 @@ export default function PrintingSettingsPage({ system }) {
   }, [pcPrinterManifestUrl])
 
   useEffect(() => {
-    setAgentError('')
-    if ((stations || []).length === 0) {
-      setAgentHint('Önce yazdırma istasyonu oluşturun.')
-      setAgentPrinters([])
-      return
-    }
     if (!activeStation?.id) {
-      setAgentHint('En az 1 aktif yazdırma istasyonu seçin.')
       setAgentPrinters([])
       return
     }
 
-    if (agentStatus === 'no_heartbeat') {
-      setAgentHint('Bilgisayar bu istasyona bağlanmamış. Yazdırma uygulamasında bu istasyonun anahtarıyla eşleştirme yapıp servisi başlatın.')
-    } else if (agentStatus === 'offline') {
-      const sec = heartbeatAgeMs !== null ? Math.round(heartbeatAgeMs / 1000) : null
-      setAgentHint(sec ? `Bilgisayar çevrimdışı. Son görüldü: ${sec} sn önce` : 'Bilgisayar çevrimdışı.')
-    } else if (agentStatus === 'stale') {
-      const sec = heartbeatAgeMs !== null ? Math.round(heartbeatAgeMs / 1000) : null
-      setAgentHint(sec ? `Bilgisayar geç yanıt veriyor. Son görüldü: ${sec} sn önce` : 'Bilgisayar geç yanıt veriyor.')
-    } else {
-      setAgentHint('')
-    }
     ;(async () => {
       try {
         const qs = `?system=${encodeURIComponent(sys)}`
@@ -170,7 +115,7 @@ export default function PrintingSettingsPage({ system }) {
         setAgentPrinters([])
       }
     })()
-  }, [sys, stations?.length, activeStation?.id, agentStatus, heartbeatAgeMs])
+  }, [sys, activeStation?.id, activeStation?.lastHeartbeatAt])
 
   useEffect(() => {
     if (labelProfile?.options && typeof labelProfile.options === 'object') {
@@ -456,18 +401,9 @@ export default function PrintingSettingsPage({ system }) {
 
       <AutoPrintInfoCard
         busy={busy}
-        status={agentStatus}
-        printerCount={agentPrinters.length}
-        hostname={agentHostname}
-        version={agentVersion}
+        stations={stations}
         latestVersion={latestAgentVersion}
-        updateAvailable={compareAgentVersions(latestAgentVersion, agentVersion) === 1}
-        versionComparable={compareAgentVersions(latestAgentVersion, agentVersion) !== null}
-        installedVersionNewer={compareAgentVersions(latestAgentVersion, agentVersion) === -1}
-        lastSeenSec={heartbeatAgeMs !== null ? heartbeatAgeMs / 1000 : null}
         onReload={loadAll}
-        error={agentError}
-        hint={agentHint}
       />
 
       <PrintStationsCard
