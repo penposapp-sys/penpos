@@ -464,8 +464,8 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   const note = safeText(noteText)
   const q = Math.max(1, Number(qty || 1))
   const amount = safeText(amountText) || `${q} ADET`
-  const w = Math.max(20, Number(widthMm || 50))
-  const h = Math.max(20, Number(heightMm || 30))
+  const w = Math.max(20, Number(widthMm || 60))
+  const h = Math.max(20, Number(heightMm || 40))
   const marginMm = Math.max(0, Math.min(0.8, Math.min(w, h) * 0.015))
 
   const doc = new PDFDocument({

@@ -100,8 +100,8 @@ const getJobPdfBase64 = async ({ job, tenantId, system, station }) => {
     jobMeta: job?.meta || {},
     triggerMode: String(job?.meta?.triggerMode || '')
   })
-  const labelWidthMm = Math.max(20, Number(stationPrinter?.widthMm || profileOptions.widthMm || 50))
-  const labelHeightMm = Math.max(20, Number(stationPrinter?.heightMm || profileOptions.heightMm || 30))
+  const labelWidthMm = Math.max(20, Number(stationPrinter?.widthMm || profileOptions.widthMm || 60))
+  const labelHeightMm = Math.max(20, Number(stationPrinter?.heightMm || profileOptions.heightMm || 40))
   const receiptWidthMm = Math.max(58, Number(stationPrinter?.receiptWidthMm || profileOptions.widthMm || 80))
 
   if (String(job?.payload?.type || '') === 'pdf_base64') {

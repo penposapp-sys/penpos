@@ -36,15 +36,15 @@ export default function LabelPrinterSettingsCard({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Genişlik (mm)</div>
-            <input className="input" value={widthMm} onChange={(e) => setWidthMm(e.target.value)} placeholder="50" disabled={busy} />
+            <input className="input" value={widthMm} onChange={(e) => setWidthMm(e.target.value)} placeholder="60" disabled={busy} />
           </label>
           <label>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yükseklik (mm)</div>
-            <input className="input" value={heightMm} onChange={(e) => setHeightMm(e.target.value)} placeholder="30" disabled={busy} />
+            <input className="input" value={heightMm} onChange={(e) => setHeightMm(e.target.value)} placeholder="40" disabled={busy} />
           </label>
         </div>
 
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>Örn: 50x30 mm</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>Örn: 60x40 mm</div>
 
         <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="checkbox" checked={autoPrintOnOrder} onChange={(e) => setAutoPrintOnOrder(e.target.checked)} disabled={busy} />

@@ -56,8 +56,8 @@ const makeDraftPrinter = (type = 'label') => ({
   useForKitchenReceipt: false,
   autoPrintOnOrder: type === 'label',
   printOnReady: type === 'label',
-  widthMm: 50,
-  heightMm: 30,
+  widthMm: 60,
+  heightMm: 40,
   receiptWidthMm: 80,
   copies: 1
 })
@@ -79,8 +79,8 @@ const normalizeDrafts = (list) => (Array.isArray(list) ? list : []).map((entry) 
     : (String(entry?.receiptRole || '').trim().toLowerCase() === 'kitchen'),
   autoPrintOnOrder: entry?.autoPrintOnOrder === true,
   printOnReady: entry?.printOnReady === true,
-  widthMm: Number(entry?.widthMm || 50) || 50,
-  heightMm: Number(entry?.heightMm || 30) || 30,
+  widthMm: Number(entry?.widthMm || 60) || 60,
+  heightMm: Number(entry?.heightMm || 40) || 40,
   receiptWidthMm: Number(entry?.receiptWidthMm || 80) || 80,
   copies: Math.max(1, Math.min(10, Number(entry?.copies || 1) || 1))
 }))
@@ -247,8 +247,8 @@ export default function PrintStationsCard({
       useForKitchenReceipt: entry.printerType === 'receipt' ? entry.useForKitchenReceipt === true : false,
       autoPrintOnOrder: entry.printerType === 'label' ? entry.autoPrintOnOrder === true : false,
       printOnReady: entry.printerType === 'label' ? entry.printOnReady === true : false,
-      widthMm: entry.printerType === 'label' ? Number(entry.widthMm || 50) : null,
-      heightMm: entry.printerType === 'label' ? Number(entry.heightMm || 30) : null,
+      widthMm: entry.printerType === 'label' ? Number(entry.widthMm || 60) : null,
+      heightMm: entry.printerType === 'label' ? Number(entry.heightMm || 40) : null,
       receiptWidthMm: entry.printerType === 'receipt' ? Number(entry.receiptWidthMm || 80) : null,
       copies: Math.max(1, Math.min(10, Number(entry.copies || 1) || 1))
     }))

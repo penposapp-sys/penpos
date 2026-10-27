@@ -497,8 +497,8 @@ const ensureSystemProfileForType = async ({ tenantId, system, type, station }) =
   const nextOptions = code === 'receipt'
     ? { widthMm: toPositiveNumberOrNull(stationPrinter?.receiptWidthMm, 80) || 80 }
     : {
-        widthMm: toPositiveNumberOrNull(stationPrinter?.widthMm, 50) || 50,
-        heightMm: toPositiveNumberOrNull(stationPrinter?.heightMm, 30) || 30
+        widthMm: toPositiveNumberOrNull(stationPrinter?.widthMm, 60) || 60,
+        heightMm: toPositiveNumberOrNull(stationPrinter?.heightMm, 40) || 40
       }
 
   const existingProfile = await profileRepo.findByCodeAndScope(code, tenantId, system)

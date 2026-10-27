@@ -45,8 +45,8 @@ export default function PrintingSettingsPage({ system }) {
 
   const [labelPrinterName, setLabelPrinterName] = useState('')
   const [labelActive, setLabelActive] = useState(false)
-  const [labelW, setLabelW] = useState('50')
-  const [labelH, setLabelH] = useState('30')
+  const [labelW, setLabelW] = useState('60')
+  const [labelH, setLabelH] = useState('40')
   const [labelAutoPrintOnOrder, setLabelAutoPrintOnOrder] = useState(false)
   const [labelPrintOnReady, setLabelPrintOnReady] = useState(false)
 
@@ -252,8 +252,8 @@ export default function PrintingSettingsPage({ system }) {
         printerId: printer.id,
         payloadType: 'raw',
         options: {
-          widthMm: mmNum(labelW, 50),
-          heightMm: mmNum(labelH, 30),
+          widthMm: mmNum(labelW, 60),
+          heightMm: mmNum(labelH, 40),
           autoPrintOnOrder: labelAutoPrintOnOrder === true,
           printOnReady: labelPrintOnReady === true
         },
