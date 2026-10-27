@@ -12,6 +12,7 @@ import Table from '../models/Table.js'
 import Tenant from '../models/Tenant.js'
 import PrintProfile from '../models/PrintProfile.js'
 import { renderLabelPdfBase64, renderReceiptPdfBase64, renderTextPdfBase64 } from '../services/pdfRenderService.js'
+import { buildStationAgentLeaseFilter, stationAgentOwnerChanged } from '../services/stationAgentLease.js'
 
 const getDeliveryPaymentLine = (order) => {
   if (String(order?.paymentStatus || '') === 'paid') return 'Ödemesi alındı'
@@ -165,13 +166,25 @@ export const stationAuth = async (req, res) => {
     const stationId = String(req.params.stationId || '').trim()
     if (!mongoose.isValidObjectId(stationId)) throw error('invalid_request', 'Invalid stationId', 400)
     const secret = String(req.body?.secret || req.body?.stationSecret || req.body?.station_secret || '')
+    const agentId = String(req.body?.agentId || '').trim()
     if (!secret) throw error('invalid_request', 'secret zorunlu', 400)
+    if (!/^[a-f0-9-]{36}$/i.test(agentId)) throw error('invalid_request', 'agentId zorunlu', 400)
     const st = await PrintStation.findById(stationId)
     if (!st) throw error('not_found', 'İstasyon bulunamadı', 404)
     if (!String(st.secretHash || '').trim()) throw error('station_secret_missing', 'İstasyon secret ayarlı değil', 400)
     const ok = await bcrypt.compare(secret, String(st.secretHash || ''))
     if (!ok) throw error('unauthorized', 'Secret yanlış', 401)
-    const token = signToken({ type: 'station', stationId: String(st.id), tenantId: String(st.tenantId), system: String(st.system) })
+    const now = new Date()
+    const ownerChanged = stationAgentOwnerChanged(st.agentOwnerId, agentId)
+    const leaseFilter = buildStationAgentLeaseFilter({ stationId: st._id, agentId, now })
+    const update = { $set: { agentOwnerId: agentId, agentLeaseAt: now } }
+    if (ownerChanged) {
+      update.$set.lastHeartbeatAt = null
+      update.$set.lastHeartbeatMeta = { hostname: '', version: '', printers: [] }
+    }
+    const claimed = await PrintStation.findOneAndUpdate(leaseFilter, update, { new: true })
+    if (!claimed) throw error('station_agent_conflict', 'Bu istasyon başka bir bilgisayardaki Print Agent tarafından kullanılıyor', 409)
+    const token = signToken({ type: 'station', stationId: String(st.id), tenantId: String(st.tenantId), system: String(st.system), agentId })
     res.json({ success: true, token })
   } catch (err) {
     sendError(res, err)
@@ -183,7 +196,8 @@ export const heartbeat = async (req, res) => {
     const stationId = String(req.params.stationId || '').trim()
     if (!mongoose.isValidObjectId(stationId)) throw error('invalid_request', 'Invalid stationId', 400)
     const auth = req.stationAuth
-    const scope = auth?.stationId === stationId ? { tenantId: auth.tenantId, system: auth.system } : await getStationScope(stationId)
+    if (!auth || auth.stationId !== stationId) throw error('unauthorized', 'Station token required', 401)
+    const scope = { tenantId: auth.tenantId, system: auth.system }
     if (!scope?.tenantId) throw error('not_found', 'İstasyon bulunamadı', 404)
     const body = req.body && typeof req.body === 'object' ? req.body : {}
     const nextMeta = {
@@ -191,8 +205,12 @@ export const heartbeat = async (req, res) => {
       hostname: String(body.hostname || ''),
       version: String(body.version || '')
     }
-    const update = { lastHeartbeatAt: new Date(), lastHeartbeatMeta: nextMeta }
-    const st = await stationRepo.updateByIdAndScope(stationId, scope.tenantId, scope.system, update)
+    const update = { lastHeartbeatAt: new Date(), agentLeaseAt: new Date(), lastHeartbeatMeta: nextMeta }
+    const st = await PrintStation.findOneAndUpdate(
+      { _id: stationId, tenantId: scope.tenantId, system: scope.system, agentOwnerId: auth.agentId },
+      { $set: update },
+      { new: true }
+    )
     if (!st) throw error('not_found', 'İstasyon bulunamadı', 404)
     if (process.env.PRINTING_HEARTBEAT_DEBUG === '1') {
       const key = String(stationId)
@@ -215,7 +233,8 @@ export const claimNext = async (req, res) => {
     if (!mongoose.isValidObjectId(stationId)) throw error('invalid_request', 'Invalid stationId', 400)
 
     const auth = req.stationAuth
-    const scope = auth?.stationId === stationId ? { tenantId: auth.tenantId, system: auth.system } : await getStationScope(stationId)
+    if (!auth || auth.stationId !== stationId) throw error('unauthorized', 'Station token required', 401)
+    const scope = { tenantId: auth.tenantId, system: auth.system }
     if (!scope?.tenantId) throw error('not_found', 'İstasyon bulunamadı', 404)
 
     const job = await jobRepo.claimNextAssigned(scope.tenantId, scope.system, stationId)

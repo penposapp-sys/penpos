@@ -32,6 +32,8 @@ const schema = new mongoose.Schema(
     isActive: { type: Boolean, default: false, index: true },
     lastHeartbeatAt: { type: Date, default: null, index: true },
     lastHeartbeatMeta: { type: Object, default: { hostname: '', version: '', printers: [] } },
+    agentOwnerId: { type: String, default: '' },
+    agentLeaseAt: { type: Date, default: null, index: true },
     lastSeenAt: { type: Date, default: null, index: true },
     lastSeenMeta: { type: Object, default: {} },
     printers: { type: [stationPrinterSchema], default: [] }

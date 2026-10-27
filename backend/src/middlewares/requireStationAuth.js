@@ -1,7 +1,5 @@
 import { error } from '../utils/errors.js'
 import { verifyToken } from '../utils/jwt.js'
-import mongoose from 'mongoose'
-import bcrypt from 'bcryptjs'
 import PrintStation from '../models/PrintStation.js'
 
 const getBearer = (req) => {
@@ -17,32 +15,19 @@ export const requireStationAuth = (req, res, next) => {
       if (token) {
         const payload = verifyToken(token)
         if (!payload || payload.type !== 'station') throw error('unauthorized', 'Invalid station token', 401)
-        req.stationAuth = {
-          stationId: String(payload.stationId || ''),
-          tenantId: String(payload.tenantId || ''),
-          system: String(payload.system || 'kermes')
-        }
+        const stationId = String(payload.stationId || '')
+        const agentId = String(payload.agentId || '')
+        if (!agentId) throw error('unauthorized', 'Agent identity required', 401)
+        const station = await PrintStation.findById(stationId).select('agentOwnerId tenantId system').lean()
+        if (!station || String(station.agentOwnerId || '') !== agentId) throw error('station_agent_conflict', 'Print Agent istasyon sahibi değil', 409)
+        req.stationAuth = { stationId, tenantId: String(station.tenantId || ''), system: String(station.system || 'kermes'), agentId }
         next()
         return
       }
 
-      const stationId = String(req.headers['x-station-id'] || req.params?.stationId || '').trim()
-      const stationSecret = String(req.headers['x-station-secret'] || '').trim()
-      if (!stationId || !mongoose.isValidObjectId(stationId) || !stationSecret) {
-        throw error('unauthorized', 'Station token required', 401)
-      }
-      const st = await PrintStation.findById(stationId).select('secretHash tenantId system').lean()
-      if (!st || !String(st.secretHash || '').trim()) throw error('unauthorized', 'Invalid station token', 401)
-      const ok = await bcrypt.compare(stationSecret, String(st.secretHash || ''))
-      if (!ok) throw error('unauthorized', 'Invalid station token', 401)
-      req.stationAuth = {
-        stationId: String(stationId),
-        tenantId: String(st.tenantId || ''),
-        system: String(st.system || 'kermes')
-      }
-      next()
-    } catch {
-      next(error('unauthorized', 'Invalid station token', 401))
+      throw error('unauthorized', 'Station token required', 401)
+    } catch (err) {
+      next(err?.status ? err : error('unauthorized', 'Invalid station token', 401))
     }
   })()
 }

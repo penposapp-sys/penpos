@@ -5,8 +5,10 @@ import http from 'http'
 import https from 'https'
 import dns from 'dns'
 import { spawn } from 'child_process'
+import crypto from 'crypto'
+import { resolveWindowsPrinterName } from './printerName.js'
 
-const AGENT_VERSION = '0.1.1'
+const AGENT_VERSION = '0.1.2'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {
@@ -17,6 +19,17 @@ const readJson = async (p) => {
 const writeJson = async (p, value) => {
   const txt = JSON.stringify(value, null, 2)
   await fs.writeFile(p, txt, 'utf8')
+}
+
+const ensureAgentId = async (baseDir) => {
+  const identityPath = path.join(baseDir, 'agent-id.json')
+  try {
+    const saved = await readJson(identityPath)
+    if (/^[a-f0-9-]{36}$/i.test(String(saved?.agentId || ''))) return String(saved.agentId)
+  } catch {}
+  const agentId = crypto.randomUUID()
+  await writeJson(identityPath, { agentId })
+  return agentId
 }
 
 const run = (file, args, { timeoutMs = 30000 } = {}) => {
@@ -486,7 +499,8 @@ const startStatusServer = ({ port, getStatus, log }) => {
 
 const printPdf = async ({ sumatraPath, printerName, pdfPath, orientation = 'portrait' }) => {
   const exe = String(sumatraPath || '').trim()
-  const prn = String(printerName || '').trim()
+  const requested = String(printerName || '').trim()
+  const prn = resolveWindowsPrinterName(requested, await listPrintersWindows())
   const dir = String(orientation || '').trim().toLowerCase()
   if (!exe) throw new Error('sumatraPath missing')
   if (!prn) throw new Error('printerName missing')
@@ -510,7 +524,8 @@ const selectThermalReceiptContent = (job) => {
 }
 
 const printRawText = async ({ printerName, content, txtPath, encoding = 'cp857' }) => {
-  const prn = String(printerName || '').trim()
+  const requested = String(printerName || '').trim()
+  const prn = resolveWindowsPrinterName(requested, await listPrintersWindows())
   if (!prn) throw new Error('printerName missing')
   const rawBinary = Buffer.isBuffer(content)
   const normalizedEncoding = String(encoding || 'cp857').trim().toLowerCase()
@@ -524,31 +539,8 @@ const printRawText = async ({ printerName, content, txtPath, encoding = 'cp857' 
     '$txtPath = ' + psQuote(txtPath),
     `$codePage = ${String(codePage)}`,
     `$rawBinary = $${rawBinary ? 'true' : 'false'}`,
-    '$normalizeName = {',
-    '  param([string]$value)',
-    '  if ([string]::IsNullOrWhiteSpace($value)) { return "" }',
-    '  $normalized = $value.Normalize([Text.NormalizationForm]::FormD)',
-    '  $chars = New-Object System.Collections.Generic.List[char]',
-    '  foreach ($ch in $normalized.ToCharArray()) {',
-    '    if ([Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne [Globalization.UnicodeCategory]::NonSpacingMark) { [void]$chars.Add($ch) }',
-    '  }',
-    '  $plain = -join $chars.ToArray()',
-    "  $plain = $plain -replace [char]0xFFFD, ''",
-    "  $plain = $plain -replace '[^a-zA-Z0-9]', ''",
-    '  return $plain.ToLowerInvariant()',
-    '}',
     '$availablePrinters = @(Get-Printer | Select-Object -ExpandProperty Name)',
-    '$matchedPrinterName = $availablePrinters | Where-Object { $_ -eq $printerName } | Select-Object -First 1',
-    'if (-not $matchedPrinterName) {',
-    '  $targetNormalized = & $normalizeName $printerName',
-    '  $matchedPrinterName = $availablePrinters | Where-Object { (& $normalizeName $_) -eq $targetNormalized } | Select-Object -First 1',
-    '}',
-    'if (-not $matchedPrinterName) {',
-    '  $targetNormalized = & $normalizeName $printerName',
-    '  $matchedPrinterName = $availablePrinters | Where-Object { (& $normalizeName $_).Contains($targetNormalized) -or $targetNormalized.Contains((& $normalizeName $_)) } | Select-Object -First 1',
-    '}',
-    'if (-not $matchedPrinterName) { throw "Printer not found: $printerName" }',
-    '$printerName = [string]$matchedPrinterName',
+    'if ($availablePrinters -notcontains $printerName) { throw "Printer not found: $printerName" }',
     '$printed = $false',
     'try {',
     '  $bytes = [System.Convert]::FromBase64String($contentBase64)',
@@ -685,6 +677,7 @@ const main = async () => {
   const backendBaseUrl = String(cfg.backendBaseUrl || '').replace(/\/+$/, '')
   const stationId = String(cfg.stationId || '').trim()
   const stationSecret = String(cfg.stationSecret || '').trim()
+  const agentId = await ensureAgentId(baseDir)
   const jobPollIntervalMs = Math.max(500, Number(cfg.jobPollIntervalMs || 1500))
   const heartbeatIntervalMs = Math.max(2000, Number(cfg.heartbeatIntervalMs || 10000))
   const requestTimeoutMs = Math.max(2000, Number(cfg.requestTimeoutMs || 20000))
@@ -746,7 +739,7 @@ const main = async () => {
 
   const auth = async () => {
     log('info', '[AUTH] Auth oluyor...', { stationId })
-    const body = { stationSecret, hostname: os.hostname(), at: new Date().toISOString(), version: AGENT_VERSION }
+    const body = { stationSecret, agentId, hostname: os.hostname(), at: new Date().toISOString(), version: AGENT_VERSION }
     const authRes = await httpJson(authUrl, { method: 'POST', body, timeoutMs: requestTimeoutMs })
     const t = String(authRes?.token || authRes?.data?.token || '').trim()
     if (!t) throw new Error('Station token alınamadı')
@@ -759,6 +752,7 @@ const main = async () => {
     await auth()
   } catch (e) {
     if (e?.status === 401) log('error', '[AUTH] 401 station auth failed → secret yanlış/eskimiş')
+    else if (e?.status === 409) log('error', '[AUTH] 409 istasyon başka bir bilgisayardaki Print Agent tarafından kullanılıyor')
     else log('error', '[AUTH] Network error → backendBaseUrl yanlış/LAN kapalı')
   }
 
@@ -797,6 +791,8 @@ const main = async () => {
         if (e?.status === 401) {
           log('error', '[HEARTBEAT] 401 station auth failed → secret yanlış/eskimiş')
           try { await auth() } catch {}
+        } else if (e?.status === 409) {
+          log('error', '[HEARTBEAT] 409 bu Print Agent istasyon sahibi değil')
         } else {
           log('error', '[HEARTBEAT] Network error → backendBaseUrl yanlış/LAN kapalı')
         }

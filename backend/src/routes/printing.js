@@ -7,6 +7,7 @@ import { PERMISSIONS } from '../constants/permissions.js'
 import * as ctrl from '../controllers/printingController.js'
 import * as agentCtrl from '../controllers/stationAgentController.js'
 import { requireActiveSubscription } from '../middlewares/requireActiveSubscription.js'
+import { requireStationAuth } from '../middlewares/requireStationAuth.js'
 
 const router = Router()
 
@@ -33,15 +34,15 @@ router.get('/jobs', ...authSettings, ctrl.listJobs)
 router.post('/jobs', requireAuth, tenantGuard, requireActiveSubscription, requireRole(['tenant_admin', 'staff']), ctrl.createJob)
 
 router.post('/stations/:stationId/auth', agentCtrl.stationAuth)
-router.post('/stations/:stationId/heartbeat', agentCtrl.heartbeat)
+router.post('/stations/:stationId/heartbeat', requireStationAuth, agentCtrl.heartbeat)
 
-router.post('/stations/:stationId/claim-next', agentCtrl.claimNext)
-router.get('/jobs/:jobId/file', agentCtrl.downloadJobFile)
+router.post('/stations/:stationId/claim-next', requireStationAuth, agentCtrl.claimNext)
+router.get('/jobs/:jobId/file', requireStationAuth, agentCtrl.downloadJobFile)
 
-router.post('/jobs/:jobId/complete', agentCtrl.completeJob)
-router.post('/jobs/:jobId/fail', agentCtrl.failJob)
-router.patch('/jobs/:jobId/complete', agentCtrl.completeJob)
-router.patch('/jobs/:jobId/fail', agentCtrl.failJob)
+router.post('/jobs/:jobId/complete', requireStationAuth, agentCtrl.completeJob)
+router.post('/jobs/:jobId/fail', requireStationAuth, agentCtrl.failJob)
+router.patch('/jobs/:jobId/complete', requireStationAuth, agentCtrl.completeJob)
+router.patch('/jobs/:jobId/fail', requireStationAuth, agentCtrl.failJob)
 router.patch('/jobs/:jobId/cancel', ...authSettings, ctrl.cancelJob)
 
 router.get('/stations/:stationId/printers', ...authSettings, ctrl.listStationPrinters)
