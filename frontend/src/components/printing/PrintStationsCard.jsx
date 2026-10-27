@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { api } from '../../lib/apiClient.js'
 import { toast } from '../../lib/toast.js'
 import { useResponsiveFlags } from '../../hooks/useResponsiveFlags.js'
@@ -103,6 +103,8 @@ export default function PrintStationsCard({
   const [rotatedSecret, setRotatedSecret] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [draftsByStation, setDraftsByStation] = useState({})
+  const [expandedStationId, setExpandedStationId] = useState('')
+  const stationExpansionInitialized = useRef(false)
 
   useEffect(() => {
     const next = {}
@@ -110,6 +112,11 @@ export default function PrintStationsCard({
       next[String(station.id)] = normalizeDrafts(station?.printers || [])
     }
     setDraftsByStation(next)
+    if (!stationExpansionInitialized.current && (stations || []).length > 0) {
+      const initialStation = (stations || []).find((station) => station?.isActive === true) || stations[0]
+      setExpandedStationId(String(initialStation?.id || ''))
+      stationExpansionInitialized.current = true
+    }
   }, [JSON.stringify(stations || [])])
 
   const blocked = busy || submitting
@@ -162,6 +169,7 @@ export default function PrintStationsCard({
     try {
       const r = typeof onCreate === 'function' ? await onCreate() : null
       const secret = String(r?.secret || '').trim()
+      if (r?.stationId) setExpandedStationId(String(r.stationId))
       if (secret) {
         setRotatedSecret(secret)
         setSecretModalOpen(true)
@@ -279,30 +287,39 @@ export default function PrintStationsCard({
           const availablePrinters = Array.isArray(s.lastHeartbeatMeta?.printers) && s.lastHeartbeatMeta.printers.length > 0
             ? s.lastHeartbeatMeta.printers
             : agentPrinters
+          const isExpanded = expandedStationId === String(s.id)
 
           return (
-            <div key={s.id} style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 12, minWidth: 0, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{localizeStationName(s.name)}</div>
-                  <div style={{ marginTop: 2, fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div>İstasyon ID: <span style={{ fontFamily: 'monospace' }}>{shortId(s.id)}</span></div>
-                    <button className="btn btn--compact" onClick={() => copyText('İstasyon ID', s.id)} disabled={blocked}>Kopyala</button>
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)', display: 'grid', gap: 2 }}>
-                    <div>{s.isActive ? 'Aktif' : 'Pasif'} · {label}{age}</div>
-                    <div style={{ overflowWrap: 'anywhere' }}>Bilgisayar: {host || '-'} · v{ver || '-'} · Ajan yazıcıları: {printersCount} · Tanımlı kurallar: {configuredPrinters.length}</div>
-                  </div>
-                </div>
+            <section key={s.id} style={{ border: `1px solid ${isExpanded ? 'var(--theme-accent)' : 'var(--border)'}`, borderRadius: 14, minWidth: 0, overflow: 'hidden', background: 'var(--app-surface)', boxShadow: isExpanded ? 'var(--theme-active-glow)' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: 12, background: isExpanded ? 'var(--app-surface-2, var(--app-surface-soft))' : 'transparent' }}>
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  onClick={() => setExpandedStationId(isExpanded ? '' : String(s.id))}
+                  style={{ display: 'flex', flex: '1 1 320px', minWidth: 0, gap: 12, alignItems: 'center', textAlign: 'left', border: 0, padding: 0, color: 'var(--app-text)', background: 'transparent', cursor: 'pointer' }}
+                >
+                  <span aria-hidden="true" style={{ width: 30, height: 30, flex: '0 0 30px', display: 'grid', placeItems: 'center', borderRadius: 9, color: 'var(--theme-accent)', background: 'var(--app-surface)', fontSize: 20, fontWeight: 900 }}>{isExpanded ? '−' : '+'}</span>
+                  <span style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+                    <span style={{ fontWeight: 900, fontSize: 15, overflowWrap: 'anywhere' }}>{localizeStationName(s.name)}</span>
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 8px', fontSize: 12, color: 'var(--muted)' }}>
+                      <span>{s.isActive ? 'Aktif' : 'Pasif'} · {label}{age}</span>
+                      <span>Bilgisayar: {host || '-'} · v{ver || '-'}</span>
+                      <span>{printersCount} bilgisayar yazıcısı · {configuredPrinters.length} tanımlı yazıcı kuralı</span>
+                      <span style={{ fontFamily: 'monospace' }}>ID: {shortId(s.id)}</span>
+                    </span>
+                  </span>
+                </button>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: isCompact ? '100%' : 'auto' }}>
+                  <button className="btn" onClick={() => copyText('İstasyon ID', s.id)} disabled={blocked} style={{ flex: isCompact ? '1 1 120px' : undefined }}>ID Kopyala</button>
                   <button className="btn" onClick={() => onActivate(s.id)} disabled={blocked || s.isActive === true} style={{ flex: isCompact ? '1 1 140px' : undefined }}>{s.isActive ? 'Aktif' : 'Aktif Yap'}</button>
                   <button className="btn" onClick={() => setRotateStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Anahtar Yenile</button>
                   <button className="btn btn--danger" onClick={() => setDeleteStationId(String(s.id))} disabled={blocked} style={{ flex: isCompact ? '1 1 140px' : undefined }}>Sil</button>
                 </div>
               </div>
 
+              {isExpanded && <div style={{ display: 'grid', gap: 12, padding: 14, borderTop: '1px solid var(--border)' }}>
               {s.isActive === true && (
-                <div style={{ display: 'grid', gap: 10, padding: 12, border: '1px dashed var(--app-border, var(--border))', borderRadius: 12, background: 'var(--app-surface-2, var(--app-surface-soft))' }}>
+                <div style={{ display: 'grid', gap: 10, padding: 12, border: '1px solid var(--app-border, var(--border))', borderRadius: 12, background: 'var(--app-surface-2, var(--app-surface-soft))' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <div>
                       <div style={{ fontWeight: 800 }}>İstasyon Yazıcıları</div>
@@ -506,7 +523,9 @@ export default function PrintStationsCard({
                   ))}
                 </div>
               )}
-            </div>
+              {s.isActive !== true && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Bu istasyonu kullanmak için “Aktif Yap” düğmesine basın.</div>}
+              </div>}
+            </section>
           )
         })}
 
@@ -517,7 +536,7 @@ export default function PrintStationsCard({
         open={!!rotateStationId}
         onClose={() => setRotateStationId('')}
         title="Gizli anahtar yenilensin mi?"
-        description="Gizli anahtar yenilenirse bu istasyona bağlı ajan yeniden ayarlanmalıdır. Devam edilsin mi?"
+        description="Gizli anahtar yenilenirse bu istasyona bağlı bilgisayarın bağlantı ayarları yeniden yapılmalıdır. Devam edilsin mi?"
         confirmText="Yenile"
         cancelText="Vazgeç"
         onConfirm={doRotate}

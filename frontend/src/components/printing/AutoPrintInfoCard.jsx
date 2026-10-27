@@ -23,17 +23,17 @@ export default function AutoPrintInfoCard({
     st === 'no_station' ? 'Yazdırma istasyonu yok'
       : st === 'no_active_station' ? 'Aktif istasyon yok'
         : st === 'no_heartbeat' ? 'Bağlantı sinyali yok'
-          : isOnline ? 'Ajan çevrimiçi'
-            : isStale ? 'Ajan yavaş yanıt veriyor'
-              : isOffline ? 'Ajan çevrimdışı'
-                : 'Ajan bekleniyor'
+          : isOnline ? 'Bilgisayar çevrimiçi'
+            : isStale ? 'Bilgisayar yavaş yanıt veriyor'
+              : isOffline ? 'Bilgisayar çevrimdışı'
+                : 'Bilgisayar bekleniyor'
   const statusColor = isOnline ? 'var(--success-text)' : isStale ? 'var(--warning-text)' : 'var(--danger-text)'
 
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <div>
-          <div style={{ fontWeight: 800 }}>Yazdırma Ajanı</div>
+          <div style={{ fontWeight: 800 }}>Yazdırma Bilgisayarı</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ fontWeight: 800, color: statusColor }}>{statusText}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Yazıcılar: {Number(printerCount || 0)}</div>

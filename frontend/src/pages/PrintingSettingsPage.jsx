@@ -150,13 +150,13 @@ export default function PrintingSettingsPage({ system }) {
     }
 
     if (agentStatus === 'no_heartbeat') {
-      setAgentHint('Ajan bu istasyona bağlanmamış. Ajanın `config.json` dosyasına `stationId` ve `stationSecret` girip ajanı çalıştırın.')
+      setAgentHint('Bilgisayar bu istasyona bağlanmamış. Yazdırma uygulamasında bu istasyonun anahtarıyla eşleştirme yapıp servisi başlatın.')
     } else if (agentStatus === 'offline') {
       const sec = heartbeatAgeMs !== null ? Math.round(heartbeatAgeMs / 1000) : null
-      setAgentHint(sec ? `Ajan çevrimdışı. Son görüldü: ${sec} sn önce` : 'Ajan çevrimdışı.')
+      setAgentHint(sec ? `Bilgisayar çevrimdışı. Son görüldü: ${sec} sn önce` : 'Bilgisayar çevrimdışı.')
     } else if (agentStatus === 'stale') {
       const sec = heartbeatAgeMs !== null ? Math.round(heartbeatAgeMs / 1000) : null
-      setAgentHint(sec ? `Ajan geç yanıt veriyor. Son görüldü: ${sec} sn önce` : 'Ajan geç yanıt veriyor.')
+      setAgentHint(sec ? `Bilgisayar geç yanıt veriyor. Son görüldü: ${sec} sn önce` : 'Bilgisayar geç yanıt veriyor.')
     } else {
       setAgentHint('')
     }
