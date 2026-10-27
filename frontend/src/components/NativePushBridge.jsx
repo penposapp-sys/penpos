@@ -13,7 +13,63 @@ export default function NativePushBridge() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const lastTokenRef = useRef('')
+  const knownWaiterCallIdsRef = useRef(new Set())
+  const waiterCallsInitializedRef = useRef(false)
   const { playAlert } = useKitchenAlertSound({ debounceMs: 1200 })
+
+  const notifyWaiterCall = (id, title, body) => {
+    const callId = String(id || '').trim()
+    if (callId && knownWaiterCallIdsRef.current.has(callId)) return
+    if (callId) knownWaiterCallIdsRef.current.add(callId)
+    playAlert()
+    toast.info([title || 'Garson çağrısı', body].filter(Boolean).join(' - '))
+  }
+
+  // Keep an in-app fallback so incoming calls are still visible when this APK
+  // was built without Firebase configuration and native push cannot register.
+  useEffect(() => {
+    if (!user) return undefined
+    let cancelled = false
+
+    const pollWaiterCalls = async () => {
+      try {
+        const response = await api('/api/tenant/waiter-calls?status=open', {
+          silent: true,
+          skipBranchHeader: true,
+          cacheMode: 'no-store'
+        })
+        if (cancelled || response?.success === false) return
+        const calls = Array.isArray(response?.calls) ? response.calls : []
+        const currentIds = new Set(calls.map((call) => String(call?.id || '')).filter(Boolean))
+
+        if (waiterCallsInitializedRef.current) {
+          calls.forEach((call) => {
+            const id = String(call?.id || '')
+            if (id && !knownWaiterCallIdsRef.current.has(id)) {
+              notifyWaiterCall(id, 'Garson çağrısı', `${call.tableName || 'Masa'} garson çağırıyor.`)
+            }
+          })
+        } else {
+          waiterCallsInitializedRef.current = true
+        }
+
+        // Prune resolved calls so a later new call can be announced normally.
+        knownWaiterCallIdsRef.current = new Set(
+          [...knownWaiterCallIdsRef.current].filter((id) => currentIds.has(id))
+        )
+        currentIds.forEach((id) => knownWaiterCallIdsRef.current.add(id))
+      } catch {
+        // Push remains the primary delivery path; polling is a quiet fallback.
+      }
+    }
+
+    pollWaiterCalls()
+    const timer = window.setInterval(pollWaiterCalls, 5000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [user, playAlert])
 
   useEffect(() => {
     if (!user || !isCapacitorNativePlatform()) return undefined
@@ -108,8 +164,7 @@ export default function NativePushBridge() {
             const body = String(notification?.body || '').trim()
             const data = notification?.data || {}
             if (String(data.type || '').trim() === 'waiter_call') {
-              playAlert()
-              toast.info([title || 'Garson çağrısı', body].filter(Boolean).join(' - '))
+              notifyWaiterCall(data.waiterCallId, title, body)
               return
             }
             if (title || body) toast.success([title, body].filter(Boolean).join(' - '))

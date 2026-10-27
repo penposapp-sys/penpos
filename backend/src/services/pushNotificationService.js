@@ -1,4 +1,5 @@
-import admin from 'firebase-admin'
+import { cert, getApps, initializeApp } from 'firebase-admin/app'
+import { getMessaging } from 'firebase-admin/messaging'
 import User from '../models/User.js'
 import { getUserAccessibleBranchIds } from '../utils/branchVisibility.js'
 import { error as logError, info } from '../utils/logger.js'
@@ -43,8 +44,8 @@ const getFirebaseApp = () => {
   }
 
   try {
-    appInstance = admin.apps[0] || admin.initializeApp({
-      credential: admin.credential.cert(credentials)
+    appInstance = getApps()[0] || initializeApp({
+      credential: cert(credentials)
     })
     return appInstance
   } catch (err) {
@@ -53,9 +54,9 @@ const getFirebaseApp = () => {
   }
 }
 
-const getMessaging = () => {
+const getMessagingClient = () => {
   const app = getFirebaseApp()
-  return app ? admin.messaging(app) : null
+  return app ? getMessaging(app) : null
 }
 
 const normalizePlatform = (value) => {
@@ -147,10 +148,12 @@ const extractActiveTokens = (users = []) => {
 }
 
 export const sendPushToUsers = async (users = [], payload = {}) => {
-  const messaging = getMessaging()
+  const messaging = getMessagingClient()
   const tokens = extractActiveTokens(users)
   if (!messaging || tokens.length === 0) {
-    return { sent: 0, skipped: tokens.length === 0 ? 'no_tokens' : 'firebase_not_configured' }
+    const result = { sent: 0, skipped: tokens.length === 0 ? 'no_tokens' : 'firebase_not_configured' }
+    info('[PUSH_SEND_RESULT]', { tokenCount: tokens.length, ...result })
+    return result
   }
 
   const response = await messaging.sendEachForMulticast({
@@ -181,10 +184,19 @@ export const sendPushToUsers = async (users = [], payload = {}) => {
   })
   if (invalidTokens.length > 0) await disableInvalidTokens(invalidTokens)
 
-  return {
+  const result = {
     sent: Number(response.successCount || 0),
     failed: Number(response.failureCount || 0)
   }
+  info('[PUSH_SEND_RESULT]', {
+    tokenCount: tokens.length,
+    ...result,
+    failureCodes: response.responses
+      .filter((item) => !item.success)
+      .map((item) => String(item.error?.code || 'unknown'))
+      .slice(0, 10)
+  })
+  return result
 }
 
 export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName = '', waiterCallId = '' } = {}) => {

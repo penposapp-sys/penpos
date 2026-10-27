@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "512320170426",
+    "project_id": "penpos-dfcd7",
+    "storage_bucket": "penpos-dfcd7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:512320170426:android:02bf738744c4e9cfd1d583",
+        "android_client_info": {
+          "package_name": "com.penpos.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0_1jrT_9LtYUVSbqJnEv3DfTenG9UJvQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
