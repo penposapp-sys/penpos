@@ -1,4 +1,5 @@
 import { error } from '../utils/errors.js'
+import { buildLabelAmountLine, normalizeLabelServingType } from '../utils/labelServingType.js'
 import { createOrder, findByIdAndTenant, updateById } from '../repositories/orderRepository.js'
 import { findByIdAndTenant as findMenuItem } from '../repositories/menuItemRepository.js'
 import Order from '../models/Order.js'
@@ -393,6 +394,19 @@ const getEffectiveServingTypeForOrder = (order) => {
   return normalizeServingType(order?.servingType) || 'plate'
 }
 
+const getServingTypeForItemLabel = (order, item, batchId) => {
+  if (String(order?.saleType || '').trim() === 'delivery') return 'package'
+  const itemServingType = normalizeLabelServingType(item?.servingType)
+  if (itemServingType) return itemServingType
+  const targetBatchId = String(batchId || item?.kitchenBatchId || '')
+  const batchServingType = targetBatchId
+    ? normalizeLabelServingType((Array.isArray(order?.kitchenBatches) ? order.kitchenBatches : [])
+        .find((batch) => String(batch?.batchId || '') === targetBatchId)?.servingType)
+    : null
+  if (batchServingType) return batchServingType
+  return getEffectiveServingTypeForOrder(order)
+}
+
 const buildLabelTopLine = async (order) => {
   const tableName = order?.tableId
     ? String((await Table.findById(order.tableId).select('name').lean())?.name || '')
@@ -471,7 +485,8 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     const qty = Math.max(1, Number(it?.qty || 1))
     const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
     const isWeightBased = it?.isWeightBased === true || weightGrams > 0
-    const amountLine = isWeightBased && weightGrams > 0 ? `${weightGrams} GR` : `${qty} ADET`
+    const servingType = getServingTypeForItemLabel(order, it, batchId)
+    const amountLine = buildLabelAmountLine({ qty, weightGrams, isWeightBased, servingType })
     const noteLine = String(it?.note || '').trim()
     const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}` : ''}\n`
 
@@ -487,6 +502,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
         categoryId: categoryId || null,
         itemId: it?._id ? String(it._id) : null,
         qty,
+        servingType,
         triggerMode: mode
       }
     })
@@ -561,7 +577,8 @@ const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '',
     const qty = Math.max(1, Number(it?.qty || 1))
     const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
     const isWeightBased = it?.isWeightBased === true || weightGrams > 0
-    const amountLine = isWeightBased && weightGrams > 0 ? `${weightGrams} GR` : `${qty} ADET`
+    const servingType = getServingTypeForItemLabel(order, it, batchId)
+    const amountLine = buildLabelAmountLine({ qty, weightGrams, isWeightBased, servingType })
     const noteLine = String(reason || it?.cancelReason || it?.note || '').trim()
     const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}` : ''}\n`
 
@@ -577,6 +594,7 @@ const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '',
         categoryId: categoryId || null,
         itemId: it?._id ? String(it._id) : null,
         qty,
+        servingType,
         triggerMode: 'item_cancel',
         cancelReason: noteLine
       }
@@ -1752,7 +1770,9 @@ export const completeItemByItemIdService = async (tenantId, id, itemId, options 
         qty: readyItem.qty,
         kitchenBatchId: readyItem.kitchenBatchId,
         isWeightBased: readyItem.isWeightBased,
-        weightGrams: readyItem.weightGrams
+        weightGrams: readyItem.weightGrams,
+        servingType: readyItem.servingType,
+        note: readyItem.note
       }],
       mode: 'item_ready',
       batchId: readyItem.kitchenBatchId || null
@@ -1800,7 +1820,8 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
       kitchenBatchId: first?.kitchenBatchId || null,
       isWeightBased: first?.isWeightBased === true,
       weightGrams: Math.max(0, readyItems.reduce((sum, item) => sum + (Number(item?.weightGrams || 0) || 0), 0)),
-      note: String(first?.note || '')
+      note: String(first?.note || ''),
+      servingType: first?.servingType
     }
 
     await enqueueOrderItemLabels({
@@ -2598,6 +2619,7 @@ export const sendOrderService = async (tenantId, id, { servingType, kitchenEnabl
         categoryId: it.categoryId || null,
         nameSnapshot: it.nameSnapshot,
         qty: it.qty,
+        servingType: it.servingType,
         isWeightBased: it.isWeightBased,
         weightGrams: it.weightGrams,
         note: it.note || ''
