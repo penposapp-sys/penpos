@@ -5,6 +5,7 @@ import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
 import { isCapacitorNativePlatform } from '../utils/device.js'
 import { getNativeRuntimeCapabilities } from '../lib/nativeRuntime.js'
+import { useKitchenAlertSound } from '../lib/useKitchenAlertSound.js'
 
 const normalizeToken = (token) => String(token || '').trim()
 
@@ -12,6 +13,7 @@ export default function NativePushBridge() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const lastTokenRef = useRef('')
+  const { playAlert } = useKitchenAlertSound({ debounceMs: 1200 })
 
   useEffect(() => {
     if (!user || !isCapacitorNativePlatform()) return undefined
@@ -104,6 +106,12 @@ export default function NativePushBridge() {
           const receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
             const title = String(notification?.title || '').trim()
             const body = String(notification?.body || '').trim()
+            const data = notification?.data || {}
+            if (String(data.type || '').trim() === 'waiter_call') {
+              playAlert()
+              toast.info([title || 'Garson çağrısı', body].filter(Boolean).join(' - '))
+              return
+            }
             if (title || body) toast.success([title, body].filter(Boolean).join(' - '))
           })
           cleanups.push(() => receivedListener?.remove?.())
@@ -157,7 +165,7 @@ export default function NativePushBridge() {
         }
       })
     }
-  }, [navigate, user])
+  }, [navigate, playAlert, user])
 
   return null
 }
