@@ -8,7 +8,7 @@ import { spawn } from 'child_process'
 import crypto from 'crypto'
 import { resolveWindowsPrinterName } from './printerName.js'
 
-const AGENT_VERSION = '0.1.2'
+const AGENT_VERSION = '0.1.3'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {

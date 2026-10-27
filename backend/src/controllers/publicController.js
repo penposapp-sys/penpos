@@ -915,7 +915,7 @@ export const downloadPrintAgentSetup = async (req, res) => {
   return res.download(resolved.filePath, resolved.fileName)
 }
 
-export const downloadPrintAgentSetupInstaller = async (_req, res) => {
+const resolvePrintAgentWindowsSetupInstaller = () => {
   const envPath = String(process.env.PRINT_AGENT_WINDOWS_SETUP_FILE || '').trim()
   const directories = [
     path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows'),
@@ -934,9 +934,13 @@ export const downloadPrintAgentSetupInstaller = async (_req, res) => {
     }
   }
   if (envPath) candidates.push(envPath)
-  const filePath = candidates.find((candidate) => {
+  return candidates.find((candidate) => {
     try { return fs.statSync(candidate).isFile() } catch { return false }
   })
+}
+
+export const downloadPrintAgentSetupInstaller = async (_req, res) => {
+  const filePath = resolvePrintAgentWindowsSetupInstaller()
   if (!filePath) {
     return res.status(404).json({ success: false, code: 'print_agent_setup_not_found', message: 'Windows kurulum dosyası henüz yayınlanmadı.' })
   }
@@ -944,7 +948,8 @@ export const downloadPrintAgentSetupInstaller = async (_req, res) => {
 }
 export const getPrintAgentWindowsManifest = async (req, res) => {
   const resolved = resolvePrintAgentWindowsBinary()
-  if (!resolved.filePath) {
+  const setupFilePath = resolvePrintAgentWindowsSetupInstaller()
+  if (!resolved.filePath && !setupFilePath) {
     return res.status(404).json({
       success: false,
       code: 'print_agent_not_found',
@@ -956,13 +961,22 @@ export const getPrintAgentWindowsManifest = async (req, res) => {
   const fallbackPath = '/api/public/downloads/print-agent/windows'
   const base = buildBaseUrl(req)
   const downloadUrl = String(process.env.PRINT_AGENT_WINDOWS_URL || (base ? new URL(fallbackPath, base).toString() : fallbackPath)).trim()
+  const setupFileName = setupFilePath ? path.basename(setupFilePath) : ''
+  const setupVersionMatch = setupFileName.match(/_(\d+(?:\.\d+)*)\.exe$/i)
+  let setupPublishedAt = null
+  if (setupFilePath) {
+    try { setupPublishedAt = fs.statSync(setupFilePath).mtime.toISOString() } catch {}
+  }
 
   return res.json({
     success: true,
     platform: 'windows',
-    version: resolved.version,
-    fileName: resolved.fileName,
+    version: resolved.version || '',
+    fileName: resolved.fileName || setupFileName,
     downloadUrl,
+    setupVersion: setupVersionMatch ? setupVersionMatch[1] : '',
+    setupFileName,
+    setupPublishedAt,
     required: false,
     notes: String(process.env.PRINT_AGENT_WINDOWS_NOTES || '').trim(),
     publishedAt: resolved.publishedAt
