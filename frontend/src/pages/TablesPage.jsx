@@ -268,7 +268,7 @@ export function TablesManagementContent({ embedded = false }) {
 
     const openTables = tables
       .filter((table) => activeByTable?.[table?.id]?.hasActive)
-      .sort((a, b) => getTableActivityTimestamp(a, activeByTable, paidByTable) - getTableActivityTimestamp(b, activeByTable, paidByTable))
+      .sort((a, b) => getTableActivityTimestamp(b, activeByTable, paidByTable) - getTableActivityTimestamp(a, activeByTable, paidByTable))
 
     if (openTables.length > 0) {
       return {
