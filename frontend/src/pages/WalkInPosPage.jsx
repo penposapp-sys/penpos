@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { startTransition, useCallback } from 'react'
 import { api } from '../lib/apiClient.js'
@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx'
 import InputModal from '../components/InputModal.jsx'
 import ProductConfigModal from '../components/ProductConfigModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import PaymentCollectionModal from '../components/PaymentCollectionModal.jsx'
 import SalesEntryDateButton from '../components/SalesEntryDateButton.jsx'
 import { isValidObjectId } from '../lib/ids.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -2347,194 +2348,40 @@ export default function WalkInPosPage() {
         </div>
       </div>
 
-    <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Ödeme Al" dialogStyle={{ width: 'min(700px, calc(100vw - 32px))' }} bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}>
-      <div className="payment-modal-stack">
-        <div className="payment-amount-banner">
-          <span className="payment-amount-icon" aria-hidden="true">▣</span>
-          <span className="payment-amount-copy">
-            <span>Ödenecek Tutar</span>
-            <strong>{Math.max(0, signedBalance).toFixed(2)} TL</strong>
-          </span>
-          {canEditEntryDate ? (
-            <div className="payment-amount-date">
-              <span className="payment-amount-date-label">Ödeme Tarihi</span>
-              <SalesEntryDateButton
-                value={paymentEntryDate}
-                onChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
-                title="Ödeme tarihini seç"
-                showValue
-              />
-            </div>
-          ) : null}
-        </div>
-        <div className="payment-meta-line">
-          Masasız Satış — {order?.customerName || 'Misafir'} • {order?.orderNo ? `Sipariş ${order.orderNo}` : `Sipariş #${(order?.id || '').slice(-6)}`}
-        </div>
-
-        <div className="payment-panel payment-entry-pane">
-          <div className="payment-panel-body payment-summary-card">
-            <div className="payment-split-order-summary">
-              <div className="payment-summary-row">
-                <span>Ara Toplam</span><strong>{grossTotal.toFixed(2)} TL</strong>
-              </div>
-              <div className="payment-summary-row payment-summary-row--editor">
-                <label className="payment-field-label">İndirim (%)</label>
-                <div className="payment-summary-actions">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="input"
-                    value={discountDraft}
-                    onChange={(e) => setDiscountDraft(e.target.value)}
-                    disabled={!canTakePayment || busy}
-                  />
-                  <button className="btn btn--compact" onClick={applyDiscount} disabled={!canTakePayment || busy}>
-                    Uygula
-                  </button>
-                </div>
-              </div>
-              <div className="payment-summary-totals">
-                <div className="payment-summary-row">
-                  <span>İndirim Tutarı</span><strong>{discountTotal.toFixed(2)} TL</strong>
-                </div>
-                <div className="payment-summary-row payment-summary-row--net">
-                  <span>Net</span><strong>{netTotal.toFixed(2)} TL</strong>
-                </div>
-              </div>
-            </div>
-
-        {previousLines.length > 0 && (
-          <div className="payment-panel">
-            <div className="payment-panel-body">
-              <div className="payment-split-title">Önceki Ödemeler</div>
-              <div className="payment-history-list">
-                {previousLines.map((r) => (
-                  <div key={`${r.kind}:${r.id}`} className="payment-history-row">
-                    <div style={{ display: 'grid' }}>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(r.createdAt || Date.now()).toLocaleString()}</div>
-                      <div style={{ fontWeight: 600 }}>
-                        {Number(r.amount || 0).toFixed(2)} TL • {r.label}
-                        {(r.accountName && r.accountName !== '-') ? ` • ${r.accountName}` : ''}
-                      </div>
-                      {!!r.note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div>}
-                    </div>
-                    {r.canDelete && (
-                      <button
-                        className="btn btn--compact"
-                        onClick={() => {
-                          if (r.kind === 'payment') return deletePayment(r.id)
-                          if (r.kind === 'veresiye') return deleteVeresiyeEntry(r.id)
-                          if (r.kind === 'collection') return deleteCollection(r.id)
-                          if (r.kind === 'discount') return deleteDiscount()
-                        }}
-                        disabled={busy}
-                      >
-                        Sil
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-            <div>
-              <div className="payment-field-label">Ödeme Yöntemi</div>
-              <div className="payment-method-grid">
-                {payMethods.map((m) => {
-                  const active = paymentMethod === m.key
-                  return (
-                    <button
-                      key={m.key}
-                      type="button"
-                      className={`btn payment-method-btn ${active ? 'is-active' : ''}`}
-                      disabled={!canTakePayment || busy}
-                      onClick={() => setPaymentMethod(m.key)}
-                    >
-                      {m.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <label>
-              <div className="payment-field-label">Alınan Tutar</div>
-              <input
-                type="number"
-                className="input"
-                value={paymentAmount}
-                onChange={(e) => {
-                  paymentAmountKeypadEditedRef.current = true
-                  setPaymentAmount(e.target.value)
-                }}
-                placeholder="Tutar giriniz"
-                disabled={!canTakePayment || busy}
-              />
-            </label>
-            <div className="payment-quick-values" aria-label="Hızlı tutarlar">
-              <button type="button" className="payment-quick-all" onClick={() => { paymentAmountKeypadEditedRef.current = true; setPaymentAmount(balanceDue > 0 ? String(balanceDue) : '') }} disabled={!canTakePayment || busy}>
-                Tamamını Al<span>{balanceDue.toFixed(2)} TL</span>
-              </button>
-              {[1000, 500, 200, 100].map((amount) => (
-                <button key={amount} type="button" onClick={() => { paymentAmountKeypadEditedRef.current = true; setPaymentAmount(String(amount)) }} disabled={!canTakePayment || busy}>
-                  {amount.toLocaleString('tr-TR')} TL
-                </button>
-              ))}
-            </div>
-            <div className="payment-keypad" aria-label="Sayısal tuş takımı">
-              {['1', '2', '3', 'back', '4', '5', '6', '7', '8', '9', '0', '.'].map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`payment-key${key === 'back' ? ' payment-key--back' : ''}${key === '0' ? ' payment-key--zero' : ''}`}
-                  data-key={key}
-                  aria-label={key === 'back' ? 'Son rakamı sil' : undefined}
-                  onClick={() => applyPaymentKey(key)}
-                  disabled={!canTakePayment || busy}
-                >
-                  {key === 'back' ? '⌫' : key === '.' ? ',' : key}
-                </button>
-              ))}
-              <button className="payment-key payment-key--submit" type="button" onClick={payOrder} disabled={!canTakePayment || busy || balanceDue <= 0.01}>
-                <span aria-hidden="true">✓</span>Ödeme Ekle
-              </button>
-              <button className="payment-key payment-key--credit" type="button" onClick={openVeresiye} disabled={!canCreateVeresiye || creditAccountsDisabled || busy || balanceDue <= 0.01}>
-                Veresiye Yap
-              </button>
-            </div>
-            <div className="payment-panel payment-balance-summary">
-              <div className="payment-panel-body payment-summary-card">
-                <div className="payment-summary-row"><span>Ödenen</span><strong>{paidTotal.toFixed(2)} TL</strong></div>
-                <div className="payment-summary-row"><span>{signedBalanceLabel}</span><strong>{signedBalanceValue.toFixed(2)} TL</strong></div>
-              </div>
-            </div>
-            <button
-              className="btn payment-note-toggle"
-              type="button"
-              aria-expanded={paymentNoteOpen}
-              aria-controls="walkin-payment-note-field"
-              onClick={() => setPaymentNoteOpen((open) => !open)}
-            >
-              {paymentNoteOpen ? 'Notu Kapat' : 'Not Ekle (Opsiyonel)'}
-            </button>
-            <div id="walkin-payment-note-field" hidden={!paymentNoteOpen}>
-              <label>
-                <div className="payment-field-label">Not (opsiyonel)</div>
-                <input className="input" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} disabled={!canTakePayment || busy} />
-              </label>
-            </div>
-            {selectedPaymentIsCash && (
-              <div className="payment-summary-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                <div>Paraüstü</div><div style={{ fontWeight: 600 }}>{changeDue.toFixed(2)} TL</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </Modal>
-
+    <PaymentCollectionModal
+      open={payOpen}
+      onClose={() => setPayOpen(false)}
+      order={order}
+      customerLabel="Masasız Satış"
+      payMethods={payMethods}
+      paymentMethod={paymentMethod}
+      onPaymentMethodChange={setPaymentMethod}
+      paymentAmount={paymentAmount}
+      onPaymentAmountChange={setPaymentAmount}
+      paymentDate={paymentEntryDate}
+      onPaymentDateChange={(value) => setPaymentEntryDate(writeSalesEntryDate(value))}
+      showPaymentDate={canEditEntryDate}
+      paymentNote={paymentNote}
+      onPaymentNoteChange={setPaymentNote}
+      canTakePayment={canTakePayment}
+      busy={busy}
+      previousLines={previousLines}
+      onDeleteLine={(line) => {
+        if (line.kind === 'payment') return deletePayment(line.id)
+        if (line.kind === 'veresiye') return deleteVeresiyeEntry(line.id)
+        if (line.kind === 'collection') return deleteCollection(line.id)
+        if (line.kind === 'discount') return deleteDiscount()
+      }}
+      selectedPaymentIsCash={selectedPaymentIsCash}
+      changeDue={changeDue}
+      onSubmit={payOrder}
+      showDiscount
+      discountDraft={discountDraft}
+      onDiscountDraftChange={setDiscountDraft}
+      onApplyDiscount={applyDiscount}
+      showVeresiye={!creditAccountsDisabled && canCreateVeresiye}
+      onOpenVeresiye={openVeresiye}
+    />
     <Modal open={veresiyeOpen} onClose={() => setVeresiyeOpen(false)} title="Veresiye Yap">
       <div style={{ display: 'grid', gap: 10 }}>
         {!!veresiyeBranchError && (

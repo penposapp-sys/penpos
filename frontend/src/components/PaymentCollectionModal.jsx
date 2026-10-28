@@ -86,8 +86,8 @@ export default function PaymentCollectionModal({
       onClose={onClose}
       title="Ödeme Al"
       backdropClose={false}
-      dialogStyle={{ width: 'min(700px, calc(100vw - 32px))', ...(dialogStyle || {}) }}
-      bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}
+      dialogStyle={{ width: 'min(1080px, calc(100vw - 40px))', maxHeight: '88dvh', ...(dialogStyle || {}) }}
+      bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14, maxHeight: 'calc(88dvh - 76px)' }}
     >
       {!order ? <div>Yükleniyor...</div> : (
         <div className="payment-modal-stack">

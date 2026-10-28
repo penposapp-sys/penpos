@@ -421,7 +421,10 @@ export default function PosPage() {
     }
     const categories = Array.isArray(res?.categories) ? res.categories : []
     setCategories(categories)
-    setActiveCategory('')
+    const firstCategoryId = categories.length
+      ? String(categories[0]?.id || categories[0]?._id || '')
+      : ''
+    setActiveCategory(firstCategoryId)
   }
   const loadItems = async () => {
     itemsApiCallCountRef.current += 1
@@ -2337,7 +2340,7 @@ export default function PosPage() {
           </div>
         </div>
 
-        <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} showAllCategories onSelect={handleCategorySelect} />
+        <SaleCategorySidebar categories={categories} activeCategoryId={activeCategory} onSelect={handleCategorySelect} />
 
         <div className="card salePanel saleProductsPanel">
           <div className="saleProductsPanelHeader">
@@ -2412,8 +2415,8 @@ export default function PosPage() {
           {tableName ? `Masa: ${tableName}` : 'Masasız'} · {order?.orderNo ? `Sipariş ${order.orderNo}` : 'Sipariş —'}
         </span>
       )}
-      dialogStyle={{ width: 'min(1120px, calc(100vw - 32px))' }}
-      bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14 }}
+      dialogStyle={{ width: 'min(1080px, calc(100vw - 40px))', maxHeight: '88dvh' }}
+      bodyStyle={{ paddingTop: 10, paddingInline: 16, paddingBottom: 14, maxHeight: 'calc(88dvh - 76px)' }}
     >
       <div className="payment-modal-stack">
         <div className="payment-amount-banner">
