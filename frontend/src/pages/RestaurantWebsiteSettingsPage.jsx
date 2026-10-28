@@ -809,9 +809,7 @@ export default function RestaurantWebsiteSettingsPage({ systemType = 'kermes' })
           {!isStore && settings.integrations.showReservationButton ? (
             <div style={{ gridColumn: '1 / -1', padding: 12, borderRadius: 8, background: 'var(--surface-muted, rgba(245,158,11,0.1))', color: 'var(--text)', lineHeight: 1.5 }}>
               Bu seçenek yalnızca web sitesi butonunun görünürlüğünü yönetir. Online rezervasyon hizmeti ayrıca şube bazında açılmalıdır.
-              <button type="button" className="btn" onClick={() => navigate('/restoran/app/reservations')} style={{ display: 'block', marginTop: 10 }}>
-                Rezervasyon hizmeti ve şube ayarlarına git
-              </button>
+              Rezervasyon hizmeti ve şube ayarları Masalar sayfasındaki “Rezervasyonlar” butonundan açılır.
             </div>
           ) : null}
         </div>

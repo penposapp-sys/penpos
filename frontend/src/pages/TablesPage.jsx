@@ -55,6 +55,7 @@ const getBorderColor = (active, paid, elapsedMinutes) => {
 export function TablesManagementContent({ embedded = false }) {
   const nav = useNavigate()
   const { user, allowedBranchIds } = useAuth()
+  const canViewReservations = user?.role === 'tenant_admin' || (Array.isArray(user?.permissions) && user.permissions.includes('reservations_view'))
   const canEditEntryDate = user?.role === 'tenant_admin'
   const { ids: allowed } = buildBranchQueryParams(allowedBranchIds)
 
@@ -184,7 +185,7 @@ export function TablesManagementContent({ embedded = false }) {
   }, [allowedBranchIds, busyGlobal, busyTableId])
 
   useEffect(() => {
-    if (!Array.isArray(allowedBranchIds) || allowed.length === 0) {
+    if (!canViewReservations || !Array.isArray(allowedBranchIds) || allowed.length === 0) {
       setPendingReservations(0)
       return undefined
     }
@@ -209,7 +210,7 @@ export function TablesManagementContent({ embedded = false }) {
       mounted = false
       window.clearInterval(timer)
     }
-  }, [allowedBranchIds, allowed.length])
+  }, [allowedBranchIds, allowed.length, canViewReservations])
 
   useEffect(() => {
     let mounted = true
@@ -451,14 +452,16 @@ export function TablesManagementContent({ embedded = false }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <button className="btn" type="button" onClick={() => nav('/restoran/app/reservations')} style={{ flexShrink: 0 }}>
-              Rezervasyonlar
-              {pendingReservations > 0 ? (
-                <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, background: '#e11d48', color: '#fff', fontSize: 12, fontWeight: 900, lineHeight: 1 }}>
-                  {pendingReservations}
-                </span>
-              ) : null}
-            </button>
+            {canViewReservations ? (
+              <button className="btn" type="button" onClick={() => nav('/restoran/app/reservations')} style={{ flexShrink: 0 }}>
+                Rezervasyonlar
+                {pendingReservations > 0 ? (
+                  <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, background: '#e11d48', color: '#fff', fontSize: 12, fontWeight: 900, lineHeight: 1 }}>
+                    {pendingReservations}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
             <button className="btn" type="button" onClick={() => nav('/restoran/app/waiter-calls')} style={{ flexShrink: 0 }}>
               Garson Cagrilari
               {openWaiterCallCount > 0 ? (

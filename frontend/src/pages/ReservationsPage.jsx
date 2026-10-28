@@ -82,7 +82,7 @@ export default function ReservationsPage() {
   const isAdmin = user?.role === 'tenant_admin'
   const isStaff = user?.role === 'staff'
   const permissions = Array.isArray(user?.permissions) ? user.permissions : []
-  const canViewReservations = isAdmin || permissions.includes('manage_tables') || permissions.includes('reservations_view')
+  const canViewReservations = isAdmin || permissions.includes('reservations_view')
   const canCreateReservations = isAdmin || permissions.includes('manage_tables') || permissions.includes('reservations_create')
   const canApproveReservations = isAdmin || permissions.includes('manage_tables') || permissions.includes('reservations_approve')
   const activeStaffBranchId = String(user?.branchId || (allowedIds.length === 1 ? allowedIds[0] : '')).trim()

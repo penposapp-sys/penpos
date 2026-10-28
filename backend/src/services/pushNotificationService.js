@@ -265,7 +265,7 @@ export const notifyReservationUsers = async ({
       type: 'reservation',
       reservationId: String(reservationId),
       branchId: String(branchId),
-      targetPath: '/restoran/app/reservations'
+      targetPath: '/restoran/app/tables'
     }
   })
 }
