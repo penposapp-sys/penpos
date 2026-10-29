@@ -496,6 +496,7 @@ export const collectPackageOrderPaymentService = async (tenantId, user, orderId,
     amount: payload?.amount,
     note: payload?.note,
     cashierId: user?.id || user?._id || null,
+    itemAllocations: payload?.itemAllocations,
     entryDate: payload?.entryDate
   })
 

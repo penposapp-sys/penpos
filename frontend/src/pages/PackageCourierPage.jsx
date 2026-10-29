@@ -421,7 +421,7 @@ export default function PackageCourierPage() {
   const paymentBalance = Math.max(0, Number(paymentTarget?.balanceDue || 0))
   const changeDue = selectedPaymentIsCash ? Math.max(0, enteredPaymentAmount - paymentBalance) : 0
 
-  const submitPayment = async () => {
+  const submitPayment = async ({ itemAllocations = [] } = {}) => {
     if (!paymentTarget?.id) {
       toast.error('Sipariş bulunamadı')
       return
@@ -443,7 +443,7 @@ export default function PackageCourierPage() {
     try {
       const result = await api(`/api/pos/package-orders/${paymentTarget.id}/collect-payment`, {
         method: 'POST',
-        body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, entryDate: paymentEntryDate }),
+        body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, itemAllocations, entryDate: paymentEntryDate }),
         silent: true
       })
       const nextOrder = result?.order || null
@@ -852,7 +852,6 @@ export default function PackageCourierPage() {
         changeDue={changeDue}
         onSubmit={submitPayment}
         submitLabel="Kaydet / Tahsil Et"
-        dialogStyle={{ width: 'min(720px, calc(100vw - 24px))' }}
       />
 
       <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Kuryeye Ata">

@@ -1341,7 +1341,7 @@ export default function WalkInPosPage() {
   }
 
 
-  const payOrder = async () => {
+  const payOrder = async ({ itemAllocations = [] } = {}) => {
     if (!canTakePayment) {
       toast.error('Ödeme alma yetkiniz yok')
       return
@@ -1358,7 +1358,7 @@ export default function WalkInPosPage() {
     }
     const amount = paymentAmount ? Number(paymentAmount) : 0
     const res = await safeAction(
-      (signal) => api(`/api/pos/orders/${currentOrderId}/payments`, { method: 'POST', data: { method: paymentMethod, amount, note: paymentNote, entryDate: paymentEntryDate }, signal, silent: true }),
+      (signal) => api(`/api/pos/orders/${currentOrderId}/payments`, { method: 'POST', data: { method: paymentMethod, amount, note: paymentNote, itemAllocations, entryDate: paymentEntryDate }, signal, silent: true }),
       { reload: false }
     )
     const fresh = pickOrder(res)
@@ -1371,7 +1371,7 @@ export default function WalkInPosPage() {
     await reloadOrder().catch(() => null)
   }
 
-  const applyDiscount = async () => {
+  const applyDiscount = async (percent = discountDraft) => {
     if (!canTakePayment) {
       toast.error('İndirim yetkiniz yok')
       return
@@ -1383,7 +1383,7 @@ export default function WalkInPosPage() {
       return
     }
     const res = await safeAction(
-      (signal) => api(`/api/pos/orders/${currentOrderId}/discount`, { method: 'PUT', data: { discountPercent: Number(discountDraft) }, signal, silent: true }),
+      (signal) => api(`/api/pos/orders/${currentOrderId}/discount`, { method: 'PUT', data: { discountPercent: Number(percent) }, signal, silent: true }),
       { reload: false }
     )
     const fresh = pickOrder(res)
@@ -1670,18 +1670,6 @@ export default function WalkInPosPage() {
 
   const previousLines = useMemo(() => {
     const out = []
-    if (discountTotal > 0) {
-      out.push({
-        kind: 'discount',
-        id: `discount:${String(order?.id || order?._id || '')}`,
-        createdAt: order?.updatedAt || order?.createdAt || null,
-        amount: discountTotal,
-        label: 'İndirim',
-        note: discountPercent > 0 ? `%${discountPercent} indirim uygulandı` : '',
-        accountName: '',
-        canDelete: !!canTakePayment
-      })
-    }
     const payments = Array.isArray(order?.payments) ? order.payments : []
     for (const p of payments) {
       out.push({
@@ -1724,7 +1712,7 @@ export default function WalkInPosPage() {
     return out
       .filter(x => x.id)
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-  }, [order?.id, order?._id, order?.updatedAt, order?.createdAt, order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye, discountTotal, discountPercent])
+  }, [order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye])
 
   const uiStatusLabels = {
     waiting: 'Bekliyor',

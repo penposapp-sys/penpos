@@ -953,7 +953,7 @@ export default function DeliveryOrderDetailPage() {
     await safeAction((signal) => api(`/api/pos/orders/${orderId}/send`, { method: 'PUT', data: { servingType: ServingType.PACKAGE }, signal, silent: true }))
     await reloadOrder()
   }
-  const payOrder = async () => {
+  const payOrder = async ({ itemAllocations = [] } = {}) => {
     if (!canTakePayment) {
       toast.error('Ödeme alma yetkiniz yok')
       return
@@ -970,7 +970,7 @@ export default function DeliveryOrderDetailPage() {
     const amount = paymentAmount ? Number(paymentAmount) : 0
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/payments`, {
       method: 'POST',
-      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, entryDate: paymentEntryDate }),
+      body: JSON.stringify({ method: paymentMethod, amount, note: paymentNote, itemAllocations, entryDate: paymentEntryDate }),
       signal,
       silent: true
     }))
@@ -986,7 +986,7 @@ export default function DeliveryOrderDetailPage() {
     }
   }
 
-  const applyDiscount = async () => {
+  const applyDiscount = async (percent = discountDraft) => {
     if (!canTakePayment) {
       toast.error('İndirim yetkiniz yok')
       return
@@ -998,7 +998,7 @@ export default function DeliveryOrderDetailPage() {
     }
     const res = await safeAction((signal) => api(`/api/pos/orders/${orderId}/discount`, {
       method: 'PUT',
-      body: JSON.stringify({ discountPercent: Number(discountDraft) }),
+      body: JSON.stringify({ discountPercent: Number(percent) }),
       signal,
       silent: true
     }))
