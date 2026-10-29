@@ -2469,6 +2469,25 @@ export const splitOrderServiceByItemId = async (tenantId, id, itemsToMove = [], 
       const updatedSourceTotals = computeTotals(updatedSourceItems)
       await Order.findByIdAndUpdate(order.id, { items: updatedSourceItems, totals: updatedSourceTotals }, { new: true, session })
 
+      const splitKitchenBatches = (() => {
+        const map = new Map()
+        for (const it of newOrderItems) {
+          const id = String(it?.kitchenBatchId || '').trim()
+          if (!id) continue
+          const batchItems = newOrderItems.filter((x) => String(x?.kitchenBatchId || '').trim() === id)
+          const hasActive = batchItems.some((x) => ['sent', 'cooking'].includes(String(x?.status || '')))
+          if (!map.has(id)) {
+            map.set(id, {
+              batchId: id,
+              servingType: it?.servingType || null,
+              sentAt: it?.kitchenSentAt || it?.sentAt || new Date(),
+              completedAt: hasActive ? null : new Date()
+            })
+          }
+        }
+        return Array.from(map.values())
+      })()
+
       newOrder = await Order.create([{
         tenantId,
         branchId: order.branchId,
@@ -2479,7 +2498,8 @@ export const splitOrderServiceByItemId = async (tenantId, id, itemsToMove = [], 
         status: 'open',
         items: newOrderItems,
         totals: computeTotals(newOrderItems),
-        note: ''
+        note: '',
+        kitchenBatches: splitKitchenBatches
       }], { session }).then((res) => res[0])
 
       if (targetTableId) {
@@ -3608,13 +3628,22 @@ export const completeKitchenBatchByIdService = async (tenantId, orderId, batchId
     if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
   }
   order.items = items
-  if (Array.isArray(order.kitchenBatches)) {
-    order.kitchenBatches = order.kitchenBatches.map((batch) => {
-      if (String(batch?.batchId || '') !== target) return batch
-      const plainBatch = typeof batch?.toObject === 'function' ? batch.toObject() : batch
-      return { ...plainBatch, completedAt: now }
+  if (!Array.isArray(order.kitchenBatches)) order.kitchenBatches = []
+  const hasTargetBatch = order.kitchenBatches.some((batch) => String(batch?.batchId || '') === target)
+  if (!hasTargetBatch) {
+    const sample = items.find((it) => String(it?.kitchenBatchId || '') === target)
+    order.kitchenBatches.push({
+      batchId: target,
+      servingType: (sample && sample.servingType) ? sample.servingType : null,
+      sentAt: (sample && (sample.kitchenSentAt || sample.sentAt)) ? (sample.kitchenSentAt || sample.sentAt) : (order.createdAt || now),
+      completedAt: null
     })
   }
+  order.kitchenBatches = order.kitchenBatches.map((batch) => {
+    if (String(batch?.batchId || '') !== target) return batch
+    const plainBatch = typeof batch?.toObject === 'function' ? batch.toObject() : batch
+    return { ...plainBatch, completedAt: now }
+  })
   if (order.currentKitchenBatchId && String(order.currentKitchenBatchId) === target) {
     order.currentKitchenBatchId = null
   }
@@ -3637,7 +3666,7 @@ export const completeKitchenBatchService = async (tenantId, id) => {
   const now = new Date()
   for (const it of items) {
     if (!it) continue
-    if (it.status !== 'sent') continue
+    if (!['sent', 'cooking'].includes(it.status)) continue
     it.status = 'completed'
     if (!it.sentAt) it.sentAt = order.createdAt || now
     if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
@@ -3861,6 +3890,60 @@ const mergeItems = (targetItems, sourceItems) => {
   return [...targetList, ...sourceList].map(normalizeMergedItem)
 }
 
+const toPlainKitchenBatches = (batches) => {
+  const list = Array.isArray(batches) ? batches : []
+  const out = []
+  for (const b of list) {
+    const p = typeof b?.toObject === 'function' ? b.toObject() : (b || {})
+    const batchId = String(p?.batchId || '').trim()
+    if (!batchId) continue
+    out.push({
+      batchId,
+      servingType: p?.servingType ?? null,
+      sentAt: p?.sentAt ?? null,
+      completedAt: p?.completedAt ?? null
+    })
+  }
+  return out
+}
+
+const mergeKitchenBatches = (targetOrder, sourceOrders, mergedItems) => {
+  const map = new Map()
+  const addTarget = toPlainKitchenBatches(targetOrder?.kitchenBatches)
+  const addSource = (sourceOrders || []).flatMap((o) => toPlainKitchenBatches(o?.kitchenBatches))
+  for (const b of [...addTarget, ...addSource]) {
+    if (!b.batchId) continue
+    if (!map.has(b.batchId)) {
+      map.set(b.batchId, { ...b })
+    } else {
+      const prev = map.get(b.batchId)
+      map.set(b.batchId, {
+        ...prev,
+        servingType: prev.servingType || b.servingType || null,
+        sentAt: prev.sentAt && b.sentAt ? (new Date(prev.sentAt).getTime() <= new Date(b.sentAt).getTime() ? prev.sentAt : b.sentAt) : (prev.sentAt || b.sentAt || null),
+        completedAt: prev.completedAt || b.completedAt || null
+      })
+    }
+  }
+  // Ensure every batch referenced by merged items has an entry (no orphan batches)
+  const mergedItemList = Array.isArray(mergedItems) ? mergedItems : []
+  const itemBatchIds = Array.from(new Set(mergedItemList
+    .map((it) => String((it?.kitchenBatchId || it?._doc?.kitchenBatchId || '') || '').trim())
+    .filter(Boolean)))
+  for (const id of itemBatchIds) {
+    if (!map.has(id)) {
+      const sample = mergedItemList.find((it) => String((it?.kitchenBatchId || it?._doc?.kitchenBatchId || '') || '').trim() === id)
+      map.set(id, {
+        batchId: id,
+        servingType: (sample && (sample?.servingType || sample?._doc?.servingType)) ? (sample?.servingType || sample?._doc?.servingType) : null,
+        sentAt: (sample && (sample?.kitchenSentAt || sample?._doc?.kitchenSentAt || sample?.sentAt || sample?._doc?.sentAt)) ? (sample?.kitchenSentAt || sample?._doc?.kitchenSentAt || sample?.sentAt || sample?._doc?.sentAt) : (targetOrder?.createdAt || null),
+        completedAt: null
+      })
+    }
+  }
+  return Array.from(map.values())
+}
+
 const buildMergedOrderData = (targetOrder, sourceOrders) => {
   const mergedItems = mergeItems(targetOrder.items, sourceOrders.flatMap(o => o.items))
   for (const it of mergedItems) {
@@ -3889,11 +3972,12 @@ const buildMergedOrderData = (targetOrder, sourceOrders) => {
     ...(targetOrder.mergeSourceOrderIds || []),
     ...sourceOrders.map(o => o.id)
   ]
-  return { mergedItems, totals, mergeSourceOrderIds }
+  const mergedKitchenBatches = mergeKitchenBatches(targetOrder, sourceOrders, mergedItems)
+  return { mergedItems, totals, mergeSourceOrderIds, mergedKitchenBatches }
 }
 
 const mergeOrdersWithTransaction = async (tenantId, targetOrder, sourceOrders, sourceTables) => {
-  const { mergedItems, totals, mergeSourceOrderIds } = buildMergedOrderData(targetOrder, sourceOrders)
+  const { mergedItems, totals, mergeSourceOrderIds, mergedKitchenBatches } = buildMergedOrderData(targetOrder, sourceOrders)
   const session = await mongoose.startSession()
   try {
     await session.withTransaction(async () => {
@@ -3912,7 +3996,7 @@ const mergeOrdersWithTransaction = async (tenantId, targetOrder, sourceOrders, s
       }
       await Order.findByIdAndUpdate(
         targetOrder.id,
-        { items: mergedItems, totals: safeTotals, mergeSourceOrderIds },
+        { items: mergedItems, totals: safeTotals, mergeSourceOrderIds, kitchenBatches: mergedKitchenBatches },
         { new: true, session }
       )
       for (const o of sourceOrders) {
@@ -3934,7 +4018,7 @@ const mergeOrdersWithTransaction = async (tenantId, targetOrder, sourceOrders, s
 }
 
 const mergeOrdersFallbackAtomic = async (tenantId, targetOrder, sourceOrders, sourceTables) => {
-  const { mergedItems, totals, mergeSourceOrderIds } = buildMergedOrderData(targetOrder, sourceOrders)
+  const { mergedItems, totals, mergeSourceOrderIds, mergedKitchenBatches } = buildMergedOrderData(targetOrder, sourceOrders)
   const safeTotals = {
     ...totals,
     subtotal: Number.isFinite(Number(totals?.subtotal)) ? Number(totals.subtotal) : 0,
@@ -3950,7 +4034,7 @@ const mergeOrdersFallbackAtomic = async (tenantId, targetOrder, sourceOrders, so
   }
   await Order.findByIdAndUpdate(
     targetOrder.id,
-    { items: mergedItems, totals: safeTotals, mergeSourceOrderIds },
+    { items: mergedItems, totals: safeTotals, mergeSourceOrderIds, kitchenBatches: mergedKitchenBatches },
     { new: true }
   )
   for (const o of sourceOrders) {
