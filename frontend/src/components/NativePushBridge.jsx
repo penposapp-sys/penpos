@@ -25,16 +25,26 @@ export default function NativePushBridge() {
     toast.info([title || 'Garson çağrısı', body].filter(Boolean).join(' - '))
   }
 
+  // Garson çağrısı uç noktası tenant'a bağlıdır. Platform/mağaza/anaokulu
+  // kullanıcıları bu isteği yapmamalı; aksi halde 401 oturumu kapatır.
+  const userSystemType = String(user?.systemType || '').trim().toLowerCase()
+  const canPollWaiterCalls = Boolean(
+    user?.tenantId &&
+    (user.role === 'tenant_admin' || user.role === 'staff') &&
+    (userSystemType === '' || userSystemType === 'kermes' || userSystemType === 'restaurant')
+  )
+
   // Keep an in-app fallback so incoming calls are still visible when this APK
   // was built without Firebase configuration and native push cannot register.
   useEffect(() => {
-    if (!user) return undefined
+    if (!canPollWaiterCalls) return undefined
     let cancelled = false
 
     const pollWaiterCalls = async () => {
       try {
         const response = await api('/api/tenant/waiter-calls?status=open', {
           silent: true,
+          suppressAuthRedirect: true,
           skipBranchHeader: true,
           cacheMode: 'no-store'
         })
@@ -69,7 +79,7 @@ export default function NativePushBridge() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [user, playAlert])
+  }, [canPollWaiterCalls, user?.id, user?.tenantId, playAlert])
 
   useEffect(() => {
     if (!user || !isCapacitorNativePlatform()) return undefined
