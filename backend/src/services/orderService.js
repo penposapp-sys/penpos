@@ -1784,7 +1784,7 @@ export const completeItemByItemIdService = async (tenantId, id, itemId, options 
   return { order: decorateOrder(fresh) }
 }
 
-export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds = []) => {
+export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds = [], { acknowledge = false } = {}) => {
   const order = await findByIdAndTenant(orderId, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
 
@@ -1792,46 +1792,55 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
   if (ids.length === 0) throw error('invalid_request', 'Invalid item ids', 400)
 
   const readyItems = []
+  let matchedItems = 0
   const now = new Date()
   for (const itemId of ids) {
     const it = order.items.id(itemId)
     if (!it) continue
-    if (!['sent', 'cooking'].includes(it.status)) continue
-    it.status = 'completed'
-    if (!it.sentAt) it.sentAt = order.createdAt || now
-    if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
-    readyItems.push(it)
+    matchedItems += 1
+    if (['sent', 'cooking'].includes(it.status)) {
+      it.status = 'completed'
+      if (!it.sentAt) it.sentAt = order.createdAt || now
+      if (!it.kitchenSentAt) it.kitchenSentAt = it.sentAt
+      readyItems.push(it)
+    }
+    if (acknowledge) it.kitchenAcknowledgedAt = now
   }
 
-  if (readyItems.length === 0) {
+  if (readyItems.length === 0 && !acknowledge) {
     throw error('invalid_state', 'No sent/cooking items found for completion', 400)
   }
+  if (acknowledge && matchedItems === 0) {
+    throw error('not_found', 'Kitchen items not found', 404)
+  }
 
-  normalizeLegacyItemStatuses(order)
+  if (readyItems.length > 0) normalizeLegacyItemStatuses(order)
   await order.save()
 
-  try {
-    const first = readyItems[0]
-    const groupedLabelItem = {
-      _id: first?._id,
-      menuItemId: first?.menuItemId,
-      nameSnapshot: first?.nameSnapshot,
-      qty: readyItems.reduce((sum, item) => sum + Math.max(1, Number(item?.qty || 1)), 0),
-      kitchenBatchId: first?.kitchenBatchId || null,
-      isWeightBased: first?.isWeightBased === true,
-      weightGrams: Math.max(0, readyItems.reduce((sum, item) => sum + (Number(item?.weightGrams || 0) || 0), 0)),
-      note: String(first?.note || ''),
-      servingType: first?.servingType
-    }
+  if (readyItems.length > 0) {
+    try {
+      const first = readyItems[0]
+      const groupedLabelItem = {
+        _id: first?._id,
+        menuItemId: first?.menuItemId,
+        nameSnapshot: first?.nameSnapshot,
+        qty: readyItems.reduce((sum, item) => sum + Math.max(1, Number(item?.qty || 1)), 0),
+        kitchenBatchId: first?.kitchenBatchId || null,
+        isWeightBased: first?.isWeightBased === true,
+        weightGrams: Math.max(0, readyItems.reduce((sum, item) => sum + (Number(item?.weightGrams || 0) || 0), 0)),
+        note: String(first?.note || ''),
+        servingType: first?.servingType
+      }
 
-    await enqueueOrderItemLabels({
-      tenantId,
-      order,
-      items: [groupedLabelItem],
-      mode: 'item_ready',
-      batchId: first?.kitchenBatchId || null
-    })
-  } catch {
+      await enqueueOrderItemLabels({
+        tenantId,
+        order,
+        items: [groupedLabelItem],
+        mode: 'item_ready',
+        batchId: first?.kitchenBatchId || null
+      })
+    } catch {
+    }
   }
 
   const fresh = await Order.findById(order.id).lean()
@@ -3543,6 +3552,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
       const byBatch = new Map()
       for (const it of rawItems) {
         if (!it) continue
+        if (it.kitchenAcknowledgedAt) continue
         if (it.status !== 'sent' && it.status !== 'cooking' && it.status !== 'completed' && it.status !== 'cancelled') continue
         const rawBatchId = it.kitchenBatchId ? String(it.kitchenBatchId) : ''
         const key = rawBatchId || '__legacy__'

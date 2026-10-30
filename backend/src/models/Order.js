@@ -44,7 +44,8 @@ const itemSchema = new mongoose.Schema({
   cancelReason: { type: String, default: '' },
   kitchenBatchId: { type: String, default: null },
   kitchenSentAt: { type: Date, default: null },
-  kitchenPrintedAt: { type: Date, default: null }
+  kitchenPrintedAt: { type: Date, default: null },
+  kitchenAcknowledgedAt: { type: Date, default: null }
 })
 
 const kitchenBatchSchema = new mongoose.Schema(

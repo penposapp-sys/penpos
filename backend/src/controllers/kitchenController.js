@@ -381,6 +381,22 @@ export const itemGroupComplete = async (req, res) => {
   }
 }
 
+export const itemGroupDismiss = async (req, res) => {
+  try {
+    await ensureNotExpired(req.user.tenantId, req.user.id)
+    await ensureFeature(req.user.tenantId, 'kitchen')
+    const { id } = req.params
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : []
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw error('invalid_request', 'Invalid order id', 400)
+    }
+    const { order } = await completeKitchenItemGroupService(req.user.tenantId, id, itemIds, { acknowledge: true })
+    res.json({ order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
 export const itemGroupCooking = async (req, res) => {
   try {
     await ensureNotExpired(req.user.tenantId, req.user.id)

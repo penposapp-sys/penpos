@@ -254,18 +254,17 @@ export default function KitchenPage() {
     } catch {}
   }, [viewMode])
 
-  const complete = async (id) => {
-    try {
-      await api(`/api/kitchen/orders/${id}/complete`, { method: 'PUT' })
-      await load({ preserveScroll: true })
-    } catch (err) {
-      setError(err.message)
-    }
-  }
+  const completeVisibleItems = async (orderId, items) => {
+    const itemIds = (Array.isArray(items) ? items : [])
+      .map((item) => String(item?._id || '').trim())
+      .filter(Boolean)
+    if (!orderId || itemIds.length === 0) return
 
-  const completeBatch = async (orderId, batchId) => {
     try {
-      await api(`/api/kitchen/orders/${orderId}/batches/${batchId}/complete`, { method: 'PUT' })
+      await api(`/api/kitchen/orders/${orderId}/items/group-dismiss`, {
+        method: 'PUT',
+        body: JSON.stringify({ itemIds })
+      })
       await load({ preserveScroll: true })
     } catch (err) {
       setError(err.message)
@@ -625,8 +624,7 @@ export default function KitchenPage() {
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  if (o.batchId) completeBatch(o.orderId || o.id, o.batchId)
-                  else complete(o.orderId || o.id)
+                  completeVisibleItems(o.orderId || o.id, o.items)
                 }}
                 disabled={!Array.isArray(o.items) || o.items.length === 0}
               >
