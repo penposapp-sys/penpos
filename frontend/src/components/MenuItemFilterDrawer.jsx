@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 const normalizeId = (v) => String(v || '').trim()
 
@@ -59,13 +60,13 @@ export default function MenuItemFilterDrawer({
 
   if (!open) return null
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
       <div
         className="card"
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 0,
           right: 0,
           height: '100%',
@@ -136,6 +137,7 @@ export default function MenuItemFilterDrawer({
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

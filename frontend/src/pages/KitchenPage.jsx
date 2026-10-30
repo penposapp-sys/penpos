@@ -116,6 +116,10 @@ export default function KitchenPage() {
   const requireCancelReasonForProduct = getSetting('general.requireCancelReasonForProduct', false) === true
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_normal' })
   const { soundEnabled, setSoundEnabled, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
+  const playAlertRef = useRef(playAlert)
+  useEffect(() => {
+    playAlertRef.current = playAlert
+  }, [playAlert])
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem('kitchenViewMode') === 'separate' ? 'separate' : 'grouped'
@@ -187,14 +191,39 @@ export default function KitchenPage() {
       restoreMainScrollTop()
       lastIdsRef.current = ids
 
+      const newIds = ids.filter((id) => !prevIds.includes(id))
+      const hiddenMenuItemIds = menuFilters?.hiddenSet
+      const isAudibleBatchId = (orderId, batchId) => {
+        const targetOrder = safe.find((o) => String(o?.id || '') === String(orderId || ''))
+        if (!targetOrder) return false
+        const batches = Array.isArray(targetOrder?.batches) ? targetOrder.batches : []
+        const targetBatch = batchId ? batches.find((b) => String(b?.batchId || '') === String(batchId)) : null
+        const items = batchId
+          ? (Array.isArray(targetBatch?.items) ? targetBatch.items : [])
+          : (Array.isArray(targetOrder?.items) ? targetOrder.items : [])
+        return items.some((it) => {
+          if (!it) return false
+          if (!['sent', 'cooking'].includes(String(it?.status || ''))) return false
+          const menuItemId = String(it?.menuItemId || '')
+          if (menuItemId && hiddenMenuItemIds instanceof Set && hiddenMenuItemIds.has(menuItemId)) return false
+          return true
+        })
+      }
+      const audibleNewIds = newIds.filter((id) => {
+        const separatorIndex = String(id).indexOf(':')
+        const hasBatch = separatorIndex !== -1
+        const orderId = hasBatch ? String(id).slice(0, separatorIndex) : String(id)
+        const batchId = hasBatch ? String(id).slice(separatorIndex + 1) : null
+        return isAudibleBatchId(orderId, batchId)
+      })
+
+      if (audibleNewIds.length > 0) {
+        await playAlertRef.current()
+      }
+
       if (!initialLoadedRef.current) {
         initialLoadedRef.current = true
         return
-      }
-
-      const newIds = ids.filter((id) => !prevIds.includes(id))
-      if (newIds.length > 0) {
-        await playAlert()
       }
     } catch (err) {
       setError(err.message)
@@ -211,7 +240,7 @@ export default function KitchenPage() {
       clearInterval(id)
       clearInterval(t)
     }
-  }, [(Array.isArray(allowedBranchIds) ? allowedBranchIds : []).join(',')])
+  }, [menuFilters.hiddenSet, (Array.isArray(allowedBranchIds) ? allowedBranchIds : []).join(',')])
 
   useEffect(() => {
     try {
@@ -622,10 +651,8 @@ export default function KitchenPage() {
           <button
             type="button"
             className="btn"
-            onClick={async () => {
-              const next = !soundEnabled
-              setSoundEnabled(next)
-              if (next) await ensureAudioUnlocked()
+            onClick={() => {
+              setSoundEnabled(!soundEnabled)
             }}
             title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapali (Ac)'}
           >

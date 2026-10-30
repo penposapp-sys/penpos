@@ -17,6 +17,10 @@ export function useKitchenAlertSound({ debounceMs = 5000 } = {}) {
       return true
     }
   })
+  const soundEnabledRef = useRef(soundEnabled)
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled
+  }, [soundEnabled])
 
   const ensureAudioElement = useCallback(() => {
     if (typeof window === 'undefined') return null
@@ -49,7 +53,7 @@ export function useKitchenAlertSound({ debounceMs = 5000 } = {}) {
   }, [ensureAudioElement])
 
   const playAlert = useCallback(async () => {
-    if (!soundEnabled) return
+    if (!soundEnabledRef.current) return
     const now = Date.now()
     if (now - Number(lastPlayedRef.current || 0) < debounceMs) return
     lastPlayedRef.current = now
@@ -69,7 +73,7 @@ export function useKitchenAlertSound({ debounceMs = 5000 } = {}) {
       audio.volume = 1
       await audio.play()
     } catch {}
-  }, [debounceMs, ensureAudioElement, ensureAudioUnlocked, soundEnabled])
+  }, [debounceMs, ensureAudioElement, ensureAudioUnlocked])
 
   useEffect(() => {
     try {
@@ -83,15 +87,38 @@ export function useKitchenAlertSound({ debounceMs = 5000 } = {}) {
     const unlock = () => {
       ensureAudioUnlocked()
     }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') unlock()
+    }
 
     window.addEventListener('pointerdown', unlock, { passive: true })
     window.addEventListener('keydown', unlock)
     window.addEventListener('touchstart', unlock, { passive: true })
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
 
     return () => {
       window.removeEventListener('pointerdown', unlock)
       window.removeEventListener('keydown', unlock)
       window.removeEventListener('touchstart', unlock)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [ensureAudioUnlocked, soundEnabled])
+
+  // Ses acıldığında hemen unlock denemesi yap; böylece sonraki playAlert
+  // çağrıları unlock state'i bypass etmeden ses çalabilir.
+  useEffect(() => {
+    if (!soundEnabled) return undefined
+    let cancelled = false
+    const run = async () => {
+      const ok = await ensureAudioUnlocked()
+      if (!cancelled && ok) unlockedRef.current = true
+    }
+    const timer = window.setTimeout(run, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
     }
   }, [ensureAudioUnlocked, soundEnabled])
 

@@ -18,6 +18,10 @@ export default function KitchenBulkPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const menuFilters = useKitchenMenuFilters({ scope: 'kitchen_bulk' })
   const { soundEnabled, setSoundEnabled, soundIcon, ensureAudioUnlocked, playAlert } = useKitchenAlertSound()
+  const playAlertRef = useRef(playAlert)
+  useEffect(() => {
+    playAlertRef.current = playAlert
+  }, [playAlert])
 
   const load = async () => {
     setError('')
@@ -46,20 +50,30 @@ export default function KitchenBulkPage() {
 
       setItems(filtered)
 
-      const rowKeys = filtered
-        .flatMap(it => (Array.isArray(it?.rows) ? it.rows : []).map(r => String(r?.rowKey || '')))
-        .filter(Boolean)
       const prevRowKeys = lastRowKeysRef.current || []
-      lastRowKeysRef.current = rowKeys
+
+      const audibleRowKeys = []
+      for (const card of filtered) {
+        const rows = Array.isArray(card?.rows) ? card.rows : []
+        const cardStatus = String(card?.status || '')
+        const hidden = card?.menuItemId && menuFilters?.hiddenSet instanceof Set && menuFilters.hiddenSet.has(String(card?.menuItemId))
+        if (hidden || (cardStatus !== 'sent' && cardStatus !== 'cooking')) continue
+        for (const row of rows) {
+          const key = String(row?.rowKey || '')
+          if (!key) continue
+          audibleRowKeys.push(key)
+        }
+      }
+
+      const newAudibleRowKeys = audibleRowKeys.filter(key => !prevRowKeys.includes(key))
+      lastRowKeysRef.current = audibleRowKeys
+      if (newAudibleRowKeys.length > 0) {
+        await playAlertRef.current()
+      }
 
       if (!initialLoadedRef.current) {
         initialLoadedRef.current = true
         return
-      }
-
-      const newRowKeys = rowKeys.filter(key => !prevRowKeys.includes(key))
-      if (newRowKeys.length > 0) {
-        await playAlert()
       }
     } catch (err) {
       setError(err?.message || 'Yükleme hatası')
@@ -72,7 +86,7 @@ export default function KitchenBulkPage() {
     load()
     const id = setInterval(load, 4000)
     return () => clearInterval(id)
-  }, [(Array.isArray(allowedBranchIds) ? allowedBranchIds : []).join(','), playAlert])
+  }, [menuFilters.hiddenSet, (Array.isArray(allowedBranchIds) ? allowedBranchIds : []).join(',')])
 
   const doneRow = async (rowKey, payload) => {
     const key = String(rowKey || '')
@@ -236,12 +250,8 @@ export default function KitchenBulkPage() {
           <button
             type="button"
             className="btn"
-            onClick={async () => {
-              const next = !soundEnabled
-              setSoundEnabled(next)
-              if (next) {
-                await ensureAudioUnlocked()
-              }
+            onClick={() => {
+              setSoundEnabled(!soundEnabled)
             }}
             title={soundEnabled ? 'Ses Açık (Kapat)' : 'Ses Kapalı (Aç)'}
           >
