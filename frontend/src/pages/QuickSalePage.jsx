@@ -11,7 +11,6 @@ import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { getProductPortionOptions, requiresProductConfig } from '../lib/productPortions.js'
 import { inferPaymentMethodType, paymentMethodLabel } from '../lib/paymentMethods.js'
 import { useCategorySwipe } from '../hooks/useCategorySwipe.js'
-import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
 import { ServingType } from '../utils/servingType.js'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
@@ -209,15 +208,7 @@ export default function QuickSalePage() {
     if (!canViewAccounts) return
     setAccountsLoading(true)
     try {
-      const { params } = buildBranchQueryParams(allowedBranchIds)
-      if (!params) {
-        setAccounts([])
-        toast.error('Cari hesapları bulmak için yetkili şube bulunamadı.')
-        return
-      }
-      params.set('q', String(query || ''))
-      params.set('limit', '20')
-      const response = await api(`/api/accounts?${params.toString()}`, { skipBranchHeader: true })
+      const response = await api(`/api/accounts?q=${encodeURIComponent(query || '')}&limit=20`)
       setAccounts(response.accounts || [])
     } catch (err) {
       toast.error(err.message)
