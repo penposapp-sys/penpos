@@ -111,6 +111,7 @@ const orderSchema = new mongoose.Schema(
     orderNo: { type: Number, default: null },
     orderDayKey: { type: String, default: '' },
     tableId: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', default: null },
+    tableName: { type: String, default: '' },
     status: { type: String, enum: ['open', 'sent', 'paid', 'cancelled', 'completed', 'merged', 'closed'], default: 'open' },
     items: { type: [itemSchema], default: [] },
     totals: {
@@ -132,6 +133,27 @@ const orderSchema = new mongoose.Schema(
     mergedIntoOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
     mergeSourceOrderIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
     saleType: { type: String, enum: ['table', 'walkin', 'delivery'], default: 'table' },
+    saleSource: { type: String, enum: ['standard', 'quick-sale'], default: 'standard' },
+    quickSaleRequestId: { type: String, default: undefined },
+    quickSalePayloadHash: { type: String, default: undefined },
+    quickSaleHistory: {
+      type: [{
+        action: { type: String, required: true },
+        actorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        actorUserName: { type: String, default: '' },
+        details: { type: mongoose.Schema.Types.Mixed, default: {} },
+        createdAt: { type: Date, default: Date.now }
+      }],
+      default: []
+    },
+    quickSaleAdjustmentRequests: {
+      type: [{
+        requestId: { type: String, required: true },
+        payloadHash: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now }
+      }],
+      default: []
+    },
     orderChannel: { type: String, enum: ['manual', 'online', 'qr'], default: 'manual' },
     approvalStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
     cancelRequestStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
@@ -180,6 +202,10 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ tenantId: 1, createdAt: -1 })
 orderSchema.index({ tenantId: 1, branchId: 1, createdAt: -1 })
 orderSchema.index({ tenantId: 1, branchId: 1, orderDayKey: 1, orderNo: 1 })
+orderSchema.index(
+  { tenantId: 1, branchId: 1, quickSaleRequestId: 1 },
+  { unique: true, partialFilterExpression: { quickSaleRequestId: { $type: 'string' } } }
+)
 
 orderSchema.virtual('total').get(function () {
   const items = Array.isArray(this.items) ? this.items : []

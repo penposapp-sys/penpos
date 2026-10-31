@@ -527,11 +527,24 @@ const ensureSystemProfileForType = async ({ tenantId, system, type, station }) =
 
 export const createJob = async (tenantId, system, actorUserId, input) => {
   const type = String(input?.type || '').trim()
+  const idempotencyKey = String(input?.meta?.idempotencyKey || '').trim()
   const requestedProfileId = String(input?.profileId || '').trim()
   const stationIdRaw = String(input?.stationId || '').trim()
   const payloadType = String(input?.payload?.type || input?.payloadType || 'raw').trim()
   const payloadContent = String(input?.payload?.content || input?.payloadContent || '')
   if (!['receipt', 'label'].includes(type)) throw error('invalid_request', 'Invalid type', 400)
+  if (idempotencyKey.length > 200) throw error('invalid_request', 'Invalid idempotencyKey', 400)
+
+  if (idempotencyKey) {
+    const existing = await jobRepo.findByIdempotencyKey(tenantId, system, type, idempotencyKey)
+    if (existing) {
+      return {
+        id: String(existing._id || existing.id),
+        status: existing.status,
+        queuedWithoutStation: !existing.stationId
+      }
+    }
+  }
 
   let stationId = stationIdRaw
   let queuedWithoutStation = false
@@ -581,25 +594,37 @@ export const createJob = async (tenantId, system, actorUserId, input) => {
     throw error('printer_inactive', `Yazıcı pasif: ${type}`, 400)
   }
 
-  const created = await jobRepo.create({
-    tenantId,
-    system,
-    type,
-    stationId: st ? new mongoose.Types.ObjectId(String(st.id)) : null,
-    profileId: new mongoose.Types.ObjectId(String((resolvedProfile?.id || prf.id))),
-    status: 'queued',
-    payload: {
-      type: ['raw', 'html', 'pdf_base64'].includes(payloadType) ? payloadType : 'raw',
-      content: payloadContent
-    },
-    meta: input?.meta && typeof input.meta === 'object' ? input.meta : {},
-    attempts: 0,
-    lockedByStationId: null,
-    lockedAt: null,
-    printedAt: null,
-    lastError: null,
-    createdByUserId: actorUserId && mongoose.isValidObjectId(String(actorUserId)) ? new mongoose.Types.ObjectId(String(actorUserId)) : null
-  })
+  let created
+  try {
+    created = await jobRepo.create({
+      tenantId,
+      system,
+      type,
+      stationId: st ? new mongoose.Types.ObjectId(String(st.id)) : null,
+      profileId: new mongoose.Types.ObjectId(String((resolvedProfile?.id || prf.id))),
+      status: 'queued',
+      payload: {
+        type: ['raw', 'html', 'pdf_base64'].includes(payloadType) ? payloadType : 'raw',
+        content: payloadContent
+      },
+      meta: input?.meta && typeof input.meta === 'object' ? input.meta : {},
+      attempts: 0,
+      lockedByStationId: null,
+      lockedAt: null,
+      printedAt: null,
+      lastError: null,
+      createdByUserId: actorUserId && mongoose.isValidObjectId(String(actorUserId)) ? new mongoose.Types.ObjectId(String(actorUserId)) : null
+    })
+  } catch (err) {
+    if (err?.code !== 11000 || !idempotencyKey) throw err
+    const existing = await jobRepo.findByIdempotencyKey(tenantId, system, type, idempotencyKey)
+    if (!existing) throw err
+    return {
+      id: String(existing._id || existing.id),
+      status: existing.status,
+      queuedWithoutStation: !existing.stationId
+    }
+  }
   return { id: String(created.id), status: created.status, queuedWithoutStation }
 }
 

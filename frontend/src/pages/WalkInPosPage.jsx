@@ -31,7 +31,7 @@ import { readSalesEntryDate, todayYmd, writeSalesEntryDate } from '../lib/salesE
 import useVirtualProductGrid from '../hooks/useVirtualProductGrid.js'
 import { diffPerfCounter, getPerfNow, incrementPerfCounter, isPerfDebugEnabled, logPerf, markPerfEnd, markPerfStart, snapshotPerfCounter } from '../lib/perfDebug.js'
 
-export default function WalkInPosPage() {
+export default function WalkInPosPage({ quickSale = false } = {}) {
   const perfDebugEnabled = isPerfDebugEnabled()
   const nav = useNavigate()
   const location = useLocation()
@@ -66,6 +66,7 @@ export default function WalkInPosPage() {
   })
 
   const [order, setOrder] = useState(null)
+  const isQuickSaleOrder = quickSale || order?.saleSource === 'quick-sale'
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [payOpen, setPayOpen] = useState(false)
@@ -113,6 +114,14 @@ export default function WalkInPosPage() {
   const [orderCancelConfirmOpen, setOrderCancelConfirmOpen] = useState(false)
   const [itemCancelConfirmOpen, setItemCancelConfirmOpen] = useState(false)
   const [customerNameDraft, setCustomerNameDraft] = useState('')
+  const [quickSaleStarting, setQuickSaleStarting] = useState(false)
+  const [quickSaleStartError, setQuickSaleStartError] = useState('')
+  const [quickSaleFinalizing, setQuickSaleFinalizing] = useState(false)
+  const [quickSaleFinalizeError, setQuickSaleFinalizeError] = useState('')
+  const quickSaleStartRequestedRef = useRef(false)
+  const quickSaleFinalizingRef = useRef(new Set())
+  const quickSaleCompletedRef = useRef(new Set())
+  const quickSaleReceiptQueuedRef = useRef(new Set())
   
   const [busy, setBusy] = useState(false)
   const [qtyDraftByRow, setQtyDraftByRow] = useState(() => ({}))
@@ -685,16 +694,16 @@ export default function WalkInPosPage() {
   }
 
   useEffect(() => {
-    if (isOrderView) return
+    if (isOrderView || quickSale) return
     loadActiveOrders()
-  }, [isOrderView, Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : ''])
+  }, [isOrderView, quickSale, Array.isArray(allowedBranchIds) ? allowedBranchIds.join(',') : ''])
 
   useEffect(() => {
-    if (isOrderView) return
+    if (isOrderView || quickSale) return
     const removedOrderId = location?.state?.removedOrderId || null
     if (!removedOrderId) return
     setActiveOrders(prev => prev.filter(o => String(getListOrderId(o)) !== String(removedOrderId)))
-  }, [isOrderView, location?.state?.removedOrderId])
+  }, [isOrderView, quickSale, location?.state?.removedOrderId])
 
   useEffect(() => {
     if (!selectedOrderId || !isOrderView) {
@@ -714,32 +723,73 @@ export default function WalkInPosPage() {
     run()
   }, [selectedOrderId, isOrderView])
 
-  const startWalkInOrder = async () => {
-    const createWalkInOrderForBranch = async (branchIdOverride) => {
-      try {
-        const res = await api('/api/pos/walkin/orders', {
-          method: 'POST',
-          data: { customerName: 'Misafir', note: '', entryDate },
-          branchIdOverride,
-          silent: true
-        })
-        const fresh = pickOrder(res)
-        const newId = getOrderId(fresh)
-        if (!newId) {
-          toast.error('Sipariş başlatılamadı')
-          return
-        }
-        nav(`/restoran/app/walkin/${newId}`)
-      } catch (err) {
-        toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
-      }
+  const createWalkInOrderForBranch = async (branchIdOverride) => {
+    if (quickSale) {
+      setQuickSaleStarting(true)
+      setQuickSaleStartError('')
     }
+    try {
+      const res = await api('/api/pos/walkin/orders', {
+        method: 'POST',
+        data: { customerName: 'Misafir', note: '', entryDate, ...(quickSale ? { saleSource: 'quick-sale' } : {}) },
+        branchIdOverride,
+        silent: true
+      })
+      if (!res?.ok || res?.success === false) {
+        throw new Error(res?.message || res?.data?.message || 'Sipariş başlatılamadı')
+      }
+      const fresh = pickOrder(res)
+      const newId = getOrderId(fresh)
+      if (!newId) throw new Error('Sipariş başlatılamadı')
+      nav(`/restoran/app/${quickSale ? 'quick-sale' : 'walkin'}/${newId}`)
+      return true
+    } catch (err) {
+      const message = err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.'
+      if (quickSale) {
+        setQuickSaleStarting(false)
+        setQuickSaleStartError(message)
+        quickSaleStartRequestedRef.current = false
+      }
+      toast.error(message)
+      return false
+    }
+  }
 
+  const startWalkInOrder = async () => {
+    if (quickSale) setQuickSaleStarting(true)
     const currentSelectedBranchId = (() => {
       const raw = String(selectedBranchId || '').trim()
       if (raw) return raw
       try { return String(localStorage.getItem('selectedBranchId') || '').trim() } catch { return '' }
     })()
+
+    if (quickSale) {
+      const activeBranches = await loadAvailableBranches()
+      const selectedBranchIsActive = activeBranches.some((branch) => (
+        String(branch?._id || branch?.id || '').trim() === currentSelectedBranchId
+      ))
+      if (selectedBranchIsActive) {
+        await createWalkInOrderForBranch(currentSelectedBranchId)
+        return
+      }
+      if (activeBranches.length === 1) {
+        const onlyBranchId = String(activeBranches[0]?._id || activeBranches[0]?.id || '').trim()
+        try {
+          localStorage.setItem('selectedBranchId', onlyBranchId)
+          setSelectedBranchId(onlyBranchId)
+        } catch {}
+        await createWalkInOrderForBranch(onlyBranchId)
+        return
+      }
+      setQuickSaleStarting(false)
+      if (activeBranches.length > 1) {
+        setBranchPickerOpen(true)
+        return
+      }
+      setQuickSaleStartError(branchPickerError || 'Kullanılabilir aktif şube bulunamadı.')
+      return
+    }
+
     const hasSelectedAllowedBranch = currentSelectedBranchId && (
       normalizedAllowedBranchIds.length === 0 || normalizedAllowedBranchIds.includes(currentSelectedBranchId)
     )
@@ -754,12 +804,14 @@ export default function WalkInPosPage() {
         await createWalkInOrderForBranch(onlyBranchId)
         return
       }
+      if (quickSale) setQuickSaleStarting(false)
       await loadAvailableBranches()
       setBranchPickerOpen(true)
       return
     }
 
     if (user?.role === 'tenant_admin' && normalizedAllowedBranchIds.length > 1 && !currentSelectedBranchId) {
+      if (quickSale) setQuickSaleStarting(false)
       await loadAvailableBranches()
       setBranchPickerOpen(true)
       return
@@ -771,6 +823,71 @@ export default function WalkInPosPage() {
       toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
     }
   }
+
+  useEffect(() => {
+    if (!quickSale) return
+    if (isOrderView) {
+      quickSaleStartRequestedRef.current = false
+      return
+    }
+    if (quickSaleStartRequestedRef.current) return
+    quickSaleStartRequestedRef.current = true
+    void startWalkInOrder()
+  }, [quickSale, isOrderView])
+
+  const renderBranchPickerModal = () => (
+    <Modal
+      open={branchPickerOpen}
+      onClose={() => {
+        setBranchPickerOpen(false)
+        if (quickSale) {
+          setQuickSaleStartError('Satış başlatmak için şube seçin.')
+          quickSaleStartRequestedRef.current = false
+        }
+      }}
+      title="Sipariş Şubesi Seç"
+    >
+      <div style={{ display: 'grid', gap: 10 }}>
+        <div className="card" style={{ borderColor: '#bfdbfe', background: '#eff6ff' }}>
+          <div style={{ fontWeight: 700, color: '#1d4ed8' }}>Siparişi hangi şubeye gireceğinizi seçin</div>
+          <div style={{ color: 'var(--muted)', marginTop: 4 }}>
+            İşlem yapılacak şubeyi seçin.
+          </div>
+        </div>
+        {branchPickerLoading ? <div style={{ color: 'var(--muted)' }}>Şubeler yükleniyor...</div> : null}
+        {!!branchPickerError ? <div style={{ color: 'var(--danger)' }}>{branchPickerError}</div> : null}
+        {!branchPickerLoading && !branchPickerError && availableBranches.length === 0 ? (
+          <div style={{ color: 'var(--muted)' }}>Kullanılabilir şube bulunamadı.</div>
+        ) : null}
+        <div style={{ display: 'grid', gap: 8 }}>
+          {availableBranches.map((branch) => {
+            const branchId = String(branch?._id || branch?.id || '').trim()
+            return (
+              <button
+                key={branchId}
+                className="btn"
+                type="button"
+                onClick={async () => {
+                  try {
+                    localStorage.setItem('selectedBranchId', branchId)
+                    setSelectedBranchId(branchId)
+                    window.dispatchEvent(new CustomEvent('selected_branch_changed', { detail: { branchId } }))
+                  } catch {}
+                  setBranchPickerOpen(false)
+                  await createWalkInOrderForBranch(branchId)
+                }}
+                disabled={branchPickerLoading || !branchId}
+                style={{ justifyContent: 'space-between', display: 'flex' }}
+              >
+                <span>{branch?.name || 'Şube'}</span>
+                <span style={{ color: 'var(--muted)' }}>{branchId === selectedBranchId ? 'Seçili' : 'Seç'}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </Modal>
+  )
 
   const currentOrderId = selectedOrderId || getOrderId(order)
   const cartCounts = useMemo(() => {
@@ -1233,7 +1350,10 @@ export default function WalkInPosPage() {
       return
     }
     const res = await safeAction(
-      (signal) => api(`/api/pos/orders/${orderId}/note`, { method: 'PUT', data: { note: nextNote }, signal, silent: true }),
+      (signal) => api(
+        isQuickSaleOrder ? `/api/pos/quick-sales/${orderId}/note` : `/api/pos/orders/${orderId}/note`,
+        { method: 'PUT', data: { note: nextNote }, signal, silent: true }
+      ),
       { reload: false }
     )
     const fresh = pickOrder(res)
@@ -1340,6 +1460,67 @@ export default function WalkInPosPage() {
     await reloadOrder().catch(() => null)
   }
 
+  const finalizeQuickSale = async (paidOrder) => {
+    const orderId = getOrderId(paidOrder)
+    if (!quickSale || !orderId || paidOrder?.paymentStatus !== 'paid') return
+    const orderKey = String(orderId)
+    if (quickSaleCompletedRef.current.has(orderKey) || quickSaleFinalizingRef.current.has(orderKey)) return
+
+    quickSaleFinalizingRef.current.add(orderKey)
+    setQuickSaleFinalizing(true)
+    setQuickSaleFinalizeError('')
+    try {
+      const currentRes = await api(`/api/pos/orders/${orderKey}`, { silent: true })
+      const latestOrder = pickOrder(currentRes) || paidOrder
+      if (latestOrder.paymentStatus !== 'paid') {
+        throw new Error('Ödeme tamamlanmadığı için mutfak ve fiş işlemleri başlatılamadı.')
+      }
+
+      const openItems = (Array.isArray(latestOrder.items) ? latestOrder.items : [])
+        .some((item) => item && item.status === 'open')
+      if (openItems) {
+        const kitchenRes = await api(`/api/pos/orders/${orderKey}/send`, {
+          method: 'PUT',
+          data: {
+            servingType: latestOrder.servingType || servingType,
+            kitchenEnabled: true,
+            sendToKitchen: true
+          },
+          silent: true
+        })
+        if (kitchenRes?.success === false) {
+          throw new Error(kitchenRes?.message || 'Sipariş mutfağa gönderilemedi.')
+        }
+      }
+
+      if (!quickSaleReceiptQueuedRef.current.has(orderKey)) {
+        await enqueueReceiptPrint({
+          system: 'kermes',
+          orderId: orderKey,
+          copyCount: 1,
+          idempotencyKey: `quick-sale-receipt:${orderKey}`
+        })
+        quickSaleReceiptQueuedRef.current.add(orderKey)
+      }
+
+      quickSaleCompletedRef.current.add(orderKey)
+      setQuickSaleFinalizeError('')
+      toast.success('Satış tamamlandı; sipariş mutfağa gönderildi ve fiş yazdırma kuyruğuna alındı.')
+    } catch (err) {
+      const message = err?.data?.message || err?.message || 'Hızlı satış tamamlanamadı.'
+      setQuickSaleFinalizeError(`Satış kaydedildi; otomatik mutfak/fiş işlemi tamamlanamadı: ${message}`)
+      toast.error(message)
+    } finally {
+      quickSaleFinalizingRef.current.delete(orderKey)
+      setQuickSaleFinalizing(quickSaleFinalizingRef.current.size > 0)
+    }
+  }
+
+  useEffect(() => {
+    if (quickSale && order?.saleSource === 'quick-sale' && order?.paymentStatus === 'paid') {
+      void finalizeQuickSale(order)
+    }
+  }, [quickSale, order?.id, order?._id, order?.saleSource, order?.paymentStatus])
 
   const payOrder = async ({ itemAllocations = [] } = {}) => {
     if (!canTakePayment) {
@@ -1361,12 +1542,16 @@ export default function WalkInPosPage() {
       (signal) => api(`/api/pos/orders/${currentOrderId}/payments`, { method: 'POST', data: { method: paymentMethod, amount, note: paymentNote, itemAllocations, entryDate: paymentEntryDate }, signal, silent: true }),
       { reload: false }
     )
+    if (!res) return
     const fresh = pickOrder(res)
     if (fresh) {
       setNote(fresh.note || '')
       const due = Number(fresh.balanceDue ?? fresh.totals?.balanceDue ?? 0)
       setPaymentAmount(due > 0 ? String(due) : '')
       setPaymentNote('')
+      if (quickSale && fresh.paymentStatus === 'paid') {
+        await finalizeQuickSale(fresh)
+      }
     }
     await reloadOrder().catch(() => null)
   }
@@ -1737,6 +1922,35 @@ export default function WalkInPosPage() {
   }
 
   if (!isOrderView) {
+    if (quickSale) {
+      return (
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div className="card" style={{ ...topbarStyle, justifyContent: 'flex-start', gap: 12 }}>
+            <strong style={{ color: '#b91c1c', fontSize: 18 }}>HIZLI SATIŞ</strong>
+            <span style={{ color: 'var(--muted)' }}>
+              {quickSaleStarting ? 'Satış ekranı hazırlanıyor…' : 'Satış için şube seçimi bekleniyor.'}
+            </span>
+          </div>
+          {quickSaleStartError ? (
+            <div className="card" role="alert" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <span style={{ color: 'var(--danger)' }}>{quickSaleStartError}</span>
+              <button
+                className="btn btn--primary"
+                type="button"
+                disabled={quickSaleStarting}
+                onClick={() => {
+                  quickSaleStartRequestedRef.current = true
+                  void startWalkInOrder()
+                }}
+              >
+                Tekrar Dene
+              </button>
+            </div>
+          ) : null}
+          {renderBranchPickerModal()}
+        </div>
+      )
+    }
     return (
       <div style={{ display: 'grid', gap: 12 }}>
         <div className="card" style={topbarStyle}>
@@ -1761,7 +1975,8 @@ export default function WalkInPosPage() {
             const color = ui === 'ready' ? '#166534' : ui === 'sent' ? '#9a3412' : '#4b5563'
             const borderColor = ui === 'ready' ? '#86efac' : ui === 'sent' ? '#fdba74' : '#e5e7eb'
             const customerName = String(o.customerName || '').trim() || 'Misafir'
-            const title = `Masasız Satış — ${customerName} • ${o?.orderNo ? `Sipariş ${o.orderNo}` : 'Sipariş —'}`
+            const isQuickSale = o.saleSource === 'quick-sale'
+            const title = `${isQuickSale ? 'Hızlı Satış' : 'Masasız Satış'} — ${customerName} • ${o?.orderNo ? `Sipariş ${o.orderNo}` : 'Sipariş —'}`
             const totals = o?.totals || {}
             const netTotal = Number(totals.netTotal ?? totals.grandTotal ?? totals.total ?? o?.netTotal ?? o?.total ?? 0)
             const balanceDue = Number(totals.balanceDue ?? o?.balanceDue ?? 0)
@@ -1773,12 +1988,12 @@ export default function WalkInPosPage() {
                 onClick={() => nav(`/restoran/app/walkin/${oid}`)}
                 style={{ cursor: 'pointer', display: 'grid', gap: 8, borderColor, position: 'relative' }}
               >
-                <span className="page-pill" style={{ position: 'absolute', top: 10, left: 10, background: '#f3f4f6', borderColor: '#d1d5db', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span className="page-pill" style={{ position: 'absolute', top: 10, left: 10, background: isQuickSale ? '#fef2f2' : '#f3f4f6', borderColor: isQuickSale ? '#fecaca' : '#d1d5db', color: isQuickSale ? '#b91c1c' : '#374151', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     <path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
-                  MASASIZ
+                  {isQuickSale ? 'HIZLI SATIŞ' : 'MASASIZ'}
                 </span>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
                   <div style={{ fontWeight: 800, lineHeight: 1.2 }}>{customerName}</div>
@@ -1799,6 +2014,7 @@ export default function WalkInPosPage() {
             )
           })}
         </div>
+        {renderBranchPickerModal()}
       </div>
     )
   }
@@ -1813,48 +2029,81 @@ export default function WalkInPosPage() {
           onClick={() => setMobileCartExpanded(false)}
         />
       )}
+      {quickSaleFinalizeError ? (
+        <div className="card" role="alert" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, borderColor: '#fca5a5' }}>
+          <span style={{ color: 'var(--danger)' }}>{quickSaleFinalizeError}</span>
+          <button
+            className="btn"
+            type="button"
+            disabled={quickSaleFinalizing}
+            onClick={() => void finalizeQuickSale(order)}
+          >
+            {quickSaleFinalizing ? 'Gönderiliyor…' : 'Tekrar Dene'}
+          </button>
+        </div>
+      ) : null}
       <div className="card stickyTop" style={topbarStyle}>
-        <button className="btn" onClick={() => nav('/restoran/app/walkin')}>← Geri</button>
+        {isQuickSaleOrder ? (
+          <>
+            <button className="btn" onClick={() => nav('/restoran/app/walkin')}>← Geri</button>
+            <div style={{ fontSize: 14, color: '#b91c1c', fontWeight: 900, whiteSpace: 'nowrap' }}>HIZLI SATIŞ</div>
+          </>
+        ) : (
+          <button className="btn" onClick={() => nav('/restoran/app/walkin')}>← Geri</button>
+        )}
         <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', whiteSpace: 'nowrap', minWidth: 0 }}>
-            <span>Masasız Satış —</span>
-            <input
-              className="input"
-              value={customerNameDraft}
-              placeholder="Misafir"
-              onChange={(e) => setCustomerNameDraft(e.target.value)}
-              onBlur={async () => {
-                if (!getOrderId(order) || busy) return
-                const next = String(customerNameDraft || '').trim() || 'Misafir'
-                const current = String(order?.customerName || '').trim() || 'Misafir'
-                if (next === current) {
-                  setCustomerNameDraft(current)
-                  return
-                }
-                await saveCustomerName(next)
-              }}
-              onKeyDown={async (e) => {
-                if (e.key !== 'Enter') return
-                e.preventDefault()
-                if (!getOrderId(order) || busy) return
-                const next = String(customerNameDraft || '').trim() || 'Misafir'
-                await saveCustomerName(next)
-              }}
-              disabled={!getOrderId(order) || busy}
-              style={{
-                height: 28,
-                padding: '4px 8px',
-                fontSize: 12,
-                maxWidth: 180,
-                width: 160,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            />
+            {!isQuickSaleOrder ? (
+              <>
+                <span>Masasız Satış —</span>
+                <input
+                  className="input"
+                  value={customerNameDraft}
+                  placeholder="Misafir"
+                  onChange={(e) => setCustomerNameDraft(e.target.value)}
+                  onBlur={async () => {
+                    if (!getOrderId(order) || busy) return
+                    const next = String(customerNameDraft || '').trim() || 'Misafir'
+                    const current = String(order?.customerName || '').trim() || 'Misafir'
+                    if (next === current) {
+                      setCustomerNameDraft(current)
+                      return
+                    }
+                    await saveCustomerName(next)
+                  }}
+                  onKeyDown={async (e) => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    if (!getOrderId(order) || busy) return
+                    const next = String(customerNameDraft || '').trim() || 'Misafir'
+                    await saveCustomerName(next)
+                  }}
+                  disabled={!getOrderId(order) || busy}
+                  style={{
+                    height: 28,
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    maxWidth: 180,
+                    width: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                />
+              </>
+            ) : null}
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
               • {order?.orderNo ? `Sipariş ${order.orderNo}` : `Sipariş #${String(selectedOrderId).slice(-6)}`}
+              {order?.createdAt ? ` • ${new Date(order.createdAt).toLocaleString('tr-TR')}` : ''}
             </span>
+            {isQuickSaleOrder && order ? (
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                • {order.paymentStatus === 'paid' ? 'Tahsil edildi' : 'Eksik tahsilat'}
+                {Array.isArray(order.payments) && order.payments.length
+                  ? ` · ${order.payments.map((payment) => `${paymentMethodLabel(payment)} ${Number(payment.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`).join(', ')}`
+                  : ''}
+              </span>
+            ) : null}
           </div>
           {Math.abs(signedBalance) > 0.01 && (
             <span
@@ -1888,13 +2137,13 @@ export default function WalkInPosPage() {
             ) : null}
           </div>
         ) : null}
-        <button
+        {!isQuickSaleOrder ? <button
           className="btn btn--danger btn--close-action"
           onClick={closeSelectedOrder}
           disabled={!getOrderId(order) || busy}
         >
           Kapat
-        </button>
+        </button> : null}
       </div>
 
       <div className="walkin-sales-page__body" style={{ flex: 1, minHeight: 0, overflow: isMobilePortrait ? 'visible' : 'hidden' }}>
@@ -2105,9 +2354,9 @@ export default function WalkInPosPage() {
                         opacity: (it?.status === 'completed' || it?.status === 'cancelled') ? 0.6 : 1
                       }}
                       onInfoClick={() => {
-                        if (isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId })
+                        if (!isQuickSaleOrder && isOpen && isWeightBased && !isMultiGroup) openWeightEditor({ ...it, itemId })
                       }}
-                      infoStyle={isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
+                      infoStyle={!isQuickSaleOrder && isOpen && isWeightBased && !isMultiGroup ? { cursor: 'pointer' } : undefined}
                       title={it?.nameSnapshot}
                       badge={badge ? (
                         <span className={`page-pill sale-cart-line-status${it?.status === 'open' ? ' sale-cart-line-status--open-dark' : ''}`} style={{ background: badge.bg, borderColor: badge.border, color: badge.color }}>
@@ -2134,7 +2383,7 @@ export default function WalkInPosPage() {
                                   const nextQty = currentQty <= 1 ? 0 : currentQty - 1
                                   setItemQtyByRow(row, nextQty)
                                 }}
-                                disabled={disableBase || isMultiGroup || isQtyLocked}
+                                disabled={disableBase || isQuickSaleOrder || isMultiGroup || isQtyLocked}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               >
                                 -
@@ -2154,7 +2403,7 @@ export default function WalkInPosPage() {
                                   const nextQty = currentQty + 1
                                   setItemQtyByRow(row, nextQty)
                                 }}
-                                disabled={disableBase || isMultiGroup || isQtyLocked}
+                                disabled={disableBase || isMultiGroup || isQtyLocked || (isQuickSaleOrder && isWeightBased)}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               >
                                 +
@@ -2207,7 +2456,7 @@ export default function WalkInPosPage() {
                                     activeQtyRowKeyRef.current = null
                                     commitQtyDraft(row.key, selectedOrderId || getOrderId(order), itemId, row.qty, e.target.value)
                                   }}
-                                  disabled={disableBase || isMultiGroup || isQtyLocked || isWeightBased}
+                                  disabled={disableBase || isQuickSaleOrder || isMultiGroup || isQtyLocked || isWeightBased}
                                 />
                               )}
                             </>
@@ -2238,7 +2487,7 @@ export default function WalkInPosPage() {
                                   setSelectedItemForCancel(row.itemId)
                                   setItemCancelConfirmOpen(true)
                                 }}
-                                disabled={disableBase || isCancelLocked || isMultiGroup}
+                                disabled={disableBase || isQuickSaleOrder || isCancelLocked || isMultiGroup}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                                 style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' }}
                               >
@@ -2257,7 +2506,7 @@ export default function WalkInPosPage() {
                                 setSelectedItemForCancel(row.itemId)
                                 setItemCancelConfirmOpen(true)
                               }}
-                              disabled={disableBase || isCancelLocked}
+                              disabled={disableBase || isQuickSaleOrder || isCancelLocked}
                               title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' }}
                             >
@@ -2323,7 +2572,7 @@ export default function WalkInPosPage() {
                       onClick={openPaymentModal}
                       disabled={!getOrderId(order)}
                     >Ödeme Al</button>
-                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
+                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={isQuickSaleOrder || order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
 
                     <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--print" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
                     <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--preview" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
@@ -2340,7 +2589,7 @@ export default function WalkInPosPage() {
       open={payOpen}
       onClose={() => setPayOpen(false)}
       order={order}
-      customerLabel="Masasız Satış"
+      customerLabel={isQuickSaleOrder ? 'Hızlı Satış' : 'Masasız Satış'}
       payMethods={payMethods}
       paymentMethod={paymentMethod}
       onPaymentMethodChange={setPaymentMethod}
@@ -2354,7 +2603,7 @@ export default function WalkInPosPage() {
       canTakePayment={canTakePayment}
       busy={busy}
       previousLines={previousLines}
-      onDeleteLine={(line) => {
+      onDeleteLine={isQuickSaleOrder ? undefined : (line) => {
         if (line.kind === 'payment') return deletePayment(line.id)
         if (line.kind === 'veresiye') return deleteVeresiyeEntry(line.id)
         if (line.kind === 'collection') return deleteCollection(line.id)
@@ -2363,11 +2612,11 @@ export default function WalkInPosPage() {
       selectedPaymentIsCash={selectedPaymentIsCash}
       changeDue={changeDue}
       onSubmit={payOrder}
-      showDiscount
+      showDiscount={!isQuickSaleOrder}
       discountDraft={discountDraft}
       onDiscountDraftChange={setDiscountDraft}
       onApplyDiscount={applyDiscount}
-      showVeresiye={!creditAccountsDisabled && canCreateVeresiye}
+      showVeresiye={!isQuickSaleOrder && !creditAccountsDisabled && canCreateVeresiye}
       onOpenVeresiye={openVeresiye}
     />
     <Modal open={veresiyeOpen} onClose={() => setVeresiyeOpen(false)} title="Veresiye Yap">
@@ -2560,62 +2809,7 @@ export default function WalkInPosPage() {
       }}
     />
 
-    <Modal open={branchPickerOpen} onClose={() => setBranchPickerOpen(false)} title="Sipariş Şubesi Seç">
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div className="card" style={{ borderColor: '#bfdbfe', background: '#eff6ff' }}>
-          <div style={{ fontWeight: 700, color: '#1d4ed8' }}>Siparişi hangi şubeye gireceğinizi seçin</div>
-          <div style={{ color: 'var(--muted)', marginTop: 4 }}>
-            Ana kullanıcıda tüm masalar görünür; yeni hızlı satış ve paket sipariş için önce işlem yapılacak şube seçilir.
-          </div>
-        </div>
-        {branchPickerLoading ? <div style={{ color: 'var(--muted)' }}>Şubeler yükleniyor...</div> : null}
-        {!!branchPickerError ? <div style={{ color: 'var(--danger)' }}>{branchPickerError}</div> : null}
-        {!branchPickerLoading && !branchPickerError && availableBranches.length === 0 ? (
-          <div style={{ color: 'var(--muted)' }}>Kullanılabilir şube bulunamadı.</div>
-        ) : null}
-        <div style={{ display: 'grid', gap: 8 }}>
-          {availableBranches.map((branch) => {
-            const branchId = String(branch?._id || branch?.id || '').trim()
-            return (
-              <button
-                key={branchId}
-                className="btn"
-                type="button"
-                onClick={async () => {
-                  try {
-                    localStorage.setItem('selectedBranchId', branchId)
-                    setSelectedBranchId(branchId)
-                    window.dispatchEvent(new CustomEvent('selected_branch_changed', { detail: { branchId } }))
-                  } catch {}
-                  setBranchPickerOpen(false)
-                  await api('/api/pos/walkin/orders', {
-                    method: 'POST',
-                    data: { customerName: 'Misafir', note: '', entryDate },
-                    branchIdOverride: branchId,
-                    silent: true
-                  }).then((res) => {
-                    const fresh = pickOrder(res)
-                    const newId = getOrderId(fresh)
-                    if (!newId) {
-                      toast.error('Sipariş başlatılamadı')
-                      return
-                    }
-                    nav(`/restoran/app/walkin/${newId}`)
-                  }).catch((err) => {
-                    toast.error(err?.data?.message || err?.message || 'Sunucu hatası. Tekrar deneyin.')
-                  })
-                }}
-                disabled={branchPickerLoading || !branchId}
-                style={{ justifyContent: 'space-between', display: 'flex' }}
-              >
-                <span>{branch?.name || 'Şube'}</span>
-                <span style={{ color: 'var(--muted)' }}>{branchId === selectedBranchId ? 'Seçili' : 'Seç'}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </Modal>
+    {renderBranchPickerModal()}
 
     </div>
   )

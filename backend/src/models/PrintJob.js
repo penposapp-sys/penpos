@@ -24,5 +24,12 @@ const schema = new mongoose.Schema(
 )
 
 schema.index({ tenantId: 1, system: 1, stationId: 1, status: 1, createdAt: 1 })
+schema.index(
+  { tenantId: 1, system: 1, type: 1, 'meta.idempotencyKey': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { 'meta.idempotencyKey': { $type: 'string' } }
+  }
+)
 
 export default mongoose.model('PrintJob', schema)

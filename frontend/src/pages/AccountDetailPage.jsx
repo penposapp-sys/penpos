@@ -415,7 +415,7 @@ export default function AccountDetailPage() {
     if (!txId || !accountId) return
     setDeleteLoading(true)
     try {
-      const res = await api(`/api/restoran/cari/transactions/${txId}`, { method: 'DELETE', silent: true })
+      const res = await api(`/api/accounts/transactions/${txId}`, { method: 'DELETE', silent: true })
       if (!res?.ok) {
         const code = res?.code
         if (code === 'payment_locked') toast.error('Bu hareket silinemez')
@@ -427,6 +427,11 @@ export default function AccountDetailPage() {
       setDeleteOpen(false)
       setDeleteTarget(null)
       await reloadAccount(accountId)
+    } catch (err) {
+      const code = err?.code || err?.data?.code
+      if (code === 'payment_locked') toast.error('Bu hareket sipariş ödemesine bağlı olduğu için silinemez.')
+      else if (code === 'forbidden') toast.error('Tahsilat silme yetkiniz bulunmuyor.')
+      else toast.error(err?.data?.message || err?.message || 'Tahsilat silinemedi.')
     } finally {
       setDeleteLoading(false)
     }
@@ -898,7 +903,7 @@ export default function AccountDetailPage() {
                   </div>
                 </div>
                 <div className="payment-discount-presets" aria-label="Hazır indirim oranları">
-                  {[1, 5, 10, 15, 20, 25, 30].map((percent) => (
+                  {[1, 5, 10, 15, 20, 25, 30, 100].map((percent) => (
                     <button
                       key={percent}
                       type="button"

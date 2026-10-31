@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
 import Reservation from '../models/Reservation.js'
+import Order from '../models/Order.js'
 
 dotenv.config()
 
@@ -44,6 +45,13 @@ const syncReservationSlotIndex = async () => {
   }
 }
 
+const syncQuickSaleRequestIndex = async () => {
+  await Order.collection.createIndex(
+    { tenantId: 1, branchId: 1, quickSaleRequestId: 1 },
+    { unique: true, partialFilterExpression: { quickSaleRequestId: { $type: 'string' } } }
+  )
+}
+
 export const connectDB = async () => {
   const uri = (process.env.MONGODB_URI || process.env.MONGO_URI || '').trim()
   try {
@@ -60,6 +68,7 @@ export const connectDB = async () => {
     })
     await syncUserIndexes()
     await syncReservationSlotIndex()
+    await syncQuickSaleRequestIndex()
     try {
       const admin = mongoose.connection.db.admin()
       let info

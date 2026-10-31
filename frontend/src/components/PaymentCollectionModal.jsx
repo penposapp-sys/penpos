@@ -469,7 +469,7 @@ export default function PaymentCollectionModal({
                           </div>
                         </div>
                         <div className="payment-discount-presets" aria-label="Hazır indirim oranları">
-                          {[1, 5, 10, 15, 20, 25, 30].map((percent) => (
+                          {[1, 5, 10, 15, 20, 25, 30, 100].map((percent) => (
                             <button
                               key={percent}
                               type="button"

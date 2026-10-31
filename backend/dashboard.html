@@ -10,7 +10,7 @@
         </a>
     </div>
 
-    <div class="left-menu-inner scroll-pane jspScrollable" tabindex="0" style="overflow: hidden; padding: 0px; width: 219px;">
+    <div class="left-menu-inner scroll-pane left-menu-resp jspScrollable" tabindex="0" style="overflow: hidden; padding: 0px; width: 219px;">
         
     <div class="jspContainer" style="width: 219px; height: 520px;"><div class="jspPane" style="padding: 0px; top: 0px; width: 213px;"><ul class="left-menu-list left-menu-list-root list-unstyled">
             <!--//Todo: Girmemesi için false eklendi, kaldırılacak sonradan-->
@@ -52,12 +52,12 @@
                         </li>
                             <li class="left-menu-list-separator"></li>
                             <li class="left-menu-list-item">
-                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingInvoiceList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Fatura </a>
+                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingInvoiceList?minDate=2026-08-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Fatura </a>
                             </li>
 
                         <li class="left-menu-list-separator"></li>
                         <li class="left-menu-list-item">
-                            <a class="left-menu-link" href="/IncomingInvoice/IncomingInvoiceList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-download"></i> Gelen e-Fatura </a>
+                            <a class="left-menu-link" href="/IncomingInvoice/IncomingInvoiceList?minDate=2026-08-01"><i class="left-menu-link-icon icmn-file-download"></i> Gelen e-Fatura </a>
                         </li>
                         <li class="left-menu-list-separator"></li>
                         <li class="left-menu-list-item">
@@ -81,7 +81,7 @@
 
                             <li class="left-menu-list-separator"></li>
                             <li class="left-menu-list-item">
-                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingArchiveList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Arşiv </a>
+                                <a class="left-menu-link" href="/OutgoingInvoice/OutgoingArchiveList?minDate=2026-08-01"><i class="left-menu-link-icon icmn-file-upload"></i> Giden e-Arşiv </a>
                             </li>
 
                         <li class="left-menu-list-separator"></li>
@@ -172,7 +172,7 @@
                     </li>
                     <li class="left-menu-list-separator"></li>
                     <li class="left-menu-list-item">
-                        <a class="left-menu-link" href="/Payment/CommonPaymentList?minDate=2026-07-01"><i class="left-menu-link-icon icmn-file-download"></i> Fatura Ödeme Listesi </a>
+                        <a class="left-menu-link" href="/Payment/CommonPaymentList?minDate=2026-08-01"><i class="left-menu-link-icon icmn-file-download"></i> Fatura Ödeme Listesi </a>
                     </li>
                 </ul>
             </li>
@@ -366,7 +366,7 @@
                         <li>
                             <a class="dropdown-item" href="#">
                                 <i class="dropdown-icon icmn-earth"></i>
-                                turmob-19
+                                turmob-26
                             </a>
                         </li>
 
@@ -446,7 +446,7 @@
                         <span class="newheader-top-action__icon"><i class="fa fa-ticket"></i></span>
                         <span class="newheader-top-action__content">
                             <span class="newheader-top-action__label">KALAN KONTÖR</span>
-                            <span class="newheader-top-action__value">1730</span>
+                            <span class="newheader-top-action__value">1723</span>
                         </span>
                     </a>
 
@@ -529,7 +529,7 @@
                     <h4 style="display: inline; margin:-2px; padding: inherit">Anasayfa</h4>
                 </div>
                 <div class="panel-body">
-                    <input name="__RequestVerificationToken" type="hidden" value="WQeUJjP6jQpfEWkGQXGbYdOgOTGFJAeqk8Z0NE533lWgJkbAjuje2jE-ih2SDk17PCtJLerGd29S0h_nHkjKbf2L-2e430LwlyjFrN7YsQFd2WBlqMidPC1E1jPEscpe0">
+                    <input name="__RequestVerificationToken" type="hidden" value="OUnGCMTh6n5trINKDrUdoFu8gcakJTA7pACnp5oQjo7cMJG1mmEdt6Z1-bNWyUBxzGm9DWlmnxin6L8D0nE6MTVCnoKIgLyPoYSOTJVIfvaT2R3LY9LnusSWp87AsrEg0">
                     
 
 
@@ -567,7 +567,7 @@
                     <h5 style="font-weight:bold !important" class="text-uppercase">Gelen Okunmayan E-Fatura</h5>
                     <i class="counter-icon icmn-file-download"></i>
                     <span class="counter-count">
-                        <span class="unread-invoice-counter">19</span>
+                        <span class="unread-invoice-counter">20</span>
 
                     </span>
                 </div>
@@ -597,7 +597,7 @@
                     <h5 style="font-weight:bold !important" class="text-uppercase">Gelen E-Fatura</h5>
                     <i class="counter-icon icmn-file-download"></i>
                     <span class="counter-count">
-                        <span class="incoming-invoice-counter">22</span>
+                        <span class="incoming-invoice-counter">23</span>
 
                     </span>
                 </div>
@@ -1383,7 +1383,7 @@
 
             var url = window.location.pathname;
             var activePage = stripTrailingSlash(url);
-            console.log(activePage)
+            //console.log(activePage)
             $('nav li a').each(function () {
                 var currentPage = stripTrailingSlash($(this).attr('href'));
                 if (activePage == currentPage) {
@@ -1394,8 +1394,7 @@
 
     </script>
     <!-- End Page Scripts -->
-		<!--TURMOBGELISTIRME DEFER OLARAK EKLENDI -->
-        <script defer="" src="/Scripts/shortkeys.js"></script>
+        <script defer="" src="/Scripts/keyboard-shortcuts.js"></script>
         <script defer="" src="/Scripts/turmob_batch_log_modal.js"></script>
         <script defer="" src="/Scripts/turmob_para_tutar_format.js"></script>
         <script defer="" src="/Scripts/irsaliye-detay-aktarim.js"></script>
@@ -1404,7 +1403,17 @@
         <script defer="" src="/Scripts/turmob_istisna.js"></script>
         <script defer="" src="/Scripts/turmob_invoice_menu_manager.js"></script>
         <script defer="" src="/Scripts/turmob_emm_rapor_batch.js"></script>
-   
+    <!-- Global site tag (gtag.js) - Google Analytics
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-131041380-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-131041380-1');
+    </script>  -->
+
+
         <div id="chatContent">
             <script>
 	window.fwSettings={
@@ -1439,7 +1448,6 @@
 
 
     
-
 
 
 <div class="enjoyhint enjoyhint-step-1"><div class="enjoyhint_svg_wrapper enjoyhint_svg_transparent"><svg width="1120" height="840" class="enjoyhint_canvas enjoyhint_svg"><defs><marker id="arrowMarker" viewBox="0 0 36 21" refX="21" refY="10" markerUnits="strokeWidth" orient="auto" markerWidth="16" markerHeight="12"><path style="fill:none; stroke:rgb(255,255,255); stroke-width:2" d="M0,0 c30,11 30,9 0,20"></path></marker></defs><path style="fill:none; stroke:rgb(255,255,255); stroke-width:3" marker-end="url(#arrowMarker)" d="M646,258 Q719,258 719,130" id="enjoyhint_arrpw_line"></path></svg></div><div id="kinetic_container"><div class="kineticjs-content" role="presentation" style="position: relative; display: inline-block; width: 1120px; height: 840px;"><canvas width="1120" height="840" style="padding: 0px; margin: 0px; border: 0px; background: transparent; position: absolute; top: 0px; left: 0px; width: 1120px; height: 840px;"></canvas></div></div><canvas id="enj_canvas" width="1120" height="840" class="enjoyhint_canvas"></canvas><div class="enjoyhint_disable_events" style="top: 0px; left: 0px; height: 0px;"></div><div class="enjoyhint_disable_events" style="top: 110px; left: 0px;"></div><div class="enjoyhint_disable_events" style="top: 0px; left: 0px; width: 649px;"></div><div class="enjoyhint_disable_events" style="top: 0px; left: 789px;"></div><div class="enjoyhint_skip_btn" style="left: 274px; top: 311px;">Kapat</div><div class="enjoyhint_next_btn" style="left: 164px; top: 311px;">İlerle</div><div class="enjoyhint_close_btn" style="right: 10px; top: 10px;"></div><div class="enjoy_hint_label" id="enjoyhint_label" style="top: 225px; left: 164px;">Kontör satın alma, firma bilgileri güncelleme gibi  <br>işlemlerinizi buradan yapabilirsiniz..</div></div><div id="freshworks-container" data-html2canvas-ignore="true" style="width: 0px; height: 0px; bottom: 0px; right: 0px; z-index: 2147483647;"><div aria-live="polite"><iframe allowfullscreen="" id="launcher-frame" title="Help widget launcher" data-testid="launcher-frame" style="right: 22px; bottom: 22px; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; position: fixed; min-width: 104px; max-width: 156px; height: 56px; z-index: 2147483000; visibility: visible;"></iframe><iframe allowfullscreen="" id="lightbox-frame" data-testid="lightbox-frame" style="display: none;"></iframe></div></div><iframe title="FreshworksWidget" id="freshworks-frame" data-html2canvas-ignore="true" style="display: none;"></iframe>

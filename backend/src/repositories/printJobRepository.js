@@ -5,6 +5,9 @@ export const listRecentByTenantAndSystem = (tenantId, system, limit = 50) =>
 
 export const create = (data) => PrintJob.create(data)
 
+export const findByIdempotencyKey = (tenantId, system, type, idempotencyKey) =>
+  PrintJob.findOne({ tenantId, system, type, 'meta.idempotencyKey': idempotencyKey })
+
 export const findByIdAndScope = (id, tenantId, system) =>
   PrintJob.findOne({ _id: id, tenantId, system })
 

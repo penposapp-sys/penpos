@@ -38,6 +38,7 @@ import MenuItemsPage from './pages/MenuItemsPage.jsx'
 import ProductItemSettingsPage from './pages/ProductItemSettingsPage.jsx'
 import PosPage from './pages/PosPage.jsx'
 import WalkInPosPage from './pages/WalkInPosPage.jsx'
+import QuickSalePage from './pages/QuickSalePage.jsx'
 import DeliveryOrdersPage from './pages/DeliveryOrdersPage.jsx'
 import DeliveryOrderDetailPage from './pages/DeliveryOrderDetailPage.jsx'
 import PackageCourierPage from './pages/PackageCourierPage.jsx'
@@ -78,6 +79,7 @@ import RestaurantWebsitePage from './pages/RestaurantWebsitePage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PrintingSettingsPage from './pages/PrintingSettingsPage.jsx'
 import PrintStationPage from './pages/PrintStationPage.jsx'
+import CallAgentSettingsPage from './pages/CallAgentSettingsPage.jsx'
 import { hasAuthToken } from './lib/authStorage.js'
 import NativePushBridge from './components/NativePushBridge.jsx'
 
@@ -734,6 +736,8 @@ export default function App() {
           <Route path="app/reservations" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['reservations_view']} system="kermes"><ReservationsPage /></ProtectedRoute>} />
           <Route path="app/kitchen" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['kitchen_access']} system="kermes"><KitchenPage /></ProtectedRoute>} />
           <Route path="app/kitchen/bulk" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['kitchen_access']} system="kermes"><KitchenBulkPage /></ProtectedRoute>} />
+          <Route path="app/quick-sale/:orderId?" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><QuickSalePage /></ProtectedRoute>} />
+          <Route path="app/quick-sales" element={<Navigate to="/restoran/app/walkin" replace />} />
           <Route path="app/walkin" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />
           <Route path="app/walkin/:orderId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'walkin_access']} system="kermes"><WalkInPosPage /></ProtectedRoute>} />
           <Route path="app/delivery" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['pos_access', 'view_delivery']} system="kermes"><DeliveryOrdersPage /></ProtectedRoute>} />
@@ -759,6 +763,7 @@ export default function App() {
             <Route path="catalog/items/:itemId" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_menu']} system="kermes"><ProductItemSettingsPage /></ProtectedRoute>} />
             <Route path="tables" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsTablesContent /></ProtectedRoute>} />
             <Route path="printers" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><PrintingSettingsPage system="kermes" /></ProtectedRoute>} />
+            <Route path="call-agent" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><CallAgentSettingsPage /></ProtectedRoute>} />
             <Route path="payments" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsPaymentsContent /></ProtectedRoute>} />
             <Route path="delivery" element={<ProtectedRoute roles={['tenant_admin', 'staff']} permissions={['manage_settings']} system="kermes"><SettingsDeliveryPage /></ProtectedRoute>} />
             <Route path="billing" element={<ProtectedRoute roles={['tenant_admin']} system="kermes" allowExpired><UpgradePlan /></ProtectedRoute>} />

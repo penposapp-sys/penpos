@@ -19,6 +19,7 @@ import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { mergeBusinessSettings } from '../utils/businessSettings.js'
 import { parseManualEntryDate } from '../utils/manualEntryDate.js'
+import { completeQuickSaleOrderWhenKitchenReady } from '../utils/quickSaleKitchen.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 import { isVisibleInBranch } from '../utils/branchVisibility.js'
 import { buildKitchenReceiptRaw } from '../utils/kitchenReceiptRaw.js'
@@ -28,6 +29,10 @@ import { notifyOnlineOrderUsers } from './pushNotificationService.js'
 const toMoney = (v) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+const rejectQuickSaleRefundMutation = () => {
+  throw error('quick_sale_refund_unavailable', 'Hızlı Satış bu değişiklik için güvenli iade/kasa akışı bulunmadığından güncellenemiyor.', 409)
 }
 
 const parseRequestedDeliveryAt = (entryDate, requestedDeliveryTime, fallbackDate = new Date()) => {
@@ -414,6 +419,7 @@ const buildLabelTopLine = async (order) => {
   const customerName = String(order?.customerName || '').trim()
 
   if (tableName) return tableName
+  if (order?.saleSource === 'quick-sale') return 'HIZLI SATIŞ'
   if (order?.saleType === 'delivery') return customerName ? `PAKET - ${customerName}` : 'PAKET'
   if (order?.saleType === 'walkin') return customerName || 'HIZLI'
   return 'SIPARIS'
@@ -868,7 +874,7 @@ export const createOrderService = async (tenantId, userId, branchId, { createdBy
   }
 }
 
-export const createWalkInOrderService = async (tenantId, userId, branchId, { customerName, note, createdByName, entryDate } = {}) => {
+export const createWalkInOrderService = async (tenantId, userId, branchId, { customerName, note, createdByName, entryDate, saleSource } = {}) => {
   const safeCustomerName = (String(customerName || '').trim().slice(0, 40)) || 'Misafir'
   const safeNote = String(note || '').trim()
   const safeCreatedByName = String(createdByName || '').trim()
@@ -886,6 +892,7 @@ export const createWalkInOrderService = async (tenantId, userId, branchId, { cus
     status: 'open',
     totals: { subtotal: 0, grandTotal: 0 },
     saleType: 'walkin',
+    saleSource: saleSource === 'quick-sale' ? 'quick-sale' : 'standard',
     customerName: safeCustomerName,
     note: safeNote,
     paymentStatus: 'unpaid',
@@ -899,6 +906,7 @@ export const createWalkInOrderService = async (tenantId, userId, branchId, { cus
     totals: order.totals,
     note: order.note,
     saleType: order.saleType,
+    saleSource: order.saleSource,
     customerName: order.customerName,
     orderNo: order.orderNo,
     orderDayKey: order.orderDayKey
@@ -940,7 +948,8 @@ export const getWalkInOrdersService = async (tenantId, branchFilter, { status = 
     const d = decorateOrder(o)
     return {
       _id: d._id || d.id,
-      customerName: d.customerName || '',
+      customerName: d.customerName || (d.saleSource === 'quick-sale' ? d.note : ''),
+      saleSource: d.saleSource || 'standard',
       orderNo: d.orderNo ?? null,
       orderDayKey: d.orderDayKey || '',
       createdAt: d.createdAt,
@@ -1253,6 +1262,7 @@ export const createPublicOnlineOrderService = async (
 export const updateDeliveryStatusService = async (tenantId, id, deliveryStatus) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   if (order.saleType !== 'delivery') throw error('invalid_request', 'Not a delivery order', 400)
 
   const next = String(deliveryStatus || '').trim()
@@ -1503,6 +1513,7 @@ export const getOrderService = async (tenantId, id) => {
     note: obj.note,
     mergeSourceOrderIds: obj.mergeSourceOrderIds || [],
     saleType: obj.saleType,
+    saleSource: obj.saleSource || 'standard',
     deliveryCustomerId: obj.deliveryCustomerId ? String(obj.deliveryCustomerId) : null,
     customerName: obj.customerName,
     kitchenEnabled: obj.kitchenEnabled,
@@ -1711,7 +1722,17 @@ export const completeItemService = async (tenantId, id, menuItemId) => {
   if (!it) throw error('not_found', 'Item not in order', 404)
   it.status = 'completed'
   normalizeLegacyItemStatuses(order)
-  const updated = await updateById(id, { items: order.items })
+  const quickSaleCompleted = completeQuickSaleOrderWhenKitchenReady(order)
+  const updates = { items: order.items }
+  if (quickSaleCompleted) {
+    Object.assign(updates, {
+      status: order.status,
+      closedAt: order.closedAt,
+      currentKitchenBatchId: order.currentKitchenBatchId,
+      kitchenBatches: order.kitchenBatches
+    })
+  }
+  const updated = await updateById(id, updates)
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_item_complete', 'Order', updated.id, { menuItemId })
   const dto = await getOrderService(tenantId, updated.id)
   return { order: dto }
@@ -1757,6 +1778,7 @@ export const completeItemByItemIdService = async (tenantId, id, itemId, options 
   }
   readyItem.status = 'completed'
   normalizeLegacyItemStatuses(order)
+  completeQuickSaleOrderWhenKitchenReady(order)
   await order.save()
 
   try {
@@ -1814,7 +1836,10 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
     throw error('not_found', 'Kitchen items not found', 404)
   }
 
-  if (readyItems.length > 0) normalizeLegacyItemStatuses(order)
+  if (readyItems.length > 0) {
+    normalizeLegacyItemStatuses(order)
+    completeQuickSaleOrderWhenKitchenReady(order, now)
+  }
   await order.save()
 
   if (readyItems.length > 0) {
@@ -1850,6 +1875,7 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
 export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   const tenantSettings = await getTenantBusinessSettings(tenantId)
   const cancelReason = String(reason || '').trim()
   if (tenantSettings.general.requireCancelReasonForProduct === true && !cancelReason) {
@@ -1907,6 +1933,7 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
 export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user, unitIndex }) => {
     const order = await findByIdAndTenant(orderId, user.tenantId)
     if (!order) throw error('not_found', 'Order not found', 404)
+    if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
     const tenantSettings = await getTenantBusinessSettings(user.tenantId)
     const cancelReason = String(reason || '').trim()
     if (tenantSettings.general.requireCancelReasonForProduct === true && !cancelReason) {
@@ -2118,6 +2145,7 @@ export const setKitchenItemGroupCookingService = async (tenantId, orderId, itemI
 export const removeItemService = async (tenantId, id, menuItemId) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   if (isNotEditableStatus(order.status)) {
     const e = new Error('Order is not editable')
     e.status = 409
@@ -2179,6 +2207,7 @@ export const setItemQuantityService = async (tenantId, id, menuItemId, quantity)
   const idx = order.items.findIndex(it => String(it.menuItemId) === String(menuItemId))
   if (idx === -1) throw error('not_found', 'Item not in order', 404)
   const qty = Math.max(0, Number(quantity) || 0)
+  if (order.saleSource === 'quick-sale' && qty < Number(order.items[idx].qty || 0)) rejectQuickSaleRefundMutation()
   if (qty <= 0) {
     order.items.splice(idx, 1)
   } else {
@@ -2224,6 +2253,7 @@ export const setItemQuantityByItemIdService = async (tenantId, id, itemId, quant
   const it = order.items.id(itemId)
   if (!it) throw error('item_not_found', 'Item not found', 404)
   const qty = Math.max(0, Number(quantity) || 0)
+  if (order.saleSource === 'quick-sale' && qty < Number(it.qty || 0)) rejectQuickSaleRefundMutation()
   if (qty <= 0) {
     const idx = order.items.findIndex(x => String(x?._id) === String(itemId))
     if (idx === -1) throw error('item_not_found', 'Item not found', 404)
@@ -2539,6 +2569,7 @@ export const setCustomerNameService = async (tenantId, id, customerName) => {
 export const cancelOrderService = async (tenantId, id) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   const summary = computePaymentSummary(order)
   if (summary.paidTotal > 0) throw error('invalid_state', 'Order paid', 400)
 
@@ -2840,6 +2871,7 @@ export const deleteOrderPaymentService = async (tenantId, id, paymentId) => {
   }
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   if (['closed', 'cancelled', 'merged'].includes(order.status)) {
     const e = new Error('Order is not editable')
     e.status = 409
@@ -2869,6 +2901,7 @@ export const deleteOrderPaymentService = async (tenantId, id, paymentId) => {
 export const setOrderDiscountService = async (tenantId, id, discountPercent) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   if (['closed', 'cancelled', 'merged'].includes(order.status)) {
     const e = new Error('Order is not editable')
     e.status = 409
@@ -2927,6 +2960,7 @@ export const updateOrderEntryDateService = async (tenantId, id, entryDate) => {
 export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, id, { accountId, amount, note }) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   const tenantSettings = await getTenantBusinessSettings(tenantId)
   if (tenantSettings.general.disableCreditAccounts === true) {
     throw error('credit_accounts_disabled', 'Cari hesap kullanımı kapalı', 403)
@@ -3225,6 +3259,7 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
 
   const order = await findByIdAndTenant(orderId, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
+  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
 
   if (['closed', 'cancelled', 'merged'].includes(order.status)) {
     const e = new Error('Order is not editable')
@@ -3595,6 +3630,7 @@ export const listKitchenOrdersService = async (tenantId, branchFilter) => {
         totals: o.totals,
         createdAt: o.createdAt,
         saleType: o.saleType,
+        saleSource: o.saleSource || 'standard',
         orderChannel: String(o.orderChannel || ''),
         approvalStatus: String(o.approvalStatus || ''),
         cancelRequestStatus: String(o.cancelRequestStatus || ''),
@@ -3657,6 +3693,7 @@ export const completeKitchenBatchByIdService = async (tenantId, orderId, batchId
   if (order.currentKitchenBatchId && String(order.currentKitchenBatchId) === target) {
     order.currentKitchenBatchId = null
   }
+  completeQuickSaleOrderWhenKitchenReady(order, now)
   await order.save()
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }
@@ -3692,6 +3729,7 @@ export const completeKitchenBatchService = async (tenantId, id) => {
     })
   }
   order.currentKitchenBatchId = null
+  completeQuickSaleOrderWhenKitchenReady(order, now)
   await order.save()
   const fresh = await Order.findById(order.id).lean()
   return { order: decorateOrder(fresh) }

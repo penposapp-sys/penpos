@@ -7,11 +7,21 @@ import {
   getSystemDiscriminatorFilter,
   isCollectionInSystemScope
 } from '../src/services/dataManagementScope.js'
-import { getTenantResetDeletionPlan } from '../src/services/dataManagementPolicy.js'
+import { getTenantResetDeletionPlan, isCollectionPreservedOnReset } from '../src/services/dataManagementPolicy.js'
 import { finalizeTenantBackup, parseAndVerifyTenantBackup } from '../src/services/tenantBackupService.js'
 
 const SYSTEM_COLLECTIONS = {
-  restaurant: ['orders', 'menuitems', 'branches', 'accounttransactions', 'reservations', 'reservationnotifications'],
+  restaurant: [
+    'orders',
+    'menuitems',
+    'branches',
+    'accounttransactions',
+    'reservations',
+    'reservationnotifications',
+    'call_agent_devices',
+    'call_agent_pairing_sessions',
+    'call_agent_token_sessions'
+  ],
   canteen: ['canteen_sales', 'canteen_products', 'canteen_branches', 'canteen_stock_movements'],
   anaokulu: ['anaokuluschools']
 }
@@ -49,6 +59,20 @@ test('all registered tenant-scoped models have an explicit scope classification'
     let tenantScoped = false
     model.schema.eachPath((path) => {
       if (path === 'tenantId' || path === 'tenant') tenantScoped = true
+    })
+
+    test('call-agent credentials stay tenant-scoped and are excluded from tenant data export/reset', () => {
+      const collections = [
+        'call_agent_devices',
+        'call_agent_pairing_sessions',
+        'call_agent_token_sessions'
+      ]
+      for (const name of collections) {
+        assert.equal(isCollectionInSystemScope(name, 'restaurant'), true)
+        assert.equal(isCollectionInSystemScope(name, 'canteen'), false)
+        assert.equal(isCollectionInSystemScope(name, 'anaokulu'), false)
+        assert.equal(isCollectionPreservedOnReset(name), true)
+      }
     })
     if (tenantScoped) {
       assert.notEqual(
@@ -88,7 +112,13 @@ test('reset plans only include known deletable collections from the selected sys
 
   for (const [system, ownCollections] of Object.entries(SYSTEM_COLLECTIONS)) {
     const planned = getTenantResetDeletionPlan(candidates, system).map(({ name }) => name)
-    for (const ownCollection of ownCollections) assert.ok(planned.includes(ownCollection), `${system} reset must include ${ownCollection}`)
+    for (const ownCollection of ownCollections) {
+      if (isCollectionPreservedOnReset(ownCollection)) {
+        assert.equal(planned.includes(ownCollection), false, `${system} reset must preserve ${ownCollection}`)
+      } else {
+        assert.ok(planned.includes(ownCollection), `${system} reset must include ${ownCollection}`)
+      }
+    }
     for (const sharedCollection of RESETTABLE_SHARED_COLLECTIONS) assert.ok(planned.includes(sharedCollection), `${system} reset must include ${sharedCollection}`)
     for (const [otherSystem, otherCollections] of Object.entries(SYSTEM_COLLECTIONS)) {
       if (otherSystem === system) continue

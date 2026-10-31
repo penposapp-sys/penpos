@@ -28,10 +28,12 @@ import settingsLogoRouter from './routes/settingsLogo.js'
 import settingsMenuRouter from './routes/settingsMenu.js'
 import userPreferencesRouter from './routes/userPreferences.js'
 import printingRouter from './routes/printing.js'
+import callAgentsRouter from './routes/callAgents.js'
 import waiterCallsRouter from './routes/waiterCalls.js'
 import reservationsRouter from './routes/reservations.js'
 import anaokuluRouter from './routes/anaokulu.js'
 import { requireActiveSubscription } from './middlewares/requireActiveSubscription.js'
+import { requireCallAgentHttps } from './middlewares/requireCallAgentHttps.js'
 import { requireAuth } from './middlewares/requireAuth.js'
 import { tenantGuard } from './middlewares/tenantGuard.js'
 import { sendError } from './utils/errors.js'
@@ -45,6 +47,7 @@ import { startTenantUsageCleanup } from './services/tenantUsageService.js'
 export const createServer = () => {
   startTenantUsageCleanup()
   const app = express()
+  app.use('/api/call-agents', requireCallAgentHttps)
   const __filename = fileURLToPath(import.meta.url)
   const __dirname = path.dirname(__filename)
   const isProd = process.env.NODE_ENV === 'production'
@@ -228,6 +231,7 @@ export const createServer = () => {
   app.use('/api/platform', platformRouter)
   app.use('/api/payments', paymentsRouter)
   app.use('/api/printing', printingRouter)
+  app.use('/api/call-agents', callAgentsRouter)
   app.use('/api/settings/products', requireAuth, tenantGuard, requireActiveSubscription, settingsProductsRouter)
   app.use('/api/settings/menu', requireAuth, tenantGuard, requireActiveSubscription, settingsMenuRouter)
   app.use('/api/settings', requireAuth, tenantGuard, requireActiveSubscription, settingsLogoRouter)

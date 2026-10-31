@@ -10,6 +10,7 @@ import * as logger from '../utils/logger.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import { normalizeManualEntryDateInput } from '../utils/manualEntryDate.js'
+import { addQuickSaleItemsService, createQuickSaleService, getQuickSalesService, updateQuickSaleNoteService } from '../services/quickSaleService.js'
 
 const getStaffAllowedBranchIds = (req) => {
   if (String(req.user?.role || '') !== 'staff') return null
@@ -689,6 +690,13 @@ export const receipt = async (req, res) => {
 
 export const createWalkInOrder = async (req, res) => {
   try {
+    if (req.body?.saleSource === 'quick-sale') {
+      return res.status(400).json({
+        success: false,
+        code: 'quick_sale_requires_confirmation',
+        message: 'Hızlı Satış için ödeme onaylı satış akışını kullanın.'
+      })
+    }
     const tenantId = req.user?.tenantId
     const branchId = req.user?.branchId
     if (!tenantId) {
@@ -707,7 +715,6 @@ export const createWalkInOrder = async (req, res) => {
     const customerName = String(req.body?.customerName || '').trim() || 'Misafir'
     const note = String(req.body?.note || '').trim()
     const entryDate = normalizeManualEntryDateInput(req.body?.entryDate)
-
     const order = await createWalkInOrderService(tenantId, req.user.id, branchId, { customerName, note, createdByName: req.user?.name, entryDate })
     res.json({ success: true, order })
   } catch (err) {
@@ -741,6 +748,139 @@ export const listWalkInOrders = async (req, res) => {
 
     const result = await getWalkInOrdersService(tenantId, { branchIds: finalIds }, { status, limit })
     res.json({ success: true, orders: result.orders || [] })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const createQuickSale = async (req, res) => {
+  try {
+    const creditAccountId = String(req.body?.creditAccountId || '').trim()
+    const canCreateVeresiye = ['tenant_admin', 'superadmin'].includes(String(req.user?.role || ''))
+      || (Array.isArray(req.user?.permissions) && req.user.permissions.includes('create_veresiye'))
+    if (creditAccountId && !canCreateVeresiye) {
+      return res.status(403).json({
+        success: false,
+        code: 'permission_denied',
+        message: 'Veresiye oluşturma yetkiniz bulunmuyor.'
+      })
+    }
+    const branchId = req.branch?.id || req.branchId || req.user?.branchId
+    const result = await createQuickSaleService(req.user.tenantId, req.user.id, branchId, {
+      requestId: req.body?.requestId,
+      items: req.body?.items,
+      note: req.body?.note,
+      paymentMethod: req.body?.paymentMethod,
+      discountPercent: req.body?.discountPercent,
+      creditAccountId,
+      servingType: req.body?.servingType,
+      sendToKitchen: req.body?.sendToKitchen === undefined ? true : req.body.sendToKitchen,
+      createdByName: req.user?.name
+    })
+    let order = result.order
+    let kitchenError = ''
+    if (req.body?.sendToKitchen !== false && (order.items || []).some((item) => item?.status === 'open')) {
+      try {
+        const kitchenResult = await sendOrderService(req.user.tenantId, order._id, {
+          kitchenEnabled: true,
+          sendToKitchen: true,
+          servingType: req.body?.servingType
+        })
+        order = kitchenResult.order
+      } catch (err) {
+        kitchenError = String(err?.message || 'Sipariş mutfağa gönderilemedi.')
+        logger.error('QUICK_SALE_KITCHEN_SEND_FAIL', { orderId: String(order._id), error: kitchenError })
+      }
+    }
+    if (!result.duplicate) {
+      try {
+        await auditLog(req.user.tenantId, req.user.id, 'quick_sale_created', 'order', order._id, {
+          requestId: req.body?.requestId
+        })
+      } catch (err) {
+        logger.error('QUICK_SALE_AUDIT_FAIL', { orderId: String(order._id), error: err?.message || String(err) })
+      }
+    }
+    return res.status(result.duplicate ? 200 : 201).json({
+      success: true,
+      order,
+      duplicate: result.duplicate === true,
+      kitchenError
+    })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const listQuickSales = async (req, res) => {
+  try {
+    const branchIds = Array.isArray(req.branchIds) ? req.branchIds.map(String).filter(Boolean) : []
+    const orders = await getQuickSalesService(req.user.tenantId, branchIds, req.query?.limit)
+    res.json({ success: true, orders })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const updateQuickSaleNote = async (req, res) => {
+  try {
+    const branchId = req.branch?.id || req.branchId
+    const order = await updateQuickSaleNoteService(
+      req.user.tenantId,
+      branchId,
+      req.params.id,
+      { id: req.user.id, name: req.user?.name },
+      req.body?.note
+    )
+    try {
+      await auditLog(req.user.tenantId, req.user.id, 'quick_sale_note_updated', 'order', order._id, {})
+    } catch (err) {
+      logger.error('QUICK_SALE_AUDIT_FAIL', { orderId: String(order._id), error: err?.message || String(err) })
+    }
+    res.json({ success: true, order })
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+export const addQuickSaleItems = async (req, res) => {
+  try {
+    const branchId = req.branch?.id || req.branchId
+    const result = await addQuickSaleItemsService(
+      req.user.tenantId,
+      branchId,
+      req.params.id,
+      { id: req.user.id, name: req.user?.name },
+      {
+        requestId: req.body?.requestId,
+        items: req.body?.items,
+        paymentMethod: req.body?.paymentMethod
+      }
+    )
+    let order = result.order
+    let kitchenError = ''
+    if ((order.items || []).some((item) => item?.status === 'open')) {
+      try {
+        const kitchenResult = await sendOrderService(req.user.tenantId, order._id, {
+          kitchenEnabled: true,
+          sendToKitchen: true
+        })
+        order = kitchenResult.order
+      } catch (err) {
+        kitchenError = String(err?.message || 'Ek ürünler mutfağa gönderilemedi.')
+        logger.error('QUICK_SALE_ADJUSTMENT_KITCHEN_FAIL', { orderId: String(order._id), error: kitchenError })
+      }
+    }
+    if (!result.duplicate) {
+      try {
+        await auditLog(req.user.tenantId, req.user.id, 'quick_sale_items_added', 'order', order._id, {
+          requestId: req.body?.requestId
+        })
+      } catch (err) {
+        logger.error('QUICK_SALE_AUDIT_FAIL', { orderId: String(order._id), error: err?.message || String(err) })
+      }
+    }
+    res.json({ success: true, order, duplicate: result.duplicate === true, kitchenError })
   } catch (err) {
     sendError(res, err)
   }

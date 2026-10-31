@@ -450,13 +450,15 @@ export default function KitchenPage() {
   const renderCardList = (cardList) => (
     <div className="kitchenOrdersGrid">
       {(Array.isArray(cardList) ? cardList : []).map((o) => {
-        const titleLeft = o?.tableName
+        const titleLeft = o?.saleSource === 'quick-sale'
+          ? 'HIZLI SATIŞ'
+          : (o?.tableName
           ? String(o.tableName)
           : (o.saleType === 'delivery'
             ? (o.customerName ? `Paket • ${o.customerName}` : 'Paket')
             : (o.saleType === 'walkin'
               ? (o.customerName ? `Hızlı • ${o.customerName}` : 'Hızlı Satış')
-              : (o?.orderNo ? `Sipariş ${o.orderNo}` : `Sipariş #${String(o.id).slice(-6)}`)))
+              : (o?.orderNo ? `Sipariş ${o.orderNo}` : `Sipariş #${String(o.id).slice(-6)}`))))
         const sendTime = o.batchSentAt
           ? new Date(o.batchSentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
           : '-'
@@ -470,7 +472,7 @@ export default function KitchenPage() {
           <div key={`${o._id || o.id}-${String(o.batchId || 'legacy')}`} className="card kitchenOrderCard" style={{ borderColor: ageColor(o.batchSentAt || o.createdAt) }}>
             <div className="kitchen-card-header">
               <div className="kitchen-card-info">
-                <span style={{ fontWeight: 700, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{titleLeft}</span>
+                <span style={{ fontWeight: o?.saleSource === 'quick-sale' ? 900 : 700, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', color: o?.saleSource === 'quick-sale' ? '#b91c1c' : undefined }}>{titleLeft}</span>
                 <span className="kitchen-card-sep">•</span>
                 <span>{sendTime}</span>
                 {createdByName && (

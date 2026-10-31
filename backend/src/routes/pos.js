@@ -53,6 +53,10 @@ router.put('/tables/:targetTableId/merge', requireAuth, tenantGuard, resolveBran
 
 router.post('/walkin/orders', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'walkin_access']), ctrl.createWalkInOrder)
 router.get('/walkin/orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'walkin_access']), ctrl.listWalkInOrders)
+router.post('/quick-sales', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'walkin_access', 'take_payment']), ctrl.createQuickSale)
+router.get('/quick-sales', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'walkin_access']), ctrl.listQuickSales)
+router.put('/quick-sales/:id/note', requireAuth, tenantGuard, resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'walkin_access']), ctrl.updateQuickSaleNote)
+router.post('/quick-sales/:id/items', requireAuth, tenantGuard, validateObjectIdParam('id'), resolveBranchFromOrder, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'walkin_access', 'take_payment']), ctrl.addQuickSaleItems)
 
 router.post('/delivery/orders', requireAuth, tenantGuard, branchGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'manage_delivery']), ctrl.createDeliveryOrder)
 router.get('/delivery/orders', requireAuth, tenantGuard, branchListGuard, requireRole(['tenant_admin', 'staff']), requirePermission(['pos_access', 'view_delivery']), ctrl.listDeliveryOrders)

@@ -34,7 +34,10 @@ export const getProductDetailUpdate = (collectionKey) => {
 
 export const RESET_PRESERVED_COLLECTIONS = Object.freeze([
   'users',
-  'paymentrequests'
+  'paymentrequests',
+  'callagentdevices',
+  'callagentpairingsessions',
+  'callagenttokensessions'
 ])
 
 export const isCollectionPreservedOnReset = (name) =>

@@ -30,6 +30,7 @@ export default function Layout() {
     isPortraitTablet && (
       pathname.startsWith('/restoran/app/tables')
       || pathname.startsWith('/restoran/app/pos')
+      || pathname.startsWith('/restoran/app/quick-sale')
       || pathname.startsWith('/restoran/app/walkin')
       || pathname.startsWith('/restoran/app/delivery')
     )
@@ -92,6 +93,7 @@ export default function Layout() {
   useEffect(() => {
     const enabled = !!(isMobilePortrait && (
       pathname.startsWith('/restoran/app/pos') ||
+      pathname.startsWith('/restoran/app/quick-sale') ||
       pathname.startsWith('/restoran/app/walkin') ||
       pathname.startsWith('/restoran/app/delivery') ||
       pathname.startsWith('/magaza/kasa')
@@ -281,7 +283,8 @@ export default function Layout() {
       items.push({ path: '/restoran/app/kitchen/bulk', label: 'Toplu Hazırlama', icon: IconUtensils, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('walkin_access')))) {
-      items.push({ path: '/restoran/app/walkin', label: 'Masasız Satış', icon: IconShoppingCart, show: true })
+      items.push({ path: '/restoran/app/quick-sale', label: 'Hızlı Satış', icon: IconShoppingCart, show: true })
+      items.push({ path: '/restoran/app/walkin', label: 'Masasız Satışlar', icon: IconShoppingCart, show: true })
     }
     if (!isExpired && (user.role === 'tenant_admin' || (perms.includes('pos_access') && perms.includes('view_delivery')))) {
       items.push({ path: '/restoran/app/delivery', label: 'Paket Servis', icon: IconTruck, show: true, badgeCount: pendingOnlineCount })
@@ -339,6 +342,7 @@ export default function Layout() {
   const isMobileSettingsRoute = isMobilePortrait && isSettingsRoute
   const isDesktopSalesRoute = !isMobilePortrait && (
     pathname.startsWith('/restoran/app/pos') ||
+    pathname.startsWith('/restoran/app/quick-sale') ||
     pathname.startsWith('/restoran/app/walkin') ||
     pathname.startsWith('/restoran/app/delivery')
   )

@@ -1,0 +1,241 @@
+.call-agent-settings {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  color: var(--app-text, #1f2937);
+}
+
+.call-agent-settings-heading,
+.call-agent-settings-card-heading,
+.call-agent-device,
+.call-agent-device-title,
+.call-agent-device-meta,
+.call-agent-pairing-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.call-agent-settings-heading {
+  align-items: flex-start;
+}
+
+.call-agent-settings-eyebrow,
+.call-agent-settings-tag {
+  color: var(--app-text-secondary, #64748b);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.call-agent-settings-heading h1 {
+  margin: 7px 0;
+  font-size: 24px;
+}
+
+.call-agent-settings-heading p,
+.call-agent-settings-card-heading p,
+.call-agent-pairing-actions p,
+.call-agent-settings-note {
+  color: var(--app-text-secondary, #64748b);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.call-agent-settings-heading p,
+.call-agent-settings-card-heading p {
+  margin: 0;
+}
+
+.call-agent-settings-card {
+  padding: 20px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 16px;
+  background: var(--app-surface, #fff);
+}
+
+.call-agent-settings-card h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.call-agent-settings-tag {
+  flex: none;
+  padding: 7px 9px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.call-agent-settings-refresh,
+.call-agent-pairing-form button,
+.call-agent-device > button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--settings-accent, #385ec8);
+  border-radius: 9px;
+  color: var(--settings-accent-text, #fff);
+  background: var(--settings-accent, #385ec8);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.call-agent-settings-refresh:disabled,
+.call-agent-pairing-form button:disabled,
+.call-agent-device > button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.call-agent-pairing-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.call-agent-pairing-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--app-text, #1f2937);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.call-agent-pairing-form input,
+.call-agent-pairing-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--app-border, #cbd5e1);
+  border-radius: 9px;
+  color: var(--app-text, #1f2937);
+  background: var(--app-surface, #fff);
+  font: inherit;
+  font-size: 13px;
+}
+
+.call-agent-pairing-form input:focus-visible,
+.call-agent-pairing-form select:focus-visible,
+.call-agent-settings button:focus-visible {
+  outline: 2px solid var(--settings-accent, #385ec8);
+  outline-offset: 2px;
+}
+
+.call-agent-optional {
+  color: var(--app-text-secondary, #64748b);
+  font-weight: 400;
+}
+
+.call-agent-pairing-actions {
+  grid-column: 1 / -1;
+}
+
+.call-agent-pairing-actions p {
+  max-width: 650px;
+  margin: 0;
+}
+
+.call-agent-settings-message {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.call-agent-settings-message.is-error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.call-agent-settings-message.is-success {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.call-agent-settings-empty {
+  padding: 28px 12px;
+  color: var(--app-text-secondary, #64748b);
+  text-align: center;
+  font-size: 13px;
+}
+
+.call-agent-device-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 17px;
+}
+
+.call-agent-device {
+  padding: 14px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 12px;
+}
+
+.call-agent-device-main {
+  min-width: 0;
+}
+
+.call-agent-device-title {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.call-agent-device-title strong {
+  font-size: 14px;
+}
+
+.call-agent-device-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.call-agent-device-status.is-active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.call-agent-device-status.is-revoked {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.call-agent-device-id {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  color: var(--app-text-secondary, #64748b);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.call-agent-device-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  color: var(--app-text-secondary, #64748b);
+  font-size: 12px;
+}
+
+.call-agent-settings-note {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .call-agent-settings { padding: 14px; }
+  .call-agent-settings-heading,
+  .call-agent-settings-card-heading,
+  .call-agent-device,
+  .call-agent-pairing-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .call-agent-pairing-form { grid-template-columns: 1fr; }
+  .call-agent-pairing-actions { grid-column: auto; }
+  .call-agent-settings-refresh,
+  .call-agent-pairing-form button,
+  .call-agent-device > button { width: 100%; }
+}

@@ -16839,6 +16839,43 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
   font-size: var(--app-font-size) !important;
 }
 
+.pageShell.quick-sale-page .quick-sale-grid {
+  grid-template-columns: minmax(132px, 170px) minmax(0, 1fr) minmax(300px, 380px);
+  grid-template-areas: "categories products cart";
+  align-items: stretch;
+}
+
+.pageShell.quick-sale-page .quick-sale-grid > .saleCategoryPanel {
+  grid-area: categories;
+  min-width: 0;
+}
+
+.pageShell.quick-sale-page .quick-sale-grid > .saleProductsPanel {
+  grid-area: products;
+  min-width: 0;
+}
+
+.pageShell.quick-sale-page .quick-sale-grid > .saleCartPanelShell {
+  grid-area: cart;
+  min-width: 0;
+}
+
+.pageShell.quick-sale-page .posItemsGrid {
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  justify-content: stretch;
+}
+
+.pageShell.quick-sale-page .productCard,
+.pageShell.quick-sale-page .productCard__img {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pageShell.quick-sale-page .productCard__img {
+  width: 100%;
+  object-fit: cover;
+}
+
 @media (max-width: 767px), (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
   body.pos-app-layout .pageShell.walkin-layout .walkin-sales-page__body,
   body.pos-app-layout .delivery-layout .delivery-detail-shell {
@@ -16861,8 +16898,34 @@ body.pos-app-layout .delivery-layout .saleCartFooterActionBtn {
     overflow: hidden;
   }
 
+  body.pos-app-layout .pageShell.quick-sale-page .quick-sale-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 38px minmax(0, 1fr) !important;
+    grid-template-areas: "categories" "products" !important;
+  }
+
   body.pos-app-layout .pageShell.walkin-layout .saleStandard3Col > :first-child {
     display: none;
+  }
+
+  body.pos-app-layout .pageShell.quick-sale-page .quick-sale-grid > .saleCategoryPanel {
+    grid-area: categories;
+    grid-row: 1;
+    display: flex !important;
+    height: 38px;
+    max-height: 38px;
+  }
+
+  body.pos-app-layout .pageShell.quick-sale-page .quick-sale-grid > .saleProductsPanel {
+    grid-area: products;
+    grid-row: 2;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+  }
+
+  body.pos-app-layout .pageShell.quick-sale-page .quick-sale-grid > .saleCartPanelShell {
+    grid-area: cart;
   }
 
   body.pos-app-layout .delivery-layout .delivery-detail-info-row {
@@ -20455,6 +20518,72 @@ html.tenant-dark-mode body.restaurant-app-layout .modal-backdrop .app-modal[aria
 body.tenant-dark-mode .modal-backdrop .app-modal[aria-label="Yeni Paket Siparişi"] :is(input.input, textarea.input, select.input)::placeholder {
   color: #929ba7 !important;
   -webkit-text-fill-color: #929ba7 !important;
+}
+
+.pageShell.quick-sale-page .saleCartFooter {
+  flex: 0 0 auto;
+  height: auto;
+  max-height: 50%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.pageShell.quick-sale-page .saleCartFooterInner {
+  height: auto;
+  min-height: 0;
+}
+
+.pageShell.quick-sale-page .quick-sale-cart-options {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pageShell.quick-sale-page .quick-sale-cart-options .saleCartModeRowInner {
+  flex-wrap: nowrap;
+}
+
+.pageShell.quick-sale-page .quick-sale-kitchen-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.pageShell.quick-sale-page .quick-sale-kitchen-mode .saleCartModeGroup {
+  justify-content: flex-end;
+}
+
+.pageShell.quick-sale-page .quick-sale-kitchen-mode .saleCartModeBtn {
+  min-width: 0;
+  padding-right: 8px;
+  padding-left: 8px;
+  font-size: 11px;
+}
+
+@media (max-width: 767px), (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+  body.pos-app-layout .pageShell.quick-sale-page .saleCartPanelShell[data-mobile-expanded="true"] {
+    height: min(90dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 16px));
+  }
+
+  .pageShell.quick-sale-page .quick-sale-cart-options .saleCartModeRowInner {
+    gap: 4px;
+  }
+
+  .pageShell.quick-sale-page .quick-sale-cart-options .saleCartModeGroup {
+    gap: 4px;
+  }
+
+  .pageShell.quick-sale-page .quick-sale-kitchen-mode {
+    flex-wrap: wrap;
+  }
+
+  body.pos-app-layout .pageShell.quick-sale-page .saleCartFooter {
+    max-height: 55%;
+  }
 }
 
 html[data-theme="dark"] body.sales-mobile-scroll .delivery-orders-page .delivery-detail-header-card,

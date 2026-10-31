@@ -230,7 +230,7 @@ const buildReceiptContent = (receipt) => {
   ].join('')
 }
 
-export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1 } = {}) => {
+export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1, idempotencyKey = '' } = {}) => {
   const sys = normalizeSystem(system)
   const oid = String(orderId || '').trim()
   const copies = Math.max(1, Math.min(10, Number(copyCount || 1)))
@@ -248,7 +248,12 @@ export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1 } = {
       system: sys,
       type: 'receipt',
       payload: { type: 'raw', content },
-      meta: { orderId: String(receipt.id), copies, receiptRole: 'cashier' }
+      meta: {
+        orderId: String(receipt.id),
+        copies,
+        receiptRole: 'cashier',
+        ...(String(idempotencyKey || '').trim() ? { idempotencyKey: String(idempotencyKey).trim() } : {})
+      }
     },
     silent: true
   })

@@ -22,7 +22,12 @@ import {
 const BACKUP_FORMAT = 'penpos-tenant-full-backup'
 const BACKUP_VERSION = 1
 const MAX_BACKUP_BYTES = 100 * 1024 * 1024
-const EXCLUDED_COLLECTIONS = new Set(['tenants'])
+const EXCLUDED_COLLECTIONS = new Set([
+  'tenants',
+  'callagentdevices',
+  'callagentpairingsessions',
+  'callagenttokensessions'
+])
 const SYSTEM_COLLECTION_PREFIX = 'system.'
 const TENANT_FIELDS = ['tenantId', 'tenant']
 const RESTORABLE_TENANT_FIELDS = ['name', 'description', 'phone', 'logoUrl', 'settings', 'allowedBranchIds']

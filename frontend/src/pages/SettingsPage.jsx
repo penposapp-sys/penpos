@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Armchair, Bike, Building2, CreditCard, Database, Package, Printer, QrCode, ReceiptText, Search, Store, UserRound, Users } from 'lucide-react'
+import { Armchair, Bike, Building2, CreditCard, Database, Package, Printer, QrCode, Radio, ReceiptText, Search, Store, UserRound, Users } from 'lucide-react'
 import { api } from '../lib/apiClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
@@ -77,6 +77,7 @@ const SETTINGS_ICONS = {
   staff: Users,
   tables: Armchair,
   printers: Printer,
+  callAgent: Radio,
   payments: CreditCard,
   delivery: Bike,
   billing: ReceiptText,
@@ -530,6 +531,14 @@ export default function SettingsPage() {
               icon: 'printers',
               group: 'Cihaz',
               description: 'Print Agent, fiş ve etiket yazıcıları'
+            },
+            {
+              key: 'call-agent',
+              to: '/restoran/settings/call-agent',
+              label: 'Masa Çağrı Sistemi',
+              icon: 'callAgent',
+              group: 'Cihaz',
+              description: 'Çağrı ajanı cihaz eşleştirme ve yetki yönetimi'
             },
             ...(user?.role === 'tenant_admin'
               ? [{
