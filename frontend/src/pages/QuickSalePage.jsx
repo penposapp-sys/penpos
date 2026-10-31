@@ -11,6 +11,7 @@ import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { getProductPortionOptions, requiresProductConfig } from '../lib/productPortions.js'
 import { inferPaymentMethodType, paymentMethodLabel } from '../lib/paymentMethods.js'
 import { useCategorySwipe } from '../hooks/useCategorySwipe.js'
+import { buildBranchQueryParams } from '../lib/branchQuery.js'
 import { buildCartRows } from '../lib/cartItemRows.js'
 import { ServingType } from '../utils/servingType.js'
 import { useBusinessSettings } from '../context/BusinessSettingsContext.jsx'
@@ -205,20 +206,21 @@ export default function QuickSalePage() {
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
 
   const searchAccounts = async (query = accountQuery) => {
-    if (!canViewAccounts || !branchId) return
+    if (!canViewAccounts) return
     setAccountsLoading(true)
     try {
-      const response = await api(`/api/accounts?q=${encodeURIComponent(String(query || '').trim())}&limit=20`, {
-        silent: true,
-        branchIdOverride: branchId
-      })
-      if (!response?.ok || response?.success === false) {
-        throw new Error(response?.data?.message || response?.message || 'Cari hesaplar yüklenemedi.')
+      const { params } = buildBranchQueryParams(allowedBranchIds)
+      if (!params) {
+        setAccounts([])
+        toast.error('Cari hesapları bulmak için yetkili şube bulunamadı.')
+        return
       }
-      const accountList = Array.isArray(response?.accounts) ? response.accounts : (Array.isArray(response?.data?.accounts) ? response.data.accounts : [])
-      setAccounts(accountList.filter((account) => String(account.branchId || '') === String(branchId)))
+      params.set('q', String(query || ''))
+      params.set('limit', '20')
+      const response = await api(`/api/accounts?${params.toString()}`, { skipBranchHeader: true })
+      setAccounts(response.accounts || [])
     } catch (err) {
-      toast.error(err?.data?.message || err?.message || 'Cari hesaplar yüklenemedi.')
+      toast.error(err.message)
     } finally {
       setAccountsLoading(false)
     }
@@ -232,9 +234,17 @@ export default function QuickSalePage() {
     setPaymentMode('credit')
     setPaymentMethod('')
     setAccountQuery('')
+    setAccounts([])
     setAccountPickerOpen(true)
-    void searchAccounts('')
   }
+
+  useEffect(() => {
+    if (!accountPickerOpen) return
+    const timer = setTimeout(() => {
+      void searchAccounts(accountQuery)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [accountPickerOpen, accountQuery, allowedBranchIds])
 
   const submitQuickSaleAccount = async (event) => {
     event.preventDefault()

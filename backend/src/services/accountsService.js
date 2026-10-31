@@ -8,6 +8,7 @@ import { log as auditLog } from './auditService.js'
 import { isTxnSupported } from '../utils/mongoTxn.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 import { notDeletedFilter } from '../utils/softDelete.js'
+import { applyBranchFilter } from '../utils/branchFilter.js'
 
 const toMoney = (v) => {
   const raw = v === null || v === undefined ? '' : String(v).trim().replace(/\s/g, '').replace(',', '.')
@@ -52,7 +53,10 @@ export const listAccountsService = async (tenantId, branchFilter, query = {}) =>
   const limit = Math.max(1, Math.min(100, Number(query.limit) || 20))
   const q = String(query.q || '').trim()
 
-  let filter = { tenantId, isActive: true }
+  const branchIds = Array.isArray(branchFilter?.branchIds)
+    ? branchFilter.branchIds.map(String).filter(Boolean)
+    : []
+  let filter = applyBranchFilter({ tenantId, isActive: true }, branchIds)
 
   if (q) {
     filter.$or = [
