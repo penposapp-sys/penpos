@@ -15,3 +15,27 @@ export const completeQuickSaleOrderWhenKitchenReady = (order, completedAt = new 
   }
   return true
 }
+
+export const completeQuickSaleOrderWithoutKitchen = (order, completedAt = new Date()) => {
+  if (
+    order?.saleSource !== 'quick-sale'
+    || order.kitchenEnabled !== false
+    || order.sendToKitchen !== false
+    || ['closed', 'cancelled', 'merged', 'completed'].includes(String(order.status || ''))
+  ) return false
+
+  const items = Array.isArray(order.items) ? order.items : []
+  if (
+    items.length === 0
+    || (Array.isArray(order.kitchenBatches) && order.kitchenBatches.length > 0)
+    || items.some(item => item && ['sent', 'cooking'].includes(String(item.status || '')))
+  ) return false
+
+  for (const item of items) {
+    if (item && item.status !== 'cancelled') item.status = 'completed'
+  }
+  order.status = 'completed'
+  order.closedAt = order.closedAt || completedAt
+  order.currentKitchenBatchId = null
+  return true
+}

@@ -15,6 +15,7 @@ import { error } from '../utils/errors.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { mergeBusinessSettings } from '../utils/businessSettings.js'
+import { completeQuickSaleOrderWithoutKitchen } from '../utils/quickSaleKitchen.js'
 
 const money = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100
 
@@ -396,6 +397,7 @@ export const createQuickSaleService = async (tenantId, userId, branchId, {
     createdAt: now,
     updatedAt: now
   }
+  completeQuickSaleOrderWithoutKitchen(orderData, now)
 
   try {
     const order = await saveQuickSale({

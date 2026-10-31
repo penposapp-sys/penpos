@@ -19,7 +19,7 @@ import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { mergeBusinessSettings } from '../utils/businessSettings.js'
 import { parseManualEntryDate } from '../utils/manualEntryDate.js'
-import { completeQuickSaleOrderWhenKitchenReady } from '../utils/quickSaleKitchen.js'
+import { completeQuickSaleOrderWhenKitchenReady, completeQuickSaleOrderWithoutKitchen } from '../utils/quickSaleKitchen.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 import { isVisibleInBranch } from '../utils/branchVisibility.js'
 import { buildKitchenReceiptRaw } from '../utils/kitchenReceiptRaw.js'
@@ -930,6 +930,16 @@ export const getWalkInOrdersService = async (tenantId, branchFilter, { status = 
   filter = applyBranchFilter(filter, branchIds.length > 0 ? branchIds : (branchId ? [branchId] : []))
 
   if (status === 'active') {
+    const pendingNoKitchenQuickSales = await Order.find({
+      ...filter,
+      saleSource: 'quick-sale',
+      kitchenEnabled: false,
+      sendToKitchen: false,
+      status: { $in: ['open', 'sent'] }
+    }).limit(safeLimit)
+    for (const order of pendingNoKitchenQuickSales) {
+      if (completeQuickSaleOrderWithoutKitchen(order)) await order.save()
+    }
     filter.status = { $in: ['open', 'sent'] }
   }
 
@@ -2569,9 +2579,12 @@ export const setCustomerNameService = async (tenantId, id, customerName) => {
 export const cancelOrderService = async (tenantId, id) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   const summary = computePaymentSummary(order)
-  if (summary.paidTotal > 0) throw error('invalid_state', 'Order paid', 400)
+  if (summary.paidTotal > 0.01) {
+    throw error('invalid_state', order.saleSource === 'quick-sale'
+      ? 'Önce tahsilat ve veresiye hareketlerini geri alın; tahsil edilmiş satış iptal edilemez.'
+      : 'Order paid', 400)
+  }
 
   const now = new Date()
   const isDelivery = String(order.saleType || '') === 'delivery'
@@ -2584,6 +2597,8 @@ export const cancelOrderService = async (tenantId, id) => {
   order.status = 'cancelled'
   if (isDelivery) {
     order.deliveryStatus = 'cancelled'
+    order.closedAt = now
+  } else if (order.saleSource === 'quick-sale') {
     order.closedAt = now
   }
   order.totals = computeTotals(order.items)
@@ -2871,8 +2886,8 @@ export const deleteOrderPaymentService = async (tenantId, id, paymentId) => {
   }
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
-  if (['closed', 'cancelled', 'merged'].includes(order.status)) {
+  if (['closed', 'cancelled', 'merged'].includes(order.status)
+    || (order.status === 'completed' && order.saleSource !== 'quick-sale')) {
     const e = new Error('Order is not editable')
     e.status = 409
     e.payload = { code: 'order_not_editable', message: 'Order is not editable' }
@@ -2901,7 +2916,6 @@ export const deleteOrderPaymentService = async (tenantId, id, paymentId) => {
 export const setOrderDiscountService = async (tenantId, id, discountPercent) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   if (['closed', 'cancelled', 'merged'].includes(order.status)) {
     const e = new Error('Order is not editable')
     e.status = 409
@@ -2912,6 +2926,7 @@ export const setOrderDiscountService = async (tenantId, id, discountPercent) => 
   if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
     throw error('invalid_discount', 'Invalid discount percent', 400)
   }
+  if (order.saleSource === 'quick-sale' && pct !== 0) rejectQuickSaleRefundMutation()
   order.discountPercent = pct
   const paymentState = await computePersistedPaymentState(tenantId, order)
   order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
@@ -3259,9 +3274,9 @@ export const deleteOrderCollectionTransactionService = async (tenantId, orderId,
 
   const order = await findByIdAndTenant(orderId, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
 
-  if (['closed', 'cancelled', 'merged'].includes(order.status)) {
+  if (['closed', 'cancelled', 'merged'].includes(order.status)
+    || (order.status === 'completed' && order.saleSource !== 'quick-sale')) {
     const e = new Error('Order is not editable')
     e.status = 409
     e.payload = { error: 'conflict', code: 'order_not_editable', message: 'Order is not editable' }

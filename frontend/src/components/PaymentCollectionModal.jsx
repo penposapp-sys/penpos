@@ -33,6 +33,7 @@ export default function PaymentCollectionModal({
   onSubmit,
   submitLabel = 'Ödeme Ekle',
   showDiscount = false,
+  allowQuickSaleDiscountDeletion = false,
   discountDraft = '',
   onDiscountDraftChange,
   onApplyDiscount,
@@ -70,7 +71,7 @@ export default function PaymentCollectionModal({
         label: 'İndirim',
         note: Number(order?.discountPercent || 0) > 0 ? `%${Number(order.discountPercent || 0)} indirim uygulandı` : '',
         accountName: '',
-        canDelete: !!(showDiscount && canTakePayment && onDeleteLine)
+        canDelete: !!((showDiscount || allowQuickSaleDiscountDeletion) && canTakePayment && onDeleteLine)
       }
     : null
   const historyLines = discountHistoryLine ? [discountHistoryLine, ...previousLines] : previousLines

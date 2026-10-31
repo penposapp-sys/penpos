@@ -20769,3 +20769,61 @@ body.mobile-system-dark .modal-backdrop > .app-modal :is(input, textarea, select
   color: #9ca3af !important;
   -webkit-text-fill-color: #9ca3af !important;
 }
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart-line {
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  grid-template-areas:
+    "info price"
+    "detail price"
+    "actions actions" !important;
+  align-items: center;
+  gap: 6px 8px;
+  min-height: 0;
+  padding: 8px;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart-line__info {
+  display: grid;
+  grid-area: info;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  min-width: 0;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-product-heading {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-product-heading strong {
+  display: block;
+  line-height: 1.25;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-product-note {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart-line__detail {
+  grid-area: detail;
+  justify-self: start;
+  text-align: left;
+  white-space: normal;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart-line__actions {
+  grid-area: actions;
+  justify-self: end;
+  gap: 6px;
+}
+
+body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart-line__price {
+  grid-area: price;
+  align-self: center;
+}

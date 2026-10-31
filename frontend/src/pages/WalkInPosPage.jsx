@@ -1581,6 +1581,10 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
   }
 
   const deleteDiscount = async () => {
+    if (!canTakePayment) {
+      toast.error('İndirim silme yetkiniz yok')
+      return
+    }
     setDiscountDraft(0)
     const currentOrderId = order?._id || order?.id || selectedOrderId
     if (!currentOrderId) {
@@ -1855,6 +1859,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
 
   const previousLines = useMemo(() => {
     const out = []
+    const quickSaleCanEditPayments = !isQuickSaleOrder || !['closed', 'cancelled', 'merged'].includes(String(order?.status || ''))
     const payments = Array.isArray(order?.payments) ? order.payments : []
     for (const p of payments) {
       out.push({
@@ -1865,7 +1870,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
         label: paymentMethodLabel(p),
         note: String(p?.note || ''),
         accountName: '',
-        canDelete: !!canTakePayment
+        canDelete: !!canTakePayment && quickSaleCanEditPayments
       })
     }
     const ver = Array.isArray(order?.veresiyeEntries) ? order.veresiyeEntries : []
@@ -1878,7 +1883,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
         label: 'Veresiye',
         note: String(v?.note || ''),
         accountName: String(v?.accountName || '-'),
-        canDelete: !!canCreateVeresiye
+        canDelete: !!canCreateVeresiye && quickSaleCanEditPayments
       })
     }
     const col = Array.isArray(order?.linkedCollections) ? order.linkedCollections : []
@@ -1891,13 +1896,13 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
         label: 'Cari Tahsilat',
         note: String(c?.note || ''),
         accountName: String(c?.accountName || '-'),
-        canDelete: !!canTakePayment
+        canDelete: !!canTakePayment && quickSaleCanEditPayments
       })
     }
     return out
       .filter(x => x.id)
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-  }, [order?.payments, order?.veresiyeEntries, order?.linkedCollections, canTakePayment, canCreateVeresiye])
+  }, [order?.payments, order?.veresiyeEntries, order?.linkedCollections, order?.status, isQuickSaleOrder, canTakePayment, canCreateVeresiye])
 
   const uiStatusLabels = {
     waiting: 'Bekliyor',
@@ -2572,7 +2577,13 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
                       onClick={openPaymentModal}
                       disabled={!getOrderId(order)}
                     >Ödeme Al</button>
-                    <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger" onClick={() => setOrderCancelConfirmOpen(true)} disabled={isQuickSaleOrder || order.paymentStatus === 'paid' || order.status === 'cancelled'}>İptal</button>
+                    <button
+                      className="btn saleCartFooterActionBtn saleCartFooterActionBtn--danger"
+                      onClick={() => setOrderCancelConfirmOpen(true)}
+                      disabled={order.status === 'cancelled' || (!isQuickSaleOrder && order.paymentStatus === 'paid')}
+                    >
+                      İptal
+                    </button>
 
                     <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--print" onClick={printReceiptOneClick} disabled={!getOrderId(order) || printingReceipt}>Fiş Yazdır</button>
                     <button className="btn saleCartFooterActionBtn saleCartFooterActionBtn--preview" type="button" onClick={openReceiptPreview} disabled={!getOrderId(order)}>Fişi Gör</button>
@@ -2603,7 +2614,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
       canTakePayment={canTakePayment}
       busy={busy}
       previousLines={previousLines}
-      onDeleteLine={isQuickSaleOrder ? undefined : (line) => {
+      onDeleteLine={(line) => {
         if (line.kind === 'payment') return deletePayment(line.id)
         if (line.kind === 'veresiye') return deleteVeresiyeEntry(line.id)
         if (line.kind === 'collection') return deleteCollection(line.id)
@@ -2613,6 +2624,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
       changeDue={changeDue}
       onSubmit={payOrder}
       showDiscount={!isQuickSaleOrder}
+      allowQuickSaleDiscountDeletion={isQuickSaleOrder}
       discountDraft={discountDraft}
       onDiscountDraftChange={setDiscountDraft}
       onApplyDiscount={applyDiscount}
@@ -2785,7 +2797,9 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
       onClose={() => setOrderCancelConfirmOpen(false)}
       title="Siparişi İptal Et?"
       description={
-        order?.status === 'sent'
+        isQuickSaleOrder && paidTotal > 0.01
+          ? 'İptalden önce Ödeme Al ekranından mevcut ödeme ve veresiye hareketlerini silmeniz gerekir. İade edilmemiş tahsilatı olan satış iptal edilmez.'
+          : order?.status === 'sent'
           ? 'Bu işlem sepetteki tüm ürünleri iptal eder. Geri alınamaz. Mutfakta hazırlanan ürünler de iptal edilir.'
           : 'Bu işlem sepetteki tüm ürünleri iptal eder. Geri alınamaz.'
       }

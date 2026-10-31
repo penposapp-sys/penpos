@@ -7,7 +7,6 @@ import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
 import SalesProductGrid from '../components/SalesProductGrid.jsx'
 import ProductConfigModal from '../components/ProductConfigModal.jsx'
 import Modal from '../components/Modal.jsx'
-import ProductImage from '../components/ProductImage.jsx'
 import { enqueueReceiptPrint } from '../lib/printingClient.js'
 import { getProductPortionOptions, requiresProductConfig } from '../lib/productPortions.js'
 import { inferPaymentMethodType, paymentMethodLabel } from '../lib/paymentMethods.js'
@@ -42,6 +41,10 @@ export default function QuickSalePage() {
   const [accounts, setAccounts] = useState([])
   const [accountsLoading, setAccountsLoading] = useState(false)
   const [selectedCreditAccount, setSelectedCreditAccount] = useState(null)
+  const [createAccountOpen, setCreateAccountOpen] = useState(false)
+  const [createAccountForm, setCreateAccountForm] = useState({ name: '', phone: '', note: '' })
+  const [createAccountError, setCreateAccountError] = useState('')
+  const [creatingAccount, setCreatingAccount] = useState(false)
   const [cartViewMode, setCartViewMode] = useState('grouped')
   const [servingType, setServingType] = useState(ServingType.PLATE)
   const [sendToKitchen, setSendToKitchen] = useState(true)
@@ -198,6 +201,7 @@ export default function QuickSalePage() {
   const canTakePayment = hasPerm('take_payment')
   const canCreateVeresiye = hasPerm('create_veresiye')
   const canViewAccounts = hasPerm('view_accounts')
+  const canManageAccounts = hasPerm('manage_accounts') || hasPerm('accounts_manage')
   const creditAccountsDisabled = getSetting('general.disableCreditAccounts', false) === true
 
   const searchAccounts = async (query = accountQuery) => {
@@ -230,6 +234,54 @@ export default function QuickSalePage() {
     setAccountQuery('')
     setAccountPickerOpen(true)
     void searchAccounts('')
+  }
+
+  const submitQuickSaleAccount = async (event) => {
+    event.preventDefault()
+    if (!canManageAccounts || !branchId) {
+      toast.error(!branchId ? 'Cari oluşturmak için etkin bir şube gerekli.' : 'Cari oluşturma yetkiniz yok.')
+      return
+    }
+    const name = String(createAccountForm.name || '').trim()
+    if (!name) {
+      setCreateAccountError('Cari adı zorunludur.')
+      return
+    }
+    setCreatingAccount(true)
+    setCreateAccountError('')
+    try {
+      const response = await api('/api/accounts', {
+        method: 'POST',
+        data: {
+          name,
+          phone: String(createAccountForm.phone || '').trim(),
+          note: String(createAccountForm.note || '').trim()
+        },
+        branchIdOverride: branchId,
+        silent: true
+      })
+      if (!response?.ok || response?.success === false) {
+        throw new Error(response?.data?.message || response?.message || 'Cari oluşturulamadı.')
+      }
+      const account = response?.account || response?.data?.account
+      const id = getId(account)
+      if (!id) throw new Error('Cari oluşturuldu ancak cari bilgisi alınamadı.')
+      const createdAccount = { ...account, id }
+      setAccounts((current) => [createdAccount, ...current.filter((item) => getId(item) !== id)])
+      setSelectedCreditAccount(createdAccount)
+      setPaymentMode('credit')
+      setPaymentMethod('')
+      setCreateAccountForm({ name: '', phone: '', note: '' })
+      setCreateAccountOpen(false)
+      setAccountPickerOpen(false)
+      toast.success('Cari oluşturuldu ve seçildi.')
+    } catch (err) {
+      const message = err?.data?.message || err?.message || 'Cari oluşturulamadı.'
+      setCreateAccountError(message)
+      toast.error(message)
+    } finally {
+      setCreatingAccount(false)
+    }
   }
 
   const addConfiguredProduct = useCallback((product, config = {}) => {
@@ -448,14 +500,13 @@ export default function QuickSalePage() {
                     return (
                     <div className="sale-cart-line" key={row.key}>
                       <div className="sale-cart-line__info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <ProductImage product={{ imageUrl: line.imageUrl, name: line.name }} alt="" width={40} height={40} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
+                        <div className="quick-sale-cart-product-heading">
                           <strong>{line.name}</strong>
                         </div>
                         <input
-                          className="input"
+                          className="input quick-sale-cart-product-note"
                           aria-label={`${line.name} ürün notu`}
-                          placeholder="Ürün notu"
+                          placeholder="Ürün notu ekle"
                           value={line.note}
                           onChange={(event) => updateLine(line.key, { note: event.target.value })}
                           disabled={cartLocked}
@@ -652,6 +703,21 @@ export default function QuickSalePage() {
                 aria-label="Cari hesap ara"
               />
               <button type="submit" className="btn" disabled={accountsLoading}>Ara</button>
+              {canManageAccounts ? (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setCreateAccountError('')
+                    setCreateAccountForm({ name: '', phone: '', note: '' })
+                    setAccountPickerOpen(false)
+                    setCreateAccountOpen(true)
+                  }}
+                  disabled={accountsLoading}
+                >
+                  + Yeni Cari
+                </button>
+              ) : null}
             </div>
             <div style={{ display: 'grid', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
               {accounts.map((account) => (
@@ -676,6 +742,63 @@ export default function QuickSalePage() {
               ))}
               {!accountsLoading && accounts.length === 0 ? <span className="muted">Cari hesap bulunamadı.</span> : null}
               {accountsLoading ? <span className="muted">Cari hesaplar yükleniyor…</span> : null}
+            </div>
+          </form>
+        </Modal>
+        <Modal
+          open={createAccountOpen}
+          title="Yeni Cari"
+          onClose={() => {
+            if (creatingAccount) return
+            setCreateAccountOpen(false)
+            setCreateAccountError('')
+          }}
+          dialogStyle={{ width: 'min(520px, calc(100vw - 24px))' }}
+        >
+          <form onSubmit={submitQuickSaleAccount} style={{ display: 'grid', gap: 12 }}>
+            {createAccountError ? (
+              <div className="card" role="alert" style={{ color: 'var(--danger)' }}>{createAccountError}</div>
+            ) : null}
+            <label style={{ display: 'grid', gap: 6 }}>
+              <strong>Ad Soyad (zorunlu)</strong>
+              <input
+                className="input"
+                value={createAccountForm.name}
+                onChange={(event) => setCreateAccountForm((current) => ({ ...current, name: event.target.value }))}
+                disabled={creatingAccount}
+                autoFocus
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <strong>Telefon</strong>
+              <input
+                className="input"
+                value={createAccountForm.phone}
+                onChange={(event) => setCreateAccountForm((current) => ({ ...current, phone: event.target.value }))}
+                disabled={creatingAccount}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <strong>Not</strong>
+              <input
+                className="input"
+                value={createAccountForm.note}
+                onChange={(event) => setCreateAccountForm((current) => ({ ...current, note: event.target.value }))}
+                disabled={creatingAccount}
+              />
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setCreateAccountOpen(false)}
+                disabled={creatingAccount}
+              >
+                Vazgeç
+              </button>
+              <button type="submit" className="btn btn--primary" disabled={creatingAccount || !branchId}>
+                {creatingAccount ? 'Kaydediliyor…' : 'Cari Oluştur'}
+              </button>
             </div>
           </form>
         </Modal>

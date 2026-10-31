@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import Order from '../src/models/Order.js'
-import { completeQuickSaleOrderWhenKitchenReady } from '../src/utils/quickSaleKitchen.js'
+import { completeQuickSaleOrderWhenKitchenReady, completeQuickSaleOrderWithoutKitchen } from '../src/utils/quickSaleKitchen.js'
 import { computePaymentSummary } from '../src/utils/orderFinancial.js'
 
 test('orders persist quick-sale separately from standard sales', () => {
@@ -110,4 +110,35 @@ test('kitchen completion leaves regular restaurant orders unchanged', () => {
   assert.equal(completeQuickSaleOrderWhenKitchenReady(order), false)
   assert.equal(order.status, 'sent')
   assert.equal(order.closedAt, undefined)
+})
+
+test('quick sales not sent to the kitchen are completed immediately', () => {
+  const completedAt = new Date('2026-10-31T12:00:00.000Z')
+  const order = {
+    saleSource: 'quick-sale',
+    status: 'open',
+    kitchenEnabled: false,
+    sendToKitchen: false,
+    items: [{ status: 'open' }, { status: 'open' }]
+  }
+
+  assert.equal(completeQuickSaleOrderWithoutKitchen(order, completedAt), true)
+  assert.equal(order.status, 'completed')
+  assert.equal(order.closedAt, completedAt)
+  assert.deepEqual(order.items.map(item => item.status), ['completed', 'completed'])
+})
+
+test('quick-sale auto-completion does not close orders already sent to the kitchen', () => {
+  const order = {
+    saleSource: 'quick-sale',
+    status: 'sent',
+    kitchenEnabled: false,
+    sendToKitchen: false,
+    kitchenBatches: [{ batchId: 'batch-1' }],
+    items: [{ status: 'sent' }]
+  }
+
+  assert.equal(completeQuickSaleOrderWithoutKitchen(order), false)
+  assert.equal(order.status, 'sent')
+  assert.equal(order.items[0].status, 'sent')
 })
