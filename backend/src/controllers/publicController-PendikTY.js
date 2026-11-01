@@ -17,6 +17,7 @@ import { createPublicQrOrder } from '../modules/canteen/services/canteenQrOrderS
 import { listPublicQrOrdersByCustomer } from '../modules/canteen/services/canteenQrOrderService.js'
 import { createPublicOnlineOrderService } from '../services/orderService.js'
 import { normalizeTenantWebsiteSlug } from '../services/tenantWebsiteService.js'
+import { getPrintAgentVersion, readPrintAgentRelease } from '../utils/printAgentRelease.js'
 import {
   getCustomer,
   getCustomerFavoriteProductIds,
@@ -49,18 +50,6 @@ const buildBaseUrl = (req) => {
     return `${proto}://${host}`
   } catch {
     return ''
-  }
-}
-
-const getPrintAgentVersion = () => {
-  const envVersion = String(process.env.PRINT_AGENT_WINDOWS_VERSION || '').trim()
-  if (envVersion) return envVersion
-  try {
-    const packageJsonPath = path.join(process.cwd(), 'print-agent', 'package.json')
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-    return String(packageJson?.version || '0.1.1').trim() || '0.1.1'
-  } catch {
-    return '0.1.1'
   }
 }
 
@@ -112,7 +101,6 @@ const resolvePrintAgentWindowsBinary = () => {
   const requestedFileName = String(process.env.PRINT_AGENT_WINDOWS_FILENAME || 'PenPOS_PrintAgent.exe').trim() || 'PenPOS_PrintAgent.exe'
   const exeFileName = /^PenPOS_PrintAgent_Setup(?:_|\.exe$)/i.test(requestedFileName) ? 'PenPOS_PrintAgent.exe' : requestedFileName
   const envIsSetup = /^PenPOS_PrintAgent_Setup(?:_|\.exe$)/i.test(path.basename(envPath))
-  const version = getPrintAgentVersion()
   const candidates = [
     ...(!envIsSetup && envPath ? [envPath] : []),
     path.join(process.cwd(), 'backend', 'public', 'downloads', 'print-agent', 'windows', 'PenPOS_PrintAgent.exe'),
@@ -123,6 +111,7 @@ const resolvePrintAgentWindowsBinary = () => {
   const existing = candidates.find((candidate) => {
     try { return fs.statSync(candidate).isFile() } catch { return false }
   })
+  const version = getPrintAgentVersion(existing || '')
   let publishedAt = null
   if (existing) {
     try { publishedAt = fs.statSync(existing).mtime.toISOString() } catch { publishedAt = null }
@@ -887,6 +876,7 @@ export const getPrintAgentWindowsManifest = async (req, res) => {
   const fallbackPath = '/api/public/downloads/print-agent/windows'
   const base = buildBaseUrl(req)
   const downloadUrl = String(process.env.PRINT_AGENT_WINDOWS_URL || (base ? new URL(fallbackPath, base).toString() : fallbackPath)).trim()
+  const release = readPrintAgentRelease(resolved.filePath)
 
   return res.json({
     success: true,
@@ -894,6 +884,8 @@ export const getPrintAgentWindowsManifest = async (req, res) => {
     version: resolved.version,
     fileName: resolved.fileName,
     downloadUrl,
+    setupVersion: String(release.setupVersion || ''),
+    setupFileName: String(release.setupFileName || ''),
     required: false,
     notes: String(process.env.PRINT_AGENT_WINDOWS_NOTES || '').trim(),
     publishedAt: resolved.publishedAt

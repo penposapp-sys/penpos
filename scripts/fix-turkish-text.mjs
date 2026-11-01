@@ -6,8 +6,7 @@ const TARGETS = [
   'frontend/src',
   'backend/src',
   'backend/scripts',
-  '../PenPos YAZICI exe/setup',
-  '../PenPos YAZICI exe/service'
+  'print-agent'
 ]
 
 const TEXT_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.json', '.md', '.txt', '.yml', '.yaml'])

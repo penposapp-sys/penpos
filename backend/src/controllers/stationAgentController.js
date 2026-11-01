@@ -18,6 +18,7 @@ import { renderLabelPdfBase64, renderReceiptPdfBase64, renderTextPdfBase64 } fro
 import { buildStationAgentLeaseFilter, stationAgentOwnerChanged } from '../services/stationAgentLease.js'
 import { resolveUploadDirCandidates } from '../utils/uploads.js'
 import { computePaymentSummary } from '../utils/orderFinancial.js'
+import { buildCashierReceiptRaw } from '../utils/cashierReceiptRaw.js'
 
 const getDeliveryPaymentLine = (order) => {
   if (String(order?.paymentStatus || '') === 'paid') return 'Ödemesi alındı'
@@ -338,6 +339,69 @@ export const claimNext = async (req, res) => {
     })
     const copies = Math.max(1, Math.min(10, Number(stationPrinter?.copies || job?.meta?.copies || 1)))
     const printerName = String(printer?.windowsPrinterName || '').trim()
+    const renderOrderReceiptRaw = job?.type === 'receipt'
+      && (job?.meta?.renderOrderReceiptRaw === true || job?.meta?.renderOrderReceiptPdf === true)
+    let rawContent = String(job?.payload?.content || '')
+    let meta = job?.meta && typeof job.meta === 'object' ? job.meta : {}
+    if (renderOrderReceiptRaw) {
+      const orderId = String(job?.meta?.orderId || '').trim()
+      if (!mongoose.isValidObjectId(orderId)) throw error('invalid_request', 'Receipt orderId is invalid', 400)
+      const [tenant, order] = await Promise.all([
+        Tenant.findById(scope.tenantId).select('name logoUrl settings').lean(),
+        Order.findOne({ _id: orderId, tenantId: scope.tenantId }).lean()
+      ])
+      if (!order) throw error('not_found', 'Receipt order not found', 404)
+      const tableName = order?.tableId
+        ? String((await Table.findById(order.tableId).select('name').lean())?.name || order?.tableName || '')
+        : String(order?.tableName || '')
+      const collections = await AccountTransaction.find({
+        tenantId: scope.tenantId,
+        orderId: order._id,
+        source: 'collection',
+        type: 'credit',
+        isDeleted: { $ne: true }
+      }).select('amount method methodLabel methodName createdAt').lean()
+      const collectionEntries = collections.map((entry) => ({
+        amount: Number(entry?.amount || 0),
+        method: String(entry?.method || 'other'),
+        methodLabel: String(entry?.methodLabel || entry?.method || ''),
+        methodName: String(entry?.methodName || ''),
+        createdAt: entry?.createdAt || null,
+        source: 'collection'
+      }))
+      const financial = computePaymentSummary({ ...order, collectionEntries })
+      const paymentDetails = [
+        ...(Array.isArray(order?.payments) ? order.payments : []),
+        ...collectionEntries
+      ]
+      const business = tenant?.settings?.business && typeof tenant.settings.business === 'object'
+        ? tenant.settings.business
+        : {}
+      const receipt = {
+        saleSource: String(order?.saleSource || 'standard'),
+        businessName: String(business.businessName || business.companyName || tenant?.name || 'PENPOS'),
+        createdAt: order?.createdAt || job?.createdAt,
+        receiptNo: String(order?._id || '').slice(-8).toUpperCase(),
+        orderNo: order?.orderNo || String(order?._id || ''),
+        tableName,
+        cashierName: String(order?.createdByName || order?.createdByUserName || ''),
+        items: Array.isArray(order?.items) ? order.items : [],
+        totals: { subtotal: financial.total, grandTotal: financial.netTotal },
+        paidTotal: financial.paidTotal,
+        balanceDue: financial.balanceDue,
+        displayBalance: financial.veresiyeTotal,
+        payments: paymentDetails,
+        paymentMethod: String(order?.paymentMethod || ''),
+        paymentStatus: financial.balanceDue <= 0.01 ? 'paid' : 'unpaid',
+        discountTotal: financial.discountTotal,
+        note: String(order?.note || '')
+      }
+      const widthMm = Math.max(58, Number(stationPrinter?.receiptWidthMm || profile?.options?.widthMm || 80))
+      const logoBuffer = await loadTenantLogoBuffer(scope.tenantId, tenant)
+      const rawReceipt = await buildCashierReceiptRaw(receipt, { widthMm, logoBuffer })
+      rawContent = rawReceipt.toString('base64')
+      meta = { ...meta, rawEncoding: 'base64' }
+    }
     logger.info(`[PRINTING_CLAIM] station=${stationId} job=${jobId}`)
     res.json({
       job: {
@@ -345,11 +409,11 @@ export const claimNext = async (req, res) => {
         type: String(job.type || ''),
         fileUrl,
         payloadType: String(job?.payload?.type || ''),
-        rawContent: String(job?.payload?.content || ''),
+        rawContent,
         profileId: String(job.profileId || ''),
         printerName,
         copies,
-        meta: job?.meta && typeof job.meta === 'object' ? job.meta : {},
+        meta,
         printSettings: {
           printerName,
           copies,

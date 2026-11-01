@@ -289,7 +289,10 @@ export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1, idem
   const receiptRes = await api(`/api/pos/orders/${encodeURIComponent(oid)}/receipt`, { silent: true })
   const receipt = receiptRes?.receipt || null
   if (!receipt) throw new Error(receiptRes?.message || 'Fis verisi alinamadi')
-  const content = buildReceiptContent(receipt)
+  const renderDesignedReceiptRaw = String(receipt?.saleSource || '') === 'quick-sale'
+    || String(receipt?.saleType || '') === 'table'
+    || Boolean(String(receipt?.tableName || '').trim())
+  const content = renderDesignedReceiptRaw ? '' : buildReceiptContent(receipt)
 
   const res = await api('/api/printing/jobs', {
     method: 'POST',
@@ -301,6 +304,7 @@ export const enqueueReceiptPrint = async ({ system, orderId, copyCount = 1, idem
         orderId: String(receipt.id),
         copies,
         receiptRole: 'cashier',
+        ...(renderDesignedReceiptRaw ? { renderOrderReceiptRaw: true } : {}),
         ...(String(idempotencyKey || '').trim() ? { idempotencyKey: String(idempotencyKey).trim() } : {})
       }
     },

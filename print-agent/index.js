@@ -7,8 +7,9 @@ import dns from 'dns'
 import { spawn } from 'child_process'
 import crypto from 'crypto'
 import { resolveWindowsPrinterName } from './printerName.js'
+import { decodeRawPayload } from './rawPayload.js'
 
-const AGENT_VERSION = '0.1.3'
+const AGENT_VERSION = '0.1.9'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {
@@ -885,9 +886,10 @@ const main = async () => {
         const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
         const thermalContent = selectThermalReceiptContent(job)
         const thermalEncoding = String(job?.meta?.rawEncoding || 'cp857').trim() || 'cp857'
+        const rawPayload = decodeRawPayload(thermalContent, thermalEncoding)
         try {
           for (let i = 0; i < copies; i++) {
-            await printRawText({ printerName, content: thermalContent, txtPath: txtTmp, encoding: thermalEncoding })
+            await printRawText({ printerName, content: rawPayload, txtPath: txtTmp, encoding: thermalEncoding })
           }
           await httpJson(completeUrl, { method: 'PATCH', headers: buildHeaders(), timeoutMs: requestTimeoutMs })
         } finally {
@@ -943,13 +945,17 @@ const main = async () => {
   }
 }
 
-main().catch((e) => {
-  const message = String(e?.message || e || 'Bilinmeyen hata')
-  console.error('[AGENT_FATAL]', message)
-  Promise.resolve()
-    .then(() => writeFatalLog(message, { stack: String(e?.stack || '') }))
-    .then(() => showFatalDialog(`${message}\n\nDetay log: C:/ProgramData/PenPOS/PrintAgent/agent-fatal.log`))
-    .finally(() => {
-      process.exit(1)
-    })
-})
+if (process.argv.includes('--version')) {
+  process.stdout.write(`${AGENT_VERSION}\n`)
+} else {
+  main().catch((e) => {
+    const message = String(e?.message || e || 'Bilinmeyen hata')
+    console.error('[AGENT_FATAL]', message)
+    Promise.resolve()
+      .then(() => writeFatalLog(message, { stack: String(e?.stack || '') }))
+      .then(() => showFatalDialog(`${message}\n\nDetay log: C:/ProgramData/PenPOS/PrintAgent/agent-fatal.log`))
+      .finally(() => {
+        process.exit(1)
+      })
+  })
+}
