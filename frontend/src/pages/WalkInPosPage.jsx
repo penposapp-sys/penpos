@@ -1395,6 +1395,10 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
     }
 
     if (balanceDue > 0.01) {
+      if (isQuickSaleOrder) {
+        toast.error('Kapatmadan önce tahsilatı tamamlayın.')
+        return
+      }
       nav('/restoran/app/walkin')
       return
     }
@@ -1522,7 +1526,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
     }
   }, [quickSale, order?.id, order?._id, order?.saleSource, order?.paymentStatus])
 
-  const payOrder = async ({ itemAllocations = [] } = {}) => {
+  const payOrder = async ({ amount: submittedAmount, itemAllocations = [] } = {}) => {
     if (!canTakePayment) {
       toast.error('Ödeme alma yetkiniz yok')
       return
@@ -1537,7 +1541,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
       setError('Sipariş bulunamadı')
       return
     }
-    const amount = paymentAmount ? Number(paymentAmount) : 0
+    const amount = Number(submittedAmount ?? paymentAmount) || 0
     const res = await safeAction(
       (signal) => api(`/api/pos/orders/${currentOrderId}/payments`, { method: 'POST', data: { method: paymentMethod, amount, note: paymentNote, itemAllocations, entryDate: paymentEntryDate }, signal, silent: true }),
       { reload: false }
@@ -2142,13 +2146,13 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
             ) : null}
           </div>
         ) : null}
-        {!isQuickSaleOrder ? <button
+        <button
           className="btn btn--danger btn--close-action"
           onClick={closeSelectedOrder}
-          disabled={!getOrderId(order) || busy}
+          disabled={!getOrderId(order) || busy || (isQuickSaleOrder && (balanceDue > 0.01 || ['closed', 'cancelled'].includes(String(order?.status || ''))))}
         >
-          Kapat
-        </button> : null}
+          {isQuickSaleOrder ? 'Zorunlu Kapat' : 'Kapat'}
+        </button>
       </div>
 
       <div className="walkin-sales-page__body" style={{ flex: 1, minHeight: 0, overflow: isMobilePortrait ? 'visible' : 'hidden' }}>
@@ -2614,6 +2618,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
       canTakePayment={canTakePayment}
       busy={busy}
       previousLines={previousLines}
+      defaultToBalanceDueOnEmpty={isQuickSaleOrder}
       onDeleteLine={(line) => {
         if (line.kind === 'payment') return deletePayment(line.id)
         if (line.kind === 'veresiye') return deleteVeresiyeEntry(line.id)

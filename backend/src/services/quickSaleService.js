@@ -320,7 +320,6 @@ export const createQuickSaleService = async (tenantId, userId, branchId, {
     creditAccount = await CustomerAccount.findOne({
       _id: safeCreditAccountId,
       tenantId,
-      branchId,
       isActive: true
     }).select('_id name branchId').lean()
     if (!creditAccount) throw error('invalid_account', 'Cari bulunamadı veya pasif.', 409)
@@ -428,7 +427,7 @@ export const getQuickSalesService = async (tenantId, branchIds, limit = 100) => 
     saleType: 'walkin',
     saleSource: 'quick-sale',
     paymentStatus: 'paid',
-    status: { $nin: ['cancelled', 'merged'] }
+    status: { $nin: ['cancelled', 'merged', 'closed'] }
   }
   filter = applyBranchFilter(filter, Array.isArray(branchIds) ? branchIds : [])
   const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(safeLimit).lean()

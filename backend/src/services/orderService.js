@@ -3442,7 +3442,7 @@ export const closeOrderService = async (tenantId, id) => {
     throw error('invalid_state', 'Order not closable (Unpaid balance)', 400)
   }
 
-  const nextStatus = order.status === 'cancelled' ? 'closed' : 'completed'
+  const nextStatus = order.saleSource === 'quick-sale' || order.status === 'cancelled' ? 'closed' : 'completed'
   const updated = await updateById(id, { status: nextStatus, closedAt: new Date() })
   if (updated.tableId) {
     await (await import('../repositories/tableRepository.js')).updateById(updated.tableId, { status: 'empty', activeOrderId: null, note: '' })

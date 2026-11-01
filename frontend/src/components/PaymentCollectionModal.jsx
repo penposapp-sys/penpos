@@ -32,6 +32,7 @@ export default function PaymentCollectionModal({
   changeDue = 0,
   onSubmit,
   submitLabel = 'Ödeme Ekle',
+  defaultToBalanceDueOnEmpty = false,
   showDiscount = false,
   allowQuickSaleDiscountDeletion = false,
   discountDraft = '',
@@ -200,7 +201,10 @@ export default function PaymentCollectionModal({
   }
 
   const handleSubmit = () => {
-    const amount = Number(paymentAmount || 0)
+    const enteredAmount = Number(paymentAmount || 0)
+    const amount = enteredAmount > 0
+      ? enteredAmount
+      : (defaultToBalanceDueOnEmpty && splitSelectedRows.length === 0 ? balanceDue : 0)
     const useAllocations = splitSelectedRows.length > 0 && Math.abs(round2(amount) - splitSelectedAmount) <= 0.01
     const allocationMap = new Map()
     if (useAllocations) {
@@ -218,7 +222,7 @@ export default function PaymentCollectionModal({
         allocationMap.set(itemId, current)
       }
     }
-    onSubmit?.({ itemAllocations: Array.from(allocationMap.values()) })
+    onSubmit?.({ amount, itemAllocations: Array.from(allocationMap.values()) })
   }
 
   return (
