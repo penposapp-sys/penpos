@@ -104,6 +104,17 @@ const itemRow = ({ name, qty, subtotal, note }) => {
   return out
 }
 
+const quickSaleItemRow = ({ name, qty, subtotal }) => {
+  const price = money(subtotal)
+  const qtyText = `x${Math.max(1, Number(qty || 1))}`
+  const nameWidth = Math.max(8, RECEIPT_WIDTH - price.length - qtyText.length - 2)
+  const nameLines = wrapText(name, nameWidth)
+  const firstName = String(nameLines.shift() || '-')
+  let out = `${firstName.padEnd(nameWidth)} ${qtyText} ${price}\n`
+  for (const nameLine of nameLines) out += `${nameLine}\n`
+  return out
+}
+
 const derivePaymentType = (receipt) => {
   const payments = Array.isArray(receipt?.payments) ? receipt.payments : []
   if (payments.length > 0) {
@@ -152,6 +163,44 @@ const buildReceiptContent = (receipt) => {
   const balanceDue = Number(receipt?.balanceDue ?? receipt?.totals?.balanceDue ?? Math.max(0, grandTotal - paidTotal))
   const displayBalance = Number(receipt?.displayBalance ?? 0)
   const lines = []
+
+  if (String(receipt?.saleSource || '') === 'quick-sale') {
+    const quickSaleLines = [
+      center('HIZLI SATIS').trimEnd(),
+      line('-').trimEnd(),
+      pairRow('Fis No:', String(receiptNo)).trimEnd(),
+      pairRow('Tarih / Saat:', `${datePart} ${timePart}`.trim()).trimEnd(),
+      line('-').trimEnd()
+    ]
+    for (const item of activeItems) {
+      quickSaleLines.push(quickSaleItemRow({
+        name: item?.nameSnapshot || '-',
+        qty: item?.qty || 1,
+        subtotal: item?.subtotal || 0
+      }).trimEnd())
+    }
+    quickSaleLines.push(line('-').trimEnd())
+    quickSaleLines.push(pairRow('TOPLAM', money(grandTotal)).trimEnd())
+    quickSaleLines.push(pairRow('Odeme:', derivePaymentType(receipt)).trimEnd())
+    if (String(receipt?.note || '').trim()) {
+      quickSaleLines.push(line('-').trimEnd())
+      quickSaleLines.push(...wrapText(`Not: ${String(receipt.note).trim()}`))
+    }
+    quickSaleLines.push(line('-').trimEnd())
+    quickSaleLines.push(center('TESEKKUR EDERIZ').trimEnd())
+    return [
+      cmd.init,
+      cmd.alignCenter,
+      cmd.boldOn,
+      cmd.normalSize,
+      `${toPrintAscii(businessName).toUpperCase()}\n`,
+      cmd.boldOff,
+      cmd.alignLeft,
+      `${quickSaleLines.join('\n')}\n`,
+      '\n',
+      cmd.cut
+    ].join('')
+  }
 
   lines.push(center('HOS GELDINIZ').trimEnd())
   if (isPackage) {

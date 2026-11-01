@@ -1,4 +1,6 @@
 import mongoose from 'mongoose'
+import fs from 'fs/promises'
+import path from 'path'
 import bcrypt from 'bcryptjs'
 import { error, sendError } from '../utils/errors.js'
 import PrintStation from '../models/PrintStation.js'
@@ -8,11 +10,14 @@ import * as stationRepo from '../repositories/printStationRepository.js'
 import * as jobRepo from '../repositories/printJobRepository.js'
 import * as logger from '../utils/logger.js'
 import Order from '../models/Order.js'
+import AccountTransaction from '../models/AccountTransaction.js'
 import Table from '../models/Table.js'
 import Tenant from '../models/Tenant.js'
 import PrintProfile from '../models/PrintProfile.js'
 import { renderLabelPdfBase64, renderReceiptPdfBase64, renderTextPdfBase64 } from '../services/pdfRenderService.js'
 import { buildStationAgentLeaseFilter, stationAgentOwnerChanged } from '../services/stationAgentLease.js'
+import { resolveUploadDirCandidates } from '../utils/uploads.js'
+import { computePaymentSummary } from '../utils/orderFinancial.js'
 
 const getDeliveryPaymentLine = (order) => {
   if (String(order?.paymentStatus || '') === 'paid') return 'Ödemesi alındı'
@@ -21,6 +26,32 @@ const getDeliveryPaymentLine = (order) => {
   const plannedLabel = String(order?.deliveryPaymentMethodLabel || order?.deliveryPaymentMethod || '').trim()
   if (plannedStatus === 'pay_on_delivery' && plannedLabel) return plannedLabel
   return ''
+}
+
+const loadTenantLogoBuffer = async (tenantId, tenant) => {
+  const logoUrl = String(tenant?.settings?.logo?.url || tenant?.logoUrl || '').trim()
+  if (!logoUrl) return null
+  let preferredName = ''
+  try {
+    preferredName = path.basename(new URL(logoUrl, 'http://localhost').pathname)
+  } catch {
+    preferredName = ''
+  }
+  const fileNames = ['logo.webp', 'logo.png', 'logo.jpg', 'logo.jpeg']
+  if (fileNames.includes(preferredName)) {
+    fileNames.splice(fileNames.indexOf(preferredName), 1)
+    fileNames.unshift(preferredName)
+  }
+  for (const directory of resolveUploadDirCandidates(`tenant-${tenantId}`)) {
+    for (const fileName of fileNames) {
+      try {
+        return await fs.readFile(path.join(directory, fileName))
+      } catch (err) {
+        if (err?.code !== 'ENOENT') throw err
+      }
+    }
+  }
+  return null
 }
 
 const normalizePrinters = (value) => {
@@ -116,23 +147,70 @@ const getJobPdfBase64 = async ({ job, tenantId, system, station }) => {
     }
     if (mongoose.isValidObjectId(orderId)) {
       const [tenant, order] = await Promise.all([
-        Tenant.findById(tenantId).select('name').lean(),
+        Tenant.findById(tenantId).select('name logoUrl settings').lean(),
         Order.findOne({ _id: orderId, tenantId }).lean()
       ])
       const tableName = order?.tableId
-        ? String((await Table.findById(order.tableId).select('name').lean())?.name || '')
-        : ''
+        ? String((await Table.findById(order.tableId).select('name').lean())?.name || order?.tableName || '')
+        : String(order?.tableName || '')
       const items = Array.isArray(order?.items) ? order.items.filter(it => it && it.status !== 'cancelled') : []
       const isPackage = String(order?.saleType || '') === 'delivery' || String(order?.servingType || '') === 'package'
+      const settings = tenant?.settings && typeof tenant.settings === 'object' ? tenant.settings : {}
+      const business = settings.business && typeof settings.business === 'object' ? settings.business : {}
+      const isTableOrder = String(order?.saleType || '') === 'table'
+      const useDesignedReceipt = String(order?.saleSource || '') === 'quick-sale' || (!isPackage && (isTableOrder || !!tableName))
+      const collections = await AccountTransaction.find({
+        tenantId,
+        orderId: order._id,
+        source: 'collection',
+        type: 'credit',
+        isDeleted: { $ne: true }
+      }).select('amount method methodLabel methodName createdAt').lean()
+      const collectionEntries = collections.map((entry) => ({
+        amount: Number(entry?.amount || 0),
+        method: String(entry?.method || 'other'),
+        methodLabel: String(entry?.methodLabel || entry?.method || ''),
+        methodName: String(entry?.methodName || ''),
+        createdAt: entry?.createdAt || null,
+        source: 'collection'
+      }))
+      const financial = computePaymentSummary({ ...order, collectionEntries })
+      const paymentDetails = [
+        ...(Array.isArray(order?.payments) ? order.payments : []),
+        ...collectionEntries
+      ]
       return await renderReceiptPdfBase64({
-        tenantName: String(tenant?.name || ''),
+        tenantName: String(useDesignedReceipt
+          ? (business.businessName || business.companyName || tenant?.name || '')
+          : (tenant?.name || '')),
+        logoBuffer: await loadTenantLogoBuffer(tenantId, tenant),
+        saleSource: String(order?.saleSource || 'standard'),
         createdAt: order?.createdAt || job?.createdAt,
+        receiptNo: String(order?._id || '').slice(-8).toUpperCase(),
         orderNo: order?.orderNo || String(order?._id || ''),
         tableName,
+        cashierName: String(order?.createdByName || order?.createdByUserName || ''),
         items,
-        totals: order?.totals || { grandTotal: order?.netTotal || 0 },
-        paidStatus: String(order?.paymentStatus || ''),
+        totals: useDesignedReceipt
+          ? {
+              subtotal: financial.total,
+              discountTotal: financial.discountTotal,
+              grandTotal: financial.netTotal
+            }
+          : (order?.totals || { grandTotal: order?.netTotal || 0 }),
+        paidTotal: financial.paidTotal,
+        balanceDue: financial.balanceDue,
+        displayBalance: financial.veresiyeTotal,
+        paidStatus: useDesignedReceipt
+          ? (financial.balanceDue <= 0.01 ? 'paid' : 'unpaid')
+          : String(order?.paymentStatus || ''),
+        payments: paymentDetails,
+        paymentMethod: String(order?.paymentMethod || ''),
+        note: String(order?.note || ''),
+        discountTotal: financial.discountTotal,
+        discountPercent: Number(order?.discountPercent || 0),
         widthMm: receiptWidthMm,
+        isTableOrder,
         isPackage,
         customerName: order?.customerName,
         customerPhone: order?.customerPhone,

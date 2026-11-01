@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit'
 import path from 'path'
+import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 import * as logger from '../utils/logger.js'
 
@@ -11,6 +12,248 @@ const safeMoney = (n) => {
 }
 
 const safeText = (v) => String(v || '').trim()
+const formatReceiptMoney = (value) => `${safeMoney(value).toFixed(2)} TL`
+
+const renderDesignedReceiptPdfBase64 = async ({
+  tenantName,
+  logoBuffer,
+  layout,
+  createdAt,
+  receiptNo,
+  orderNo,
+  tableName,
+  cashierName,
+  items,
+  totals,
+  paidTotal,
+  balanceDue,
+  displayBalance,
+  paidStatus,
+  payments,
+  paymentMethod,
+  note,
+  discountTotal,
+  discountPercent,
+  widthMm
+} = {}) => {
+  const widthPt = mmToPt(Math.max(58, Math.min(80, Number(widthMm || 80))))
+  const margin = mmToPt(2.5)
+  const margins = { top: margin, left: margin, right: margin, bottom: margin }
+  let processedLogo = Buffer.isBuffer(logoBuffer) ? logoBuffer : null
+  if (processedLogo) {
+    try {
+      processedLogo = await sharp(processedLogo, { failOn: 'error' })
+        .resize({ width: 480, height: 190, fit: 'inside', withoutEnlargement: true })
+        .grayscale()
+        .normalize()
+        .threshold(175)
+        .png()
+        .toBuffer()
+    } catch (err) {
+      logger.warn('[RECEIPT_LOGO_RENDER_FAILED]', { message: err?.message || 'Logo image could not be processed' })
+      processedLogo = null
+    }
+  }
+  const options = {
+    tenantName: safeText(tenantName) || 'PENPOS',
+    logoBuffer: processedLogo,
+    layout,
+    createdAt,
+    receiptNo: safeText(receiptNo) || '-',
+    orderNo: safeText(orderNo) || '-',
+    tableName: safeText(tableName),
+    cashierName: safeText(cashierName),
+    items: Array.isArray(items) ? items : [],
+    totals: totals || {},
+    paidTotal: safeMoney(paidTotal),
+    balanceDue: safeMoney(balanceDue),
+    displayBalance: safeMoney(displayBalance),
+    paidStatus: String(paidStatus || ''),
+    payments: Array.isArray(payments) ? payments : [],
+    paymentMethod: safeText(paymentMethod),
+    note: safeText(note),
+    discountTotal: safeMoney(discountTotal),
+    discountPercent: safeMoney(discountPercent)
+  }
+
+  const draw = (doc) => {
+    const left = doc.page.margins.left
+    const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
+    const right = left + contentWidth
+    let y = doc.page.margins.top
+    const textHeight = (text, size, bold, width, align = 'left') => {
+      useFont(doc, bold ? 'trBold' : 'tr')
+      doc.fontSize(size)
+      return doc.heightOfString(String(text || ''), { width, align, lineGap: 0 })
+    }
+    const addText = (text, size = 9, bold = false, align = 'left', gap = 1) => {
+      const value = String(text || '')
+      const height = textHeight(value, size, bold, contentWidth, align)
+      useFont(doc, bold ? 'trBold' : 'tr')
+      doc.fontSize(size)
+      doc.fillColor('#000')
+      doc.text(value, left, y, { width: contentWidth, align, lineGap: 0 })
+      y += height + gap
+      return height
+    }
+    const addRule = (gap = 4, dashed = false) => {
+      doc.moveTo(left, y)
+        .lineTo(right, y)
+        .lineWidth(0.7)
+      if (dashed) doc.dash(2, { space: 2 })
+      doc.stroke()
+      if (dashed) doc.undash()
+      y += gap
+    }
+    const addPair = (label, value, { size = 9, bold = false } = {}) => {
+      const leftWidth = contentWidth * 0.48
+      const rightWidth = contentWidth - leftWidth
+      const valueText = String(value ?? '')
+      const height = Math.max(
+        textHeight(label, size, bold, leftWidth),
+        textHeight(valueText, size, false, rightWidth, 'right')
+      )
+      useFont(doc, bold ? 'trBold' : 'tr')
+      doc.fontSize(size)
+      doc.text(label, left, y, { width: leftWidth, lineGap: 0 })
+      useFont(doc, 'tr')
+      doc.fontSize(size)
+      doc.text(valueText, left + leftWidth, y, { width: rightWidth, align: 'right', lineGap: 0 })
+      y += height + 1
+    }
+    const addItems = () => {
+      const qtyWidth = mmToPt(10)
+      const priceWidth = Math.min(mmToPt(25), contentWidth * 0.4)
+      const nameWidth = Math.max(mmToPt(18), contentWidth - qtyWidth - priceWidth)
+      const qtyX = left + nameWidth
+      const priceX = qtyX + qtyWidth
+      for (const item of options.items) {
+        const name = safeText(item?.nameSnapshot) || '-'
+        const qty = `x${Math.max(1, Number(item?.qty || 1))}`
+        const price = formatReceiptMoney(item?.subtotal)
+        const nameHeight = textHeight(name, 9, false, nameWidth)
+        const qtyHeight = textHeight(qty, 8, false, qtyWidth, 'center')
+        const priceHeight = textHeight(price, 8, false, priceWidth, 'right')
+        const rowHeight = Math.max(nameHeight, qtyHeight, priceHeight)
+        useFont(doc, 'tr')
+        doc.fontSize(9)
+        doc.text(name, left, y, { width: nameWidth, lineGap: 0 })
+        doc.fontSize(8)
+        doc.text(qty, qtyX, y, { width: qtyWidth, align: 'center', lineGap: 0 })
+        doc.text(price, priceX, y, { width: priceWidth, align: 'right', lineGap: 0 })
+        y += rowHeight + 4
+      }
+    }
+
+    if (options.logoBuffer) {
+      const logoWidth = Math.min(mmToPt(38), contentWidth)
+      const logoHeight = mmToPt(15)
+      doc.image(options.logoBuffer, left + ((contentWidth - logoWidth) / 2), y, {
+        fit: [logoWidth, logoHeight],
+        align: 'center',
+        valign: 'center'
+      })
+      y += logoHeight + 2
+    }
+    addText(options.tenantName, 13, true, 'center', 5)
+
+    const title = layout === 'quick-sale' ? 'HIZLI SATIŞ' : 'MASA SİPARİŞİ'
+    const titleHeight = mmToPt(8)
+    doc.roundedRect(left, y, contentWidth, titleHeight, 4).fill('#000')
+    useFont(doc, 'trBold')
+    doc.fontSize(12)
+    doc.fillColor('#fff')
+    doc.text(title, left, y + mmToPt(1.2), { width: contentWidth, align: 'center', lineBreak: false })
+    doc.fillColor('#000')
+    y += titleHeight + 5
+
+    const dt = options.createdAt ? new Date(options.createdAt) : new Date()
+    const validDate = Number.isFinite(dt.getTime())
+    const datePart = validDate ? dt.toLocaleDateString('tr-TR') : '-'
+    const timePart = validDate ? dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'
+    if (layout === 'quick-sale') {
+      addPair('Fiş No:', options.receiptNo, { size: 9, bold: true })
+      addPair('Tarih / Saat:', `${datePart} ${timePart}`)
+    } else {
+      addText(`Masa: ${options.tableName || '-'}`, 11, true, 'left', 2)
+      addRule(4)
+      addPair('Fiş No:', options.receiptNo, { bold: true })
+      addPair('Sipariş No:', options.orderNo)
+      addPair('Tarih:', datePart)
+      addPair('Saat:', timePart)
+      addPair('Kasiyer:', options.cashierName || '-')
+      const status = options.paidStatus === 'paid' ? 'ÖDENDİ' : (options.paidTotal > 0 ? 'KISMİ ÖDENDİ' : 'BEKLİYOR')
+      addPair('Durum:', status, { bold: true })
+    }
+    addRule(5)
+    addItems()
+    addRule(5, true)
+
+    const subtotal = safeMoney(options.totals?.subtotal ?? options.totals?.total)
+    const grandTotal = safeMoney(options.totals?.grandTotal ?? options.totals?.netTotal ?? options.totals?.total)
+    if (layout === 'quick-sale') {
+      if (options.discountTotal > 0 || options.discountPercent > 0) {
+        addPair(`Ara Toplam:`, formatReceiptMoney(subtotal))
+        addPair(`İndirim${options.discountPercent > 0 ? ` (%${options.discountPercent})` : ''}:`, formatReceiptMoney(options.discountTotal))
+      }
+      addPair('TOPLAM', formatReceiptMoney(grandTotal), { size: 12, bold: true })
+      const payment = options.payments
+        .map((payment) => safeText(payment?.methodLabel || payment?.methodName || payment?.method))
+        .filter(Boolean)
+        .join(', ') || options.paymentMethod || (options.paidStatus === 'paid' ? 'Ödendi' : 'Bekliyor')
+      addText(`Ödeme: ${payment}`, 10, true, 'left', 4)
+      if (options.note) {
+        addRule(5)
+        addText(`Not: ${options.note}`, 9, false, 'left', 3)
+      }
+      addRule(5)
+      addText('TEŞEKKÜR EDERİZ', 10, true, 'center', 1)
+    } else {
+      addPair('Ara Toplam:', formatReceiptMoney(subtotal))
+      if (options.discountTotal > 0 || options.discountPercent > 0) {
+        addPair(`İndirim${options.discountPercent > 0 ? ` (%${options.discountPercent})` : ''}:`, formatReceiptMoney(options.discountTotal))
+      }
+      addPair('Ödenen:', formatReceiptMoney(options.paidTotal))
+      addPair('Kalan:', formatReceiptMoney(options.balanceDue))
+      addPair('Bakiye:', formatReceiptMoney(options.displayBalance))
+      addRule(4)
+      addPair('TOPLAM:', formatReceiptMoney(grandTotal), { size: 14, bold: true })
+      addRule(4)
+      const payment = options.payments
+        .map((entry) => {
+          const method = safeText(entry?.methodLabel || entry?.methodName || entry?.method)
+          return method ? `${method}: ${formatReceiptMoney(entry?.amount)}` : ''
+        })
+        .filter(Boolean)
+      addText(`Ödeme: ${payment.join(', ') || options.paymentMethod || (options.paidStatus === 'paid' ? 'Ödendi' : 'Bekliyor')}`, 9, false, 'left', 6)
+      addText('AFİYET OLSUN', 10, true, 'center', 1)
+    }
+    return y
+  }
+
+  const measureDoc = new PDFDocument({ size: [widthPt, mmToPt(1000)], margins })
+  applyTrFont(measureDoc)
+  measureDoc.lineGap(0)
+  measureDoc.on('data', () => {})
+  const contentEnd = draw(measureDoc)
+  measureDoc.end()
+
+  const heightPt = Math.max(mmToPt(45), contentEnd + margins.bottom + mmToPt(2))
+  const doc = new PDFDocument({ autoFirstPage: false, margins })
+  doc.addPage({ size: [widthPt, heightPt], margins })
+  applyTrFont(doc)
+  doc.lineGap(0)
+  draw(doc)
+  const chunks = []
+  doc.on('data', (chunk) => chunks.push(chunk))
+  const done = new Promise((resolve, reject) => {
+    doc.on('end', resolve)
+    doc.on('error', reject)
+  })
+  doc.end()
+  await done
+  return Buffer.concat(chunks).toString('base64')
+}
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -252,13 +495,26 @@ export const renderTextPdfBase64 = async ({ text, widthMm, heightMm, fontSize = 
 
 export const renderReceiptPdfBase64 = async ({
   tenantName,
+  logoBuffer,
+  saleSource,
   createdAt,
+  receiptNo,
   orderNo,
   tableName,
+  cashierName,
   items,
   totals,
+  paidTotal,
+  balanceDue,
+  displayBalance,
   paidStatus,
+  payments,
+  paymentMethod,
+  note,
+  discountTotal,
+  discountPercent,
   widthMm,
+  isTableOrder,
   isPackage,
   customerName,
   customerPhone,
@@ -267,13 +523,38 @@ export const renderReceiptPdfBase64 = async ({
   deliveryPaymentLine
 } = {}) => {
   const tName = safeText(tenantName) || 'PENPOS'
+  const quickSale = String(saleSource || '') === 'quick-sale'
+  const requestedMm = Math.max(58, Number(widthMm || 80))
+  const paperMm = Math.max(58, Math.min(80, requestedMm))
+  if (quickSale || isTableOrder === true || (!isPackage && safeText(tableName))) {
+    return renderDesignedReceiptPdfBase64({
+      tenantName: tName,
+      logoBuffer,
+      layout: quickSale ? 'quick-sale' : 'table',
+      createdAt,
+      receiptNo,
+      orderNo,
+      tableName,
+      cashierName,
+      items,
+      totals,
+      paidTotal,
+      balanceDue,
+      displayBalance,
+      paidStatus,
+      payments,
+      paymentMethod,
+      note,
+      discountTotal,
+      discountPercent,
+      widthMm: paperMm
+    })
+  }
   const dt = createdAt ? new Date(createdAt) : new Date()
   const dateStr = Number.isFinite(dt.getTime()) ? dt.toLocaleString('tr-TR') : ''
   const oNo = orderNo !== undefined && orderNo !== null ? String(orderNo) : ''
   const tNo = safeText(tableName)
   const its = Array.isArray(items) ? items : []
-  const requestedMm = Math.max(58, Number(widthMm || 80))
-  const paperMm = Math.max(58, Math.min(80, requestedMm))
   const widthPt = mmToPt(paperMm)
   const pkg = isPackage === true || String(isPackage || '') === 'true'
   const pkgCustomer = safeText(customerName)

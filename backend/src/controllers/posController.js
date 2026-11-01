@@ -3,6 +3,7 @@ import { createOrderService, getOrderService, addItemService, removeItemService,
 import { mergeOrdersService } from '../services/orderService.js'
 import { startOrderForTableService, getActiveOrderForTableService, getTablesOverviewService, closeTableService, abandonIfEmpty } from '../services/tableService.js'
 import Order from '../models/Order.js'
+import AccountTransaction from '../models/AccountTransaction.js'
 import Table from '../models/Table.js'
 import mongoose from 'mongoose'
 import { log as auditLog } from '../services/auditService.js'
@@ -10,6 +11,7 @@ import * as logger from '../utils/logger.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
 import { normalizeManualEntryDateInput } from '../utils/manualEntryDate.js'
+import { computePaymentSummary } from '../utils/orderFinancial.js'
 import { addQuickSaleItemsService, createQuickSaleService, getQuickSalesService, updateQuickSaleNoteService } from '../services/quickSaleService.js'
 
 const getStaffAllowedBranchIds = (req) => {
@@ -639,30 +641,58 @@ export const receipt = async (req, res) => {
   try {
     const o = await Order.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
     if (!o) throw (await import('../utils/errors.js')).error('not_found', 'Order not found', 404)
-    const [table, tenant] = await Promise.all([
+    const [table, tenant, collectionRows] = await Promise.all([
       o.tableId ? Table.findOne({ _id: o.tableId, tenantId: req.user.tenantId }).select('name').lean() : Promise.resolve(null),
-      req.tenant?.name ? Promise.resolve({ name: req.tenant.name }) : findTenantById(req.user.tenantId)
+      findTenantById(req.user.tenantId),
+      AccountTransaction.find({
+        tenantId: req.user.tenantId,
+        orderId: o._id,
+        source: 'collection',
+        type: 'credit',
+        isDeleted: { $ne: true }
+      }).select('amount method methodLabel methodName createdAt').lean()
     ])
-    const subtotal = Number(o.total ?? o.totals?.subtotal ?? 0)
-    const discountTotal = Number(o.discountTotal ?? 0)
-    const grandTotal = Number(o.netTotal ?? o.totals?.grandTotal ?? 0)
-    const paidTotal = Number(o.paidTotal ?? 0)
-    const balanceDue = Number(o.balanceDue ?? 0)
+    const collectionEntries = collectionRows.map((entry) => ({
+      amount: Number(entry?.amount || 0),
+      method: String(entry?.method || 'other'),
+      methodLabel: String(entry?.methodLabel || entry?.method || ''),
+      methodName: String(entry?.methodName || ''),
+      createdAt: entry?.createdAt || null,
+      source: 'collection'
+    }))
+    const financial = computePaymentSummary({
+      ...(typeof o.toObject === 'function' ? o.toObject({ virtuals: true }) : { ...o }),
+      collectionEntries
+    })
+    const tenantSettings = tenant?.settings && typeof tenant.settings === 'object' ? tenant.settings : {}
+    const businessSettings = tenantSettings.business && typeof tenantSettings.business === 'object' ? tenantSettings.business : {}
+    const logoSettings = tenantSettings.logo && typeof tenantSettings.logo === 'object' ? tenantSettings.logo : {}
+    const tableName = String(table?.name || o.tableName || '')
+    const useDesignedReceipt = String(o.saleSource || '') === 'quick-sale' || String(o.saleType || '') === 'table' || !!tableName
+    const subtotal = Number(financial.total || 0)
+    const discountTotal = Number(financial.discountTotal || 0)
+    const grandTotal = Number(financial.netTotal || 0)
+    const paidTotal = Number(financial.paidTotal || 0)
+    const balanceDue = Number(financial.balanceDue || 0)
     const dto = {
       id: o.id,
       receiptNo: String(o.id || '').slice(-8).toUpperCase(),
       status: o.status,
       orderNo: o.orderNo ?? null,
-      tableName: String(table?.name || ''),
+      tableName,
       saleType: String(o.saleType || ''),
+      saleSource: String(o.saleSource || 'standard'),
       customerName: String(o.customerName || ''),
       customerPhone: String(o.customerPhone || ''),
       customerAddress: String(o.customerAddress || ''),
       deliveryPaymentStatus: String(o.deliveryPaymentStatus || ''),
       deliveryPaymentMethod: String(o.deliveryPaymentMethod || ''),
       deliveryPaymentMethodLabel: String(o.deliveryPaymentMethodLabel || ''),
-      createdByName: String(o.createdByName || ''),
-      businessName: String(tenant?.name || 'PENPOS'),
+      createdByName: String(o.createdByName || o.createdByUserName || ''),
+      businessName: String(useDesignedReceipt
+        ? (businessSettings.businessName || businessSettings.companyName || tenant?.name || 'PENPOS')
+        : (tenant?.name || 'PENPOS')),
+      logoUrl: String(logoSettings.url || tenant?.logoUrl || ''),
       items: o.items,
       totals: {
         subtotal,
@@ -671,14 +701,18 @@ export const receipt = async (req, res) => {
         paidTotal,
         balanceDue
       },
+      displayBalance: Number(financial.veresiyeTotal || 0),
       discountPercent: Number(o.discountPercent || 0),
       discountTotal,
       paidTotal,
       balanceDue,
       netTotal: grandTotal,
-      payments: Array.isArray(o.payments) ? o.payments : [],
+      payments: [
+        ...(Array.isArray(o.payments) ? o.payments : []),
+        ...collectionEntries
+      ],
       paymentMethod: o.paymentMethod,
-      paymentStatus: o.paymentStatus,
+      paymentStatus: balanceDue <= 0.01 ? 'paid' : 'unpaid',
       note: o.note,
       createdAt: o.createdAt
     }
