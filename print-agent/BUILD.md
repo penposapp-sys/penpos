@@ -2,9 +2,10 @@
 
 Bu klasorden portable `exe` uretilebilir.
 
-Print Agent `0.1.9`, ESC/POS RAW yazdirma sirasinda Base64 ile tasinan ikili veriyi
-dogrudan yaziciya gonderebilir. Bu, termal fislerde logo raster verisi icin kullanilir;
-mevcut metin RAW yazdirma davranisi degismez.
+Print Agent `0.1.10`, ESC/POS RAW yazdirma sirasinda Base64 ile tasinan ikili veriyi
+dogrudan yaziciya gonderebilir. Tasarimli masa fislerinde Base64 encoding bilgisi
+zorunludur; eksik veya hatali aktarim artik metin olarak yazdirilmaz. Diger metin RAW
+yazdirma davranisi degismez.
 
 ## Gerekenler
 

@@ -9,7 +9,7 @@ import crypto from 'crypto'
 import { resolveWindowsPrinterName } from './printerName.js'
 import { decodeRawPayload } from './rawPayload.js'
 
-const AGENT_VERSION = '0.1.9'
+const AGENT_VERSION = '0.1.10'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {
@@ -886,7 +886,9 @@ const main = async () => {
         const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
         const thermalContent = selectThermalReceiptContent(job)
         const thermalEncoding = String(job?.meta?.rawEncoding || 'cp857').trim() || 'cp857'
-        const rawPayload = decodeRawPayload(thermalContent, thermalEncoding)
+        const requiresBase64 = job?.meta?.renderOrderReceiptRaw === true
+          || job?.meta?.renderOrderReceiptPdf === true
+        const rawPayload = decodeRawPayload(thermalContent, thermalEncoding, { requireBase64: requiresBase64 })
         try {
           for (let i = 0; i < copies; i++) {
             await printRawText({ printerName, content: rawPayload, txtPath: txtTmp, encoding: thermalEncoding })

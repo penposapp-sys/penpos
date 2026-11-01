@@ -114,6 +114,34 @@ test('table receipt includes unpaid, partial, and paid totals on both widths', a
   }
 })
 
+test('table receipt binary survives JSON transport and Print Agent decoding', async () => {
+  const raw = await buildCashierReceiptRaw({
+    ...baseReceipt,
+    saleSource: 'standard',
+    note: 'Terasta servis',
+    payments: [{ methodLabel: 'Kart', amount: 100 }],
+    paidTotal: 100,
+    balanceDue: 165
+  }, { widthMm: 80, logoBuffer: logo })
+  const job = JSON.parse(JSON.stringify({
+    payloadType: 'raw',
+    rawContent: raw.toString('base64'),
+    meta: { renderOrderReceiptRaw: true, rawEncoding: 'base64' }
+  }))
+  const agentBytes = decodeRawPayload(job.rawContent, job.meta.rawEncoding, {
+    requireBase64: job.meta.renderOrderReceiptRaw
+  })
+
+  assert.ok(Buffer.isBuffer(agentBytes))
+  assert.deepEqual(agentBytes, raw)
+  assert.ok(agentBytes.includes(Buffer.from([0x1b, 0x40])))
+  assert.ok(agentBytes.includes(Buffer.from([0x1d, 0x76, 0x30, 0])))
+  assert.ok(agentBytes.includes(Buffer.from('MASA SIPARISI', 'ascii')))
+  assert.ok(agentBytes.includes(Buffer.from('KISMI ODENDI', 'ascii')))
+  assert.ok(agentBytes.includes(Buffer.from('Terasta servis', 'ascii')))
+  assert.ok(!agentBytes.includes(Buffer.from(job.rawContent, 'ascii')))
+})
+
 test('missing tenant logo still produces a complete RAW receipt', async () => {
   const raw = await buildCashierReceiptRaw(baseReceipt, { widthMm: 80 })
   assert.ok(contains(raw, 'PENDIK TANITIM ETKINLIKLERI'))
