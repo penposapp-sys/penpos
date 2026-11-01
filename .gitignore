@@ -22,6 +22,11 @@ frontend/.env.*
 frontend/dist/
 backend/public/downloads/print-agent/windows/PenPOS_PrintAgent_Setup_*.exe
 
+# Print Agent and Android releases are published separately from Git deploys.
+backend/public/downloads/print-agent/windows/PenPOS_PrintAgent.exe
+backend/public/downloads/print-agent/windows/PenPOS_PrintAgent_Release.json
+backend/public/updates/android/
+
 # logs
 *.log
 logs/
