@@ -2392,7 +2392,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
                                   const nextQty = currentQty <= 1 ? 0 : currentQty - 1
                                   setItemQtyByRow(row, nextQty)
                                 }}
-                                disabled={disableBase || isQuickSaleOrder || isMultiGroup || isQtyLocked}
+                                disabled={disableBase || isMultiGroup || isQtyLocked}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               >
                                 -
@@ -2496,7 +2496,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
                                   setSelectedItemForCancel(row.itemId)
                                   setItemCancelConfirmOpen(true)
                                 }}
-                                disabled={disableBase || isQuickSaleOrder || isCancelLocked || isMultiGroup}
+                                disabled={disableBase || isCancelLocked || isMultiGroup}
                                 title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                                 style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' }}
                               >
@@ -2515,7 +2515,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
                                 setSelectedItemForCancel(row.itemId)
                                 setItemCancelConfirmOpen(true)
                               }}
-                              disabled={disableBase || isQuickSaleOrder || isCancelLocked}
+                              disabled={disableBase || isCancelLocked}
                               title={isMultiGroup ? 'Bu işlem için Ayrı moduna geç' : undefined}
                               style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' }}
                             >
@@ -2633,7 +2633,7 @@ export default function WalkInPosPage({ quickSale = false } = {}) {
       discountDraft={discountDraft}
       onDiscountDraftChange={setDiscountDraft}
       onApplyDiscount={applyDiscount}
-      showVeresiye={!isQuickSaleOrder && !creditAccountsDisabled && canCreateVeresiye}
+      showVeresiye={!creditAccountsDisabled && canCreateVeresiye}
       onOpenVeresiye={openVeresiye}
     />
     <Modal open={veresiyeOpen} onClose={() => setVeresiyeOpen(false)} title="Veresiye Yap">

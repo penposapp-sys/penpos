@@ -97,6 +97,22 @@ const itemRows = (item, width) => {
   return rows
 }
 
+const tableItemRows = (item, width) => {
+  const qty = Number(item?.qty)
+  const quantity = Number.isFinite(qty) && qty > 0 ? String(qty) : '1'
+  const unitPrice = item?.priceSnapshot
+    ?? item?.unitPrice
+    ?? (qty > 0 ? Number(item?.subtotal || 0) / qty : item?.subtotal)
+  const nameLines = wrapText(item?.nameSnapshot || item?.productName || '-', width)
+  const rows = [
+    ...nameLines,
+    ...pairRow(`${quantity} x ${money(unitPrice)}`, money(item?.subtotal), width)
+  ]
+  const note = ascii(item?.note || '').trim()
+  if (note) rows.push(...wrapText(`  Not: ${note}`, width))
+  return rows
+}
+
 const paymentLines = (receipt, width) => {
   const payments = Array.isArray(receipt?.payments) ? receipt.payments : []
   const details = payments
@@ -149,7 +165,7 @@ export const buildCashierReceiptLines = (receipt, width = 48) => {
   if (cashierName) lines.push(...pairRow('Kasiyer:', cashierName, lineWidth))
   lines.push(...pairRow('Durum:', paymentStatus, lineWidth))
   lines.push('-'.repeat(lineWidth))
-  for (const item of activeItems) lines.push(...itemRows(item, lineWidth))
+  for (const item of activeItems) lines.push(...tableItemRows(item, lineWidth))
   lines.push('-'.repeat(lineWidth))
   lines.push(...pairRow('Ara Toplam:', money(receipt?.totals?.subtotal), lineWidth))
   const discountTotal = Number(receipt?.discountTotal || receipt?.totals?.discountTotal || 0)
@@ -217,7 +233,15 @@ export const buildCashierReceiptRaw = async (receipt, { widthMm = 80, logoBuffer
   const quickSale = String(receipt?.saleSource || '') === 'quick-sale'
   const titleIndex = 0
   output.push(commands.alignCenter, commands.boldOn, commands.doubleHeight, Buffer.from(`${ascii(lines[titleIndex] || '').trim()}\n`, 'ascii'), commands.normalSize, commands.boldOff, commands.alignLeft)
-  output.push(...lines.slice(1).map((text) => Buffer.from(`${text}\n`, 'ascii')))
+  for (const text of lines.slice(1)) {
+    const tableHighlight = !quickSale
+      && (text.trimStart().startsWith('Masa:') || text.trimStart().startsWith('GENEL TOPLAM:'))
+    if (tableHighlight) output.push(commands.boldOn)
+    if (!quickSale && text.trimStart().startsWith('GENEL TOPLAM:')) output.push(commands.doubleHeight)
+    output.push(Buffer.from(`${text}\n`, 'ascii'))
+    if (!quickSale && text.trimStart().startsWith('GENEL TOPLAM:')) output.push(commands.normalSize)
+    if (tableHighlight) output.push(commands.boldOff)
+  }
   if (!quickSale && lines.length === 0) output.push(Buffer.from('\n', 'ascii'))
   output.push(commands.cut)
   return Buffer.concat(output)

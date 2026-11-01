@@ -2,7 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo } from 'react'
 import ProductImage from './ProductImage.jsx'
 import { incrementPerfCounter, logPerf } from '../lib/perfDebug.js'
 
-function ProductCard({ item, disabled = false, onClick, measureRef = null, showImage = true }) {
+function ProductCard({ item, disabled = false, onClick, measureRef = null, showImage = true, statusLabel = '' }) {
   const price = item?.price
   const isWeightBased = !!item?.isWeightBased
   const name = item?.name
@@ -54,6 +54,7 @@ function ProductCard({ item, disabled = false, onClick, measureRef = null, showI
       <div className="productCard__content">
         <div className="productCard__name">{name}</div>
         <div className="productCard__price">{price} TL{isWeightBased ? '/KG' : ''}</div>
+        {statusLabel ? <div className="productCard__status">{statusLabel}</div> : null}
       </div>
     </button>
   )
@@ -67,6 +68,7 @@ export default memo(ProductCard, (prev, next) => {
     prev.onClick === next.onClick &&
     prev.measureRef === next.measureRef &&
     prev.showImage === next.showImage &&
+    prev.statusLabel === next.statusLabel &&
     String(prevItem?.id || prevItem?._id || '') === String(nextItem?.id || nextItem?._id || '') &&
     String(prevItem?.name || '') === String(nextItem?.name || '') &&
     String(prevItem?.imageUrl || '') === String(nextItem?.imageUrl || '') &&

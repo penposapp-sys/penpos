@@ -15,7 +15,7 @@ import { isMongoTransactionsSupported } from '../config/db.js'
 import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
 import { applyBranchFilter } from '../utils/branchFilter.js'
-import { computePaymentSummary } from '../utils/orderFinancial.js'
+import { computePaymentSummary, hasPaymentExcess } from '../utils/orderFinancial.js'
 import { findTenantById } from '../repositories/tenantRepository.js'
 import { mergeBusinessSettings } from '../utils/businessSettings.js'
 import { parseManualEntryDate } from '../utils/manualEntryDate.js'
@@ -289,6 +289,13 @@ const computeTotals = (items) => {
   return { subtotal: safeSubtotal, grandTotal }
 }
 
+const assertQuickSaleNotOverpaid = (order) => {
+  if (order?.saleSource !== 'quick-sale') return
+  if (hasPaymentExcess(order)) {
+    throw error('quick_sale_payment_exceeds_total', 'İşlem sonrası ödeme toplamı sipariş toplamını aşacağı için önce ilgili ödeme/veresiye hareketlerini silin.', 409)
+  }
+}
+
 const splitQtyItemSnapshot = (item, overrides = {}) => {
   const base = typeof item?.toObject === 'function' ? item.toObject() : { ...item }
   return {
@@ -527,87 +534,6 @@ export const reprintOrderItemLabelsService = async (tenantId, orderId, itemIds =
   const queuedCount = await enqueueOrderItemLabels({ tenantId, order, items, mode: 'manual_reprint' })
   if (!queuedCount) throw error('not_found', 'Bu ürün için etiket yazıcısı veya etiket ayarı bulunamadı', 404)
   return { queuedCount }
-}
-
-const enqueueCancelledItemLabels = async ({ tenantId, order, items, reason = '', batchId = null }) => {
-  const safeItems = Array.isArray(items) ? items.filter(Boolean) : []
-  if (!order || safeItems.length === 0) return 0
-
-  const { findByCodeAndScope } = await import('../repositories/printProfileRepository.js')
-  const { createJob, resolveActiveStationForJob, resolveStationPrinterConfig } = await import('./printingService.js')
-
-  const labelProfile = await findByCodeAndScope('label', tenantId, 'kermes')
-  const options = labelProfile?.options && typeof labelProfile.options === 'object' ? labelProfile.options : {}
-
-  const menuItemIds = safeItems
-    .map((it) => String(it?.menuItemId || '').trim())
-    .filter((id) => mongoose.Types.ObjectId.isValid(id))
-
-  const labelCandidateDocs = menuItemIds.length > 0
-    ? await MenuItem.find({ tenantId, _id: { $in: menuItemIds } }).select('_id categoryId printLabelEnabled').lean()
-    : []
-
-  const labelCandidateMap = new Map((labelCandidateDocs || []).map((doc) => [
-    String(doc?._id || ''),
-    {
-      categoryId: String(doc?.categoryId || ''),
-      printLabelEnabled: doc?.printLabelEnabled === true
-    }
-  ]))
-  const labelItems = safeItems.filter((it) => labelCandidateMap.has(String(it?.menuItemId || '')))
-  if (labelItems.length === 0) return 0
-
-  const top = `${await buildLabelTopLine(order)} - İPTAL`
-  let queuedCount = 0
-  for (const it of labelItems) {
-    const itemConfig = labelCandidateMap.get(String(it?.menuItemId || '')) || { categoryId: '', printLabelEnabled: false }
-    const categoryId = String(itemConfig.categoryId || '')
-    const activeStation = await resolveActiveStationForJob({
-      tenantId,
-      system: 'kermes',
-      jobType: 'label',
-      jobMeta: { categoryId, triggerMode: 'item_cancel' }
-    })
-    const stationPrinter = activeStation
-      ? resolveStationPrinterConfig({
-          station: activeStation,
-          jobType: 'label',
-          jobMeta: { categoryId },
-          triggerMode: 'item_cancel'
-        })
-      : null
-    if (itemConfig.printLabelEnabled !== true && !stationPrinter) continue
-    if (activeStation && !stationPrinter) continue
-
-    const name = String(it?.nameSnapshot || '').trim() || '-'
-    const qty = Math.max(1, Number(it?.qty || 1))
-    const weightGrams = Math.max(0, Number(it?.weightGrams || 0))
-    const isWeightBased = it?.isWeightBased === true || weightGrams > 0
-    const servingType = getServingTypeForItemLabel(order, it, batchId)
-    const amountLine = buildLabelAmountLine({ qty, weightGrams, isWeightBased, servingType })
-    const noteLine = String(reason || it?.cancelReason || it?.note || '').trim()
-    const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}` : ''}\n`
-
-    await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
-      type: 'label',
-      profileId: labelProfile && labelProfile.isActive !== false ? String(labelProfile.id) : undefined,
-      payload: { type: 'raw', content: payload },
-      meta: {
-        orderId: String(order.id),
-        tableId: order.tableId ? String(order.tableId) : null,
-        kitchenBatchId: batchId ? String(batchId) : (it?.kitchenBatchId ? String(it.kitchenBatchId) : null),
-        menuItemId: it?.menuItemId ? String(it.menuItemId) : null,
-        categoryId: categoryId || null,
-        itemId: it?._id ? String(it._id) : null,
-        qty,
-        servingType,
-        triggerMode: 'item_cancel',
-        cancelReason: noteLine
-      }
-    })
-    queuedCount += 1
-  }
-  return queuedCount
 }
 
 const normalizePrinterCategoryIds = (value) => Array.isArray(value)
@@ -1885,7 +1811,6 @@ export const completeKitchenItemGroupService = async (tenantId, orderId, itemIds
 export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   const tenantSettings = await getTenantBusinessSettings(tenantId)
   const cancelReason = String(reason || '').trim()
   if (tenantSettings.general.requireCancelReasonForProduct === true && !cancelReason) {
@@ -1911,7 +1836,6 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
     e.payload = { error: 'item_already_cancelled', message: 'Item already cancelled' }
     throw e
   }
-  const originalStatus = it.status
   it.status = 'cancelled'
   it.cancelledAt = new Date()
   it.note = cancelReason || it.note
@@ -1919,22 +1843,11 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
   const totals = computeTotals(order.items)
   normalizeLegacyItemStatuses(order)
   const fin = computePaymentSummary({ ...order.toObject?.() ?? order, items: order.items, totals })
+  assertQuickSaleNotOverpaid({ ...order.toObject?.() ?? order, items: order.items, totals })
   const paymentUpdates = (fin.netTotal > 0 && fin.balanceDue <= 0.01)
     ? { paymentStatus: 'paid', paidAt: order.paidAt || new Date() }
     : { paymentStatus: 'unpaid', paidAt: null }
   const updated = await updateById(id, { items: order.items, totals, ...paymentUpdates })
-  if (['sent', 'cooking', 'completed'].includes(originalStatus)) {
-    try {
-      await enqueueCancelledItemLabels({
-        tenantId,
-        order,
-        items: [it],
-        reason: cancelReason,
-        batchId: it.kitchenBatchId || null
-      })
-    } catch {
-    }
-  }
   await (await import('./auditService.js')).log(tenantId, order.createdBy, 'order_item_cancel', 'Order', updated.id, { menuItemId, reason })
   const dto = await getOrderService(tenantId, updated.id)
   return { order: dto }
@@ -1943,7 +1856,6 @@ export const cancelItemService = async (tenantId, id, menuItemId, reason) => {
 export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user, unitIndex }) => {
     const order = await findByIdAndTenant(orderId, user.tenantId)
     if (!order) throw error('not_found', 'Order not found', 404)
-    if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
     const tenantSettings = await getTenantBusinessSettings(user.tenantId)
     const cancelReason = String(reason || '').trim()
     if (tenantSettings.general.requireCancelReasonForProduct === true && !cancelReason) {
@@ -1970,9 +1882,8 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
       throw e
     }
     const cancelAt = new Date()
-    const cancelledItems = []
     if ((Number(item.qty) || 0) > 1 && !item.isWeightBased) {
-      const cancelledItem = splitItemAroundUnitSelection({
+      splitItemAroundUnitSelection({
         order,
         item,
         selectedUnitIndex: unitIndex,
@@ -1983,13 +1894,11 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
           cancelReason: cancelReason || item.cancelReason || ''
         }
       })
-      if (cancelledItem) cancelledItems.push(cancelledItem)
     } else {
       item.status = 'cancelled'
       item.cancelledAt = cancelAt
       if (cancelReason) item.note = cancelReason
       item.cancelReason = cancelReason || item.cancelReason || ''
-      cancelledItems.push(item)
     }
     if (order.tableId) {
       order.cancelAlertActive = true
@@ -1999,6 +1908,7 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
     normalizeLegacyItemStatuses(order)
   {
     const fin = computePaymentSummary(order)
+    assertQuickSaleNotOverpaid(order)
     if (fin.netTotal > 0 && fin.balanceDue <= 0.01) {
       order.paymentStatus = 'paid'
       order.paidAt = order.paidAt || new Date()
@@ -2014,16 +1924,6 @@ export const cancelItemByItemIdService = async ({ orderId, itemId, reason, user,
       order
     })
     await order.save()
-    try {
-      await enqueueCancelledItemLabels({
-        tenantId: user.tenantId,
-        order,
-        items: cancelledItems,
-        reason: cancelReason,
-        batchId: cancelledItems[0]?.kitchenBatchId || null
-      })
-    } catch {
-    }
     const freshOrder = await Order.findById(order.id).lean()
     const dto = decorateOrder(freshOrder)
     return { order: dto }
@@ -2044,7 +1944,6 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
 
   let changed = 0
   const cancelAt = new Date()
-  const cancelledItems = []
   for (const itemId of ids) {
     const item = order.items.id(itemId)
     if (!item) continue
@@ -2053,7 +1952,6 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
     item.cancelledAt = cancelAt
     if (reason) item.note = reason
     changed += 1
-    cancelledItems.push(item)
   }
 
   if (changed === 0) {
@@ -2064,6 +1962,7 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
     order.cancelAlertActive = true
   }
   order.totals = computeTotals(order.items)
+  assertQuickSaleNotOverpaid(order)
   normalizeLegacyItemStatuses(order)
   {
     const fin = computePaymentSummary(order)
@@ -2082,16 +1981,6 @@ export const cancelKitchenItemGroupService = async ({ orderId, itemIds = [], rea
     order
   })
   await order.save()
-  try {
-    await enqueueCancelledItemLabels({
-      tenantId: user.tenantId,
-      order,
-      items: cancelledItems,
-      reason,
-      batchId: cancelledItems[0]?.kitchenBatchId || null
-    })
-  } catch {
-  }
   const freshOrder = await Order.findById(order.id).lean()
   return { order: decorateOrder(freshOrder) }
 }
@@ -2155,14 +2044,14 @@ export const setKitchenItemGroupCookingService = async (tenantId, orderId, itemI
 export const removeItemService = async (tenantId, id, menuItemId) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   if (isNotEditableStatus(order.status)) {
     const e = new Error('Order is not editable')
     e.status = 409
     e.payload = { error: 'order_not_editable', message: 'Order is not editable' }
     throw e
   }
-  if (!isEditableStatus(order.status)) {
+  const isQuickSale = order.saleSource === 'quick-sale'
+  if (!isEditableStatus(order.status) && !(isQuickSale && order.status === 'completed')) {
     const e = new Error('Order not in editable status')
     e.status = 400
     e.payload = { error: 'invalid_state', message: 'Order not open or sent', details: { currentStatus: order.status, allowed: ['open', 'sent'] } }
@@ -2175,6 +2064,9 @@ export const removeItemService = async (tenantId, id, menuItemId) => {
   }
   if (idx === -1) throw error('not_found', 'Item not in order', 404)
   const existing = order.items[idx]
+  if (isQuickSale && existing.status !== 'open') {
+    throw error('invalid_state', 'Yalnızca mutfağa gönderilmemiş hızlı satış ürünleri silinebilir.', 409)
+  }
   if (existing.qty > 1) {
     existing.qty -= 1
     existing.subtotal = existing.qty * (existing.priceSnapshot || 0)
@@ -2182,6 +2074,7 @@ export const removeItemService = async (tenantId, id, menuItemId) => {
     order.items.splice(idx, 1)
   }
   order.totals = computeTotals(order.items)
+  assertQuickSaleNotOverpaid(order)
   normalizeLegacyItemStatuses(order)
   const paymentState = await computePersistedPaymentState(tenantId, order)
   order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
@@ -2202,31 +2095,27 @@ export const setItemQuantityService = async (tenantId, id, menuItemId, quantity)
   if (!mongoose.Types.ObjectId.isValid(id)) throw error('invalid_request', 'Invalid order id', 400)
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (isNotEditableStatus(order.status)) {
-    const e = new Error('Order is not editable')
-    e.status = 409
-    e.payload = { error: 'order_not_editable', message: 'Order is not editable' }
-    throw e
-  }
-  if (!isEditableStatus(order.status)) {
-    const e = new Error('invalid status')
-    e.status = 400
-    e.payload = { error: 'invalid_state', message: 'Order not open or sent', details: { currentStatus: order.status, allowed: ['open', 'sent'] } }
-    throw e
-  }
   const idx = order.items.findIndex(it => String(it.menuItemId) === String(menuItemId))
   if (idx === -1) throw error('not_found', 'Item not in order', 404)
+  const isQuickSale = order.saleSource === 'quick-sale'
+  const item = order.items[idx]
+  const canEditCompletedQuickSaleItem = isQuickSale && order.status === 'completed' && item.status === 'open'
+  if (isNotEditableStatus(order.status) || (!isEditableStatus(order.status) && !canEditCompletedQuickSaleItem)) {
+    throw error('order_not_editable', 'Order is not editable', 409)
+  }
+  if (isQuickSale && item.status !== 'open') {
+    throw error('invalid_state', 'Yalnızca mutfağa gönderilmemiş hızlı satış ürünleri silinebilir.', 409)
+  }
   const qty = Math.max(0, Number(quantity) || 0)
-  if (order.saleSource === 'quick-sale' && qty < Number(order.items[idx].qty || 0)) rejectQuickSaleRefundMutation()
   if (qty <= 0) {
     order.items.splice(idx, 1)
   } else {
-    const it = order.items[idx]
-    it.qty = qty
-    it.subtotal = qty * (it.priceSnapshot || 0)
-    order.items[idx] = it
+    item.qty = qty
+    item.subtotal = qty * (item.priceSnapshot || 0)
+    order.items[idx] = item
   }
   order.totals = computeTotals(order.items)
+  assertQuickSaleNotOverpaid(order)
   normalizeLegacyItemStatuses(order)
   const paymentState = await computePersistedPaymentState(tenantId, order)
   order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
@@ -2248,22 +2137,17 @@ export const setItemQuantityByItemIdService = async (tenantId, id, itemId, quant
   if (!mongoose.Types.ObjectId.isValid(itemId)) throw error('invalid_request', 'Invalid item id', 400)
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (isNotEditableStatus(order.status)) {
-    const e = new Error('Order is not editable')
-    e.status = 409
-    e.payload = { error: 'order_not_editable', message: 'Order is not editable' }
-    throw e
-  }
-  if (!isEditableStatus(order.status)) {
-    const e = new Error('invalid status')
-    e.status = 400
-    e.payload = { error: 'invalid_state', message: 'Order not open or sent', details: { currentStatus: order.status, allowed: ['open', 'sent'] } }
-    throw e
-  }
   const it = order.items.id(itemId)
   if (!it) throw error('item_not_found', 'Item not found', 404)
+  const isQuickSale = order.saleSource === 'quick-sale'
+  const canEditCompletedQuickSaleItem = isQuickSale && order.status === 'completed' && it.status === 'open'
+  if (isNotEditableStatus(order.status) || (!isEditableStatus(order.status) && !canEditCompletedQuickSaleItem)) {
+    throw error('order_not_editable', 'Order is not editable', 409)
+  }
+  if (isQuickSale && it.status !== 'open') {
+    throw error('invalid_state', 'Yalnızca mutfağa gönderilmemiş hızlı satış ürünleri silinebilir.', 409)
+  }
   const qty = Math.max(0, Number(quantity) || 0)
-  if (order.saleSource === 'quick-sale' && qty < Number(it.qty || 0)) rejectQuickSaleRefundMutation()
   if (qty <= 0) {
     const idx = order.items.findIndex(x => String(x?._id) === String(itemId))
     if (idx === -1) throw error('item_not_found', 'Item not found', 404)
@@ -2273,6 +2157,7 @@ export const setItemQuantityByItemIdService = async (tenantId, id, itemId, quant
     it.subtotal = qty * (it.priceSnapshot || 0)
   }
   order.totals = computeTotals(order.items)
+  assertQuickSaleNotOverpaid(order)
   normalizeLegacyItemStatuses(order)
   const paymentState = await computePersistedPaymentState(tenantId, order)
   order.paymentStatus = paymentState.isPaid ? 'paid' : 'unpaid'
@@ -2975,7 +2860,6 @@ export const updateOrderEntryDateService = async (tenantId, id, entryDate) => {
 export const setOrderVeresiyeService = async (tenantId, branchId, actorUserId, id, { accountId, amount, note }) => {
   const order = await findByIdAndTenant(id, tenantId)
   if (!order) throw error('not_found', 'Order not found', 404)
-  if (order.saleSource === 'quick-sale') rejectQuickSaleRefundMutation()
   const tenantSettings = await getTenantBusinessSettings(tenantId)
   if (tenantSettings.general.disableCreditAccounts === true) {
     throw error('credit_accounts_disabled', 'Cari hesap kullanımı kapalı', 403)

@@ -153,10 +153,14 @@ export default function QuickSalePage() {
         setCategories(nextCategories)
         setProducts(nextProducts)
         setPaymentMethods(methods)
+        setActiveCategory((current) => (
+          nextCategories.some((category) => getId(category) === current)
+            ? current
+            : getId(nextCategories[0])
+        ))
         setPaymentMethod((current) => (
           methods.some((method) => String(method.key || method.id || '') === current) ? current : ''
         ))
-        setActiveCategory('')
       } catch (err) {
         if (active) setErrorText(err?.data?.message || err?.message || 'Satış verileri yüklenemedi.')
       } finally {
@@ -171,7 +175,7 @@ export default function QuickSalePage() {
     const categoryId = String(activeCategory || '')
     const query = String(search || '').trim().toLocaleLowerCase('tr-TR')
     return products.filter((product) => {
-      const inCategory = !categoryId || String(product.categoryId || '') === categoryId
+      const inCategory = !!categoryId && String(product.categoryId || '') === categoryId
       const matchesSearch = !query || String(product.name || '').toLocaleLowerCase('tr-TR').includes(query)
       return inCategory && matchesSearch
     })
@@ -432,7 +436,6 @@ export default function QuickSalePage() {
             <SaleCategorySidebar
               categories={categories}
               activeCategoryId={activeCategory}
-              showAllCategories
               onSelect={setActiveCategory}
             />
             <div className="card salePanel saleProductsPanel">

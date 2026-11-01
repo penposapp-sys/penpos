@@ -8,6 +8,7 @@ import { log as auditLog } from './auditService.js'
 import { isTxnSupported } from '../utils/mongoTxn.js'
 import { resolvePaymentMethodSelection } from './paymentSettingsService.js'
 import { notDeletedFilter } from '../utils/softDelete.js'
+import { normalizeAccountCartQuantity } from '../utils/accountCart.js'
 
 const toMoney = (v) => {
   const raw = v === null || v === undefined ? '' : String(v).trim().replace(/\s/g, '').replace(',', '.')
@@ -37,6 +38,7 @@ const mapTransactionDto = (t, orderMap = null) => ({
       menuItemId: line?.menuItemId ? String(line.menuItemId) : null,
       name: String(line?.name || '').trim(),
       qty: Number(line?.qty || 0),
+      weightGrams: Number(line?.weightGrams || 0) || null,
       price: toMoney(line?.price),
       lineTotal: toMoney(line?.lineTotal),
       note: String(line?.note || '').trim()
@@ -470,30 +472,43 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
     .map((entry) => ({
       menuItemId: String(entry?.menuItemId || '').trim(),
       qty: Number(entry?.qty),
+      weightGrams: Number(entry?.weightGrams),
       note: String(entry?.note || '').trim()
     }))
-    .filter((entry) => mongoose.Types.ObjectId.isValid(entry.menuItemId) && Number.isFinite(entry.qty) && entry.qty > 0)
+    .filter((entry) => mongoose.Types.ObjectId.isValid(entry.menuItemId))
 
   if (normalizedItems.length === 0) throw error('invalid_request', 'Sepette ürün yok', 400)
 
   const uniqueIds = [...new Set(normalizedItems.map((entry) => entry.menuItemId))]
   const menuItems = await MenuItem.find(notDeletedFilter({ tenantId, _id: { $in: uniqueIds } }))
-    .select('name price isActive')
+    .select('name price isActive isWeightBased')
     .lean()
   const menuItemMap = new Map(menuItems.map((item) => [String(item._id), item]))
 
   const txPayload = normalizedItems.map((entry) => {
     const item = menuItemMap.get(entry.menuItemId)
     if (!item) throw error('not_found', 'Ürün bulunamadı', 404)
-    const amount = toMoney((Number(item.price || 0) || 0) * entry.qty)
+    const normalizedQuantity = normalizeAccountCartQuantity({
+      isWeightBased: item.isWeightBased === true,
+      qty: entry.qty,
+      weightGrams: entry.weightGrams
+    })
+    if (!normalizedQuantity) {
+      throw error('invalid_amount', item.isWeightBased === true ? 'Geçerli gramaj girin' : 'Geçerli bir miktar girin', 400)
+    }
+    const { qty, weightGrams } = normalizedQuantity
+    const amount = toMoney((Number(item.price || 0) || 0) * qty)
     if (amount <= 0) throw error('invalid_amount', 'Ürün tutarı geçersiz', 400)
-    const qtyLabel = Number.isInteger(entry.qty) ? String(entry.qty) : String(entry.qty).replace('.', ',')
-    const baseNote = `${String(item.name || 'Ürün').trim() || 'Ürün'} x${qtyLabel}`
+    const qtyLabel = Number.isInteger(qty) ? String(qty) : String(qty).replace('.', ',')
+    const baseNote = item.isWeightBased === true
+      ? `${String(item.name || 'Ürün').trim() || 'Ürün'} ${weightGrams} gr`
+      : `${String(item.name || 'Ürün').trim() || 'Ürün'} x${qtyLabel}`
     const note = entry.note ? `${baseNote} - ${entry.note}` : baseNote
     return {
       menuItemId: entry.menuItemId,
       name: String(item.name || '').trim(),
-      qty: entry.qty,
+      qty,
+      weightGrams,
       price: toMoney(item.price),
       amount,
       note,
@@ -525,6 +540,7 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
       menuItemId: entry.menuItemId,
       name: entry.name,
       qty: entry.qty,
+      weightGrams: entry.weightGrams,
       price: entry.price,
       lineTotal: entry.lineTotal,
       note: entry.note
@@ -552,6 +568,7 @@ export const addManualCartChargeService = async (tenantId, branchId, actorUserId
           menuItemId: line?.menuItemId ? String(line.menuItemId) : null,
           name: String(line?.name || '').trim(),
           qty: Number(line?.qty || 0),
+          weightGrams: Number(line?.weightGrams || 0) || null,
           price: toMoney(line?.price),
           lineTotal: toMoney(line?.lineTotal),
           note: String(line?.note || '').trim()

@@ -18,6 +18,7 @@ const accountTransactionSchema = new mongoose.Schema(
       menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', default: null },
       name: { type: String, default: '' },
       qty: { type: Number, default: 0 },
+      weightGrams: { type: Number, default: null },
       price: { type: Number, default: 0 },
       lineTotal: { type: Number, default: 0 },
       note: { type: String, default: '' }

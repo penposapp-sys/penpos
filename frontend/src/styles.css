@@ -4134,12 +4134,19 @@ html[data-theme="light"].theme-white body.app-shell-active :is(button:active, .b
   font-weight: 700;
 }
 
+.productCard__status {
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
 .productCard--photo {
   border-color: rgba(0,0,0,0.08);
 }
 
 .productCard--photo .productCard__name,
-.productCard--photo .productCard__price {
+.productCard--photo .productCard__price,
+.productCard--photo .productCard__status {
   color: #ffffff;
 }
 
@@ -4173,7 +4180,8 @@ html[data-theme="light"].theme-white body.app-shell-active :is(button:active, .b
 }
 
 .productCard[data-has-image="false"] .productCard__name,
-.productCard[data-has-image="false"] .productCard__price {
+.productCard[data-has-image="false"] .productCard__price,
+.productCard[data-has-image="false"] .productCard__status {
   color: var(--app-text, var(--text));
 }
 
@@ -4635,7 +4643,7 @@ html[data-theme="light"].theme-white body.app-shell-active :is(button:active, .b
 .kitchen-badge--serving {
   background: color-mix(in srgb, #f59e0b 18%, var(--app-surface));
   border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--app-border));
-  color: #fbbf24;
+  color: #000;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.2px;
@@ -8323,6 +8331,69 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
 .account-detail-scope .account-subcard { border: 0; border-radius: 0; padding: 0; background: transparent; }
 .account-detail-scope .account-order-items { display: grid; gap: 8px; }
 .account-detail-scope .account-order-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--app-surface-soft, var(--panelElevated)); }
+.account-detail-scope .account-sales-grid {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.62fr) minmax(0, 1.8fr) minmax(280px, 0.95fr);
+  grid-template-areas: "categories products cart";
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 520px;
+}
+.account-detail-scope .account-sales-grid > .saleCategoryPanel { grid-area: categories; }
+.account-detail-scope .account-sales-grid > .account-products-panel { grid-area: products; }
+.account-detail-scope .account-sales-grid > .account-cart-panel { grid-area: cart; }
+.account-detail-scope .account-products-panel .saleProductsPanelHeader {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.account-detail-scope .account-products-scroll { padding-top: 10px; }
+.account-detail-scope .account-products-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: 10px;
+  justify-content: start;
+}
+.account-detail-scope .account-products-grid .productCard { min-height: 112px; }
+.account-detail-scope .account-cart-panel { min-width: 0; }
+.account-detail-scope .account-cart-list {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+.account-detail-scope .account-cart-line {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-areas: "info price" "detail actions";
+  gap: 8px;
+  padding: 8px;
+}
+.account-detail-scope .account-cart-line .sale-cart-line__meta { display: none; }
+.account-detail-scope .account-cart-line .sale-cart-line__detail {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.account-detail-scope .account-cart-detail { display: grid; gap: 6px; min-width: 0; }
+.account-detail-scope .account-cart-item-fields {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 6px;
+}
+.account-detail-scope .account-cart-item-fields .input {
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+.account-detail-scope .account-cart-panel .saleCartFooterSummaryMain { font-size: 15px; }
+.account-detail-scope .account-cart-panel .saleCartFooter .btn { width: 100%; }
+.account-detail-scope .account-tx-list-scroll { max-height: 360px; overflow-y: auto; }
 
 @media (min-width: 769px) {
   .account-detail-scope { max-width: 100%; margin: 0; }
@@ -8337,6 +8408,13 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .account-detail-scope .txRight { font-size: 12px; }
   .account-detail-scope .txLeft { font-size: 14px; }
   .account-detail-scope .account-order-item { border-radius: 10px; padding: 10px; }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .account-detail-scope .account-sales-grid {
+    grid-template-columns: minmax(140px, 0.55fr) minmax(0, 1.45fr) minmax(240px, 0.95fr);
+    min-height: 480px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -8378,6 +8456,21 @@ html[data-theme="light"].theme-white .pos-sidebar > div:last-child > div:last-ch
   .account-detail-scope .account-subcard { padding: 0; }
   .account-detail-scope .account-order-items { gap: 6px; }
   .account-detail-scope .account-order-item { padding: 8px; }
+  .account-detail-scope .account-sales-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "categories" "products" "cart";
+    gap: 10px;
+    min-height: 0;
+  }
+  .account-detail-scope .account-sales-grid > .saleCategoryPanel,
+  .account-detail-scope .account-products-panel,
+  .account-detail-scope .account-cart-panel {
+    height: auto;
+    min-height: 0;
+  }
+  .account-detail-scope .account-products-scroll { max-height: 52vh; }
+  .account-detail-scope .account-cart-list { max-height: 42vh; }
+  .account-detail-scope .account-tx-list-scroll { max-height: 320px; }
   .account-detail-scope .saleCategoryPanel {
     height: auto;
     min-height: 0;
@@ -20826,4 +20919,82 @@ body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart
 body.pos-app-layout .pageShell.quick-sale-page .quick-sale-cart-panel .sale-cart-line__price {
   grid-area: price;
   align-self: center;
+}
+
+body.restaurant-app-layout .account-collection-modal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+body.restaurant-app-layout .account-collection-modal > * {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+body.restaurant-app-layout .account-collection-modal .payment-panel-body {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  body.restaurant-app-layout .modal-backdrop > .app-modal[aria-label="Tahsilat Al"] {
+    width: calc(100vw - 24px) !important;
+    max-width: 480px !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 22px !important;
+  }
+
+  body.restaurant-app-layout .modal-backdrop > .app-modal[aria-label="Tahsilat Al"] > .modalBody {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    max-height: none !important;
+    margin-top: 0;
+    padding: 12px !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  body.restaurant-app-layout .account-collection-modal {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  body.restaurant-app-layout .account-collection-modal .payment-split-order-summary .payment-summary-row,
+  body.restaurant-app-layout .account-collection-modal .payment-summary-totals .payment-summary-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    white-space: normal;
+  }
+
+  body.restaurant-app-layout .account-collection-modal .payment-split-order-summary .payment-summary-row--editor,
+  body.restaurant-app-layout .account-collection-modal .payment-summary-totals {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.restaurant-app-layout .account-collection-modal .payment-summary-row > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  body.restaurant-app-layout .account-collection-modal .payment-summary-row strong {
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  body.restaurant-app-layout .account-collection-modal .payment-summary-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body.restaurant-app-layout .account-collection-modal .payment-method-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

@@ -13,8 +13,8 @@ const baseReceipt = {
   tableName: 'Masa 4',
   cashierName: 'Ayse Yilmaz',
   items: [
-    { nameSnapshot: 'Cok Uzun Isimli Izgara Tavuk Urunu', qty: 2, subtotal: 240, status: 'sent' },
-    { nameSnapshot: 'Ayran', qty: 1, subtotal: 25, status: 'sent' }
+    { nameSnapshot: 'Cok Uzun Isimli Izgara Tavuk Urunu', priceSnapshot: 120, qty: 2, subtotal: 240, status: 'sent' },
+    { nameSnapshot: 'Ayran', priceSnapshot: 25, qty: 1, subtotal: 25, status: 'sent' }
   ],
   totals: { subtotal: 265, grandTotal: 265 },
   paidTotal: 0,
@@ -82,6 +82,14 @@ test('table receipt includes unpaid, partial, and paid totals on both widths', a
       assert.ok(contains(raw58, 'Masa:'))
       assert.ok(contains(raw58, 'Fis No:'))
       assert.ok(contains(raw58, 'Siparis No:'))
+      assert.ok(contains(raw58, '2 x 120.00 TL'))
+      assert.ok(contains(raw58, '1 x 25.00 TL'))
+      assert.ok(contains(raw58, '240.00 TL'))
+      assert.ok(contains(raw58, '25.00 TL'))
+      assert.ok(contains(raw80, '2 x 120.00 TL'))
+      assert.ok(contains(raw80, '1 x 25.00 TL'))
+      assert.ok(contains(raw80, '240.00 TL'))
+      assert.ok(contains(raw80, '25.00 TL'))
       assert.ok(contains(raw58, payment.expected))
       assert.ok(contains(raw58, 'Ara Toplam:'))
       assert.ok(contains(raw58, 'Odenen:'))
@@ -98,6 +106,10 @@ test('table receipt includes unpaid, partial, and paid totals on both widths', a
       assert.notEqual(logo80, -1)
       assert.deepEqual(raw58.subarray(logo58 + 4, logo58 + 6), Buffer.from([48, 0]))
       assert.deepEqual(raw80.subarray(logo80 + 4, logo80 + 6), Buffer.from([72, 0]))
+      const totalLabel = Buffer.from('GENEL TOPLAM:', 'ascii')
+      const totalOffset = raw58.indexOf(totalLabel)
+      assert.notEqual(totalOffset, -1)
+      assert.deepEqual(raw58.subarray(totalOffset - 6, totalOffset), Buffer.from([0x1b, 0x45, 1, 0x1d, 0x21, 1]))
     })
   }
 })

@@ -9,6 +9,9 @@ import Modal from '../components/Modal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import { pickInitialPaymentMethod } from '../lib/paymentMethods.js'
 import SaleCategorySidebar from '../components/SaleCategorySidebar.jsx'
+import SaleCartLine from '../components/SaleCartLine.jsx'
+import ProductCard from '../components/ProductCard.jsx'
+import ProductConfigModal from '../components/ProductConfigModal.jsx'
 
 const money = (value) => `${Number(value || 0).toFixed(2)} TL`
 const toNumberInput = (value) => {
@@ -23,7 +26,7 @@ export default function AccountDetailPage() {
   const nav = useNavigate()
   const { id } = useParams()
   const loc = useLocation()
-  const { isMobilePortrait, isTablet } = useResponsiveFlags()
+  const { isMobilePortrait } = useResponsiveFlags()
   const { user, allowedBranchIds } = useAuth()
 
   const orderIdFromUrl = useMemo(() => {
@@ -51,6 +54,7 @@ export default function AccountDetailPage() {
   const [collectForm, setCollectForm] = useState({ amount: '', method: '', note: '' })
   const [collectMethods, setCollectMethods] = useState([])
   const [collectDiscountDraft, setCollectDiscountDraft] = useState('0')
+  const [collectAppliedDiscountPercent, setCollectAppliedDiscountPercent] = useState(0)
   const [collectNoteOpen, setCollectNoteOpen] = useState(false)
   const collectAmountKeypadEditedRef = useRef(false)
   const [manualOpen, setManualOpen] = useState(false)
@@ -62,6 +66,8 @@ export default function AccountDetailPage() {
   const [activeCategoryId, setActiveCategoryId] = useState('')
   const [cartItems, setCartItems] = useState([])
   const [cartSubmitting, setCartSubmitting] = useState(false)
+  const [cartWeightItem, setCartWeightItem] = useState(null)
+  const [cartWeightModalOpen, setCartWeightModalOpen] = useState(false)
 
   const hasPerm = (p) => user?.role === 'tenant_admin' || user?.role === 'superadmin' || (user?.permissions || []).includes(p)
   const canCollect = hasPerm('collect_debt')
@@ -191,7 +197,8 @@ export default function AccountDetailPage() {
         const qty = Number(it?.qty ?? it?.quantity ?? 0) || 0
         const unit = Number(it?.price ?? it?.priceSnapshot ?? it?.unitPrice ?? 0) || 0
         const line = Number(it?.lineTotal ?? it?.total ?? it?.subtotal ?? (qty * unit)) || 0
-        return { name, qty, unit, line }
+        const weightGrams = Number(it?.weightGrams || 0) || null
+        return { name, qty, unit, line, weightGrams }
       })
       .filter((entry) => entry.name || entry.qty > 0 || entry.line > 0)
   }, [order])
@@ -203,13 +210,20 @@ export default function AccountDetailPage() {
       return String(item?.categoryId || '') === currentCategoryId
     })
   }, [menuItems, activeCategoryId])
+  const saleCategories = useMemo(
+    () => (categories || []).map((category) => ({
+      ...category,
+      name: `${category.name}${category.isActive === false ? ' (Pasif)' : ''}`
+    })),
+    [categories]
+  )
 
   const cartTotal = useMemo(
     () => (cartItems || []).reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.price || 0)), 0),
     [cartItems]
   )
   const collectGross = Math.max(0, Number(account?.balance || 0))
-  const collectDiscountPercent = Math.max(0, Math.min(100, toNumberInput(collectDiscountDraft) || 0))
+  const collectDiscountPercent = collectAppliedDiscountPercent
   const collectDiscountAmount = Number(((collectGross * collectDiscountPercent) / 100).toFixed(2))
   const collectNet = Math.max(0, Number((collectGross - collectDiscountAmount).toFixed(2)))
   const collectAmountValue = Math.max(0, toNumberInput(collectForm.amount || 0))
@@ -262,7 +276,7 @@ export default function AccountDetailPage() {
       return
     }
     try {
-      await api(`/api/accounts/${accountId}/collect`, {
+      const res = await api(`/api/accounts/${accountId}/collect`, {
         method: 'POST',
         body: JSON.stringify({
           amount: amt,
@@ -270,40 +284,49 @@ export default function AccountDetailPage() {
           method: collectForm.method,
           note: collectForm.note,
           orderId: orderIdFromUrl || undefined
-        })
+        }),
+        silent: true
       })
+      if (res?.success === false) throw new Error(res?.message || 'Tahsilat alınamadı')
       toast.success('Tahsilat kaydedildi')
       setCollectOpen(false)
       setCollectForm({ amount: '', method: 'cash', note: '' })
       setCollectDiscountDraft('0')
+      setCollectAppliedDiscountPercent(0)
       await reloadAccount(accountId)
     } catch (err) {
       toast.error(err?.message || 'Tahsilat alınamadı')
     }
   }
 
-  const applyCollectDiscount = async (percent = collectDiscountPercent) => {
+  const applyCollectDiscount = async (percent = toNumberInput(collectDiscountDraft)) => {
     const accountId = String(account?.id || '').trim()
     if (!accountId) return
-    const discountAmount = Number(((collectGross * percent) / 100).toFixed(2))
+    const discountPercent = Math.max(0, Math.min(100, toNumberInput(percent)))
+    const discountAmount = Number(((collectGross * discountPercent) / 100).toFixed(2))
     if (discountAmount <= 0) {
       toast.error('İndirim tutarı geçersiz')
       return
     }
     try {
-      await api(`/api/accounts/${accountId}/collect`, {
+      const res = await api(`/api/accounts/${accountId}/collect`, {
         method: 'POST',
         body: JSON.stringify({
           amount: 0,
           discountAmount,
-          method: collectForm.method || 'other',
+          method: collectForm.method || 'cash',
           note: collectForm.note || 'Cari indirimi',
           orderId: orderIdFromUrl || undefined
-        })
+        }),
+        silent: true
       })
-      toast.success('İndirim uygulandı')
+      if (res?.success === false) throw new Error(res?.message || 'İndirim uygulanamadı')
+      const remainingBalance = Math.max(0, Number(res?.account?.balance ?? collectGross - discountAmount))
       setCollectDiscountDraft('0')
-      setCollectForm((prev) => ({ ...prev, amount: String(Math.max(0, Number(account?.balance || 0) - discountAmount).toFixed(2)), note: '' }))
+      setCollectAppliedDiscountPercent(0)
+      setCollectForm((prev) => ({ ...prev, amount: remainingBalance.toFixed(2), note: '' }))
+      collectAmountKeypadEditedRef.current = false
+      toast.success('İndirim uygulandı')
       await reloadAccount(accountId)
     } catch (err) {
       toast.error(err?.message || 'İndirim uygulanamadı')
@@ -344,6 +367,11 @@ export default function AccountDetailPage() {
   const addToCart = (item) => {
     const itemId = String(item?.id || '')
     if (!itemId) return
+    if (item.isWeightBased) {
+      setCartWeightItem(item)
+      setCartWeightModalOpen(true)
+      return
+    }
     setCartItems((prev) => {
       const existing = prev.find((entry) => String(entry.menuItemId) === itemId)
       if (existing) {
@@ -356,6 +384,7 @@ export default function AccountDetailPage() {
           name: item.name,
           price: Number(item.price || 0),
           qty: 1,
+          weightGrams: null,
           note: '',
           isActive: item.isActive !== false
         }
@@ -363,13 +392,54 @@ export default function AccountDetailPage() {
     })
   }
 
+  const addWeightItemToCart = (payload) => {
+    const item = cartWeightItem
+    const menuItemId = String(payload?.menuItemId || item?.id || '').trim()
+    const weightGrams = Math.round(Number(payload?.weightGrams))
+    if (!item || !menuItemId || !Number.isFinite(weightGrams) || weightGrams <= 0) return false
+    const qty = weightGrams / 1000
+    setCartItems((prev) => {
+      const existing = prev.find((entry) => String(entry.menuItemId) === menuItemId)
+      if (existing) {
+        return prev.map((entry) => String(entry.menuItemId) === menuItemId
+          ? {
+              ...entry,
+              qty: Number(entry.qty || 0) + qty,
+              weightGrams: Number(entry.weightGrams || 0) + weightGrams
+            }
+          : entry)
+      }
+      return [
+        ...prev,
+        {
+          menuItemId,
+          name: item.name,
+          price: Number(item.price || 0),
+          qty,
+          weightGrams,
+          isWeightBased: true,
+          note: '',
+          isActive: item.isActive !== false
+        }
+      ]
+    })
+    return true
+  }
+
   const updateCartQty = (menuItemId, nextQty) => {
-    const qty = Number(nextQty)
-    if (!Number.isFinite(qty) || qty <= 0) {
+    const enteredValue = Number(nextQty)
+    if (!Number.isFinite(enteredValue) || enteredValue <= 0) {
       setCartItems((prev) => prev.filter((entry) => String(entry.menuItemId) !== String(menuItemId)))
       return
     }
-    setCartItems((prev) => prev.map((entry) => String(entry.menuItemId) === String(menuItemId) ? { ...entry, qty } : entry))
+    setCartItems((prev) => prev.map((entry) => {
+      if (String(entry.menuItemId) !== String(menuItemId)) return entry
+      if (entry.isWeightBased) {
+        const weightGrams = Math.round(enteredValue)
+        return { ...entry, weightGrams, qty: weightGrams / 1000 }
+      }
+      return { ...entry, qty: enteredValue }
+    }))
   }
 
   const updateCartNote = (menuItemId, note) => {
@@ -395,6 +465,7 @@ export default function AccountDetailPage() {
           items: cartItems.map((entry) => ({
             menuItemId: entry.menuItemId,
             qty: Number(entry.qty || 0),
+            weightGrams: entry.isWeightBased ? Number(entry.weightGrams || 0) : undefined,
             note: entry.note || ''
           }))
         })
@@ -471,6 +542,7 @@ export default function AccountDetailPage() {
               className="btn account-collect-btn"
               onClick={() => {
                 setCollectDiscountDraft('0')
+                setCollectAppliedDiscountPercent(0)
                 collectAmountKeypadEditedRef.current = false
                 setCollectNoteOpen(false)
                 setCollectForm((prev) => ({
@@ -490,56 +562,21 @@ export default function AccountDetailPage() {
   )
 
   const categoriesPanel = canManageAccount ? (
-    <div className="card" style={{ display: 'grid', gap: 14, alignSelf: 'start', minHeight: isMobilePortrait ? undefined : 520 }}>
-      <div>
-        <div style={{ fontWeight: 800 }}>Kategoriler</div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Aktif ve pasif kategorilerden ürün seçebilirsiniz.</div>
-      </div>
-      <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            className="btn"
-            type="button"
-            style={{
-              textAlign: 'left',
-              justifyContent: isMobilePortrait ? 'center' : 'flex-start',
-              fontWeight: String(activeCategoryId) === String(category.id) ? 800 : 600,
-              opacity: category.isActive === false ? 0.75 : 1,
-              minHeight: isMobilePortrait ? 64 : undefined,
-              whiteSpace: 'normal',
-              lineHeight: 1.05,
-              padding: isMobilePortrait ? '8px 6px' : undefined,
-              fontSize: isMobilePortrait ? 13 : undefined
-            }}
-            onClick={() => setActiveCategoryId(category.id)}
-          >
-            {category.name}{category.isActive === false ? ' (Pasif)' : ''}
-          </button>
-        ))}
-      </div>
-    </div>
-  ) : null
-
-  const mobileCategoriesPanel = canManageAccount && isMobilePortrait ? (
     <SaleCategorySidebar
       title="Kategoriler"
-      categories={categories.map((category) => ({
-        ...category,
-        name: `${category.name}${category.isActive === false ? ' (Pasif)' : ''}`
-      }))}
+      categories={saleCategories}
       activeCategoryId={activeCategoryId}
       onSelect={setActiveCategoryId}
     />
   ) : null
 
   const debtPanel = (
-    <div className="card account-tx-card" style={{ minHeight: isMobilePortrait ? undefined : 520 }}>
+    <div className="card account-tx-card">
       <div style={{ fontWeight: 800 }}>Borç Detayları</div>
       {txRows.length === 0 ? (
         <div className="account-tx-empty">Hareket yok</div>
       ) : (
-        <div className="account-tx-list">
+        <div className="account-tx-list account-tx-list-scroll">
           {txRows.map((t) => {
             const tid = String(t?.id || '')
             const expanded = tid && expandedId === tid
@@ -630,7 +667,11 @@ export default function AccountDetailPage() {
                                 <div style={{ fontWeight: 800 }}>{money(line?.lineTotal || 0)}</div>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
-                                <div>{Number(line?.qty || 0)} × {money(line?.price || 0)}</div>
+                                <div>
+                                  {line?.weightGrams
+                                    ? `${line.weightGrams} gr × ${money(line?.price || 0)}/KG`
+                                    : `${Number(line?.qty || 0)} × ${money(line?.price || 0)}`}
+                                </div>
                                 {!!String(line?.note || '').trim() && <div className="breakAny">{String(line.note).trim()}</div>}
                               </div>
                             </div>
@@ -678,7 +719,11 @@ export default function AccountDetailPage() {
                                   <div style={{ fontWeight: 800 }}>{money(it.line)}</div>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
-                                  <div>{it.qty} × {money(it.unit)}</div>
+                                  <div>
+                                    {it.weightGrams
+                                      ? `${it.weightGrams} gr × ${money(it.unit)}/KG`
+                                      : `${it.qty} × ${money(it.unit)}`}
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -697,121 +742,107 @@ export default function AccountDetailPage() {
   )
 
   const productsPanel = canManageAccount ? (
-    <div className="card" style={{ display: 'grid', gap: 14, alignSelf: 'start', alignContent: 'start', justifyContent: 'stretch', width: '100%', minHeight: isMobilePortrait ? undefined : 520 }}>
-      <div>
+    <div className="card salePanel saleProductsPanel account-products-panel">
+      <div className="saleProductsPanelHeader">
         <div style={{ fontWeight: 800 }}>Ürünler</div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Mutfağı etkilemez. Ürüne tıklayınca sepete eklenir.</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{filteredItems.length} ürün · Mutfağa gönderilmez</div>
       </div>
       {catalogLoading ? (
         <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ürünler yükleniyor...</div>
       ) : filteredItems.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--muted)' }}>Bu kategoride ürün yok</div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobilePortrait ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fill, minmax(145px, 165px))',
-            gap: 10,
-            justifyContent: 'start',
-            alignContent: 'start',
-            justifyItems: 'stretch',
-            maxHeight: isMobilePortrait ? 'none' : 520,
-            overflowY: 'auto'
-          }}
-        >
+        <div className="salePanelScroll account-products-scroll">
+          <div className="posItemsGrid account-products-grid">
           {filteredItems.map((item) => (
-            <button
+            <ProductCard
               key={item.id}
-              className="btn"
-              type="button"
-              style={{
-                textAlign: 'left',
-                display: 'grid',
-                alignContent: 'end',
-                justifyItems: 'start',
-                minHeight: isMobilePortrait ? 96 : 98,
-                borderRadius: isMobilePortrait ? 16 : 14,
-                overflow: 'hidden',
-                position: 'relative',
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: item.imageUrl
-                  ? `linear-gradient(180deg, rgba(15,23,42,0.12) 0%, rgba(15,23,42,0.78) 100%), url(${item.imageUrl}) center/cover`
-                  : 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
-                color: '#fff',
-                boxShadow: '0 16px 28px rgba(15, 23, 42, 0.18)',
-                padding: isMobilePortrait ? 9 : 10
-              }}
-              onClick={() => addToCart(item)}
-            >
-              <span style={{ fontWeight: 900, fontSize: isMobilePortrait ? 11 : 12, lineHeight: 1.05, textShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>{item.name}</span>
-              <span style={{ fontSize: isMobilePortrait ? 10 : 11, color: 'rgba(255,255,255,0.92)', fontWeight: 700, textShadow: '0 2px 10px rgba(0,0,0,0.35)' }}>
-                {money(item.price)}{item.isActive === false ? ' • Pasif ürün' : ''}
-              </span>
-            </button>
+              item={item}
+              onClick={addToCart}
+              showImage={!!item.imageUrl}
+              statusLabel={item.isActive === false ? 'Pasif ürün' : ''}
+            />
           ))}
+          </div>
         </div>
       )}
     </div>
   ) : null
 
   const cartPanel = canManageAccount ? (
-    <div className="card" style={{ display: 'grid', gap: 14, alignSelf: 'start', position: isMobilePortrait ? 'static' : 'sticky', top: 16, boxShadow: '0 14px 34px rgba(15, 23, 42, 0.06)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div>
-          <div style={{ fontWeight: 800 }}>Sepet</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Seçtiğiniz ürünler burada birikir.</div>
+    <div className="card salePanel saleCartPanelShell account-cart-panel">
+      <div className="saleCartPanelContent">
+        <div className="saleCartHeader">
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <h3 style={{ margin: 0 }}>Sepet</h3>
+            <span className="saleCartCountLabel">{cartItems.length} ürün</span>
+          </div>
         </div>
-        <div style={{ fontWeight: 900, fontSize: 18 }}>{money(cartTotal)}</div>
-      </div>
-      {cartItems.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--muted)' }}>Henüz ürün eklenmedi</div>
-      ) : (
-        <div style={{ display: 'grid', gap: 8 }}>
+        {cartItems.length === 0 ? (
+          <div className="saleCartList account-cart-list" style={{ color: 'var(--muted)' }}>Henüz ürün eklenmedi</div>
+        ) : (
+          <>
+            <div className="saleCartList account-cart-list">
           {cartItems.map((entry) => (
-            <div key={entry.menuItemId} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 8, display: 'grid', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="breakAny" style={{ fontWeight: 800, fontSize: 13, lineHeight: 1.1 }}>{entry.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{money(entry.price)}{entry.isActive === false ? ' • Pasif' : ''}</div>
+            <SaleCartLine
+              key={entry.menuItemId}
+              className="account-cart-line"
+              title={entry.name}
+              detail={(
+                <div className="account-cart-detail">
+                  <div>
+                    {money(entry.price)}{entry.isWeightBased ? '/KG' : ''}
+                    {entry.isActive === false ? ' · Pasif ürün' : ''}
+                  </div>
+                  <div className="account-cart-item-fields">
+                    <input
+                      type="number"
+                      min={entry.isWeightBased ? 1 : 0.001}
+                      step={entry.isWeightBased ? 1 : 0.001}
+                      className="input"
+                      aria-label={`${entry.name} gramajı`}
+                      value={entry.isWeightBased ? Number(entry.weightGrams ?? Number(entry.qty || 0) * 1000) : entry.qty}
+                      onChange={(e) => updateCartQty(entry.menuItemId, e.target.value)}
+                    />
+                    <input
+                      className="input"
+                      placeholder="Not"
+                      aria-label={`${entry.name} notu`}
+                      value={entry.note}
+                      onChange={(e) => updateCartNote(entry.menuItemId, e.target.value)}
+                    />
+                  </div>
                 </div>
-                <button className="btn btn--danger" type="button" style={{ padding: '8px 12px', minHeight: 36 }} onClick={() => removeCartItem(entry.menuItemId)}>Sil</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : '96px 1fr', gap: 8 }}>
-                <input
-                  type="number"
-                  min="0.001"
-                  step="0.001"
-                  className="input"
-                  style={{ minHeight: 38, paddingBlock: 8 }}
-                  value={entry.qty}
-                  onChange={(e) => updateCartQty(entry.menuItemId, e.target.value)}
-                />
-                <input
-                  className="input"
-                  placeholder="Not"
-                  style={{ minHeight: 38, paddingBlock: 8 }}
-                  value={entry.note}
-                  onChange={(e) => updateCartNote(entry.menuItemId, e.target.value)}
-                />
-              </div>
-              <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 13 }}>{money(Number(entry.qty || 0) * Number(entry.price || 0))}</div>
-            </div>
+              )}
+              actions={(
+                <button
+                  className="btn btn--danger sale-cart-line__action-btn"
+                  type="button"
+                  onClick={() => removeCartItem(entry.menuItemId)}
+                >
+                  Sil
+                </button>
+              )}
+              price={money(Number(entry.qty || 0) * Number(entry.price || 0))}
+            />
           ))}
-          <button className="btn" type="button" disabled={cartSubmitting} onClick={submitCart}>
-            {cartSubmitting ? 'Ekleniyor...' : 'Sepeti Cariye Ekle'}
-          </button>
-        </div>
-      )}
+            </div>
+            <div className="saleCartFooter">
+              <div className="saleCartFooterInner">
+                <div className="saleCartFooterSummaryMain">
+                  <span>Toplam</span>
+                  <strong>{money(cartTotal)}</strong>
+                </div>
+                <button className="btn" type="button" disabled={cartSubmitting} onClick={submitCart}>
+                  {cartSubmitting ? 'Ekleniyor...' : 'Sepeti Cariye Ekle'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   ) : null
-
-  const catalogGridStyle = isMobilePortrait || !canManageAccount
-    ? { display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start', width: '100%' }
-    : { display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(220px, 0.82fr) minmax(0, 1.8fr) minmax(300px, 0.9fr)', gap: 18, alignItems: 'start', width: '100%' }
-
-  const tabletCatalogGridStyle = canManageAccount && isTablet
-    ? { display: 'grid', gridTemplateColumns: 'minmax(220px, 0.9fr) minmax(0, 1.5fr) minmax(260px, 0.95fr)', gap: 18, alignItems: 'start', width: '100%' }
-    : null
 
   return (
     <div
@@ -840,39 +871,21 @@ export default function AccountDetailPage() {
         <>
           {balanceCard}
 
-          {canManageAccount && isMobilePortrait ? (
+          {canManageAccount ? (
             <>
-              {mobileCategoriesPanel}
-              {productsPanel}
-              {debtPanel}
-              {cartPanel}
-            </>
-          ) : canManageAccount && isTablet ? (
-            <div style={tabletCatalogGridStyle}>
-              {categoriesPanel}
-              {productsPanel}
-              {cartPanel}
-              <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
-                {debtPanel}
+              <div className="account-sales-grid">
+                {categoriesPanel}
+                {productsPanel}
+                {cartPanel}
               </div>
-            </div>
-          ) : (
-            <div style={catalogGridStyle}>
               {debtPanel}
-              {categoriesPanel}
-              {canManageAccount ? (
-                <>
-                  {productsPanel}
-                  {cartPanel}
-                </>
-              ) : null}
-            </div>
-          )}
+            </>
+          ) : debtPanel}
         </>
       )}
 
       <Modal open={collectOpen} onClose={() => setCollectOpen(false)} title="Tahsilat Al">
-        <div className="payment-modal-stack">
+        <div className="payment-modal-stack account-collection-modal">
           <div className="payment-amount-banner">
             <span className="payment-amount-icon" aria-hidden="true">▣</span>
             <span className="payment-amount-copy">
@@ -899,7 +912,7 @@ export default function AccountDetailPage() {
                       value={collectDiscountDraft}
                       onChange={(e) => setCollectDiscountDraft(e.target.value)}
                     />
-                    <button className="btn btn--compact" type="button" onClick={applyCollectDiscount}>Uygula</button>
+                    <button className="btn btn--compact" type="button" onClick={() => applyCollectDiscount()}>Uygula</button>
                   </div>
                 </div>
                 <div className="payment-discount-presets" aria-label="Hazır indirim oranları">
@@ -1004,6 +1017,15 @@ export default function AccountDetailPage() {
           </div>
         </div>
       </Modal>
+      <ProductConfigModal
+        open={cartWeightModalOpen}
+        item={cartWeightItem}
+        onClose={() => {
+          setCartWeightModalOpen(false)
+          setCartWeightItem(null)
+        }}
+        onSubmit={addWeightItemToCart}
+      />
 
       <Modal open={manualOpen} onClose={() => setManualOpen(false)} title={manualForm.type === 'debit' ? 'Manuel Borç Ekle' : 'Bakiyeden Düş'}>
         <div style={{ display: 'grid', gap: 10 }}>

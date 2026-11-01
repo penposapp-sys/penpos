@@ -42,3 +42,8 @@ export const computePaymentSummary = (order) => {
   const balanceDue = toMoney(Math.max(0, netTotal - paid))
   return { total, discountTotal, netTotal, paidTotal: paid, balanceDue, veresiyeTotal, paymentsTotal, collectionsTotal }
 }
+
+export const hasPaymentExcess = (order) => {
+  const { paidTotal, netTotal } = computePaymentSummary(order)
+  return paidTotal - netTotal > 0.01
+}
