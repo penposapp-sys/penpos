@@ -950,9 +950,14 @@ export const getPrintAgentWindowsManifest = async (req, res) => {
   const fallbackPath = '/api/public/downloads/print-agent/windows'
   const base = buildBaseUrl(req)
   const downloadUrl = String(process.env.PRINT_AGENT_WINDOWS_URL || (base ? new URL(fallbackPath, base).toString() : fallbackPath)).trim()
+  const setupDownloadPath = '/api/public/downloads/print-agent/windows/setup'
+  const setupDownloadUrl = base ? new URL(setupDownloadPath, base).toString() : setupDownloadPath
   const setupFileName = setupFilePath ? path.basename(setupFilePath) : ''
   const setupVersionMatch = setupFileName.match(/_(\d+(?:\.\d+)*)\.exe$/i)
   const release = readPrintAgentRelease(resolved.filePath)
+  const setupSha256 = /^[a-f0-9]{64}$/i.test(String(release.setupSha256 || '').trim())
+    ? String(release.setupSha256).trim().toLowerCase()
+    : ''
   let setupPublishedAt = null
   if (setupFilePath) {
     try { setupPublishedAt = fs.statSync(setupFilePath).mtime.toISOString() } catch {}
@@ -966,6 +971,8 @@ export const getPrintAgentWindowsManifest = async (req, res) => {
     downloadUrl,
     setupVersion: setupVersionMatch ? setupVersionMatch[1] : String(release.setupVersion || ''),
     setupFileName,
+    setupDownloadUrl,
+    setupSha256,
     setupPublishedAt,
     required: false,
     notes: String(process.env.PRINT_AGENT_WINDOWS_NOTES || '').trim(),

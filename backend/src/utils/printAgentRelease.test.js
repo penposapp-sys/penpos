@@ -11,16 +11,18 @@ test('release metadata independently reports Agent and Setup versions', (t) => {
   const binaryPath = path.join(directory, 'PenPOS_PrintAgent.exe')
   fs.writeFileSync(binaryPath, '')
   fs.writeFileSync(path.join(directory, 'PenPOS_PrintAgent_Release.json'), JSON.stringify({
-    agentVersion: '0.1.9',
-    setupVersion: '0.2.0',
-    setupFileName: 'PenPOS_PrintAgent_Setup_0.2.0.exe'
+    agentVersion: '0.1.10',
+    setupVersion: '0.1.10',
+    setupFileName: 'PenPOS_PrintAgent_Setup_0.1.10.exe',
+    setupSha256: 'a'.repeat(64)
   }))
 
-  assert.equal(getPrintAgentVersion(binaryPath), '0.1.9')
+  assert.equal(getPrintAgentVersion(binaryPath), '0.1.10')
   assert.deepEqual(readPrintAgentRelease(binaryPath), {
-    agentVersion: '0.1.9',
-    setupVersion: '0.2.0',
-    setupFileName: 'PenPOS_PrintAgent_Setup_0.2.0.exe'
+    agentVersion: '0.1.10',
+    setupVersion: '0.1.10',
+    setupFileName: 'PenPOS_PrintAgent_Setup_0.1.10.exe',
+    setupSha256: 'a'.repeat(64)
   })
 })
 
@@ -40,5 +42,5 @@ test('Agent package version is independent of working directory and stale env ov
 
   process.chdir(directory)
   process.env.PRINT_AGENT_WINDOWS_VERSION = '0.1.1'
-  assert.equal(getPrintAgentVersion(path.join(directory, 'PenPOS_PrintAgent.exe')), '0.1.9')
+  assert.equal(getPrintAgentVersion(path.join(directory, 'PenPOS_PrintAgent.exe')), '0.1.10')
 })

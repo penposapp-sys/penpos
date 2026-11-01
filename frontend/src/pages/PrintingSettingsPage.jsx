@@ -92,7 +92,7 @@ export default function PrintingSettingsPage({ system }) {
     ;(async () => {
       try {
         const res = await api(pcPrinterManifestUrl, { silent: true, skipBranchHeader: true })
-        setLatestAgentVersion(String(res?.setupVersion || res?.version || '').trim())
+        setLatestAgentVersion(String(res?.version || '').trim())
       } catch {
         setLatestAgentVersion('')
       }
@@ -402,7 +402,7 @@ export default function PrintingSettingsPage({ system }) {
       <AutoPrintInfoCard
         busy={busy}
         stations={stations}
-        latestVersion={latestAgentVersion}
+        latestAgentVersion={latestAgentVersion}
         onReload={loadAll}
       />
 

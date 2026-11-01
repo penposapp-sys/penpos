@@ -26,7 +26,7 @@ const compareVersions = (left, right) => {
   return 0
 }
 
-export default function AutoPrintInfoCard({ busy, stations = [], latestVersion, onReload }) {
+export default function AutoPrintInfoCard({ busy, stations = [], latestAgentVersion, onReload }) {
   const list = Array.isArray(stations) ? stations : []
 
   return (
@@ -51,17 +51,17 @@ export default function AutoPrintInfoCard({ busy, stations = [], latestVersion, 
               ? countFromMeta
               : (Array.isArray(meta.printers) ? meta.printers.length : 0)
             const ruleCount = Array.isArray(station?.printers) ? station.printers.length : 0
-            const versionComparison = compareVersions(latestVersion, version)
+            const versionComparison = compareVersions(latestAgentVersion, version)
             const updateLabel = !version
-              ? (latestVersion ? `Sürüm bilgisi yok · Güncel sürüm: ${latestVersion}` : '')
+              ? (latestAgentVersion ? `Agent sürüm bilgisi yok · Güncel Agent sürümü: ${latestAgentVersion}` : '')
               : versionComparison === 1
-                ? `Güncelleme var: ${version} → ${latestVersion}`
+                ? `Agent güncellemesi var: ${version} → ${latestAgentVersion}`
                 : versionComparison === -1
-                  ? `Yüklü sürüm ${version} · Sunucudaki sürüm ${latestVersion}`
-                  : latestVersion
+                  ? `Yüklü Agent ${version} · Sunucudaki Agent ${latestAgentVersion}`
+                  : latestAgentVersion
                     ? versionComparison === 0
-                      ? `Güncel sürüm: ${version}`
-                      : `Sürüm karşılaştırılamadı · Yüklü: ${version} · Sunucudaki: ${latestVersion}`
+                      ? `Güncel Agent sürümü: ${version}`
+                      : `Agent sürümü karşılaştırılamadı · Yüklü: ${version} · Sunucudaki: ${latestAgentVersion}`
                     : ''
 
             return (
@@ -74,7 +74,7 @@ export default function AutoPrintInfoCard({ busy, stations = [], latestVersion, 
                   <div style={{ flex: '0 0 auto', fontSize: 12, fontWeight: 800, color: status.tone }}>{status.label}</div>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', overflowWrap: 'anywhere' }}>
-                  Bilgisayar: {machineName || 'Henüz tanımlanmadı'}{version ? ` · Sürüm ${version}` : ''}
+                  Bilgisayar: {machineName || 'Henüz tanımlanmadı'}{version ? ` · Agent ${version}` : ''}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                   {printerCount} bilgisayar yazıcısı · {ruleCount} tanımlı yazıcı kuralı · {station?.isActive === true ? 'İstasyon aktif' : 'İstasyon pasif'}

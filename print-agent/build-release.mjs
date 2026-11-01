@@ -10,6 +10,19 @@ const packageJson = JSON.parse(await fs.readFile(path.join(process.cwd(), 'packa
 
 await fs.mkdir(targetDir, { recursive: true })
 await fs.copyFile(sourceExe, targetExe)
-await fs.writeFile(targetRelease, `${JSON.stringify({ agentVersion: packageJson.version }, null, 2)}\n`, 'utf8')
+let existingRelease = {}
+try {
+  const parsedRelease = JSON.parse(await fs.readFile(targetRelease, 'utf8'))
+  if (parsedRelease && typeof parsedRelease === 'object' && !Array.isArray(parsedRelease)) {
+    existingRelease = parsedRelease
+  }
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error
+}
+await fs.writeFile(
+  targetRelease,
+  `${JSON.stringify({ ...existingRelease, agentVersion: packageJson.version }, null, 2)}\n`,
+  'utf8'
+)
 
 console.log(`print-agent backend release hazir: ${targetExe}`)
