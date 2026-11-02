@@ -2,10 +2,15 @@
 
 Bu klasorden portable `exe` uretilebilir.
 
-Print Agent `0.1.10`, ESC/POS RAW yazdirma sirasinda Base64 ile tasinan ikili veriyi
+Print Agent, ESC/POS RAW yazdirma sirasinda Base64 ile tasinan ikili veriyi
 dogrudan yaziciya gonderebilir. Tasarimli masa fislerinde Base64 encoding bilgisi
 zorunludur; eksik veya hatali aktarim artik metin olarak yazdirilmaz. Diger metin RAW
 yazdirma davranisi degismez.
+
+Release surumunun tek kaynagi `print-agent/package.json` dosyasidir. `npm run build:exe`
+bu surumu Agent runtime koduna ve Electron Setup `package.json`/lock dosyalarina otomatik
+esitler. Print Agent deploy BAT'i ayni PS1 akisini kullandigi icin Agent, Setup ve Release
+JSON surumleri tek bir surum degisikligiyle birlikte uretilir.
 
 ## Gerekenler
 
@@ -57,7 +62,7 @@ bu `print-agent` projesi kullanilir; Setup paketi canonical Agent EXE'sini WinSW
 ProgramData'ya kurar ve servisi `--config C:\ProgramData\PenPOS\PrintAgent\config.json`
 parametresiyle baslatir. Mevcut config dosyasi Setup tarafindan degistirilmez.
 
-Iki surum bagimsizdir: Agent surumu bu projenin `package.json` dosyasindan, Setup
-surumu Electron Setup projesinin `package.json` dosyasindan gelir. Tek seferlik yerel
-build ve paket kontrolu icin `PenPOS-PrintAgent-Deploy.ps1 -BuildOnly`; Setup ve Agent'i
-tek seferde yayinlamak icin ayni klasordeki BAT kullanilir.
+Agent ve Setup surumleri ayni tutulur ve tek surum kaynagi bu projenin `package.json`
+dosyasidir. Tek seferlik yerel build ve paket kontrolu icin
+`PenPOS-PrintAgent-Deploy.ps1 -BuildOnly`; Setup ve Agent'i tek seferde yayinlamak icin
+ayni klasordeki BAT kullanilir.

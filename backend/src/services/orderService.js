@@ -501,6 +501,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
     const servingType = getServingTypeForItemLabel(order, it, batchId)
     const amountLine = buildLabelAmountLine({ qty, weightGrams, isWeightBased, servingType })
     const noteLine = String(it?.note || '').trim()
+    const quickSaleTableName = order.saleSource === 'quick-sale' ? String(order.note || '').trim() : ''
     const payload = `${top}\n${name}\n${amountLine}\n${noteLine ? `${noteLine}` : ''}\n`
 
     await createJob(tenantId, 'kermes', order.createdByUserId || order.createdBy, {
@@ -516,6 +517,7 @@ const enqueueOrderItemLabels = async ({ tenantId, order, items, mode, batchId = 
         itemId: it?._id ? String(it._id) : null,
         qty,
         servingType,
+        ...(quickSaleTableName ? { quickSaleTableName } : {}),
         triggerMode: mode
       }
     })

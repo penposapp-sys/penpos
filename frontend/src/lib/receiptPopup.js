@@ -59,8 +59,10 @@ const buildReceiptPopupHtml = (receipt) => {
     : ''
   const brand = `<header class="brand">${logo}<div class="business-name">${escapeHtml(receipt?.businessName || 'PENPOS')}</div></header>`
   const heading = (title) => `<div class="title">${escapeHtml(title)}</div>`
+  const quickSaleTableName = String(receipt?.note || '').trim()
   const quickSaleBody = `
     ${heading('HIZLI SATIŞ')}
+    ${quickSaleTableName ? `<div class="quick-sale-table">MASA: ${escapeHtml(quickSaleTableName)}</div>` : ''}
     <div class="pair"><strong>Fiş No:</strong><span>${escapeHtml(receipt?.receiptNo || '-')}</span></div>
     <div class="pair"><strong>Tarih / Saat:</strong><span>${escapeHtml(`${dateText} ${timeText}`)}</span></div>
     <div class="items">${itemRows}</div>
@@ -169,7 +171,7 @@ const buildReceiptPopupHtml = (receipt) => {
       font-size: 11px;
     }
     .brand { text-align: center; margin-bottom: 7px; }
-    .logo { display: block; max-width: 42mm; max-height: 18mm; margin: 0 auto 4px; object-fit: contain; filter: grayscale(1) contrast(1.5); }
+    .logo { display: block; max-width: 42mm; max-height: 18mm; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.5); }
     .business-name { font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
     .title {
       margin: 6px 0;
@@ -185,6 +187,7 @@ const buildReceiptPopupHtml = (receipt) => {
     .pair strong { flex: 0 0 47%; }
     .pair span { min-width: 0; text-align: right; overflow-wrap: anywhere; }
     .table-name { margin: 5px 0; font-size: 13px; font-weight: 800; }
+    .quick-sale-table { margin: -4px 0 5px; text-align: center; font-weight: 700; overflow-wrap: anywhere; }
     .meta, .summary { border-top: 1px solid #111; padding-top: 4px; margin-top: 4px; }
     .items { margin: 7px 0; border-top: 1px solid #111; border-bottom: 1px dashed #111; padding: 4px 0; }
     .item-row { display: grid; grid-template-columns: minmax(0, 1fr) 12mm 23mm; gap: 2px; align-items: start; padding: 3px 0; }

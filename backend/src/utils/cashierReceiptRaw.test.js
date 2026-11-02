@@ -27,15 +27,19 @@ const baseReceipt = {
 
 const contains = (raw, value) => raw.includes(Buffer.from(value, 'ascii'))
 
-test('quick sale RAW is short, branded, and prints an optional note', async () => {
-  const receipt = { ...baseReceipt, note: 'Paket olsun', payments: [{ methodLabel: 'Nakit', amount: 265 }] }
+test('quick sale RAW is short, branded, and prints the order note as its table name', async () => {
+  const receipt = { ...baseReceipt, note: 'Aile Salonu 2', payments: [{ methodLabel: 'Nakit', amount: 265 }] }
   const raw = await buildCashierReceiptRaw(receipt, { widthMm: 80, logoBuffer: logo })
   const lines = buildCashierReceiptLines(receipt, 48)
+  assert.ok(lines[0].includes('HIZLI SATIS'))
+  assert.ok(lines[1].includes('MASA: Aile Salonu 2'))
+  assert.ok(lines[2].startsWith('Fis No:'))
   assert.deepEqual(decodeRawPayload(raw.toString('base64'), 'base64'), raw)
   assert.ok(contains(raw, 'PENDIK TANITIM ETKINLIKLERI'))
   assert.ok(contains(raw, 'HIZLI SATIS'))
+  assert.ok(contains(raw, 'MASA: Aile Salonu 2'))
   assert.ok(contains(raw, 'TESEKKUR EDERIZ'))
-  assert.ok(contains(raw, 'Not: Paket olsun'))
+  assert.ok(contains(raw, 'Not: Aile Salonu 2'))
   assert.ok(contains(raw, 'Nakit: 265.00 TL'))
   assert.ok(!contains(raw, 'Masa:'))
   assert.ok(!contains(raw, 'Kasiyer:'))
@@ -56,6 +60,7 @@ test('quick sale without note keeps cash and card payment formats distinct', asy
       assert.ok(contains(raw, `${method}: 265.00 TL`))
       assert.ok(!contains(raw, 'Not:'))
       assert.ok(contains(raw, 'HIZLI SATIS'))
+      assert.ok(!contains(raw, 'MASA:'))
     })
   }
 })
@@ -106,6 +111,14 @@ test('table receipt includes unpaid, partial, and paid totals on both widths', a
       assert.notEqual(logo80, -1)
       assert.deepEqual(raw58.subarray(logo58 + 4, logo58 + 6), Buffer.from([48, 0]))
       assert.deepEqual(raw80.subarray(logo80 + 4, logo80 + 6), Buffer.from([72, 0]))
+      const logo58WidthBytes = raw58[logo58 + 4] + (raw58[logo58 + 5] << 8)
+      const logo58Height = raw58[logo58 + 6] + (raw58[logo58 + 7] << 8)
+      const logo80WidthBytes = raw80[logo80 + 4] + (raw80[logo80 + 5] << 8)
+      const logo80Height = raw80[logo80 + 6] + (raw80[logo80 + 7] << 8)
+      assert.ok(logo58Height > 0)
+      assert.ok(logo80Height > 0)
+      assert.deepEqual(raw58.subarray(logo58 + 8 + logo58WidthBytes * logo58Height, logo58 + 11 + logo58WidthBytes * logo58Height), Buffer.from([0x1b, 0x45, 1]))
+      assert.deepEqual(raw80.subarray(logo80 + 8 + logo80WidthBytes * logo80Height, logo80 + 11 + logo80WidthBytes * logo80Height), Buffer.from([0x1b, 0x45, 1]))
       const totalLabel = Buffer.from('GENEL TOPLAM:', 'ascii')
       const totalOffset = raw58.indexOf(totalLabel)
       assert.notEqual(totalOffset, -1)
@@ -139,6 +152,40 @@ test('table receipt binary survives JSON transport and Print Agent decoding', as
   assert.ok(agentBytes.includes(Buffer.from('MASA SIPARISI', 'ascii')))
   assert.ok(agentBytes.includes(Buffer.from('KISMI ODENDI', 'ascii')))
   assert.ok(agentBytes.includes(Buffer.from('Terasta servis', 'ascii')))
+  assert.ok(!agentBytes.includes(Buffer.from(job.rawContent, 'ascii')))
+})
+
+test('Turkish table receipt survives JSON transport when RAW encoding metadata is missing', async () => {
+  const receipt = {
+    ...baseReceipt,
+    businessName: 'İstanbul Şiş Kebap',
+    saleSource: 'standard',
+    items: [
+      { nameSnapshot: 'Çıtır Şiş Tavuk', priceSnapshot: 120, qty: 2, subtotal: 240, status: 'sent' },
+      { nameSnapshot: 'Ayran', priceSnapshot: 25, qty: 1, subtotal: 25, status: 'sent' }
+    ],
+    totals: { subtotal: 265, grandTotal: 265 },
+    paidTotal: 100,
+    balanceDue: 165,
+    payments: [{ methodLabel: 'Kart', amount: 100 }]
+  }
+  const raw = await buildCashierReceiptRaw(receipt, { widthMm: 80, logoBuffer: logo })
+  const job = JSON.parse(JSON.stringify({
+    type: 'receipt',
+    payloadType: 'raw',
+    rawContent: raw.toString('base64'),
+    meta: {}
+  }))
+  const agentBytes = decodeRawPayload(job.rawContent, job.meta.rawEncoding || 'cp857')
+
+  assert.ok(Buffer.isBuffer(agentBytes))
+  assert.deepEqual(agentBytes, raw)
+  assert.ok(agentBytes.includes(Buffer.from('ISTANBUL SIS KEBAP', 'ascii')))
+  assert.ok(agentBytes.includes(Buffer.from('Citir Sis Tavuk', 'ascii')))
+  assert.ok(agentBytes.includes(Buffer.from('2 x 120.00 TL', 'ascii')))
+  assert.ok(agentBytes.includes(Buffer.from('240.00 TL', 'ascii')))
+  assert.match(agentBytes.toString('ascii'), /GENEL TOPLAM:\s+265\.00 TL/)
+  assert.ok(agentBytes.includes(Buffer.from('KISMI ODENDI', 'ascii')))
   assert.ok(!agentBytes.includes(Buffer.from(job.rawContent, 'ascii')))
 })
 

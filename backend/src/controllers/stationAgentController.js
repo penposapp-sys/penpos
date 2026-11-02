@@ -233,7 +233,10 @@ const getJobPdfBase64 = async ({ job, tenantId, system, station }) => {
     const amountText = String(lines[2] || '')
     const noteText = String(lines[3] || '')
     const qty = Number(job?.meta?.qty || 1)
-    return await renderLabelPdfBase64({ topText, productText, qty, amountText, noteText, widthMm: labelWidthMm, heightMm: labelHeightMm })
+    const subtitleText = job?.meta?.quickSaleTableName
+      ? `MASA: ${String(job.meta.quickSaleTableName).trim()}`
+      : ''
+    return await renderLabelPdfBase64({ topText, subtitleText, productText, qty, amountText, noteText, widthMm: labelWidthMm, heightMm: labelHeightMm })
   }
 
   const payloadText = String(job?.payload?.content || '')

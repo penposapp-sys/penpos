@@ -140,6 +140,8 @@ export const buildCashierReceiptLines = (receipt, width = 48) => {
 
   if (quickSale) {
     lines.push(...centerText('HIZLI SATIS', lineWidth))
+    const tableName = ascii(receipt?.note || '').trim()
+    if (tableName) lines.push(...centerText(`MASA: ${tableName}`, lineWidth))
     lines.push(...pairRow('Fis No:', receiptNo, lineWidth))
     lines.push(...pairRow('Tarih / Saat:', formatDateTime(receipt?.createdAt), lineWidth))
     for (const item of activeItems) lines.push(...itemRows(item, lineWidth))
@@ -209,8 +211,7 @@ const buildLogoRaster = async (logoBuffer, paperDots) => {
   const heightHigh = (info.height >> 8) & 0xff
   return Buffer.concat([
     Buffer.from([GS, 0x76, 0x30, 0, widthLow, widthHigh, heightLow, heightHigh]),
-    raster,
-    Buffer.from([0x0a])
+    raster
   ])
 }
 

@@ -7,6 +7,11 @@ test('decodes base64 RAW bytes without text conversion', () => {
   assert.deepEqual(decodeRawPayload(source.toString('base64'), 'base64'), source)
 })
 
+test('decodes legacy ESC/POS Base64 payloads when encoding metadata is missing', () => {
+  const source = Buffer.from([0x1b, 0x40, 0x1b, 0x61, 0, ...Buffer.from('MASA SIPARISI\n', 'ascii')])
+  assert.deepEqual(decodeRawPayload(source.toString('base64')), source)
+})
+
 test('leaves existing text RAW payloads unchanged', () => {
   assert.equal(decodeRawPayload('Nakit 10.00 TL', 'cp857'), 'Nakit 10.00 TL')
 })

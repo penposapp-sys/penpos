@@ -8,8 +8,9 @@ import { spawn } from 'child_process'
 import crypto from 'crypto'
 import { resolveWindowsPrinterName } from './printerName.js'
 import { decodeRawPayload } from './rawPayload.js'
+import { getTsplLabelText } from './labelPayload.js'
 
-const AGENT_VERSION = '0.1.10'
+const AGENT_VERSION = '0.1.12'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {
@@ -300,8 +301,8 @@ const centerDots = (text, pageWidthDots, fontWidthDots) => {
   return Math.max(8, Math.floor((pageWidthDots - width) / 2))
 }
 
-const renderArialBoldLabelBitmap = async ({ top, product, note, amount, widthDots, heightDots }) => {
-  const inputBase64 = Buffer.from(JSON.stringify({ top, product, note, amount, widthDots, heightDots }), 'utf8').toString('base64')
+const renderArialBoldLabelBitmap = async ({ top, subtitle, product, note, amount, widthDots, heightDots }) => {
+  const inputBase64 = Buffer.from(JSON.stringify({ top, subtitle, product, note, amount, widthDots, heightDots }), 'utf8').toString('base64')
   const script = String.raw`
 Add-Type -AssemblyName System.Drawing
 $labelData = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${inputBase64}')) | ConvertFrom-Json
@@ -351,8 +352,11 @@ for ($attempt = 0; $attempt -lt 12; $attempt++) {
   $noteFont = New-ArialBold $noteSize
   $amountFont = New-ArialBold $amountSize
   $productLines = @(Wrap-LabelText ([string]$labelData.product) $productFont $graphics $innerWidth)
+  $subtitleLines = @()
+  if ([string]$labelData.subtitle) { $subtitleLines = @(Wrap-LabelText ([string]$labelData.subtitle) $noteFont $graphics $innerWidth) }
   $blocks = @()
   if ([string]$labelData.top) { $blocks += @{ text = [string]$labelData.top; font = $topFont } }
+  foreach ($line in $subtitleLines) { $blocks += @{ text = [string]$line; font = $noteFont } }
   foreach ($line in $productLines) { $blocks += @{ text = [string]$line; font = $productFont } }
   if ([string]$labelData.note) { $blocks += @{ text = [string]$labelData.note; font = $noteFont } }
   $blocks += @{ text = [string]$labelData.amount; font = $amountFont }
@@ -399,18 +403,14 @@ $format.Dispose(); $graphics.Dispose(); $bitmap.Dispose()
   return bitmap
 }
 
-const buildTsplLabelPayload = async (content, options = {}) => {
-  const lines = String(content || '').split(/\r?\n/g).map((line) => line.trim()).filter(Boolean)
-  const top = lines[0] || ''
-  const product = lines[1] || '-'
-  const amount = lines[2] || '1 ADET'
-  const note = lines[3] || ''
+const buildTsplLabelPayload = async (content, options = {}, meta = {}) => {
+  const { top, subtitle, product, amount, note } = getTsplLabelText(content, meta.quickSaleTableName)
   const widthMm = Math.max(20, Number(options?.widthMm || 60))
   const heightMm = Math.max(20, Number(options?.heightMm || 40))
   const widthDots = Math.round(widthMm * 8)
   const heightDots = Math.round(heightMm * 8)
   const gapMm = Math.max(0, Number(options?.gapMm || 2))
-  const bitmap = await renderArialBoldLabelBitmap({ top, product, note, amount, widthDots, heightDots })
+  const bitmap = await renderArialBoldLabelBitmap({ top, subtitle, product, note, amount, widthDots, heightDots })
   const prefix = [
     `SIZE ${widthMm} mm,${heightMm} mm`,
     `GAP ${gapMm} mm,0 mm`,
@@ -899,7 +899,7 @@ const main = async () => {
         }
       } else if (String(job?.type || '').trim().toLowerCase() === 'label' && payloadType === 'raw' && rawContent) {
         const txtTmp = path.join(spoolDir, `job-${jobId}.txt`)
-        const tsplPayload = await buildTsplLabelPayload(rawContent, printOptions)
+        const tsplPayload = await buildTsplLabelPayload(rawContent, printOptions, job?.meta || {})
         try {
           for (let i = 0; i < copies; i++) {
             await printRawText({ printerName, content: tsplPayload, txtPath: txtTmp })

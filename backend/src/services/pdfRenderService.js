@@ -153,7 +153,7 @@ const renderDesignedReceiptPdfBase64 = async ({
         align: 'center',
         valign: 'center'
       })
-      y += logoHeight + 2
+      y += logoHeight
     }
     addText(options.tenantName, 13, true, 'center', 5)
 
@@ -166,6 +166,10 @@ const renderDesignedReceiptPdfBase64 = async ({
     doc.text(title, left, y + mmToPt(1.2), { width: contentWidth, align: 'center', lineBreak: false })
     doc.fillColor('#000')
     y += titleHeight + 5
+
+    if (layout === 'quick-sale' && options.note) {
+      addText(`MASA: ${options.note}`, 10, true, 'center', 2)
+    }
 
     const dt = options.createdAt ? new Date(options.createdAt) : new Date()
     const validDate = Number.isFinite(dt.getTime())
@@ -739,8 +743,9 @@ export const renderReceiptPdfBase64 = async ({
   return Buffer.concat(chunks).toString('base64')
 }
 
-export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountText, noteText, widthMm, heightMm } = {}) => {
+export const renderLabelPdfBase64 = async ({ topText, subtitleText, productText, qty, amountText, noteText, widthMm, heightMm } = {}) => {
   const top = safeText(topText)
+  const subtitle = safeText(subtitleText)
   const product = safeText(productText)
   const note = safeText(noteText)
   const q = Math.max(1, Number(qty || 1))
@@ -766,28 +771,34 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
   const qtyText = amount
   const blockGap = Math.max(mmToPt(0.8), contentHeight * 0.03)
   const topBlockHeight = top ? Math.max(mmToPt(6), contentHeight * 0.2) : 0
+  const subtitleBlockHeight = subtitle ? Math.max(mmToPt(5), contentHeight * 0.18) : 0
   const noteBlockHeight = note ? Math.max(mmToPt(5), contentHeight * 0.18) : 0
   const qtyBlockHeight = Math.max(mmToPt(6), contentHeight * 0.18)
-  const totalGapCount = (top ? 1 : 0) + 1 + (note ? 1 : 0)
-  const productBlockHeight = Math.max(mmToPt(12), contentHeight - topBlockHeight - noteBlockHeight - qtyBlockHeight - (blockGap * totalGapCount))
+  const totalGapCount = (top ? 1 : 0) + (subtitle ? 1 : 0) + 1 + (note ? 1 : 0)
+  const productBlockHeight = Math.max(mmToPt(12), contentHeight - topBlockHeight - subtitleBlockHeight - noteBlockHeight - qtyBlockHeight - (blockGap * totalGapCount))
   const leftX = doc.page.margins.left
 
   const topFitSize = top
     ? fitFontSizeWithLineLimit(doc, top, contentWidth, topBlockHeight, { min: 8, max: Math.min(18, h * 0.34), maxLines: 2 })
     : Math.min(18, h * 0.34)
+  const subtitleFitSize = subtitle
+    ? fitFontSizeWithLineLimit(doc, subtitle, contentWidth, subtitleBlockHeight, { min: 7, max: Math.min(14, h * 0.26), maxLines: 2 })
+    : Math.min(14, h * 0.26)
   const productFitSize = fitFontSizeWithLineLimit(doc, product || '-', contentWidth, productBlockHeight, { min: 9, max: Math.min(21, h * 0.4), maxLines: 2 })
   const noteFitSize = note
     ? fitFontSizeWithLineLimit(doc, note, contentWidth, noteBlockHeight, { min: 7, max: Math.min(14, h * 0.26), maxLines: 2 })
     : Math.min(14, h * 0.26)
   const qtyFitSize = fitFontSizeWithLineLimit(doc, qtyText, contentWidth, qtyBlockHeight, { min: 8, max: Math.min(17, h * 0.32), maxLines: 1 })
   const sharedSize = Math.max(8, Math.min(topFitSize, productFitSize, qtyFitSize))
+  const subtitleSize = subtitle ? Math.max(7, Math.min(subtitleFitSize, sharedSize - 1)) : 0
   const noteSize = note ? Math.max(7, Math.min(noteFitSize, sharedSize - 1)) : 0
 
   const topHeight = top ? doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(top, { width: contentWidth, align: 'center' }) : 0
+  const subtitleHeight = subtitle ? doc.font('Helvetica').fontSize(subtitleSize).heightOfString(subtitle, { width: contentWidth, align: 'center' }) : 0
   const productHeightUsed = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(product || '-', { width: contentWidth, align: 'center' })
   const noteHeight = note ? doc.font('Helvetica').fontSize(noteSize).heightOfString(note, { width: contentWidth, align: 'center' }) : 0
   const qtyHeight = doc.font('Helvetica-Bold').fontSize(sharedSize).heightOfString(qtyText, { width: contentWidth, align: 'center', lineBreak: false })
-  const totalUsedHeight = topHeight + productHeightUsed + noteHeight + qtyHeight + (blockGap * totalGapCount)
+  const totalUsedHeight = topHeight + subtitleHeight + productHeightUsed + noteHeight + qtyHeight + (blockGap * totalGapCount)
   let y = doc.page.margins.top + Math.max(0, (contentHeight - totalUsedHeight) / 2)
 
   useFont(doc, 'trBold')
@@ -795,6 +806,13 @@ export const renderLabelPdfBase64 = async ({ topText, productText, qty, amountTe
     doc.fontSize(sharedSize)
     textMediumAt(doc, top, leftX, y, { width: contentWidth, align: 'center' })
     y += topHeight + blockGap
+  }
+
+  if (subtitle) {
+    useFont(doc, 'tr')
+    doc.fontSize(subtitleSize)
+    textMediumAt(doc, subtitle, leftX, y, { width: contentWidth, align: 'center' })
+    y += subtitleHeight + blockGap
   }
 
   useFont(doc, 'trBold')
