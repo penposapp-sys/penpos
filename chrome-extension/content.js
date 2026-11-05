@@ -17,6 +17,12 @@
     return new Promise(resolve => setTimeout(resolve, ms))
   }
 
+  const isExtensionRuntimeAvailable = () =>
+    globalThis.isLucaExtensionRuntimeAvailable()
+
+  const sendExtensionMessage = message =>
+    globalThis.sendLucaExtensionMessage(message)
+
   // content.js manifest ile "document_start" enjekte edilirse DOM henüz
   // oluşmamış olur ve hiçbir selector bulunamaz. DOM hazır olana kadar bekle.
   function waitForDomReady() {
@@ -689,9 +695,7 @@ const LUCA_PERIOD_MONTHS = {
     )
 
     if (
-      typeof chrome === "undefined" ||
-      !chrome.runtime ||
-      typeof chrome.runtime.sendMessage !== "function"
+      !isExtensionRuntimeAvailable()
     ) {
       throw new Error(
         "Chrome Extension runtime bağlantısı bulunamadı."
@@ -699,7 +703,7 @@ const LUCA_PERIOD_MONTHS = {
     }
 
     const response =
-      await chrome.runtime.sendMessage({
+      await sendExtensionMessage({
         type: "PENPOS_LUCA_SET_DATE_RANGE",
         period,
         startDate,
@@ -972,16 +976,14 @@ const LUCA_PERIOD_MONTHS = {
   // $('#OutgoingArchiveTable').DataTable().page(0).draw(false) ile bu düzeltilir.
   async function sendResetPaging(options = {}) {
     if (
-      typeof chrome === "undefined" ||
-      !chrome.runtime ||
-      typeof chrome.runtime.sendMessage !== "function"
+      !isExtensionRuntimeAvailable()
     ) {
       return null
     }
 
     try {
       const response =
-        await chrome.runtime.sendMessage({
+        await sendExtensionMessage({
           type: "PENPOS_LUCA_RESET_PAGING",
           tableIds: Array.isArray(options.tableIds) ? options.tableIds : undefined,
           pageLength: Number(options.pageLength) || undefined,
@@ -1135,10 +1137,7 @@ const LUCA_PERIOD_MONTHS = {
     )
 
     if (
-      typeof chrome === "undefined" ||
-      !chrome.runtime ||
-      typeof chrome.runtime.sendMessage !==
-        "function"
+      !isExtensionRuntimeAvailable()
     ) {
       throw new Error(
         "Chrome Extension runtime bağlantısı bulunamadı."
@@ -1146,7 +1145,7 @@ const LUCA_PERIOD_MONTHS = {
     }
 
     const response =
-      await chrome.runtime.sendMessage({
+      await sendExtensionMessage({
         type:
           "PENPOS_LUCA_INVOICES",
 
@@ -1591,15 +1590,13 @@ const LUCA_PERIOD_MONTHS = {
     }
   }
 
-  // Luca onay penceresinde onay butonunu tıklar — AMA YALNIZCA
+  // Fatura kaydı ve müşteri işlemlerindeki onay butonunu tıklar — AMA YALNIZCA
   //   * başlık TAM eşleşiyorsa,
   //   * metin şartı varsa TAM eşleşiyorsa,
   //   * onay butonunun metni TAM eşleşiyorsa.
   //
-  // Neden başlık şartı zorunlu: Luca staging listesinde "Gönder",
-  // "Raporla", "Klonla", "Sil", "Fatura Tekrar Gönderimi", "Onay" gibi
-  // pek çok pencerenin onay butonu "Onayla"dır. Sadece buton metnine
-  // bakmak "Sil" onayına basmaya yol açar.
+  // Gönderim bu yardımcıyı kullanmaz; staging listesindeki "Gönder"
+  // düğmesine doğrudan basar ve Luca'nın sonucunu bekler.
   //
   // Dönüş değerleri (çağıran taraf bunları loglar/şartlandırır):
   //   "closed" | "other-popup" | "text-mismatch" | "not-clickable-yet"
@@ -1693,14 +1690,11 @@ const LUCA_PERIOD_MONTHS = {
     return false
   }
 
-  // Gerçek Luca pencereleri (başlık -> onay butonu metni):
+  // Fatura oluşturma ve müşteri akışındaki Luca pencereleri:
   //   "Müşteri Ekleme"        -> "Evet"          (alıcı kaydı)
   //   "Fatura Kaydedilecek"   -> "Evet Kaydedelim !"  (taslak kaydı)
-  //   "Gönder"                -> "Onayla"        (taslak gönderimi)
   //   "Fatura Kaydetme"       -> "OK"            (kaydetme sonucu)
-  //   "Sil" / "Klonla" / "Raporla" / "Fatura Tekrar Gönderimi" -> "Onayla"
-  // Müşteri "Evet" onayı ile fatura "Evet Kaydedelim !" onayı
-  // BAŞLIK + BUTON METNİ ikisinden birlikte ayrılır.
+  // Onay akışları BAŞLIK + BUTON METNİ ile birlikte ayrılır.
   const LUCA_RECIPIENT_CONFIRM_TITLE = "Müşteri Ekleme"
   const LUCA_RECIPIENT_CONFIRM_LABEL = "Evet"
 
@@ -1716,9 +1710,7 @@ const LUCA_PERIOD_MONTHS = {
   // fonksiyon yoksa gerçek element.onclick işleyicisi doğrudan çalıştırılır.
   async function openLucaRecipientForm() {
     if (
-      typeof chrome === "undefined" ||
-      !chrome.runtime ||
-      typeof chrome.runtime.sendMessage !== "function"
+      !isExtensionRuntimeAvailable()
     ) {
       throw new Error(
         "Chrome Extension runtime bağlantısı bulunamadı."
@@ -1726,7 +1718,7 @@ const LUCA_PERIOD_MONTHS = {
     }
 
     const response =
-      await chrome.runtime.sendMessage({
+      await sendExtensionMessage({
         type: "PENPOS_LUCA_OPEN_RECIPIENT_MODAL"
       })
 
@@ -3319,7 +3311,7 @@ const LUCA_PERIOD_MONTHS = {
         // Oluştur!" -> CreateQuick, "Taslaklara git!" -> staging listesi).
         // Bu yüzden HİÇBİR düğmesi tıklanmaz; yalnızca numara okunur ve
         // görev PenPOS'a bildirilir.
-        await chrome.runtime.sendMessage({
+        await sendExtensionMessage({
           type: 'PENPOS_LUCA_CREATE_RESULT',
           jobId: task.jobId,
           resultToken: task.resultToken,
@@ -3457,12 +3449,9 @@ const LUCA_PERIOD_MONTHS = {
   //   .table-header-buttons) durur: "Gönder", "Sil", "Klonla",
   //   "Yazdır(Pdf)", "Aktif Sayfayı Seç", "Tümünü Seç", "Seçimi Kaldır"…
   //
-  //   SendInvoice(dt) / SendArchive(dt) -> swal:
-  //     title   "Gönder"
-  //     text    "Seçili faturaları göndermek istiyor musunuz?"
-  //     confirm "Onayla" / cancel "Hayır"
-  //     AJAX POST SendStagingInvoice { InvoiceId: [IdFatura], IsAllSelected:false }
-  //     -> başarı: swal title "Gönder",
+  //     SendInvoice(dt) / SendArchive(dt) -> AJAX POST
+  //     SendStagingInvoice { InvoiceId: [IdFatura], IsAllSelected:false }
+  //     -> başarı: Luca sonuç penceresi title "Gönder",
   //               text  "Seçili faturalar başarıyla gönderilmiştir."
   //     -> hata  : swal title "Gönder", text = response.error
   //
@@ -3482,38 +3471,16 @@ const LUCA_PERIOD_MONTHS = {
   ]
 
   const LUCA_SEND_CONFIRM_TITLE = 'Gönder'
-  const LUCA_SEND_CONFIRM_LABEL = 'Onayla'
   const LUCA_SEND_CONFIRM_TEXT = 'Seçili faturaları göndermek istiyor musunuz?'
   const LUCA_SEND_SUCCESS_RE = /Seçili\s+faturalar\s+başarıyla\s+gönderilmiştir/i
 
-  // ============================================================
-  // "LUCA TASLAĞI ARTIK YOK" — kalıcı terminal durum
-  // ============================================================
-  //
-  // PenPOS "Faturayı Onayla" dediğinde aranan numara Luca staging listesinde
-  // BULUNAMAZSA bu bir gönderim hatası DEĞİLDİR: Luca'daki taslak kullanıcı
-  // tarafından silinmiş / taşınmıştır. Bu durum:
-  //
-  //   * "gönderilmedi" diye kalıcı BAŞARISIZ sayılmamalı (aksi halde satır
-  //     sonsuza kadar hatalı kalır),
-  //   * "başarılı" sayılmamalı (aksi halde "Faturayı Gör" yanlış açılır),
-  //   * PenPOS'taki invoiceNo + draft/awaiting_approval kilidi TEMİZLENMELİ,
-  //   * satır yeniden "Fatura Kes" durumuna dönmeli.
-  //
-  // Bu yüzden ayrı bir terminal durum tanımlanır: 'draft_missing'.
-  // Backend bu durumu gördüğünde ilgili sourceKey'in fatura kaydını SİLER.
-  const LUCA_DRAFT_MISSING_STATUS = 'draft_missing'
-
-  // Luca staging listesinde numara yoksa bu bir "hata" değil, "Luca taslağı
-  // artık yok" durumudur. Kalıcı bir başarısızlık OLMAYAN bu durum ayrı
-  // işaretlenir; backend bu işaretle satırın taslak kaydını siler ve
-  // "Fatura Kes"e döndürür.
-  function draftMissingError(invoiceNo, pathname) {
+  // Staging listesinde bulunmayan faturanın gönderildiği veya silindiği
+  // varsayılmaz. Retryable hata olarak bırakılır; böylece belirsiz sonuçta
+  // PenPOS taslağı silinip aynı faturanın yeniden kesilmesi engellenir.
+  function sendDraftUnavailableError(invoiceNo, pathname) {
     const error = new Error(
-      `Luca taslak listesinde "${invoiceNo}" numaralı fatura bulunamadı (${pathname}). Luca taslağı artık yok (silinmiş veya taşınmış); fatura gönderilmedi. PenPOS kaydı temizlendi, bu satır için "Fatura Kes" ile yeni taslak oluşturulabilir.`
+      `Luca taslak listesinde "${invoiceNo}" numaralı fatura bulunamadı (${pathname}). Gönderim tekrarlanmadı ve PenPOS kaydı korundu; Luca gönderilenler listesinden doğrulayıp tekrar deneyin.`
     )
-
-    error.lucaDraftMissing = true
 
     return error
   }
@@ -3662,7 +3629,7 @@ const LUCA_PERIOD_MONTHS = {
             error: ''
           })
 
-          await chrome.runtime.sendMessage({
+          await sendExtensionMessage({
             type: 'PENPOS_LUCA_CREATE_RESULT',
             jobId: task.jobId,
             resultToken: task.resultToken,
@@ -3887,7 +3854,7 @@ const LUCA_PERIOD_MONTHS = {
       : LUCA_STAGING_ARCHIVE_URL
   }
 
-  // Toplu gönderimde sayfa geçişi (location.href) content.js bağlamını
+  // Çoklu gönderimde sayfa geçişi (location.href) content.js bağlamını
   // YENİDEN OLUŞTURUR ve görev baştan başlar. Bu yüzden "hangi kalemler
   // raporlandı" bilgisi sayfa geçişini atlatacak şekilde (sessionStorage)
   // saklanır; aksi halde aynı fatura tekrar tekrar işlenirdi.
@@ -3951,9 +3918,19 @@ const LUCA_PERIOD_MONTHS = {
         LUCA_SEND_REPORTED_KEY,
         JSON.stringify({ jobId: String(jobId || ''), records })
       )
+      return true
     } catch (error) {
-      // sessionStorage kapalıysa yalnızca bu sekmede ilerleme kaydı olmaz.
+      console.error('[PenPOS Luca Bridge] Luca gönderim ilerlemesi saklanamadı:', error)
+      return false
     }
+  }
+
+  function upsertLucaSendReported(records, record) {
+    const index = records.findIndex(
+      existing => existing.sourceKey === record.sourceKey
+    )
+    if (index === -1) records.push(record)
+    else records[index] = record
   }
 
   // Raporlanmış sonuçları backend'e TEKRAR gönderir.
@@ -3976,7 +3953,7 @@ const LUCA_PERIOD_MONTHS = {
       replayable.length
     )
 
-    const response = await chrome.runtime.sendMessage({
+    const response = await sendExtensionMessage({
       type: 'PENPOS_LUCA_CREATE_RESULT',
       jobId: task.jobId,
       resultToken: task.resultToken,
@@ -4061,7 +4038,7 @@ const LUCA_PERIOD_MONTHS = {
       replayable.length
     )
 
-    const response = await chrome.runtime.sendMessage({
+    const response = await sendExtensionMessage({
       type: 'PENPOS_LUCA_CREATE_RESULT',
       jobId: task.jobId,
       resultToken: task.resultToken,
@@ -4114,8 +4091,8 @@ const LUCA_PERIOD_MONTHS = {
   // kutuda kalan ESKİ bir numara, sonraki tüm taramalarda listeyi tek
   // faturaya daraltır:
   //   * gerçekte listede olan fatura "bulunamadı" sanılır,
-  //   * 'draft_missing' bildirilir, satır "Fatura Kes"e döner,
-  //   * kullanıcı aynı öğrenci için MÜKERRER taslak keser.
+  //   * gönderim başarısız sayılır,
+  //   * sonuç belirsizleşir ve manuel tekrar deneme gerekir.
   // Tekil onay #FaturaNo'ya yazdığı için kalıcı TEMİZLENMESİ gerekir.
   //
   // Tarih aralığı (#reportrange) da aynı filtre çubuğunda durur ve sunucuya
@@ -4214,9 +4191,8 @@ const LUCA_PERIOD_MONTHS = {
   //   2. BAŞKA hiçbir staging satırı `.selected` TAŞIMAZ (önceki kalemin
   //      seçimi kalmışsa SendInvoice() birden fazla faturayı gönderir ve
   //      başarı yanlış numaraya yazılır).
-  // TOPLU gönderimde TÜM kalemler seçilir; o zaman koşul 2 yerine
-  // "seçili satır sayısı = kalem sayısı" ve "her hedef satır kendi
-  // numarasını içerir" doğrulanır (bkz. sendLucaStagingBatch).
+  // Çoklu işte de kalemler tek tek seçilip gönderilir; önceki seçim
+  // temizlenmeden yeni faturaya geçilmez.
   function lucaStagingRows() {
     const rows = []
 
@@ -4285,8 +4261,7 @@ const LUCA_PERIOD_MONTHS = {
     }
   }
 
-  // TEK bir satırı seçer; DİĞER satırların seçimine dokunmaz (toplu seçim
-  // bunu kullanır). Gerçek kullanıcı tıklaması taklit edilir: ÖNCE satırın
+  // TEK bir satırı seçer; gerçek kullanıcı tıklaması taklit edilir: ÖNCE satırın
   // hücresine tıkla (kullanıcının tıkladığı yer; DataTables Select delege
   // dinleyicisi `td` hedefinde çalışır, doğrudan `tr.click()` bazı Luca
   // tablolarında seçim ÜRETMEZ), SONRA seçim kutusuna tıkla.
@@ -4372,10 +4347,8 @@ const LUCA_PERIOD_MONTHS = {
     return null
   }
 
-  // Gönderim penceresinin durumunu GERÇEK DOM'dan okur.
-  // "Gönder" başlıklı üç farklı pencere vardır ve hepsinin onay butonu
-  // "Onayla"dır; bu yüzden metin ayrımı şarttır:
-  //   soru metni  -> hâlâ onay bekliyor / gönderiliyor
+  // Gönderim sonucunu Luca'nın sonuç penceresinden okur.
+  //   soru metni  -> beklenmeyen onay penceresi; otomatik onay verilmez
   //   başarı     -> "Seçili faturalar başarıyla gönderilmiştir."
   //   diğer      -> response.error (gerçek Luca hatası)
   function readLucaSendResult() {
@@ -4408,7 +4381,7 @@ const LUCA_PERIOD_MONTHS = {
   }
 
   // Tüm staging listesini TEK sayfaya getirir (sayfalama sıfırlanır, arama
-  // temizlenir). Toplu onayda kalemler 2. sayfada kalıp "bulunamadı"
+  // temizlenir). Çoklu gönderimde kalemler 2. sayfada kalıp "bulunamadı"
   // sanılmasın diye gereklidir.
   async function showAllLucaStagingRows() {
     await sendResetPaging({
@@ -4465,8 +4438,7 @@ const LUCA_PERIOD_MONTHS = {
   //      Sunucu tarafı filtreler (#FaturaNo'da unutulmuş bir numara,
   //      #reportrange tarih aralığı) listeyi daraltıp HEDEF SATIRI
   //      gizleyebilir. Fatura listede dururken "bulunamadı" denirse
-  //      'draft_missing' bildirilir, PenPOS kaydı silinir ve kullanıcı
-  //      MÜKERRER taslak keser. Bu yüzden filtre önce temizlenir, liste
+  //      gönderim başarısız sayılır. Bu yüzden filtre önce temizlenir, liste
   //      tek sayfaya getirilir ve satır numaradan okunur.
   //   2) NUMARA FİLTRESİ: yalnızca 1) yetmediğinde, Luca'nın kendi
   //      sunucu tarafı daraltması son çare olarak denenir.
@@ -4503,8 +4475,8 @@ const LUCA_PERIOD_MONTHS = {
     return null
   }
 
-  // TOPLU ONAY yolu: numara ile sunucu tarafı arama YAPILMAZ (yukarıda
-  // açıklandığı gibi filtre biçim farklarına duyarlıdır).
+  // Çoklu görevde numara ile sunucu tarafı arama YAPILMAZ (filtre biçim
+  // farklarına duyarlıdır); her fatura listede ayrı ayrı bulunur.
   async function findLucaStagingRowInList(invoiceNo, attempts = 20) {
     if (attempts === 20) {
       await showAllLucaStagingRows()
@@ -4525,75 +4497,41 @@ const LUCA_PERIOD_MONTHS = {
     return null
   }
 
-  // "Gönder" -> "Onayla" adımları TEK ve TEK kalemde de, toplu gönderimde de
-  // aynıdır; ortaklaştırılır.
-  //
-  // Önceki kalemin "Gönder" SONUÇ penceresi açık kalmış olabilir
-  // (closeOnConfirm:false + DataTables tablosu yeniden kurulurken 500 ms
-  // beklenir). Açık pencere "Gönder" düğmesinin çalışmasını engeller; bu
-  // yüzden ÖNCE kapatılır.
-  //
+  // Açık bir önceki sonuç penceresi "Gönder" düğmesini engelleyebilir;
+  // yeni işlemden önce kapatılır.
   // DİKKAT: Lucada #th-buttons tablonun <tfoot>'i içindedir ve
   // stagingTable.destroy() ile SİLİNİR. Bu yüzden "Gönder" düğmesi her
   // gönderim için YENİDEN sorgulanır.
-  async function clickLucaSendAndConfirm(invoiceNo = '') {
-    await closeLucaResultSwal(LUCA_SEND_CONFIRM_TITLE)
+  async function clickLucaSend(invoiceNo = '') {
+    const previousResult = readLucaSendResult()
+    if (previousResult.state === 'success') {
+      await closeLucaResultSwal(LUCA_SEND_CONFIRM_TITLE)
+    } else if (previousResult.state !== 'none') {
+      throw new Error(
+        `Luca'da önceki gönderim penceresi açık (${previousResult.message || previousResult.state}); otomatik onay verilmedi.`
+      )
+    }
 
     const sendButton = findLucaStagingButton('Gönder')
 
     if (!sendButton) {
       throw new Error(
-        'Luca taslak listesinde "Gönder" düğmesi bulunamadı; gönderim yapılmadı.'
+        `Luca taslak listesinde "Gönder" düğmesi bulunamadı${invoiceNo ? `; "${invoiceNo}" gönderilmedi` : ''}.`
       )
     }
 
     sendButton.click()
-
-    // "Gönder" onay penceresi: başlık "Gönder" + soru metni + "Onayla".
-    // handle-click, "visible" class'ı gelene kadar onayı ÇALIŞTIRMAZ; bu
-    // yüzden "not-clickable-yet" normaldir, hemen hata verilmez.
-    let confirmOutcome = ''
-    let foreignPopupCount = 0
-    for (let attempt = 0; attempt < 80; attempt += 1) {
-      confirmOutcome = confirmLucaSwal(
-        LUCA_SEND_CONFIRM_TITLE,
-        LUCA_SEND_CONFIRM_LABEL,
-        { text: LUCA_SEND_CONFIRM_TEXT }
-      )
-
-      if (confirmOutcome === 'confirmed') break
-
-      // "Gönder" olmayan bir pencere (Sil / Klonla / Raporla / Fatura Tekrar
-      // Gönderimi) kalıcı olarak ekranda kaldıysa gönderim yapılamaz.
-      if (confirmOutcome === 'other-popup' || confirmOutcome === 'text-mismatch') {
-        foreignPopupCount += 1
-        if (foreignPopupCount >= 4) break
-      } else {
-        foreignPopupCount = 0
-      }
-
-      await sleep(250)
-    }
-
-    if (confirmOutcome !== 'confirmed') {
-      const swal = readLucaSwal()
-      const suffix = invoiceNo ? `; "${invoiceNo}" gönderilmedi.` : '.'
-
-      throw new Error(
-        `Luca gönderim onayı verilemedi (${confirmOutcome || 'pencere bulunamadı'}${swal?.open && swal.title ? `; ekrandaki pencere "${swal.title}"` : ''})${suffix}`
-      )
-    }
   }
 
   // Tek bir taslağı Luca'nın kendi akışıyla gönderir:
-  //   filtre -> satırı SEÇ -> "Gönder" -> "Onayla" -> sonucu bekle
+  //   filtre -> satırı SEÇ -> "Gönder" -> sonucu bekle
   // Herhangi bir adım doğrulanamazsa hata fırlatır (sessizce "başarılı"
   // sayılmaz); çağıran taraf bu faturayı "failed" olarak işaretler.
   // Sayfa geçişi (location.href) burada YAPILMAZ: bağlamı yok eder ve görevi
   // baştan başlatır. Sayfa hazırlığını runSendTask yapar.
   async function sendSingleLucaStagingInvoice(item, options = {}) {
-    // bulk: true  -> numara ile sunucu tarafı arama YAPILMAZ, liste taranır.
-    // bulk: false -> numara yazılıp "Ara"ya basılır (tekil onay).
+    // bulk: true  -> listede numara taranır (çoklu görev).
+    // bulk: false -> numara yazılıp "Ara"ya basılır (tekil görev).
     const bulk = options.bulk === true
 
     const invoiceNo = String(item.invoiceNo || item.no || '').trim()
@@ -4613,10 +4551,10 @@ const LUCA_PERIOD_MONTHS = {
       : await findLucaStagingRowWithFilter(invoiceNo)
 
     if (!row) {
-      // Kalıcı hata DEĞİL: Luca taslağı artık yok. 'draft_missing' ile
-      // bildirilir; backend satırın taslak kaydını temizleyip "Fatura Kes"e
-      // döndürür. Yeniden denemek için aynı numarayı beklemek anlamsızdır.
-      throw draftMissingError(invoiceNo, location.pathname)
+      // Durum belirsizdir: taslak silinmiş olabilir ya da gönderim sonucu
+      // daha önce PenPOS'a ulaşmamış olabilir. Retryable hata kullanılır;
+      // başarılı/başarısız gönderim teyit edilmeden kayıt temizlenmez.
+      throw sendDraftUnavailableError(invoiceNo, location.pathname)
     }
 
     // ÖNEMLİ: SendInvoice() yalnızca SEÇİLİ satırları gönderir. Gönder'e
@@ -4628,7 +4566,7 @@ const LUCA_PERIOD_MONTHS = {
       )
     }
 
-    await clickLucaSendAndConfirm(invoiceNo)
+    await clickLucaSend(invoiceNo)
 
     // Sonuç penceresi: "Seçili faturalar başarıyla gönderilmiştir." / hata metni
     for (let attempt = 0; attempt < 90; attempt += 1) {
@@ -4649,6 +4587,12 @@ const LUCA_PERIOD_MONTHS = {
         )
       }
 
+      if (result.state === 'confirming') {
+        throw new Error(
+          `Luca "${invoiceNo}" gönderimi için beklenmeyen bir onay penceresi açtı; otomatik onay verilmedi.`
+        )
+      }
+
       if (result.state === 'other-popup') {
         throw new Error(
           `Luca gönderim sonucu okunamadı (${result.message || 'pencere başlığı eşleşmedi'}).`
@@ -4663,126 +4607,9 @@ const LUCA_PERIOD_MONTHS = {
     )
   }
 
-  // TOPLU GÖNDERİM hazırlığı: kalemlerin satırlarını ÖNceden bulur.
-  //
-  // Listedeki KALAN sunucu filtreleri (örn. #FaturaNo'da unutulmuş bir eski
-  // numara) tüm listeyi tek faturaya daraltabilir; bu yüzden önce tüm liste
-  // tek sayfaya getirilir VE filtreler temizlenir (bkz.
-  // showAllLucaStagingRows / clearLucaStagingFilters).
-  async function planLucaStagingBatch(items) {
-    await showAllLucaStagingRows()
-    // Sunucudan dönen satırların DOM'a yerleşmesi için kısa bekleme.
-    await sleep(800)
-
-    const targets = []
-    const missing = []
-
-    for (const item of items) {
-      const invoiceNo = String(item.invoiceNo || item.no || '').trim()
-
-      if (!invoiceNo) {
-        missing.push(String(item.sourceKey || '(numarasız)'))
-        continue
-      }
-
-      let row = null
-
-      // Aynı listede birden çok kez taranır: liste geç yüklenmişse ilk
-      // taramada satır yoktur.
-      for (let attempt = 0; attempt < 20 && !row; attempt += 1) {
-        row = findLucaStagingRow(invoiceNo)
-
-        if (!row) await sleep(400)
-      }
-
-      if (!row) {
-        missing.push(invoiceNo)
-        continue
-      }
-
-      targets.push({ item, invoiceNo, row })
-    }
-
-    return { targets, missing }
-  }
-
-  // TOPLU GÖNDERİM: TÜM kalemler TEK "Gönder" tıklamasıyla gönderilir.
-  //
-  // Neden: kalem başına ayrı gönderimde her turda tablo yeniden kurulur,
-  // seçim temizlenir, Gönder/Onayla penceresi beklenir; beş fatura dakikalar
-  // sürer ve kullanıcı akışın takıldığını sanır. Luca'nın kendi
-  // SendInvoice() birden çok seçili satırı destekler ("Seçili faturalar
-  // başarıyla gönderilmiştir.").
-  //
-  // Güvenlik: seçim GÖNDERİMDEN ÖNCE doğrulanır (sayı EŞİT olmalı, her
-  // hedef satır seçili olmalı). Doğrulama başarısızsa HİÇBİR şey
-  // gönderilmez ve çağıran taraf kalemleri tek tek denemeye döner.
-  async function sendLucaStagingBatch(targets) {
-    if (!targets.length) {
-      throw new Error('Luca taslak listesinde gönderilebilir fatura bulunamadı.')
-    }
-
-    await clearAllLucaStagingSelection()
-
-    for (const target of targets) {
-      if (!(await markLucaStagingRowSelected(target.row, target.invoiceNo))) {
-        throw new Error(
-          `Luca taslak listesinde "${target.invoiceNo}" satırı seçilemedi; toplu gönderim yapılmadı.`
-        )
-      }
-    }
-
-    // Seçim DOĞRULANIR: hedef sayısı kadar satır seçili olmalı. Fazlası
-    // (ya da eksiği) yanlış faturanın gönderilmesi demektir.
-    const selectedRows = lucaStagingRows().filter(lucaStagingRowIsSelected)
-
-    if (selectedRows.length !== targets.length) {
-      throw new Error(
-        `Luca'da ${targets.length} fatura seçilmesi gerekirken ${selectedRows.length} satır seçili kaldı; toplu gönderim yapılmadı.`
-      )
-    }
-
-    for (const target of targets) {
-      if (!selectedRows.includes(target.row)) {
-        throw new Error(
-          `"${target.invoiceNo}" satırı seçilemedi; toplu gönderim yapılmadı.`
-        )
-      }
-    }
-
-    await clickLucaSendAndConfirm()
-
-    // Sonuç penceresi topludur: TÜM kalemler aynı sonucu paylaşır.
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      const result = readLucaSendResult()
-
-      if (result.state === 'success') {
-        await closeLucaResultSwal(LUCA_SEND_CONFIRM_TITLE)
-
-        return targets.map(target => target.invoiceNo)
-      }
-
-      if (result.state === 'error') {
-        throw new Error(`Luca toplu gönderimini reddetti: ${result.message}`)
-      }
-
-      if (result.state === 'other-popup') {
-        throw new Error(
-          `Luca gönderim sonucunu okunamadı (${result.message || 'pencere başlığı eşleşmedi'}).`
-        )
-      }
-
-      await sleep(500)
-    }
-
-    throw new Error(
-      'Luca toplu gönderim sonucunu bildirmedi; faturalar gönderilmiş sayılmadı.'
-    )
-  }
-
   // FATURAYI ONAYLA / TOPLU FATURA ONAYLA
-  // TEK onayda bir fatura, TOPLU onayda seçili bulunan faturalar tek
-  // "Gönder" çağrısıyla işlenir. Başarısız olan "sent" YAZILMAZ.
+  // Her fatura Luca'da ayrı gönderilir ve sonucu ayrı raporlanır.
+  // Başarısız olan "sent" YAZILMAZ.
   async function runSendTask(task) {
     const items = Array.isArray(task.items) ? task.items : []
 
@@ -4794,6 +4621,37 @@ const LUCA_PERIOD_MONTHS = {
     // sessionStorage'dan okunup atlanır (aksi halde aynı fatura tekrar
     // işlenir ve akış sonsuza kadar sürerdi).
     const reported = readLucaSendReported(task.jobId)
+
+    for (const interrupted of reported.filter(record =>
+      ['sending', 'sent_pending'].includes(record.status)
+    )) {
+      const error =
+        'Extension görevi gönderim sonucu alınmadan kesildi. Mükerrer gönderimi önlemek için fatura yeniden gönderilmedi; Luca gönderilenler listesini kontrol edip tekrar deneyin.'
+      const response = await sendExtensionMessage({
+        type: 'PENPOS_LUCA_CREATE_RESULT',
+        jobId: task.jobId,
+        resultToken: task.resultToken,
+        results: [{
+          sourceKey: interrupted.sourceKey,
+          status: 'failed',
+          error
+        }]
+      })
+      if (!response?.ok) {
+        throw new Error(response?.error || 'Kesilen Luca gönderim sonucu backend sistemine kaydedilemedi.')
+      }
+
+      upsertLucaSendReported(reported, {
+        sourceKey: interrupted.sourceKey,
+        status: 'failed',
+        invoiceNo: '',
+        error
+      })
+      if (!writeLucaSendReported(task.jobId, reported)) {
+        throw new Error('Kesilen Luca gönderim ilerlemesi tarayıcıya kaydedilemedi.')
+      }
+    }
+
     const reportedKeys = new Set(reported.map(record => record.sourceKey))
     const pending = items.filter(
       item => !reportedKeys.has(String(item.sourceKey || '').trim())
@@ -4818,145 +4676,60 @@ const LUCA_PERIOD_MONTHS = {
     }
 
     const failures = []
-    const draftsMissing = []
-
-    // TEKİL onayda numara ile sunucu tarafı arama yapılır (kesin sonuç).
-    // TOPLU onayda yapılmaz: her kalem için ayrı filtre sorgusu hem yavaştır
-    // hem de biçim farkına duyarlıdır — mevcut arşiv taslağı "bulunamadı"
-    // sanılıp satır "Fatura Kes"e döner ve MÜKERRER taslak kesilir. Toplu
-    // onayda liste tek sayfaya getirilip satır numaradan okunur.
-    const bulk = pending.length > 1
-
-    // Toplu onayda bulunan satırlar TEK bir gönderimde işlenir. Eksik satır
-    // ve toplu işlem hataları raporlanır; hiçbir zaman tekli gönderime düşmez.
-    const sentByBatch = new Set()
-    const failedByBatch = new Map()
-
-    if (bulk) {
-      let batch = null
-      try {
-        batch = await planLucaStagingBatch(pending)
-      } catch (error) {
-        const message = error?.message || 'Luca toplu taslak listesi okunamadı.'
-        for (const item of pending) failedByBatch.set(item.sourceKey, message)
-      }
-
-      if (batch) {
-        const foundKeys = new Set(batch.targets.map(target => target.item.sourceKey))
-        for (const item of pending) {
-          if (foundKeys.has(item.sourceKey)) continue
-          const invoiceNo = String(item.invoiceNo || item.no || '').trim()
-          const message = invoiceNo
-            ? `Luca taslak listesinde "${invoiceNo}" bulunamadı; toplu gönderime alınmadı.`
-            : 'Onaylanacak taslağın fatura numarası bulunamadı; toplu gönderime alınmadı.'
-          failedByBatch.set(item.sourceKey, message)
-          console.warn('[PenPOS Luca Bridge] Toplu onay için Luca taslağı bulunamadı:', message)
-        }
-
-        if (batch.targets.length) {
-          try {
-          await sendLucaStagingBatch(batch.targets)
-
-          for (const target of batch.targets) {
-            sentByBatch.add(target.item.sourceKey)
-          }
-
-          console.log(
-            '[PenPOS Luca Bridge] Toplu gönderim tamamlandı:',
-            batch.targets.length,
-            'fatura'
-          )
-          } catch (error) {
-            const message = error?.message || 'Luca toplu gönderimi başarısız.'
-            for (const target of batch.targets) {
-              failedByBatch.set(target.item.sourceKey, message)
-            }
-            console.warn('[PenPOS Luca Bridge] Toplu gönderim başarısız:', message)
-          }
-        }
-      }
-    }
+    const bulkLookup = pending.length > 1
 
     for (const item of pending) {
       let result
       let record
 
-      if (sentByBatch.has(item.sourceKey)) {
-        // Toplu gönderimde bu kalem zaten gönderildi; tek tek denemeye
-        // GİRİLMEZ (aksi halde Luca'da taslak kalmadığı için "draft_missing"
-        // sanılır ve kullanıcı mükerrer taslak keserdi).
+      try {
+        await task.assertCanContinue?.()
         const invoiceNo = String(item.invoiceNo || item.no || '').trim()
+        upsertLucaSendReported(reported, {
+          sourceKey: item.sourceKey,
+          status: 'sending',
+          invoiceNo,
+          error: ''
+        })
+        if (!writeLucaSendReported(task.jobId, reported)) {
+          throw new Error(
+            'Gönderim öncesi güvenlik kaydı saklanamadı; fatura gönderilmedi.'
+          )
+        }
 
-        result = { ...item, status: 'sent', invoiceNo }
-        record = { sourceKey: item.sourceKey, status: 'sent', invoiceNo, error: '' }
-      } else if (bulk) {
-        const message = failedByBatch.get(item.sourceKey) || 'Luca toplu onay sonucu alınamadı.'
-        const { invoiceNo: _ignoredInvoiceNo, ...rest } = item
+        const sentInvoiceNo = await sendSingleLucaStagingInvoice(item, {
+          bulk: bulkLookup
+        })
+        result = { ...item, status: 'sent', invoiceNo: sentInvoiceNo }
+        record = { sourceKey: item.sourceKey, status: 'sent', invoiceNo: sentInvoiceNo, error: '' }
+        console.log('[PenPOS Luca Bridge] Luca taslağı gönderildi:', sentInvoiceNo)
+      } catch (error) {
+        const message = error?.message || 'Luca gönderimi başarısız.'
+        const rest = { ...item }
+        delete rest.invoiceNo
+
         result = { ...rest, status: 'failed', error: message }
         record = { sourceKey: item.sourceKey, status: 'failed', invoiceNo: '', error: message }
         failures.push(message)
-        console.warn('[PenPOS Luca Bridge] Luca toplu onay satırı başarısız:', message)
-      } else {
-        try {
-          const invoiceNo = await sendSingleLucaStagingInvoice(item, { bulk })
-          result = { ...item, status: 'sent', invoiceNo }
-          record = { sourceKey: item.sourceKey, status: 'sent', invoiceNo, error: '' }
-          console.log(
-            '[PenPOS Luca Bridge] Luca taslağı gönderildi:',
-            invoiceNo
-          )
-        } catch (error) {
-          const message = error?.message || 'Luca gönderimi başarısız.'
-          // invoiceNo BİLEREK gönderilmez: başarısız gönderimde numara
-          // "gönderilmiş" anlamına gelmez, satır yeniden denenebilir kalmalıdır.
-          // (Backend de failed/cancelled sonuçlarda fatura bilgisi yazmaz.)
-          const { invoiceNo: _ignoredInvoiceNo, ...rest } = item
-
-          if (error?.lucaDraftMissing) {
-            // Luca taslağı artık yok -> kalıcı terminal durum. Backend satırın
-            // taslak kaydını siler, satır yeniden "Fatura Kes"e döner.
-            result = {
-              ...rest,
-              status: LUCA_DRAFT_MISSING_STATUS,
-              error: message
-            }
-            record = {
-              sourceKey: item.sourceKey,
-              status: LUCA_DRAFT_MISSING_STATUS,
-              invoiceNo: '',
-              error: message
-            }
-            draftsMissing.push(message)
-            console.warn(
-              '[PenPOS Luca Bridge] Luca taslağı artık yok, satır "Fatura Kes"e döndürülüyor:',
-              _ignoredInvoiceNo
-            )
-          } else {
-            result = { ...rest, status: 'failed', error: message }
-            record = { sourceKey: item.sourceKey, status: 'failed', invoiceNo: '', error: message }
-            failures.push(message)
-            console.warn('[PenPOS Luca Bridge] Luca gönderimi başarısız:', message)
-          }
-        }
+        console.warn('[PenPOS Luca Bridge] Luca gönderimi başarısız:', message)
       }
 
-      await chrome.runtime.sendMessage({
+      const response = await sendExtensionMessage({
         type: 'PENPOS_LUCA_CREATE_RESULT',
         jobId: task.jobId,
         resultToken: task.resultToken,
         results: [result]
       })
+      if (!response?.ok) {
+        throw new Error(
+          response?.error || `Luca "${item.invoiceNo || item.no || ''}" sonucu backend'e kaydedilemedi.`
+        )
+      }
 
-      reported.push(record)
-      writeLucaSendReported(task.jobId, reported)
-    }
-
-    // Kullanıcıya iki AYRI mesaj verilir: "Luca taslağı yok" kalıcıdır ve
-    // "Fatura Kes" gerektirir; gönderim hatası ise yeniden denenebilirdir.
-    if (draftsMissing.length) {
-      throw new Error(
-        `${draftsMissing.length}/${pending.length} Luca taslağı artık yok (silinmiş veya taşınmış). Bu faturalar için PenPOS'ta "Fatura Kes" ile yeni taslak oluşturulmalı. Detay: ${draftsMissing.join(' | ')}`
-      )
+      upsertLucaSendReported(reported, record)
+      if (!writeLucaSendReported(task.jobId, reported)) {
+        throw new Error('Luca gönderim sonucu tarayıcıya kaydedilemedi.')
+      }
     }
 
     if (failures.length) {
@@ -4987,7 +4760,60 @@ const LUCA_PERIOD_MONTHS = {
       "[PenPOS Luca Bridge] Luca görevi başladı."
     )
 
+    let invoiceHeartbeatTimer = null
+    let sendInvoiceHeartbeat = null
+    let invoiceTaskActive = true
+    if (['create', 'send'].includes(task.kind) && task.resultToken) {
+      sendInvoiceHeartbeat = async ({ required = false } = {}) => {
+        try {
+          if (!isExtensionRuntimeAvailable()) {
+            throw new Error(
+              'Chrome Extension bağlantısı artık etkin değil. Luca sekmesini yenileyip görevi yeniden başlatın.'
+            )
+          }
+
+          const response = await sendExtensionMessage({
+            type: 'PENPOS_LUCA_ACTIVITY',
+            jobId: task.jobId,
+            resultToken: task.resultToken
+          })
+          if (!response?.ok) {
+            throw new Error(
+              response?.error || 'Luca görev heartbeat alınmadı.'
+            )
+          }
+
+          return true
+        } catch (error) {
+          invoiceTaskActive = false
+          if (required) throw error
+          console.warn(
+            '[PenPOS Luca Bridge] Luca görev heartbeat gönderilemedi:',
+            error?.message || error
+          )
+          return false
+        }
+      }
+
+      task.assertCanContinue = async () => {
+        if (!invoiceTaskActive) {
+          throw new Error(
+            'Luca görev bağlantısı koptu; tekrar gönderim yapılmadı. Extension bağlantısını yenileyip görevi tekrar başlatın.'
+          )
+        }
+        await sendInvoiceHeartbeat({ required: true })
+      }
+    }
+
     try {
+      if (sendInvoiceHeartbeat) {
+        await sendInvoiceHeartbeat({ required: true })
+        invoiceHeartbeatTimer = window.setInterval(
+          () => { void sendInvoiceHeartbeat() },
+          30_000
+        )
+      }
+
       // manifest \"document_start\" ile enjekte edilse bile DOM hazır olmadan
       // hiçbir selector bulunamaz; önce DOM'un hazır olmasını bekle.
       await waitForDomReady()
@@ -5062,9 +4888,9 @@ const LUCA_PERIOD_MONTHS = {
 
       try {
         if (
-          chrome?.runtime?.sendMessage
+          isExtensionRuntimeAvailable()
         ) {
-          await chrome.runtime.sendMessage({
+          await sendExtensionMessage({
             type:
               "PENPOS_LUCA_ERROR",
 
@@ -5081,6 +4907,10 @@ const LUCA_PERIOD_MONTHS = {
           "[PenPOS Luca Bridge] Hata mesajı background'a gönderilemedi:",
           messageError
         )
+      }
+    } finally {
+      if (invoiceHeartbeatTimer !== null) {
+        window.clearInterval(invoiceHeartbeatTimer)
       }
     }
   }
@@ -5151,7 +4981,7 @@ const LUCA_PERIOD_MONTHS = {
       }
 
       if (
-        !chrome?.runtime?.sendMessage
+        !isExtensionRuntimeAvailable()
       ) {
         console.error(
           "[PenPOS Luca Bridge] Chrome runtime mevcut değil."
@@ -5176,8 +5006,7 @@ const LUCA_PERIOD_MONTHS = {
         )
       }, 15000)
 
-      chrome.runtime
-        .sendMessage({
+      sendExtensionMessage({
           type: data.type,
 
           jobId:
@@ -5231,7 +5060,7 @@ const LUCA_PERIOD_MONTHS = {
     )
 
     if (
-      !chrome?.runtime?.sendMessage
+      !isExtensionRuntimeAvailable()
     ) {
       console.error(
         "[PenPOS Luca Bridge] Chrome runtime bağlantısı bulunamadı."
@@ -5240,8 +5069,7 @@ const LUCA_PERIOD_MONTHS = {
       return
     }
 
-    chrome.runtime
-      .sendMessage({
+    sendExtensionMessage({
         type:
           "PENPOS_LUCA_READY"
       })

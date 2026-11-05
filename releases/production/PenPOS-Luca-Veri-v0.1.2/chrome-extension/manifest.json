@@ -1,7 +1,7 @@
 ﻿{
   "manifest_version": 3,
   "name": "PenPOS Luca Veri",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "PenPOS ile Luca arasında güvenli Chrome bağlantısı.",
   "permissions": [
     "storage",
@@ -10,9 +10,7 @@
   ],
   "host_permissions": [
     "https://turmobefatura.luca.com.tr/*",
-    "https://penpos.cloud/*",
-    "http://localhost:5173/*",
-    "http://localhost:4000/*"
+    "https://penpos.cloud/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -24,13 +22,13 @@
     {
       "matches": [
         "https://turmobefatura.luca.com.tr/*",
-        "https://penpos.cloud/*",
-        "http://localhost:5173/*"
+        "https://penpos.cloud/*"
       ],
       "js": [
+        "lucaExtensionMessaging.js",
         "content.js"
       ],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ]
 }

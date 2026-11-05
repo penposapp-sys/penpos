@@ -8,6 +8,8 @@ const activeTaskSecrets = new Map();
 const claimInFlight = new Map();
 let devicePollingStarted = false;
 
+importScripts("lucaTaskLifecycle.js");
+
 async function getApiBase() {
   return DEFAULT_API_BASE;
 }
@@ -111,7 +113,7 @@ async function releaseLucaTaskLock(jobId, reason) {
   const current = await getPendingTask();
   if (!current) return false;
   const wanted = String(jobId || "").trim();
-  if (wanted && String(current.jobId || "") !== wanted) {
+  if (!lucaTaskLockMatches(current, wanted)) {
     console.warn(
       "[PenPOS Luca Bridge] Kilit başka bir göreve ait, dokunulmadı:",
       wanted,
@@ -395,6 +397,49 @@ async function claimTaskOnce(task) {
   }
 }
 
+async function claimInvoiceCreateTaskOnce(task) {
+  const jobId = String(task?.jobId || "").trim();
+  if (!jobId) throw new Error("Luca jobId bulunamadı.");
+
+  const existing = claimInFlight.get(jobId);
+  if (existing) return existing;
+
+  const claimPromise = (async () => {
+    const result = await claimInvoiceCreateTask(task.jobId, task.extensionToken);
+    const items = Array.isArray(result.items) ? result.items : [];
+    const taskPeriod = getLucaInvoiceTaskPeriod(
+      { ...result, items },
+      task.kind
+    );
+    const lucaTask = {
+      jobId: result.jobId,
+      kind: task.kind === "send" ? "send" : "create",
+      period: taskPeriod,
+      resultToken: result.resultToken,
+      items,
+      deviceBound: true
+    };
+    await setTaskSecret(task.jobId, { tckn: result.tckn, password: result.password });
+    await setPendingTask({
+      ...task,
+      stage: "claimed",
+      lucaTask,
+      claimedAt: Date.now(),
+      heartbeatAt: Date.now()
+    });
+    return { ...lucaTask, tckn: result.tckn, password: result.password };
+  })();
+
+  claimInFlight.set(jobId, claimPromise);
+  try {
+    return await claimPromise;
+  } finally {
+    if (claimInFlight.get(jobId) === claimPromise) {
+      claimInFlight.delete(jobId);
+    }
+  }
+}
+
 async function submitInvoices(jobId, resultToken, invoices) {
   const device = await getDevice();
   const apiBase = getDeviceApiBase(device);
@@ -448,6 +493,23 @@ async function submitInvoiceCreateResult(jobId, resultToken, results) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data?.ok) throw new Error(data?.error || `Luca fatura sonucu kaydedilemedi (${response.status})`);
+  return data;
+}
+
+async function heartbeatInvoiceCreateTask(jobId, resultToken) {
+  const device = await getDevice();
+  const apiBase = getDeviceApiBase(device);
+  const response = await fetch(`${apiBase}/api/anaokulu/luca-create/jobs/${encodeURIComponent(jobId)}/heartbeat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resultToken })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.ok) {
+    const error = new Error(data?.error || `Luca heartbeat başarısız (${response.status})`);
+    if (response.status === 409) error.code = "LUCA_TASK_EXPIRED";
+    throw error;
+  }
   return data;
 }
 
@@ -1006,6 +1068,8 @@ chrome.runtime.onMessage.addListener(
       "PENPOS_LUCA_READY"
     ) {
       (async () => {
+        let task = null;
+        let taskTabMatches = false;
         try {
           const tabId =
             sender?.tab?.id;
@@ -1016,8 +1080,7 @@ chrome.runtime.onMessage.addListener(
             );
           }
 
-          const task =
-            await getPendingTask();
+          task = await getPendingTask();
 
           if (!task) {
             throw new Error(
@@ -1033,6 +1096,8 @@ chrome.runtime.onMessage.addListener(
               "Bu Luca sekmesi mevcut görevle eşleşmiyor."
             );
           }
+
+          taskTabMatches = true;
 
           // Sahip sekme konuştu: kilit canlı.
           await touchPendingTask(task.jobId);
@@ -1061,23 +1126,7 @@ chrome.runtime.onMessage.addListener(
           }
 
           const claimed = ["create", "send"].includes(task.kind)
-            ? await (async () => {
-                const result = await claimInvoiceCreateTask(task.jobId, task.extensionToken);
-                const lucaTask = {
-                  jobId: result.jobId,
-                  // Görev türü background'a GİRDİĞİ GİBİ taşınmalı.
-                  // Sabit "create" yazılırsa PENPOS_LUCA_SEND_START görevleri
-                  // content.js'te runSendTask yerine runCreateTask çalıştırır
-                  // ve gönderim yerine yeniden taslak kesmeye çalışır.
-                  kind: task.kind === "send" ? "send" : "create",
-                  resultToken: result.resultToken,
-                  items: result.items || [],
-                  deviceBound: true
-                };
-                await setTaskSecret(task.jobId, { tckn: result.tckn, password: result.password });
-                await setPendingTask({ ...task, stage: "claimed", lucaTask, claimedAt: Date.now(), heartbeatAt: Date.now() });
-                return { ...lucaTask, tckn: result.tckn, password: result.password };
-              })()
+            ? await claimInvoiceCreateTaskOnce(task)
             : await claimTaskOnce(task);
 
           sendResponse({
@@ -1102,6 +1151,14 @@ chrome.runtime.onMessage.addListener(
             err
           );
 
+          if (shouldReleaseLucaTaskLockAfterClaimFailure(task, taskTabMatches)) {
+            try {
+              await releaseLucaTaskLock(task.jobId, `görev claim edilemedi: ${err?.message || err}`);
+            } catch (releaseError) {
+              console.error("[PenPOS Luca Bridge] Claim hatası sonrası görev kilidi bırakılamadı:", releaseError);
+            }
+          }
+
           sendResponse({
             ok: false,
             error:
@@ -1111,6 +1168,45 @@ chrome.runtime.onMessage.addListener(
         }
       })();
 
+      return true;
+    }
+
+    if (message?.type === "PENPOS_LUCA_ACTIVITY") {
+      (async () => {
+        let task = null;
+        try {
+          task = await getPendingTask();
+          const messageJobId = String(message.jobId || "").trim();
+          if (
+            !task ||
+            !["create", "send"].includes(task.kind) ||
+            messageJobId !== String(task.jobId || "")
+          ) {
+            throw new Error("Heartbeat mevcut Luca fatura göreviyle eşleşmiyor.");
+          }
+
+          const resultToken = String(
+            message.resultToken || task.lucaTask?.resultToken || ""
+          ).trim();
+          if (!resultToken) throw new Error("Luca görev heartbeat anahtarı bulunamadı.");
+
+          await heartbeatInvoiceCreateTask(task.jobId, resultToken);
+          await touchPendingTask(task.jobId);
+          sendResponse({ ok: true, jobId: task.jobId });
+        } catch (err) {
+          if (err?.code === "LUCA_TASK_EXPIRED" && task) {
+            try {
+              await releaseLucaTaskLock(task.jobId, "backend Luca görevi sona erdi");
+            } catch (releaseError) {
+              console.error("[PenPOS Luca Bridge] Süresi dolan görev kilidi bırakılamadı:", releaseError);
+            }
+          }
+          sendResponse({
+            ok: false,
+            error: err?.message || "Luca görev heartbeat gönderilemedi."
+          });
+        }
+      })();
       return true;
     }
 

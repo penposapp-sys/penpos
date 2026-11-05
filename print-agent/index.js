@@ -10,7 +10,7 @@ import { resolveWindowsPrinterName } from './printerName.js'
 import { decodeRawPayload } from './rawPayload.js'
 import { getTsplLabelText } from './labelPayload.js'
 
-const AGENT_VERSION = '0.1.12'
+const AGENT_VERSION = '0.1.20'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const readJson = async (p) => {

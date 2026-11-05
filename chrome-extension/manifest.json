@@ -28,6 +28,7 @@
         "http://localhost:5173/*"
       ],
       "js": [
+        "lucaExtensionMessaging.js",
         "content.js"
       ],
       "run_at": "document_idle"
