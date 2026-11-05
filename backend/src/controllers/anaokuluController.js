@@ -4,9 +4,14 @@ import LucaJob from '../models/LucaJob.js'
 import { findLucaDeviceByToken, getLucaDeviceToken, hashLucaDeviceToken } from '../middlewares/requireLucaDevice.js'
 import { renderAnaokuluInvoicePdf } from '../services/anaokuluInvoicePdfService.js'
 import { getPlanGrossTotal, getPlanInstallmentGrossAmount, validateAnaokuluPlanSchedules } from '../utils/anaokuluPlanValidation.js'
+import {
+  expireLucaInvoiceJob,
+  isLucaInvoiceJobStale,
+  shouldSkipLucaInvoiceCreation
+} from '../utils/lucaInvoiceJobLifecycle.js'
 import crypto from 'crypto'
 
-// In-memory job store (process restart’ta sıfırlanır — kısa süreli işler için yeterli)
+// In-memory cache backed by MongoDB LucaJob documents.
 const lucaJobs = new Map()
 
 // ============================================================
@@ -52,79 +57,62 @@ const createJobKey = (action, sourceKey, invoiceNo = '') => {
   return `${action}|${String(sourceKey || '').trim()}|${number}`
 }
 
-// Bekleyen bir görev gerçekten engelliyorsa o iş TAZE olmalıdır:
-//   * extension görevi saniyeler içinde devralır (poll 5 sn) -> 90 sn
-//   * devralınmış ama HİÇ sonuç üretmemiş iş 5 dakika sonra ölüdür
-//     (Luca sekmesi kapandı / extension çöktü / akış başlamadı)
-// Bunun ötesindeki her iş ÖLÜDÜR ve satırı kilitlemez. Aksi halde 32
-// öğrencilik bir toplu kesimde yarıda kesilip kaldığında, o satırlar
-// SONSUZA kadar "bekleyen görev var" uyarısı verir ve kullanıcı hiçbir
-// Luca işlemi yapmamış olsa bile hiçbir şey deneyemez.
-const LUCA_UNCLAIMED_JOB_STALE_MS = 90 * 1000
-const LUCA_CLAIMED_JOB_STALE_MS = 5 * 60 * 1000
-
-const isLucaJobStale = (job, now = Date.now()) => {
-  if (job?.status !== 'running') return false
-  if (!['create', 'send'].includes(job?.kind)) return false
-
-  if (job?.phase === 'waiting_extension') {
-    return now - Number(job?.startedAt || 0) > LUCA_UNCLAIMED_JOB_STALE_MS
-  }
-
-  if (job?.phase === 'extension_claimed') {
-    // Kısmi sonuç varsa iş hâlâ ilerliyor olabilir; yalnızca HİÇ sonuç
-    // yoksa ölü sayılır.
-    if (Array.isArray(job?.results) && job.results.length) return false
-    return now - Number(job?.claimedAt || job?.startedAt || 0) > LUCA_CLAIMED_JOB_STALE_MS
-  }
-
-  return false
-}
-
 const listActiveJobKeys = async () => {
+  await listLucaJobs()
   const keys = new Set()
   const now = Date.now()
-  const staleJobIds = []
 
   for (const [jobId, job] of lucaJobs.entries()) {
-    if (job?.status !== 'running') continue
-    if (!['create', 'send'].includes(job?.kind)) continue
+    let activeJob = job
+    if (activeJob?.status !== 'running') continue
+    if (!['create', 'send'].includes(activeJob?.kind)) continue
 
-    if (isLucaJobStale(job, now)) {
-      staleJobIds.push(jobId)
-      continue
+    if (isLucaInvoiceJobStale(activeJob, now)) {
+      activeJob = await expireStaleLucaInvoiceJob(jobId, activeJob)
+      if (activeJob?.status !== 'running') continue
     }
 
-    for (const item of job.items || []) {
-      keys.add(createJobKey(job.kind, item.sourceKey, item.invoiceNo))
+    for (const item of activeJob.items || []) {
+      keys.add(createJobKey(activeJob.kind, item.sourceKey, item.invoiceNo))
       // Numarasız create görevleri de satır bazında korunur.
-      if (!String(item.invoiceNo || '').trim()) keys.add(createJobKey(job.kind, item.sourceKey, ''))
-    }
-  }
-
-  // Ölü işler "terk edilmiş" olarak kapatılır. Aksi halde istemcinin
-  // yoklama döngüsü sonsuza kadar sürer ve sayfa hiçbir geri bildirim
-  // vermez; kullanıcı işin ne olduğunu asla öğrenemez.
-  for (const staleId of staleJobIds) {
-    const staleJob = lucaJobs.get(staleId)
-
-    try {
-      await setLucaJob(staleId, {
-        ...staleJob,
-        status: 'error',
-        phase: 'completed',
-        error: 'Luca görevi zamanında tamamlanamadı (Chrome Extension görevi alamadı). Lütfen tekrar deneyin.',
-        finishedAt: Date.now()
-      })
-      console.warn(
-        `[Luca] ${staleId} numaralı ölü görev kapatıldı (${staleJob?.phase || 'bilinmeyen'}); satırlar yeniden deneyebilir.`
-      )
-    } catch (error) {
-      lucaJobs.delete(staleId)
+      if (!String(item.invoiceNo || '').trim()) keys.add(createJobKey(activeJob.kind, item.sourceKey, ''))
     }
   }
 
   return keys
+}
+
+const expireStaleLucaInvoiceJob = async (jobId, job) => {
+  const current = await getLucaJob(jobId, { fresh: true })
+  if (!current || !isLucaInvoiceJobStale(current)) return current || job
+  const now = Date.now()
+  const expired = expireLucaInvoiceJob(current, now)
+  const query = {
+    jobId,
+    'data.status': 'running',
+    'data.kind': current.kind,
+    'data.phase': current.phase
+  }
+  if (current.activityAt === undefined) query['data.activityAt'] = { $exists: false }
+  else query['data.activityAt'] = current.activityAt
+  if (current.phase === 'waiting_extension') query['data.startedAt'] = current.startedAt
+  else query['data.claimedAt'] = current.claimedAt
+
+  const transition = await LucaJob.updateOne(
+    query,
+    {
+      $set: {
+        data: expired,
+        expiresAt: new Date(now + 5 * 60 * 1000)
+      }
+    }
+  )
+  if (!transition.matchedCount) return (await getLucaJob(jobId, { fresh: true })) || job
+  lucaJobs.set(jobId, expired)
+  console.warn(
+    `[Luca] ${jobId} numaralı etkinliği durmuş görev kapatıldı; başarılı sonuçlar korundu, kalan satırlar tekrar denenebilir.`
+  )
+  return expired
 }
 
 const getLucaJob = async (jobId, { fresh = false } = {}) => {
@@ -1064,6 +1052,15 @@ export const createLucaInvoiceJob = async (req, res) => {
       // görev reddedilmez: Luca açılır ve GERÇEKTEN kontrol edilir.
       const sendableNo = String(previous?.no || item.invoiceNo || item.no || '').trim()
       const previousStatus = previous?.lifecycleStatus || (previousHasNo ? '' : 'verified')
+      if (shouldSkipLucaInvoiceCreation(action, previous, previousHasNo)) {
+        skipped.push({
+          sourceKey,
+          status: previousStatus || 'draft_created',
+          invoiceNo: previous.no || '',
+          reason: 'Bu satır için fatura kaydı zaten mevcut; tekrar fatura oluşturulamaz.'
+        })
+        continue
+      }
       if (previous && !previousHasNo && blockedStatuses.includes(previousStatus)) {
         skipped.push({ sourceKey, status: previousStatus, invoiceNo: previous.no || '', reason: `Bu satır zaten "${previousStatus}" aşamasında; yeniden işleme alınamaz.` })
         continue
@@ -1106,6 +1103,7 @@ export const createLucaInvoiceJob = async (req, res) => {
         lifecycleStatus: 'pending',
         ...(action === 'send' ? { invoiceNo: sendableNo } : {})
       })
+      activeJobKeys.add(createJobKey(action, sourceKey, sendableNo))
     }
 
     // Kullanılamaz/eskimiş taslak kayıtları burada SİLİNİR. Silme yapılmazsa
@@ -1130,6 +1128,7 @@ export const createLucaInvoiceJob = async (req, res) => {
 
     const jobId = crypto.randomUUID()
     const extensionToken = createLucaInvoiceToken()
+    const now = Date.now()
     await setLucaJob(jobId, {
       kind: action,
       status: 'running',
@@ -1140,7 +1139,8 @@ export const createLucaInvoiceJob = async (req, res) => {
       results: [],
       extensionToken,
       extensionTokenHash: crypto.createHash('sha256').update(extensionToken).digest('hex'),
-      startedAt: Date.now(),
+      startedAt: now,
+      activityAt: now,
       step: 'Chrome Extension bağlantısı bekleniyor…'
     })
 
@@ -1160,19 +1160,44 @@ export const claimLucaInvoiceCreateTask = async (req, res) => {
     }
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
     if (tokenHash !== job.extensionTokenHash) return res.status(401).json({ error: 'Geçersiz Extension görev anahtarı.' })
+    if (isLucaInvoiceJobStale(job)) {
+      await expireStaleLucaInvoiceJob(req.params.jobId, job)
+      return res.status(409).json({ error: 'Luca görevinin Extension bekleme süresi doldu.' })
+    }
 
     const school = await AnaokuluSchool.findOne({ tenant: job.tenantId }).lean()
     const luca = school?.settings?.luca || {}
     const resultToken = createLucaInvoiceToken()
-    await setLucaJob(req.params.jobId, {
+    const claimedAt = Date.now()
+    const claimedJob = {
       ...job,
       phase: 'extension_claimed',
       extensionToken: undefined,
       extensionTokenHash: undefined,
       resultTokenHash: crypto.createHash('sha256').update(resultToken).digest('hex'),
-      claimedAt: Date.now(),
+      claimedAt,
+      activityAt: claimedAt,
       step: 'Luca Hızlı Fatura ekranı hazırlanıyor…'
-    })
+    }
+    const claim = await LucaJob.updateOne(
+      {
+        jobId: req.params.jobId,
+        'data.status': 'running',
+        'data.kind': job.kind,
+        'data.phase': 'waiting_extension',
+        'data.extensionTokenHash': tokenHash
+      },
+      {
+        $set: {
+          data: claimedJob,
+          expiresAt: new Date(claimedAt + 10 * 60 * 1000)
+        }
+      }
+    )
+    if (!claim.matchedCount) {
+      return res.status(409).json({ error: 'Luca görevi başka bir Extension tarafından sahiplenildi.' })
+    }
+    lucaJobs.set(req.params.jobId, claimedJob)
     return res.json({
       ok: true,
       kind: 'create',
@@ -1185,6 +1210,64 @@ export const claimLucaInvoiceCreateTask = async (req, res) => {
   } catch (err) {
     console.error('[claimLucaInvoiceCreateTask] Hata:', err)
     return res.status(500).json({ error: err?.message || 'Luca oluşturma görevi alınamadı.' })
+  }
+}
+
+export const heartbeatLucaInvoiceCreateTask = async (req, res) => {
+  try {
+    const jobId = String(req.params.jobId || '')
+    const job = await getLucaJob(jobId, { fresh: true })
+    const resultToken = String(req.body?.resultToken || '').trim()
+    const expectedHash = String(job?.resultTokenHash || '')
+    const tokenHash = crypto.createHash('sha256').update(resultToken).digest('hex')
+
+    if (
+      !job ||
+      !['create', 'send'].includes(job.kind) ||
+      job.status !== 'running' ||
+      job.phase !== 'extension_claimed' ||
+      !resultToken ||
+      expectedHash.length !== tokenHash.length ||
+      !crypto.timingSafeEqual(Buffer.from(tokenHash), Buffer.from(expectedHash))
+    ) {
+      return res.status(409).json({ error: 'Luca görevi etkin değil veya heartbeat anahtarı geçersiz.' })
+    }
+    if (isLucaInvoiceJobStale(job)) {
+      await expireStaleLucaInvoiceJob(jobId, job)
+      return res.status(409).json({ error: 'Luca görevi etkinlik zaman aşımına uğradı.' })
+    }
+
+    const activityAt = Date.now()
+    const update = await LucaJob.updateOne(
+      {
+        jobId,
+        'data.status': 'running',
+        'data.kind': job.kind,
+        'data.phase': 'extension_claimed',
+        'data.resultTokenHash': expectedHash
+      },
+      {
+        $max: { 'data.activityAt': activityAt },
+        $set: { expiresAt: new Date(activityAt + 10 * 60 * 1000) }
+      }
+    )
+    if (!update.matchedCount) {
+      return res.status(409).json({ error: 'Luca görevi heartbeat sırasında sona erdi.' })
+    }
+    const cached = lucaJobs.get(jobId)
+    if (
+      cached?.status === 'running' &&
+      cached.phase === 'extension_claimed' &&
+      cached.resultTokenHash === expectedHash
+    ) {
+      cached.activityAt = Math.max(Number(cached.activityAt || 0), activityAt)
+    } else {
+      lucaJobs.set(jobId, { ...job, activityAt })
+    }
+    return res.json({ ok: true, jobId, activityAt: lucaJobs.get(jobId)?.activityAt || activityAt })
+  } catch (err) {
+    console.error('[heartbeatLucaInvoiceCreateTask] Hata:', err)
+    return res.status(500).json({ error: err?.message || 'Luca görev heartbeat kaydedilemedi.' })
   }
 }
 
@@ -1344,6 +1427,7 @@ export const submitLucaInvoiceCreateResult = async (req, res) => {
       phase: done ? 'completed' : 'extension_claimed',
       status: done ? 'done' : 'running',
       results: mergedResults,
+      activityAt: Math.max(Number(job.activityAt || 0), Date.now()),
       resultTokenHash: done ? undefined : job.resultTokenHash,
       completedAt: done ? Date.now() : undefined,
       step: done ? 'Luca fatura görevi tamamlandı.' : `${mergedResults.length}/${job.items.length} Luca taslak faturası oluşturuldu.`
@@ -1459,6 +1543,8 @@ const LUCA_JOB_STATUS_FIELDS = [
   'targetInvoiceNo',
   'startedAt',
   'claimedAt',
+  'activityAt',
+  'retryableSourceKeys',
   'extensionSubmittedAt',
   'completedAt',
   'found',
@@ -1470,12 +1556,16 @@ const LUCA_JOB_STATUS_FIELDS = [
 
 export const checkLucaJobStatus = async (req, res) => {
   try {
-    const job = await getLucaJob(req.params.jobId)
+    let job = await getLucaJob(req.params.jobId)
 
     if (!job) {
       return res.status(404).json({
         error: 'Job bulunamadı veya süresi doldu.'
       })
+    }
+
+    if (['create', 'send'].includes(job.kind)) {
+      job = await expireStaleLucaInvoiceJob(req.params.jobId, job)
     }
 
     const safeJob = {}

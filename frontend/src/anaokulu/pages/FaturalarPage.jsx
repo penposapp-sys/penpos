@@ -232,6 +232,38 @@ const toastSticky = (m, duration = 0) => {
       return
     }
 
+    const retryableStatusFor = (row) => action === 'send'
+      ? (row.invoiceWorkflowStatus || row.invoice?.lifecycleStatus || 'awaiting_approval')
+      : (row.invoiceWorkflowStatus || row.invoice?.lifecycleStatus || 'pending')
+    const applyJobResults = (results, errorMessage = '', retryableSourceKeys = null) => {
+      const resultsBySourceKey = new Map(
+        (Array.isArray(results) ? results : []).map(result => [String(result.sourceKey || ''), result])
+      )
+      const retryableKeys = Array.isArray(retryableSourceKeys)
+        ? new Set(retryableSourceKeys.map(key => String(key || '')))
+        : null
+      setInvoiceOps(previous => {
+        const next = { ...previous }
+        candidates.forEach(row => {
+          const sourceKey = String(row.sourceKey || '')
+          const result = resultsBySourceKey.get(sourceKey)
+          const retryableSendFailure = action === 'send'
+            && (!result || ['failed', 'cancelled'].includes(result.status))
+          const notMarkedRetryable = retryableKeys && !retryableKeys.has(sourceKey)
+          next[row.sourceKey] = {
+            status: notMarkedRetryable
+              ? retryableStatusFor(row)
+              : retryableSendFailure
+              ? retryableStatusFor(row)
+              : (result?.status || 'failed'),
+            action,
+            error: result?.error || (result || notMarkedRetryable ? '' : errorMessage)
+          }
+        })
+        return next
+      })
+    }
+
     const initialStatus = action === 'send' ? 'awaiting_approval' : 'creating'
     setInvoiceOps(previous => Object.fromEntries([
       ...Object.entries(previous),
@@ -254,7 +286,15 @@ const toastSticky = (m, duration = 0) => {
           // Bekleyen görev var: satırlar "failed"a ÇEVRİLMEZ ("Fatura Kes"e
           // düşmek yanlış yönlendirir; kayıt hâlâ duruyor). Mesaj KISA ve
           // EYLEM GÖSTERİR; kullanıcı kendiliğinden çaresiz bırakılmaz.
-          toastSticky('⏳ Bu satır için hâlâ çalışan bir Luca görevi var. Chrome açık mı? Luca sekmesi görünüyor mu? 1-2 dakika sonra tekrar deneyin; hâlâ olursa Luca sekmesini kapatıp tekrar deneyin.')
+          setInvoiceOps(previous => Object.fromEntries([
+            ...Object.entries(previous),
+            ...candidates.map(row => [row.sourceKey, {
+              status: retryableStatusFor(row),
+              action,
+              error: 'Başka bir Luca görevi henüz tamamlanmadı.'
+            }])
+          ]))
+          toastSticky('⏳ Bu satır için etkin bir Luca görevi var. Extension heartbeat’i kesilirse görev en geç 5 dakika içinde otomatik kapanır; tamamlanan faturalar korunur, kalan satırlar tekrar denenebilir.')
           return
         }
         // `skipped` bir HATA değil: satır zaten faturalanmış/gönderilmiş
@@ -287,8 +327,9 @@ const toastSticky = (m, duration = 0) => {
         // yalnızca ne olduğu açıklanır.
         setInvoiceOps(previous => Object.fromEntries([
           ...Object.entries(previous),
-          ...candidates.map(row => [row.sourceKey, { status: getRowWorkflowStatus(row), action }])
+          ...candidates.map(row => [row.sourceKey, { status: retryableStatusFor(row), action }])
         ]))
+        await actions.reload()
         toastSticky(
           response?.error ||
           (skipped.length
@@ -323,17 +364,7 @@ const toastSticky = (m, duration = 0) => {
           // "Luca'da taslak artık yok" ayrı bir sonuçtur: gönderilmedi ama hata
           // da değil. PenPOS kaydı temizlendiği için satır "Fatura Kes"e döner.
           const missingDraftResults = finalResults.filter(result => result.status === 'draft_missing')
-          setInvoiceOps(previous => {
-            const next = { ...previous }
-            finalResults.forEach(result => {
-              next[result.sourceKey] = {
-                status: result.status || (action === 'send' ? 'sent' : 'draft_created'),
-                action,
-                error: result.error
-              }
-            })
-            return next
-          })
+          applyJobResults(finalResults)
           await actions.reload()
           // Gerçek Luca hata metni kullanıcıya gösterilir; başarısız satırlar
           // yeniden denenebilir kalır (faturaya başarı bilgisi yazılmaz).
@@ -355,7 +386,19 @@ const toastSticky = (m, duration = 0) => {
           }
           return
         }
-        if (status?.status === 'error') throw new Error(status.error || 'Luca işlemi başarısız.')
+        if (status?.status === 'error') {
+          const errorMessage = status.error || 'Luca işlemi başarısız.'
+          applyJobResults(status.results, errorMessage, status.retryableSourceKeys)
+          await actions.reload()
+          const retryableCount = Array.isArray(status.retryableSourceKeys)
+            ? status.retryableSourceKeys.length
+            : Math.max(0, candidates.length - (status.results || []).length)
+          const recoveryMessage = retryableCount > 0
+            ? `${retryableCount} tamamlanmamış satır tekrar denenebilir.`
+            : 'Tamamlanan fatura kayıtları korundu; yeniden denenmesi gereken satır yok.'
+          toastSticky(`Luca görevi tamamlanamadı: ${errorMessage} ${recoveryMessage}`)
+          return
+        }
         // Uzun toplu işlerde (32 öğrenci gibi) kullanıcı ilerlemeyi görsün:
         // biten kalemler anında satıra yansır, toast ilerlemeyi gösterir.
         // Önceden hiçbir geri bildirim yoktu; iş bitene kadar ekran donuyordu.
@@ -380,25 +423,16 @@ const toastSticky = (m, duration = 0) => {
           }
         }
         window.setTimeout(() => poll().catch(error => {
-          setInvoiceOps(previous => ({
-            ...previous,
-            ...Object.fromEntries(candidates.map(row => [row.sourceKey, { status: 'failed', error: error.message }]))
-          }))
+          applyJobResults([], error.message)
           toastSticky(`Luca işlemi hatası: ${error.message}`)
         }), 1500)
       }
       poll().catch(error => {
-        setInvoiceOps(previous => ({
-          ...previous,
-          ...Object.fromEntries(candidates.map(row => [row.sourceKey, { status: 'failed', error: error.message }]))
-        }))
+        applyJobResults([], error.message)
         toastSticky(`Luca işlemi hatası: ${error.message}`)
       })
     } catch (error) {
-      setInvoiceOps(previous => ({
-        ...previous,
-        ...Object.fromEntries(candidates.map(row => [row.sourceKey, { status: 'failed', error: error.message }]))
-      }))
+      applyJobResults([], error.message)
       toastSticky(`Luca işlemi başlatılamadı: ${error.message}`)
     }
   }

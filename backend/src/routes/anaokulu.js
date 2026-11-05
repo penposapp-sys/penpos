@@ -17,6 +17,7 @@ import {
   failLucaExtensionTask,
   createLucaInvoiceJob,
   claimLucaInvoiceCreateTask,
+  heartbeatLucaInvoiceCreateTask,
   submitLucaInvoiceCreateResult,
   registerLucaDevice,
   heartbeatLucaDevice,
@@ -82,6 +83,7 @@ router.post(
 
 router.post('/luca-create/jobs', requireAuth, tenantGuard, createLucaInvoiceJob)
 router.post('/luca-create/jobs/:jobId/claim', claimLucaInvoiceCreateTask)
+router.post('/luca-create/jobs/:jobId/heartbeat', heartbeatLucaInvoiceCreateTask)
 router.post('/luca-create/jobs/:jobId/result', submitLucaInvoiceCreateResult)
 
 // Extension cihaz tokenı ile çalışan endpointler JWT tenant middleware'inden bağımsızdır.
