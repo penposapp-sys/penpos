@@ -45,8 +45,8 @@ function Assert-CodeSigningCertificate {
 
 $installerRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $installerRoot '..\..')).Path
-$extensionRoot = (Resolve-Path (Join-Path $repositoryRoot 'releases\production\PenPOS-Luca-Veri-v0.1.0\chrome-extension')).Path
-$extensionFiles = @('background.js', 'content.js', 'manifest.json', 'popup.css', 'popup.html', 'popup.js')
+$extensionRoot = (Resolve-Path (Join-Path $repositoryRoot 'releases\production\PenPOS-Luca-Veri-v0.1.2\chrome-extension')).Path
+$extensionFiles = @('background.js', 'content.js', 'lucaExtensionMessaging.js', 'lucaTaskLifecycle.js', 'manifest.json', 'popup.css', 'popup.html', 'popup.js')
 $canonicalOutputPath = Join-Path $installerRoot 'PenPOS Luca Veri Setup.exe'
 $publicDownloadPath = Join-Path $repositoryRoot 'backend\public\downloads\PenPOS Luca Veri Setup.exe'
 $wrapperScript = Join-Path $installerRoot 'bundle_installer.py'
@@ -97,9 +97,7 @@ if ($signingCertificate) {
 
 $outputPath = $canonicalOutputPath
 if ($unsignedTestBuild) {
-  $unsignedOutputRoot = Join-Path $installerRoot 'artifacts'
-  New-Item -ItemType Directory -Force -Path $unsignedOutputRoot | Out-Null
-  $outputPath = Join-Path $unsignedOutputRoot 'PenPOS Luca Veri Setup-UNSIGNED-TEST.exe'
+  $outputPath = Join-Path $installerRoot 'PenPOS Luca Veri Setup-UNSIGNED-TEST.exe'
 }
 
 $stagingRoot = Join-Path $env:TEMP ('PenPOSLucaStage' + [guid]::NewGuid().ToString('N'))
