@@ -786,11 +786,13 @@ const toastSticky = (m, duration = 0) => {
         setLucaStatus({ active: false, devices: [], error: statusRes.error || statusRes.message || 'Luca Veri durumu alınamadı.' })
       } else {
         const activeThresholdMs = Math.max(1000, Number(statusRes?.activeThresholdSeconds || 15) * 1000)
-        const devices = Array.isArray(statusRes?.devices) ? statusRes.devices.map(device => {
-          const timestamp = Date.parse(device?.lastSeen || '')
-          const online = Number.isFinite(timestamp) && (Date.now() - timestamp) <= activeThresholdMs
-          return { ...device, status: online ? 'online' : 'offline' }
-        }) : []
+        const devices = Array.isArray(statusRes?.devices) ? statusRes.devices
+          .map(device => {
+            const timestamp = Date.parse(device?.lastSeen || '')
+            const online = Number.isFinite(timestamp) && (Date.now() - timestamp) <= activeThresholdMs
+            return { ...device, status: online ? 'online' : 'offline' }
+          })
+          .filter(device => device.status === 'online') : []
         setLucaStatus({ ...statusRes, devices, active: devices.some(device => device.status === 'online') })
       }
     } catch (error) {

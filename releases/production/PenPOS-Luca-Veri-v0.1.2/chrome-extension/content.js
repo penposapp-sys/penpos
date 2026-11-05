@@ -4368,18 +4368,69 @@ const LUCA_PERIOD_MONTHS = {
 
   function findLucaStagingButton(label) {
     const expected = normalizeText(label)
+    const candidates = []
 
     for (const scope of LUCA_STAGING_BUTTON_SCOPES) {
-      const found = Array.from(
-        document.querySelectorAll(`${scope} button`)
-      ).find(button => normalizeText(button.innerText) === expected)
-
-      if (found) {
-        return found
+      for (const button of document.querySelectorAll(`${scope} button`)) {
+        if (
+          normalizeText(button.innerText) === expected &&
+          !candidates.includes(button)
+        ) {
+          candidates.push(button)
+        }
       }
     }
 
-    return null
+    const isVisible = button => {
+      const style = window.getComputedStyle(button)
+      const rect = button.getBoundingClientRect()
+
+      return style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        rect.width > 0 &&
+        rect.height > 0
+    }
+
+    const visible = candidates.filter(button => {
+      if (!isVisible(button)) return false
+
+      const rect = button.getBoundingClientRect()
+      return rect.bottom > 0 && rect.top < window.innerHeight
+    })
+    const fixedHeaderButton = visible.find(button => {
+      const table = button.closest('table')
+      const tableClasses = String(table?.className || '')
+      const fixedHeader = button.closest(
+        '.fixedHeader-floating, .fixedHeader-locked'
+      )
+
+      return !!fixedHeader || /fixedHeader-(?:floating|locked)/.test(tableClasses)
+    })
+
+    if (fixedHeaderButton) {
+      return fixedHeaderButton
+    }
+
+    if (visible.length <= 1) {
+      return visible[0] || candidates[0] || null
+    }
+
+    // DataTables can expose the same action in a fixed top/bottom table and
+    // in the original table body. Prefer a viewport-edge copy over the
+    // middle original; all copies invoke the same Luca action.
+    const viewportHeight = window.innerHeight
+    return visible
+      .map(button => {
+        const rect = button.getBoundingClientRect()
+        return {
+          button,
+          edgeDistance: Math.min(
+            Math.abs(rect.top),
+            Math.abs(viewportHeight - rect.bottom)
+          )
+        }
+      })
+      .sort((left, right) => left.edgeDistance - right.edgeDistance)[0].button
   }
 
   // Gönderim durumunu Luca'nın onay/sonuç penceresinden okur.
