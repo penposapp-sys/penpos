@@ -250,7 +250,10 @@ export function collectedFor(state, sid, period) {
   return round2((state?.collections || []).filter(c =>
     (sid == null || String(c.studentId) === String(sid)) &&
     (!period || (c.date || '').slice(0, 7) === period)
-  ).reduce((a, c) => a + c.amount, 0))
+  ).reduce((sum, collection) => {
+    const amount = Number(collection.amount)
+    return sum + (Number.isFinite(amount) ? amount : 0)
+  }, 0))
 }
 
 export function collectedAll(state, sid) {
@@ -673,7 +676,10 @@ export function getDashboardStats(state) {
   const checks = state?.checks || []
   const active = students.filter(s => s.active)
   const planned = expectedAllActive(state)
-  const collected = round2(collections.reduce((a, c) => a + c.amount, 0))
+  const collected = round2(collections.reduce((sum, collection) => {
+    const amount = Number(collection.amount)
+    return sum + (Number.isFinite(amount) ? amount : 0)
+  }, 0))
   const remaining = round2(planned - collected)
   const cur = curPeriod(state)
   const currentMonthCollected = collectedFor(state, null, cur)

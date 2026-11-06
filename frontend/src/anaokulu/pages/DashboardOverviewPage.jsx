@@ -24,6 +24,7 @@ import {
 import { useAnaokuluData } from '../context/AnaokuluDataContext.jsx'
 import {
   addMonths,
+  collectedFor,
   getDashboardStats,
   getYearStart,
   getMonthlyInvoicableInstallments,
@@ -32,7 +33,6 @@ import {
   getInstallmentPaid,
   getStudent,
   money,
-  planTableFor,
   periodName,
   round2,
   trDate
@@ -169,60 +169,15 @@ function getMonthInstallmentRows(state, period) {
   return rows.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || String(a.student.name || '').localeCompare(String(b.student.name || ''), 'tr'))
 }
 
-function getMonthlyStudentRows(state, period) {
-  const collections = state?.collections || []
-  const defaultYearStart = getYearStart(state)
-
-  return (state?.students || []).map(student => {
-    const planTable = planTableFor(state, student)
-    const monthIndex = planTable.periods.indexOf(period)
-    if (monthIndex < 0) return null
-
-    const installments = planTable.rows.flatMap((planRow, planIndex) => {
-      if (planRow.months[monthIndex] == null) return []
-      const schedule = getPlanInstallmentSchedule(
-        planRow.item,
-        planRow.item.start || `${defaultYearStart}-15`
-      )
-      const installment = schedule.find(item => item.dueDate.slice(0, 7) === period)
-      if (!installment) return []
-
-      const scheduleTotal = round2(schedule.reduce((sum, item) => sum + item.amount, 0))
-      const recordedDiscount = round2((Array.isArray(planRow.item.discounts) ? planRow.item.discounts : [])
-        .reduce((sum, discount) => sum + (Number(discount.amount) || 0), 0))
-      const totalDiscount = round2(Math.max(
-        0,
-        (Number(planRow.item.basePrice) || 0) - (Number(planRow.item.total) || 0),
-        recordedDiscount
-      ))
-      const amount = round2(planRow.months[monthIndex])
-
-      return [{
-        plan: planRow.item,
-        planIndex: (student.items || []).indexOf(planRow.item),
-        planName: planRow.item.name || '—',
-        installmentNo: installment.no,
-        dueDate: installment.dueDate,
-        amount,
-        discount: scheduleTotal > 0 ? round2(totalDiscount * installment.amount / scheduleTotal) : 0,
-        attendanceDeduction: round2(Math.max(0, installment.amount - amount))
-      }]
-    })
-    const studentCollections = collections.filter(collection =>
-      String(collection.studentId) === String(student.id) &&
-      String(collection.date || '').slice(0, 7) === period
-    )
-
-    return {
-      student,
-      studentId: student.id || student._id,
-      installments,
-      amount: round2(planTable.monthTotals[monthIndex]),
-      paid: round2(planTable.monthCollected[monthIndex]),
-      remaining: round2(planTable.monthRemaining[monthIndex]),
-      collections: studentCollections
-    }
-  }).filter(Boolean)
+function getInstallmentPeriodTotals(state, period) {
+  return getMonthInstallmentRows(state, period).reduce((totals, installment) => {
+    const amount = round2(Math.max(0, installment.amount))
+    const paid = round2(Math.max(0, installment.paid))
+    totals.expected = round2(totals.expected + amount)
+    totals.collected = round2(totals.collected + Math.min(amount, paid))
+    totals.remaining = round2(totals.remaining + Math.max(0, amount - paid))
+    return totals
+  }, { expected: 0, collected: 0, remaining: 0 })
 }
 
 function DashboardOverviewPage() {
@@ -258,11 +213,29 @@ function DashboardOverviewPage() {
   const isTablet = windowWidth < 1120
   const activeStudents = useMemo(() => students.filter(student => student.active !== false), [students])
   const installmentRows = useMemo(() => getMonthInstallmentRows(state, selectedPeriod), [state, selectedPeriod])
-  const monthlyStudentRows = useMemo(() => getMonthlyStudentRows(state, selectedPeriod), [state, selectedPeriod])
+  const monthlyCollectionRows = useMemo(() => (state?.collections || [])
+    .filter(collection => String(collection.date || '').slice(0, 7) === selectedPeriod)
+    .map((collection, index) => {
+      const student = getStudent(state, collection.studentId)
+      const amount = Number(collection.amount)
+      const installmentNo = Number(collection.installmentNo)
+      return {
+        studentName: student?.name || '—',
+        feeItem: collection.item || '—',
+        date: collection.date || '',
+        installmentLabel: collection.installmentNo != null && collection.installmentNo !== '' && installmentNo === 0
+          ? 'Peşinat'
+          : Number.isInteger(installmentNo) && installmentNo > 0
+            ? `${collection.installmentNo}. taksit`
+            : '—',
+        amount: Number.isFinite(amount) ? amount : 0,
+        payment: collection.payment || '—',
+        note: collection.note || '—',
+        detailKey: collection.id || collection._id || `${collection.studentId}-${collection.date}-${collection.item}-${index}`
+      }
+    }), [state, selectedPeriod])
 
-  const monthExpected = useMemo(() => round2(monthlyStudentRows.reduce((sum, row) => sum + row.amount, 0)), [monthlyStudentRows])
-  const monthCollected = useMemo(() => round2(monthlyStudentRows.reduce((sum, row) => sum + row.paid, 0)), [monthlyStudentRows])
-  const collectionRate = monthExpected > 0 ? Math.min(100, Math.round(monthCollected / monthExpected * 100)) : 0
+  const monthCashCollected = useMemo(() => collectedFor(state, null, selectedPeriod), [state, selectedPeriod])
   const invoiceRows = useMemo(() => getMonthlyInvoicableInstallments(state, selectedPeriod), [state, selectedPeriod])
   const invoiceCounts = useMemo(() => invoiceRows.reduce((counts, row) => {
     const workflow = getInvoiceWorkflow(row.invoice)
@@ -280,56 +253,67 @@ function DashboardOverviewPage() {
 
   const chartPeriods = schoolYearPeriods
   const chartRows = useMemo(() => chartPeriods.map(period => {
-    const rows = period === selectedPeriod ? monthlyStudentRows : getMonthlyStudentRows(state, period)
+    const totals = getInstallmentPeriodTotals(state, period)
     return {
       period,
-      expected: round2(rows.reduce((sum, row) => sum + row.amount, 0)),
-      collected: round2(rows.reduce((sum, row) => sum + row.paid, 0))
+      expected: totals.expected,
+      collected: totals.collected
     }
-  }), [chartPeriods, monthlyStudentRows, selectedPeriod, state])
+  }), [chartPeriods, state])
   const chartMax = Math.max(1, ...chartRows.flatMap(row => [row.expected, row.collected]))
 
   const pastPeriods = useMemo(() => Array.from({ length: 5 }, (_, index) => addMonths(selectedPeriod, -(index + 1))), [selectedPeriod])
   const pastMonthRows = useMemo(() => pastPeriods.map(period => {
-    const rows = getMonthlyStudentRows(state, period)
-    const expected = round2(rows.reduce((sum, row) => sum + row.amount, 0))
-    const collected = round2(rows.reduce((sum, row) => sum + row.paid, 0))
+    const totals = getInstallmentPeriodTotals(state, period)
     return {
       period,
-      expected,
-      collected,
-      remaining: round2(rows.reduce((sum, row) => sum + row.remaining, 0)),
-      rate: expected > 0 ? Math.min(100, Math.round(collected / expected * 100)) : 0
+      expected: totals.expected,
+      collected: totals.collected,
+      remaining: totals.remaining,
+      rate: totals.expected > 0 ? Math.min(100, Math.round(totals.collected / totals.expected * 100)) : 0
     }
   }), [pastPeriods, state])
 
   const allMonthInstallments = installmentRows
   const installmentDetailRows = useMemo(() => allMonthInstallments.map(row => {
-    const remaining = round2(row.amount - row.paid)
-    const status = remaining < 0
+    const amount = round2(Math.max(0, row.amount))
+    const paid = round2(Math.max(0, row.paid))
+    const collectedAmount = round2(Math.min(amount, paid))
+    const excessAmount = round2(Math.max(0, paid - amount))
+    const remaining = round2(Math.max(0, amount - paid))
+    const status = excessAmount > 0
       ? 'Fazla tahsilat / mahsup'
       : remaining === 0
         ? 'Tamamlandı'
-        : row.paid > 0
+        : paid > 0
           ? 'Kısmi tahsil edildi'
           : 'Tahsil edilmedi'
     return {
       ...row,
+      amount,
+      paid,
+      collectedAmount,
+      excessAmount,
       remaining,
       status,
       studentName: row.student.name || '—',
       feeItem: row.planName || '—',
-      installmentAmount: row.amount,
-      collectedAmount: row.paid,
+      installmentAmount: amount,
       discountAmount: row.discount,
       detailKey: `${row.studentId}-${row.planIndex}-${row.installmentNo}-${row.dueDate}`
     }
   }), [allMonthInstallments])
-  const allUnpaidInstallments = installmentDetailRows.filter(row => row.remaining > 0)
+  const monthExpectedInstallments = round2(installmentDetailRows.reduce((sum, row) => sum + row.amount, 0))
+  const monthInstallmentCollected = round2(installmentDetailRows.reduce((sum, row) => sum + row.collectedAmount, 0))
+  const monthInstallmentExcess = round2(installmentDetailRows.reduce((sum, row) => sum + row.excessAmount, 0))
+  const collectionRate = monthExpectedInstallments > 0
+    ? Math.min(100, Math.round(monthInstallmentCollected / monthExpectedInstallments * 100))
+    : 0
+  const allUnpaidInstallments = installmentDetailRows.filter(row => row.amount > 0 && row.remaining > 0)
   const monthUncollected = round2(allUnpaidInstallments.reduce((sum, row) => sum + row.remaining, 0))
   const unpaidRows = allUnpaidInstallments.slice(0, 5)
-  const totalMonthInstallments = allMonthInstallments.length
-  const paidMonthInstallments = installmentDetailRows.filter(row => row.remaining <= 0).length
+  const totalMonthInstallments = installmentDetailRows.filter(row => row.amount > 0).length
+  const paidMonthInstallments = installmentDetailRows.filter(row => row.amount > 0 && row.remaining === 0).length
   const remainingMonthInstallments = totalMonthInstallments - paidMonthInstallments
 
   const changeMonth = (amount) => setSelectedPeriod(current => {
@@ -399,18 +383,21 @@ function DashboardOverviewPage() {
         title: `${monthLabel(selectedPeriod)} Beklenen`,
         description: 'Öğrenci Detayı > Plan aylık tablosuyla aynı öğrenci ve taksit tutarlarıdır.',
         rows: installmentDetailRows.filter(row => row.amount > 0),
-        total: round2(installmentDetailRows
-          .filter(row => row.amount > 0)
-          .reduce((sum, row) => sum + row.remaining, 0))
+        total: monthExpectedInstallments
       }
     : detailsType === 'collected'
       ? {
           title: `${monthLabel(selectedPeriod)} Tahsil Edilen`,
-          description: 'Öğrenci Detayı > Plan kaynağındaki gibi, seçili ayda kaydedilen tahsilatların öğrenci bazındaki toplamıdır.',
-          rows: installmentDetailRows.filter(row => row.paid > 0 || row.remaining < 0),
-          total: round2(installmentDetailRows
-            .filter(row => row.paid > 0 || row.remaining < 0)
-            .reduce((sum, row) => sum + row.remaining, 0))
+          description: 'Seçili aya ait taksitlere bugüne kadar işlenmiş tahsilat tutarıdır.',
+          rows: installmentDetailRows.filter(row => row.collectedAmount > 0 || row.excessAmount > 0),
+          total: monthInstallmentCollected
+        }
+      : detailsType === 'monthlyCollections'
+        ? {
+            title: `${monthLabel(selectedPeriod)} Ay İçi Tahsilat`,
+            description: 'Seçili ay içinde kaydedilmiş tahsilat hareketlerinin toplamıdır.',
+            rows: monthlyCollectionRows,
+            total: monthCashCollected
         }
       : detailsType === 'uncollected'
         ? {
@@ -458,11 +445,12 @@ function DashboardOverviewPage() {
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 380 ? 'minmax(0, 1fr)' : windowWidth < 980 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 8, minWidth: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 380 ? 'minmax(0, 1fr)' : windowWidth < 980 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', gap: 8, minWidth: 0 }}>
         {card('Toplam Öğrenci', students.length, `${activeStudents.length} aktif · ${students.length - activeStudents.length} pasif`, Users, { main: '#0f172a', soft: '#eff6ff' })}
-        {card(`${monthLabel(selectedPeriod)} Tahsil Edilen`, money(monthCollected), `${collectionRate}% tahsilat oranı`, Wallet, { main: '#059669', soft: '#dcfce7' }, () => setDetailsType('collected'))}
-        {card(`${monthLabel(selectedPeriod)} Beklenen`, money(monthExpected), `${monthlyStudentRows.reduce((count, row) => count + row.installments.length, 0)} taksit`, Hourglass, { main: '#7c3aed', soft: '#f3e8ff' }, () => setDetailsType('expected'))}
-        {card(`${monthLabel(selectedPeriod)} Tahsil Edilmeyen`, money(monthUncollected), `${allUnpaidInstallments.length} açık taksit`, CircleAlert, { main: '#dc2626', soft: '#fee2e2' }, () => setDetailsType('uncollected'))}
+        {card(`${monthLabel(selectedPeriod)} Taksit Toplamı`, money(monthExpectedInstallments), `${totalMonthInstallments} taksit`, Hourglass, { main: '#7c3aed', soft: '#f3e8ff' }, () => setDetailsType('expected'))}
+        {card(`${monthLabel(selectedPeriod)} Taksit Tahsilatı`, money(monthInstallmentCollected), `${collectionRate}% tahsilat${monthInstallmentExcess > 0 ? ` · ${money(monthInstallmentExcess)} fazla/mahsup` : ''}`, Wallet, { main: '#059669', soft: '#dcfce7' }, () => setDetailsType('collected'))}
+        {card(`${monthLabel(selectedPeriod)} Kalan Taksit`, money(monthUncollected), `${allUnpaidInstallments.length} açık taksit`, CircleAlert, { main: '#dc2626', soft: '#fee2e2' }, () => setDetailsType('uncollected'))}
+        {card(`${monthLabel(selectedPeriod)} Ay İçi Tahsilat`, money(monthCashCollected), 'Bu ay kaydedilen tahsilatlar', CreditCard, { main: '#0369a1', soft: '#e0f2fe' }, () => setDetailsType('monthlyCollections'))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : isTablet ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1.08fr) minmax(0, 1fr) minmax(290px, 0.92fr)', gap: 8, alignItems: 'stretch' }}>
@@ -477,8 +465,8 @@ function DashboardOverviewPage() {
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
               {[
-                { label: 'Tahsil Edilen', value: monthCollected, color: '#059669', dot: '#10b981' },
-                { label: 'Beklenen', value: monthExpected, color: '#2563eb', dot: '#93c5fd' },
+                { label: 'Taksit Tahsilatı', value: monthInstallmentCollected, color: '#059669', dot: '#10b981' },
+                { label: 'Taksit Toplamı', value: monthExpectedInstallments, color: '#2563eb', dot: '#93c5fd' },
                 { label: 'Tahsil Edilmeyen', value: monthUncollected, color: '#dc2626', dot: '#fca5a5' }
               ].map(row => (
                 <div key={row.label} style={{ display: 'grid', gridTemplateColumns: '8px minmax(0, 1fr) auto', alignItems: 'center', gap: 7, fontSize: 10 }}>
@@ -506,7 +494,7 @@ function DashboardOverviewPage() {
         <section style={{ ...panelStyle, padding: 14 }}>
           {panelHeader('Eğitim Dönemi Tahsilat Grafiği', null, null, BarChart3)}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, color: '#64748b', fontSize: 11, marginBottom: 4 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><i style={{ width: 7, height: 7, borderRadius: 2, background: '#10b981' }} />Tahsil Edilen</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><i style={{ width: 7, height: 7, borderRadius: 2, background: '#10b981' }} />Ay İçi Tahsilat</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><i style={{ width: 7, height: 7, borderRadius: 2, background: '#bfdbfe' }} />Beklenen</span>
           </div>
           <div style={{ height: 154, display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', alignItems: 'end', borderBottom: '1px solid #cbd5e1', background: 'repeating-linear-gradient(to bottom, transparent 0, transparent 36px, #f1f5f9 37px)' }}>
@@ -704,15 +692,29 @@ function DashboardOverviewPage() {
               <table style={{ width: '100%', minWidth: 970, borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f8fafc' }}>
                   <tr>
-                    {['Öğrenci', 'Ücret kalemi', 'Taksit no / vade', 'Taksit tutarı', 'Tahsil edilen (ay)', 'İndirim / devamsızlık', 'Kalan', 'Durum', ''].map(label => (
-                      <th key={label} style={{ padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: label.startsWith('Taksit tutarı') || label.startsWith('Tahsil edilen') || label === 'Kalan' ? 'right' : 'left', whiteSpace: 'nowrap' }}>{label}</th>
+                    {(detailsType === 'monthlyCollections'
+                      ? ['Öğrenci', 'Ücret kalemi', 'Tarih', 'Taksit', 'Tahsilat tutarı', 'Ödeme türü', 'Açıklama']
+                      : ['Öğrenci', 'Ücret kalemi', 'Taksit no / vade', 'Taksit tutarı', detailsType === 'collected' ? 'Tahsil edilen (taksit)' : 'Tahsil edilen (ay)', 'İndirim / devamsızlık', 'Kalan', 'Durum', '']
+                    ).map(label => (
+                      <th key={label} style={{ padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: label.startsWith('Taksit tutarı') || label.startsWith('Tahsil edilen') || label === 'Tahsilat tutarı' || label === 'Kalan' ? 'right' : 'left', whiteSpace: 'nowrap' }}>{label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {financialDetails.rows.length === 0 ? (
-                    <tr><td colSpan={9} style={{ padding: 26, textAlign: 'center', color: '#64748b' }}>Bu ay için gösterilecek taksit kaydı yok.</td></tr>
-                  ) : financialDetails.rows.map(row => {
+                    <tr><td colSpan={detailsType === 'monthlyCollections' ? 7 : 9} style={{ padding: 26, textAlign: 'center', color: '#64748b' }}>{detailsType === 'monthlyCollections' ? 'Bu ay için tahsilat kaydı yok.' : 'Bu ay için gösterilecek taksit kaydı yok.'}</td></tr>
+                  ) : detailsType === 'monthlyCollections' ? monthlyCollectionRows.map(row => (
+                    <tr key={row.detailKey}>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700 }}>{row.studentName}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b', fontSize: 12 }}>{row.feeItem}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: 12 }}>{trDate(row.date)}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: 12 }}>{row.installmentLabel}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{money(row.amount)}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', fontSize: 12 }}>{row.payment}</td>
+                      <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b', fontSize: 12 }}>{row.note}</td>
+                    </tr>
+                  ))
+                  : financialDetails.rows.map(row => {
                     const appliedDiscounts = [
                       row.discount > 0 ? `İndirim ${money(row.discount)}` : '',
                       row.attendanceDeduction > 0 ? `Devamsızlık ${money(row.attendanceDeduction)}` : ''
@@ -741,12 +743,13 @@ function DashboardOverviewPage() {
                         <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#475569', whiteSpace: 'nowrap' }}>#{row.installmentNo} · {trDate(row.dueDate)}</td>
                         <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(row.amount)}</td>
                         <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <strong>{money(row.paid)}</strong>
+                          <strong>{money(row.collectedAmount)}</strong>
+                          {row.excessAmount > 0 && <small style={{ display: 'block', maxWidth: 240, marginTop: 2, color: '#2563eb', whiteSpace: 'normal' }}>Fazla tahsilat / mahsup {money(row.excessAmount)}</small>}
                           {paymentBreakdown && <small style={{ display: 'block', maxWidth: 240, marginTop: 2, color: '#64748b', whiteSpace: 'normal' }}>{paymentBreakdown}</small>}
                         </td>
                         <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{appliedDiscounts}</td>
-                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: row.remaining > 0 ? '#dc2626' : row.remaining < 0 ? '#2563eb' : '#475569', fontWeight: 750, whiteSpace: 'nowrap' }}>{money(row.remaining)}</td>
-                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: row.remaining > 0 ? (row.paid > 0 ? '#b45309' : '#dc2626') : row.remaining < 0 ? '#2563eb' : '#15803d', whiteSpace: 'nowrap' }}>{row.status}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: row.remaining > 0 ? '#dc2626' : '#475569', fontWeight: 750, whiteSpace: 'nowrap' }}>{money(row.remaining)}</td>
+                        <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: row.excessAmount > 0 ? '#2563eb' : row.remaining > 0 ? (row.paid > 0 ? '#b45309' : '#dc2626') : '#15803d', whiteSpace: 'nowrap' }}>{row.status}</td>
                         <td style={{ padding: '9px 8px', borderBottom: '1px solid #f1f5f9', color: '#2563eb', fontWeight: 750, whiteSpace: 'nowrap' }}>Detaya git →</td>
                       </tr>
                     )
@@ -754,12 +757,22 @@ function DashboardOverviewPage() {
                 </tbody>
                 <tfoot>
                   <tr style={{ background: '#f8fafc', fontWeight: 850 }}>
-                    <td colSpan={3} style={{ padding: '11px 8px', textAlign: 'right', color: '#334155' }}>Toplam ({financialDetails.rows.length} taksit)</td>
-                    <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.amount, 0)))}</td>
-                    <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.paid, 0)))}</td>
-                    <td style={{ padding: '11px 8px' }}>—</td>
-                    <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.remaining, 0)))}</td>
-                    <td colSpan={2} style={{ padding: '11px 8px', color: '#334155' }}>Kart toplamı: {money(financialDetails.total)}</td>
+                    {detailsType === 'monthlyCollections' ? (
+                      <>
+                        <td colSpan={4} style={{ padding: '11px 8px', textAlign: 'right', color: '#334155' }}>Toplam ({financialDetails.rows.length} tahsilat)</td>
+                        <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.amount, 0)))}</td>
+                        <td colSpan={2} style={{ padding: '11px 8px', color: '#334155' }}>Kart toplamı: {money(financialDetails.total)}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td colSpan={3} style={{ padding: '11px 8px', textAlign: 'right', color: '#334155' }}>Toplam ({financialDetails.rows.length} taksit)</td>
+                        <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.amount, 0)))}</td>
+                        <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.collectedAmount, 0)))}</td>
+                        <td style={{ padding: '11px 8px' }}>—</td>
+                        <td style={{ padding: '11px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(round2(financialDetails.rows.reduce((sum, row) => sum + row.remaining, 0)))}</td>
+                        <td colSpan={2} style={{ padding: '11px 8px', color: '#334155' }}>Kart toplamı: {money(financialDetails.total)}</td>
+                      </>
+                    )}
                   </tr>
                 </tfoot>
               </table>
