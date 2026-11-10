@@ -41,7 +41,9 @@ export default function CallAgentSettingsPage() {
       setBranchId((current) => activeBranches.some((branch) => String(branch._id) === current)
         ? current
         : String(activeBranches[0]?._id || ''))
-      setDevices(Array.isArray(deviceResponse.devices) ? deviceResponse.devices : [])
+      setDevices(Array.isArray(deviceResponse.devices)
+        ? deviceResponse.devices.filter((device) => device.status === 'active')
+        : [])
     } catch (loadError) {
       setError(loadError?.message || 'Masa çağrı sistemi bilgileri yüklenemedi.')
     } finally {
@@ -217,9 +219,7 @@ export default function CallAgentSettingsPage() {
             )}
       </section>
 
-      <p className="call-agent-settings-note">
-        İptal edilen cihazı yeniden kullanmak için yeni bir eşleştirme kodu oluşturun. Cihaz kaydı ve RF tuş tanımları yerel ajan verilerinde korunur.
-      </p>
+      <p className="call-agent-settings-note">Yetkisi kaldırılmış cihazlar bu listede gösterilmez.</p>
     </main>
   )
 }
