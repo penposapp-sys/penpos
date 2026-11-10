@@ -15,6 +15,7 @@ const pairingApproveLimit = rateLimit({ windowMs: 60 * 1000, max: 10 })
 const pairingCompleteLimit = rateLimit({ windowMs: 60 * 1000, max: 30 })
 const refreshLimit = rateLimit({ windowMs: 60 * 1000, max: 20 })
 const heartbeatLimit = rateLimit({ windowMs: 60 * 1000, max: 30 })
+const rfActionLimit = rateLimit({ windowMs: 60 * 1000, max: 30 })
 
 const manageDevices = [
   requireAuth,
@@ -24,10 +25,13 @@ const manageDevices = [
 ]
 
 router.post('/pairings', pairingStartLimit, ctrl.createPairing)
+router.post('/dashboard/pairings', pairingStartLimit, ...manageDevices, requireActiveSubscription, ctrl.createDashboardPairing)
 router.post('/pairings/:pairingId/approve', pairingApproveLimit, ...manageDevices, requireActiveSubscription, ctrl.approvePairing)
 router.post('/pairings/:pairingId/complete', pairingCompleteLimit, ctrl.completePairingRequest)
 router.post('/tokens/refresh', refreshLimit, ctrl.refreshTokens)
 router.post('/devices/:deviceId/heartbeat', heartbeatLimit, requireCallAgentAuth, ctrl.heartbeat)
+router.get('/devices/:deviceId/tables', rfActionLimit, requireCallAgentAuth, ctrl.listRfTables)
+router.post('/devices/:deviceId/actions', rfActionLimit, requireCallAgentAuth, ctrl.performRfAction)
 router.get('/branches', ...manageDevices, requireActiveSubscription, ctrl.listBranches)
 router.get('/devices', ...manageDevices, requireActiveSubscription, ctrl.listDevices)
 router.post('/devices/:deviceId/revoke', ...manageDevices, ctrl.revokeDevice)

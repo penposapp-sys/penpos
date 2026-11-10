@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../lib/apiClient.js'
 import './CallAgentSettingsPage.css'
 
@@ -12,8 +12,14 @@ export default function CallAgentSettingsPage() {
   const [branches, setBranches] = useState([])
   const [devices, setDevices] = useState([])
   const [branchId, setBranchId] = useState('')
-  const [pairingId, setPairingId] = useState('')
-  const [pairingCode, setPairingCode] = useState('')
+  const [createdPairing, setCreatedPairing] = useState(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('penpos-call-agent-pairing') || 'null')
+      return saved?.expiresAt && new Date(saved.expiresAt).getTime() > Date.now() ? saved : null
+    } catch {
+      return null
+    }
+  })
   const [deviceName, setDeviceName] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -47,27 +53,25 @@ export default function CallAgentSettingsPage() {
     loadData()
   }, [])
 
-  const approvePairing = async (event) => {
-    event.preventDefault()
+  const createPairing = async () => {
     setBusy(true)
     setError('')
     setNotice('')
     try {
-      const response = await api(`/api/call-agents/pairings/${encodeURIComponent(pairingId.trim())}/approve`, {
+      const response = await api('/api/call-agents/dashboard/pairings', {
         method: 'POST',
-        data: { code: pairingCode.trim().toUpperCase(), branchId, deviceName: deviceName.trim() },
+        data: { branchId, deviceName: deviceName.trim() },
         silent: true,
         skipBranchHeader: true,
         suppressAuthRedirect: true
       })
-      if (!response.ok) throw new Error(response.message || 'Cihaz eşleştirilemedi.')
-      setPairingId('')
-      setPairingCode('')
-      setDeviceName('')
-      setNotice('Çağrı ajanı cihazı bu işletme ve şubeyle eşleştirildi.')
+      if (!response.success) throw new Error(response.message || 'Eşleştirme kodu oluşturulamadı.')
+      setCreatedPairing(response.pairing)
+      sessionStorage.setItem('penpos-call-agent-pairing', JSON.stringify(response.pairing))
+      setNotice('Cihaz ve tek kullanımlık eşleştirme kodu hazır. Kod 5 dakika geçerlidir.')
       await loadData()
-    } catch (approvalError) {
-      setError(approvalError?.message || 'Cihaz eşleştirilemedi.')
+    } catch (pairingError) {
+      setError(pairingError?.message || 'Eşleştirme kodu oluşturulamadı.')
     } finally {
       setBusy(false)
     }
@@ -112,34 +116,20 @@ export default function CallAgentSettingsPage() {
         <div className="call-agent-settings-card-heading">
           <div>
             <h2>Cihaz eşleştir</h2>
-            <p>Ajan ekranındaki oturum kimliği ve tek kullanımlık kodu girin; cihazı yalnızca erişiminiz olan etkin şubeye bağlayabilirsiniz.</p>
+            <p>PenPOS sunucusu sabittir: https://penpos.cloud. Ajan uygulaması bu eşleştirme bilgilerini kullanarak otomatik bağlanır.</p>
           </div>
-          <span className="call-agent-settings-tag">HTTPS EŞLEŞTİRME</span>
+          <div className="call-agent-settings-quick-actions">
+            <a
+              className="call-agent-download-button"
+              href="/public/downloads/call-agent/PenPOS-Cagri-Ajani-Setup.exe?v=0.1.13"
+              download="PenPOS-Cagri-Ajani-Setup-0.1.13.exe"
+            >
+              EXE İndir · 0.1.13
+            </a>
+            <span className="call-agent-settings-tag">HTTPS EŞLEŞTİRME</span>
+          </div>
         </div>
-        <form className="call-agent-pairing-form" onSubmit={approvePairing}>
-          <label>
-            Eşleştirme oturum kimliği
-            <input
-              value={pairingId}
-              onChange={(event) => setPairingId(event.target.value)}
-              placeholder="Ajan ekranındaki oturum kimliği"
-              maxLength={24}
-              required
-              autoComplete="off"
-            />
-          </label>
-          <label>
-            Eşleştirme kodu
-            <input
-              value={pairingCode}
-              onChange={(event) => setPairingCode(event.target.value.toUpperCase())}
-              placeholder="12 karakterli kod"
-              maxLength={12}
-              minLength={12}
-              required
-              autoComplete="one-time-code"
-            />
-          </label>
+        <div className="call-agent-pairing-form">
           <label>
             Şube
             <select value={branchId} onChange={(event) => setBranchId(event.target.value)} required disabled={loading}>
@@ -158,12 +148,24 @@ export default function CallAgentSettingsPage() {
             />
           </label>
           <div className="call-agent-pairing-actions">
-            <p>Kod sürelidir ve yalnızca bir kez kullanılabilir. Onay, mevcut PenPOS kullanıcı ve şube yetkileriyle denetlenir.</p>
-            <button type="submit" disabled={busy || loading || !branches.length}>
-              {busy ? 'İşleniyor…' : 'Cihazı eşleştir'}
+            <p>Buton cihaz kimliği ve kodu oluşturup cihazı seçili şubeye bağlar. Ardından “Çağrı ajanını aç” bağlantısına basın.</p>
+            <button type="button" onClick={createPairing} disabled={busy || loading || !branches.length}>
+              {busy ? 'Oluşturuluyor…' : 'Cihaz Eşleştir'}
             </button>
           </div>
-        </form>
+        </div>
+        {createdPairing && (
+          <div className="call-agent-pairing-result" role="status">
+            <div><span>Cihaz kimliği</span><code>{createdPairing.deviceId}</code></div>
+            <div><span>Eşleştirme kodu</span><code>{createdPairing.pairingCode}</code></div>
+            <a
+              className="call-agent-pairing-open"
+              href={`penpos-call-agent://pair?pairingId=${encodeURIComponent(createdPairing.pairingId)}&deviceId=${encodeURIComponent(createdPairing.deviceId)}&pairingCode=${encodeURIComponent(createdPairing.pairingCode)}&expiresAt=${encodeURIComponent(createdPairing.expiresAt)}`}
+            >
+              Çağrı ajanını aç
+            </a>
+          </div>
+        )}
       </section>
 
       {(error || notice) && (
@@ -216,7 +218,7 @@ export default function CallAgentSettingsPage() {
       </section>
 
       <p className="call-agent-settings-note">
-        Bu ayar yalnızca ajan cihaz yetkisini yönetir. Kumanda/masa eşleştirmesi, gerçek RF sinyali ve gerçek masa çağrısı bu aşamada etkin değildir.
+        İptal edilen cihazı yeniden kullanmak için yeni bir eşleştirme kodu oluşturun. Cihaz kaydı ve RF tuş tanımları yerel ajan verilerinde korunur.
       </p>
     </main>
   )

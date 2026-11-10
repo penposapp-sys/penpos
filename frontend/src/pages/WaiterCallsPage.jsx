@@ -1,28 +1,30 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
+import './WaiterCallsPage.css'
 
-const formatDateTime = (value) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+const formatRelativeTime = (value, now) => {
+  const createdAt = new Date(value).getTime()
+  if (!Number.isFinite(createdAt)) return 'Zaman bilgisi yok'
+  const elapsedMinutes = Math.max(0, Math.floor((now - createdAt) / 60_000))
+  if (elapsedMinutes === 0) return 'Az önce'
+  if (elapsedMinutes < 60) return `${elapsedMinutes} dk önce`
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours < 24) {
+    const remainingMinutes = elapsedMinutes % 60
+    return remainingMinutes ? `${elapsedHours} sa ${remainingMinutes} dk önce` : `${elapsedHours} sa önce`
+  }
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  return `${elapsedDays} gün önce`
 }
 
 export default function WaiterCallsPage() {
-  const nav = useNavigate()
   const [calls, setCalls] = useState([])
-  const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState('')
+  const [now, setNow] = useState(Date.now())
 
   const load = async () => {
-    setLoading(true)
     try {
       const res = await api('/api/tenant/waiter-calls?status=open', {
         silent: true,
@@ -36,15 +38,17 @@ export default function WaiterCallsPage() {
       setCalls(Array.isArray(res?.calls) ? res.calls : [])
     } catch (err) {
       toast.error(err?.message || 'Garson çağrıları yüklenemedi')
-    } finally {
-      setLoading(false)
     }
   }
 
   useEffect(() => {
     load()
     const timer = window.setInterval(load, 5000)
-    return () => window.clearInterval(timer)
+    const clock = window.setInterval(() => setNow(Date.now()), 15_000)
+    return () => {
+      window.clearInterval(timer)
+      window.clearInterval(clock)
+    }
   }, [])
 
   const resolveCall = async (call) => {
@@ -71,81 +75,36 @@ export default function WaiterCallsPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em' }}>Garson Çağrıları</div>
-          <div style={{ marginTop: 6, color: 'var(--muted)' }}>
-            QR menüden gelen açık masa çağrılarını buradan takip edebilirsiniz.
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" type="button" onClick={load} disabled={loading}>
-            {loading ? 'Yükleniyor...' : 'Yenile'}
-          </button>
-          <button className="btn" type="button" onClick={() => nav('/restoran/app/tables')}>
-            Masalara Dön
-          </button>
-        </div>
-      </div>
-
+    <main className="waiter-calls-screen">
+      <Link className="waiter-calls-back" to="/restoran/app/tables">
+        ← Masalara Geri Dön
+      </Link>
       {calls.length > 0 ? (
-        <div className="tablesGrid">
+        <section className="waiter-calls-grid" aria-label="Açık masa çağrıları">
           {calls.map((call) => (
-            <div
+            <article
               key={call.id}
-              className="card"
-              style={{
-                display: 'grid',
-                gap: 10,
-                minHeight: 156,
-                alignContent: 'start',
-                borderRadius: 18,
-                borderWidth: 1.5,
-                borderColor: '#f97316',
-                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
-                position: 'relative'
-              }}
+              className={`waiter-call-card ${call.callType === 'service_request' ? 'waiter-call-card--service' : ''}`}
             >
-              <span
-                className="page-pill"
-                style={{
-                  position: 'absolute',
-                  top: 12,
-                  right: 12,
-                  background: '#f97316',
-                  borderColor: '#f97316',
-                  color: '#fff'
-                }}
-              >
-                Açık Çağrı
-              </span>
-
-              <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.15, paddingRight: 90 }}>
-                {call.tableName || 'Masa seçilmedi'}
+              <div className="waiter-call-card__topline" aria-label="Açık çağrı">
+                <span className="waiter-call-card__signal" aria-hidden="true" />
               </div>
-
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-                {formatDateTime(call.createdAt)}
+              <h2>{call.tableName || 'Masa'}</h2>
+              <div className="waiter-call-card__message">
+                {call.callType === 'service_request' ? 'SERVİS İSTİYOR' : 'GARSON ÇAĞIRIYOR'}
               </div>
-
-              <div style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
-                QR menü üzerinden garson çağrısı oluşturuldu.
-              </div>
-
-              <div style={{ marginTop: 'auto' }}>
-                <button className="btn" type="button" onClick={() => resolveCall(call)} disabled={busyId === call.id}>
-                  {busyId === call.id ? 'Kapatılıyor...' : 'Çağrıyı Kapat'}
-                </button>
-              </div>
-            </div>
+              <div className="waiter-call-card__time">{formatRelativeTime(call.createdAt, now)}</div>
+              <button className="waiter-call-card__resolve" type="button" onClick={() => resolveCall(call)} disabled={busyId === call.id}>
+                {busyId === call.id ? 'KAPATILIYOR…' : 'ÇAĞRIYI KAPAT'}
+              </button>
+            </article>
           ))}
-        </div>
+        </section>
       ) : null}
 
-      {calls.length === 0 && !loading ? (
-        <div className="card">Açık garson çağrısı yok.</div>
+      {calls.length === 0 ? (
+        <div className="waiter-calls-empty"><span className="waiter-calls-empty__pulse" />Açık çağrı yok</div>
       ) : null}
-    </div>
+    </main>
   )
 }

@@ -94,3 +94,18 @@ test('simulator persistence has no backend/network route', async () => {
   assert.match(main, /ipcMain\.handle\('simulator:press'[\s\S]*?getSimulatorStore\(\)\.create\(buttonCode\)/)
   assert.doesNotMatch(main.match(/ipcMain\.handle\('simulator:press'[\s\S]*?\n\}\)/)?.[0] || '', /callAgentClient|fetch\s*\(/)
 })
+
+test('raw RF captures are validated and stay diagnostic until a real protocol is mapped', async () => {
+  const main = await readElectronFile('main.js')
+  const preload = await readElectronFile('preload.cjs')
+  const protocol = await readElectronFile('serialProtocol.js')
+  const captureHandler = main.match(/if \(parsed\.kind === 'capture'\) \{[\s\S]*?\n      \}/)?.[0] || ''
+
+  assert.match(main, /parseSerialLine\(line\)/)
+  assert.match(main, /sendSerialEvent\(parsed\.event\)/)
+  assert.match(preload, /ipcRenderer\.on\('serial:event'/)
+  assert.match(protocol, /message\.eventType !== 'raw_capture'/)
+  assert.match(protocol, /message\.protocol !== 'unknown'/)
+  assert.match(protocol, /message\.deviceId !== '' \|\| message\.buttonCode !== ''/)
+  assert.doesNotMatch(captureHandler, /callAgentClient|fetch\s*\(|request\s*\(/)
+})

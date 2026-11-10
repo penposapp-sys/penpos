@@ -13,13 +13,11 @@ export const requireCallAgentAuth = async (req, res, next) => {
     const token = getBearerToken(req)
     if (!token) throw error('unauthorized', 'Çağrı ajanı erişim anahtarı gerekli', 401)
 
-    const now = new Date()
     const tokenSession = await CallAgentTokenSession.findOne({
       accessTokenHash: hashSecret(token),
-      revokedAt: null,
-      accessExpiresAt: { $gt: now }
+      revokedAt: null
     })
-    if (!tokenSession) throw error('unauthorized', 'Çağrı ajanı erişim anahtarı geçersiz veya süresi dolmuş', 401)
+    if (!tokenSession) throw error('unauthorized', 'Çağrı ajanı erişim anahtarı geçersiz veya cihaz iptal edilmiş', 401)
 
     const device = await CallAgentDevice.findOne({
       _id: tokenSession.deviceId,

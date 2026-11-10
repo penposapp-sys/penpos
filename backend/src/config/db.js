@@ -4,6 +4,7 @@ import * as logger from '../utils/logger.js'
 import User from '../models/User.js'
 import Reservation from '../models/Reservation.js'
 import Order from '../models/Order.js'
+import CallAgentTokenSession from '../models/CallAgentTokenSession.js'
 
 dotenv.config()
 
@@ -52,6 +53,17 @@ const syncQuickSaleRequestIndex = async () => {
   )
 }
 
+const removeCallAgentTokenExpiryIndex = async () => {
+  const collection = mongoose.connection.db.collection('call_agent_token_sessions')
+  const indexes = await collection.indexes()
+  const expiryIndex = indexes.find((index) => index.key?.refreshExpiresAt === 1 && Number.isFinite(index.expireAfterSeconds))
+  if (expiryIndex) {
+    await collection.dropIndex(expiryIndex.name)
+    logger.info(`Dropped call-agent session expiry index: ${expiryIndex.name}`)
+  }
+  await CallAgentTokenSession.createIndexes()
+}
+
 export const connectDB = async () => {
   const uri = (process.env.MONGODB_URI || process.env.MONGO_URI || '').trim()
   try {
@@ -69,6 +81,7 @@ export const connectDB = async () => {
     await syncUserIndexes()
     await syncReservationSlotIndex()
     await syncQuickSaleRequestIndex()
+    await removeCallAgentTokenExpiryIndex()
     try {
       const admin = mongoose.connection.db.admin()
       let info

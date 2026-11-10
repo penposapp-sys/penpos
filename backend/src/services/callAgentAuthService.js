@@ -8,9 +8,9 @@ import Tenant from '../models/Tenant.js'
 
 export const PAIRING_TTL_MS = 10 * 60 * 1000
 export const PAIRING_MAX_ATTEMPTS = 6
-export const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000
-export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
-export const MAX_REFRESH_ROTATIONS = 1000
+// Device sessions remain valid until an administrator revokes the device.
+// Keep a far-future timestamp for compatibility with older agent clients and the DB schema.
+export const DEVICE_TOKEN_EXPIRY = new Date('9999-12-31T23:59:59.999Z')
 
 const PAIRING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -51,8 +51,8 @@ const createTokenPair = () => ({
 })
 
 const sessionDoc = async (device, tokens, now, familyId = randomUUID()) => {
-  const accessExpiresAt = new Date(now.getTime() + ACCESS_TOKEN_TTL_MS)
-  const refreshExpiresAt = new Date(now.getTime() + REFRESH_TOKEN_TTL_MS)
+  const accessExpiresAt = DEVICE_TOKEN_EXPIRY
+  const refreshExpiresAt = DEVICE_TOKEN_EXPIRY
   const session = await CallAgentTokenSession.create({
     deviceId: device._id,
     tenantId: device.tenantId,
@@ -200,8 +200,10 @@ const ensureApprovedDevice = async (session, { tenantId, branchId, userId, devic
   return device
 }
 
-export const completePairing = async ({ session, pollSecret }) => {
-  if (!safeHashEqual(hashSecret(pollSecret), session.pollSecretHash)) {
+export const completePairing = async ({ session, pollSecret, pairingCode }) => {
+  const secretValid = pollSecret && safeHashEqual(hashSecret(pollSecret), session.pollSecretHash)
+  const codeValid = pairingCode && safeHashEqual(hashPairingCode(pairingCode, session.codeSalt), session.codeHash)
+  if (!secretValid && !codeValid) {
     throw error('invalid_pairing_secret', 'Eşleştirme oturum anahtarı geçersiz', 401)
   }
   if (session.status === 'pending' && new Date(session.expiresAt).getTime() <= Date.now()) {
@@ -286,23 +288,19 @@ export const rotateRefreshToken = async (refreshToken) => {
     throw error('device_not_active', 'Cihaz yetkisi etkin değil', 403)
   }
   await validateDeviceScope(device)
-  const refreshHistory = Array.isArray(current.refreshTokenHistory) ? current.refreshTokenHistory : []
-  if (refreshHistory.length >= MAX_REFRESH_ROTATIONS) {
-    await CallAgentTokenSession.updateOne({ _id: current._id, revokedAt: null }, { $set: { revokedAt: now } })
-    throw error('refresh_rotation_limit', 'Oturum yenileme sınırına ulaşıldı; cihazı yeniden eşleştirin', 401)
-  }
-
   const tokens = createTokenPair()
-  const accessExpiresAt = new Date(now.getTime() + ACCESS_TOKEN_TTL_MS)
+  const accessExpiresAt = DEVICE_TOKEN_EXPIRY
+  const refreshExpiresAt = DEVICE_TOKEN_EXPIRY
   const rotated = await CallAgentTokenSession.findOneAndUpdate(
     { _id: current._id, refreshTokenHash: tokenHash, revokedAt: null, refreshExpiresAt: { $gt: now } },
     {
       $set: {
         accessTokenHash: hashSecret(tokens.accessToken),
         refreshTokenHash: hashSecret(tokens.refreshToken),
-        accessExpiresAt
+        accessExpiresAt,
+        refreshExpiresAt
       },
-      $push: { refreshTokenHistory: tokenHash }
+      $push: { refreshTokenHistory: { $each: [tokenHash], $slice: -16 } }
     },
     { new: true }
   )

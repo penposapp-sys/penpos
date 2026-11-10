@@ -56,7 +56,13 @@ export default function NativePushBridge() {
           calls.forEach((call) => {
             const id = String(call?.id || '')
             if (id && !knownWaiterCallIdsRef.current.has(id)) {
-              notifyWaiterCall(id, 'Garson çağrısı', `${call.tableName || 'Masa'} garson çağırıyor.`)
+              notifyWaiterCall(
+                id,
+                call.callType === 'service_request' ? 'Servis talebi' : 'Garson çağrısı',
+                call.callType === 'service_request'
+                  ? `${call.tableName || 'Masa'} servis istiyor.`
+                  : `${call.tableName || 'Masa'} garson çağırıyor.`
+              )
             }
           })
         } else {

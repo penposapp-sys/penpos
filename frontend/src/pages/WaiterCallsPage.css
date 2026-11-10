@@ -1,0 +1,231 @@
+.waiter-calls-screen {
+  display: grid;
+  gap: 16px;
+  padding: 8px 2px 20px;
+}
+
+.waiter-calls-back {
+  display: none;
+}
+
+.waiter-calls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.waiter-call-card {
+  --call-accent: #ed6b14;
+  --call-soft: #fff4e9;
+  display: flex;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px 16px;
+  border: 3px solid var(--call-accent);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #fff 0%, var(--call-soft) 100%);
+  box-shadow: 0 8px 22px rgba(32, 43, 56, .09);
+  animation: waiter-call-attention 2.4s ease-in-out infinite;
+}
+
+.waiter-call-card--service {
+  --call-accent: #087f8c;
+  --call-soft: #e8f9fa;
+}
+
+.waiter-call-card__topline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: var(--call-accent);
+}
+
+.waiter-call-card__signal,
+.waiter-calls-empty__pulse {
+  position: relative;
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  border-radius: 50%;
+  background: var(--call-accent, #ed6b14);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--call-accent, #ed6b14) 18%, transparent);
+}
+
+/* Alert cards override the POS-wide typography scale for a distant viewing screen. */
+body.pos-app-layout #root .waiter-call-card {
+  display: grid;
+  grid-template-rows: 16px repeat(3, minmax(40px, 1fr)) 38px;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+body.pos-app-layout #root .waiter-call-card__topline {
+  justify-content: center;
+  margin: 0;
+}
+
+body.pos-app-layout #root .waiter-call-card h2 {
+  font-size: clamp(27px, 3vw, 43.5px) !important;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+body.pos-app-layout #root .waiter-call-card__message {
+  margin-top: 0;
+  color: #111827;
+  font-size: clamp(27px, 3vw, 43.5px) !important;
+  font-weight: 950 !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+body.pos-app-layout #root .waiter-call-card__time {
+  margin-top: 0;
+  color: #111827;
+  font-size: clamp(27px, 3vw, 43.5px) !important;
+  font-weight: 950 !important;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+body.pos-app-layout #root .waiter-call-card__resolve {
+  min-height: 38px;
+  margin-top: 0;
+  padding: 0 16px;
+  font-size: 13px !important;
+}
+
+body.pos-app-layout #root .waiter-calls-empty {
+  font-size: 26px !important;
+}
+
+.waiter-call-card__signal::after,
+.waiter-calls-empty__pulse::after {
+  position: absolute;
+  inset: -7px;
+  border: 2px solid var(--call-accent, #ed6b14);
+  border-radius: 50%;
+  content: '';
+  animation: waiter-call-beacon 1.8s ease-out infinite;
+}
+
+.waiter-call-card__status {
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: .13em;
+}
+
+.waiter-call-card h2 {
+  margin: 0;
+  color: #111827;
+  font-size: clamp(36px, 4vw, 58px);
+  font-weight: 950;
+  letter-spacing: -.045em;
+  line-height: 1;
+}
+
+.waiter-call-card__message {
+  margin-top: 22px;
+  color: #182230;
+  font-size: clamp(28px, 3.1vw, 46px);
+  font-weight: 950;
+  letter-spacing: -.035em;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.waiter-call-card__time {
+  margin-top: 14px;
+  color: #536174;
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 700;
+}
+
+.waiter-call-card__resolve {
+  min-height: 50px;
+  margin-top: auto;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--call-accent);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+
+.waiter-call-card__resolve:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+.waiter-calls-empty {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  border: 1px solid #dce3eb;
+  border-radius: 20px;
+  color: #536174;
+  background: #fff;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.waiter-calls-empty__pulse {
+  --call-accent: #22a06b;
+  width: 13px;
+  height: 13px;
+  flex-basis: 13px;
+}
+
+@keyframes waiter-call-attention {
+  0%, 100% { box-shadow: 0 8px 22px rgba(32, 43, 56, .09), 0 0 0 0 color-mix(in srgb, var(--call-accent) 0%, transparent); }
+  50% { box-shadow: 0 12px 28px rgba(32, 43, 56, .13), 0 0 0 5px color-mix(in srgb, var(--call-accent) 14%, transparent); }
+}
+
+@keyframes waiter-call-beacon {
+  0% { transform: scale(.65); opacity: .75; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
+
+@media (max-width: 900px) {
+  .waiter-calls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .waiter-calls-grid { grid-template-columns: 1fr; }
+  .waiter-call-card { min-height: 280px; }
+}
+
+@media (max-width: 767px) {
+  body.pos-app-layout #root .waiter-calls-back {
+    display: inline-flex;
+    width: fit-content;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    border: 1px solid #dce3eb;
+    border-radius: 12px;
+    color: #182230;
+    background: #fff;
+    font-size: 15px !important;
+    font-weight: 800;
+    text-decoration: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiter-call-card,
+  .waiter-call-card__signal::after,
+  .waiter-calls-empty__pulse::after { animation: none; }
+}

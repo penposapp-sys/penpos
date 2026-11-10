@@ -9,14 +9,13 @@ const schema = new mongoose.Schema(
     accessTokenHash: { type: String, required: true, unique: true },
     refreshTokenHash: { type: String, required: true, unique: true },
     refreshTokenHistory: { type: [String], default: [] },
-    accessExpiresAt: { type: Date, required: true, index: true },
-    refreshExpiresAt: { type: Date, required: true, index: true },
+    accessExpiresAt: { type: Date, required: true },
+    refreshExpiresAt: { type: Date, required: true },
     revokedAt: { type: Date, default: null, index: true }
   },
   { timestamps: true, collection: 'call_agent_token_sessions' }
 )
 
-schema.index({ refreshExpiresAt: 1 }, { expireAfterSeconds: 0 })
 schema.index({ deviceId: 1, revokedAt: 1 })
 
 export default mongoose.model('CallAgentTokenSession', schema)

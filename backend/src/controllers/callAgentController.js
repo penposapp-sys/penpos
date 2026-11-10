@@ -1,9 +1,11 @@
 import mongoose from 'mongoose'
+import { randomUUID } from 'node:crypto'
 import Branch from '../models/Branch.js'
 import CallAgentDevice from '../models/CallAgentDevice.js'
 import CallAgentPairingSession from '../models/CallAgentPairingSession.js'
 import CallAgentTokenSession from '../models/CallAgentTokenSession.js'
 import Tenant from '../models/Tenant.js'
+import Table from '../models/Table.js'
 import { log as auditLog } from '../services/auditService.js'
 import {
   approvePairingSession,
@@ -12,6 +14,7 @@ import {
   rotateRefreshToken
 } from '../services/callAgentAuthService.js'
 import { error, sendError } from '../utils/errors.js'
+import { cancelCallAgentCallsByTable, createWaiterCall } from '../services/waiterCallService.js'
 
 const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 const PAIRING_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{12}$/i
@@ -62,6 +65,50 @@ export const createPairing = async (req, res) => {
   }
 }
 
+export const createDashboardPairing = async (req, res) => {
+  try {
+    const deviceName = String(req.body?.deviceName || '').trim()
+    if (deviceName.length > 100) throw error('invalid_request', 'Cihaz adı en fazla 100 karakter olabilir', 400)
+    const { tenantId, branchId } = await validateBranchForUser(req, req.body?.branchId)
+    const deviceId = randomUUID()
+    const pairing = await createPairingSession({ deviceId, deviceName })
+    const session = await CallAgentPairingSession.findById(pairing.pairingId)
+    if (!session) throw error('pairing_not_found', 'Yeni eşleştirme isteği bulunamadı', 500)
+    const device = await approvePairingSession({
+      session,
+      code: pairing.pairingCode,
+      tenantId,
+      branchId,
+      userId: req.user.id,
+      deviceName
+    })
+    await auditLog(tenantId, req.user.id, 'call_agent_device_paired', 'CallAgentDevice', device._id, {
+      deviceId,
+      branchId: String(branchId),
+      source: 'settings'
+    })
+    const approvedSession = await CallAgentPairingSession.findById(pairing.pairingId).select('expiresAt').lean()
+    res.status(201).json({
+      success: true,
+      device: {
+        id: String(device._id),
+        deviceId: device.deviceId,
+        name: device.name,
+        branchId: String(device.branchId),
+        status: device.status
+      },
+      pairing: {
+        pairingId: pairing.pairingId,
+        deviceId,
+        pairingCode: pairing.pairingCode,
+        expiresAt: approvedSession?.expiresAt || pairing.expiresAt
+      }
+    })
+  } catch (err) {
+    sendControllerError(res, err)
+  }
+}
+
 export const approvePairing = async (req, res) => {
   try {
     const pairingId = validatePairingId(req.params.pairingId)
@@ -107,10 +154,13 @@ export const completePairingRequest = async (req, res) => {
   try {
     const pairingId = validatePairingId(req.params.pairingId)
     const pollSecret = String(req.headers['x-pairing-secret'] || '').trim()
-    if (!pollSecret || pollSecret.length > 200) throw error('invalid_pairing_secret', 'Eşleştirme oturum anahtarı gerekli', 401)
+    const pairingCode = String(req.headers['x-pairing-code'] || '').trim().toUpperCase()
+    if ((!pollSecret || pollSecret.length > 200) && !PAIRING_CODE_PATTERN.test(pairingCode)) {
+      throw error('invalid_pairing_secret', 'Eşleştirme oturum anahtarı gerekli', 401)
+    }
     const session = await CallAgentPairingSession.findById(pairingId)
     if (!session) throw error('pairing_not_found', 'Eşleştirme isteği bulunamadı', 404)
-    const result = await completePairing({ session, pollSecret })
+    const result = await completePairing({ session, pollSecret, pairingCode })
     res.json({ success: true, ...result })
   } catch (err) {
     sendControllerError(res, err)
@@ -279,6 +329,69 @@ export const revokeDevice = async (req, res) => {
       { $set: { revokedAt: new Date() } }
     )
     res.json({ success: true, deviceId, status: 'revoked' })
+  } catch (err) {
+    sendControllerError(res, err)
+  }
+}
+
+const assertAuthenticatedDeviceRoute = (req) => {
+  const deviceId = String(req.params.deviceId || '').trim()
+  if (!deviceId || deviceId !== req.callAgentAuth?.deviceId) {
+    throw error('forbidden', 'Cihaz kapsamı eşleşmiyor', 403)
+  }
+}
+
+export const listRfTables = async (req, res) => {
+  try {
+    assertAuthenticatedDeviceRoute(req)
+    const tables = await Table.find({
+      tenantId: req.callAgentAuth.tenantId,
+      branchId: req.callAgentAuth.branchId,
+      isActive: true
+    }).select('_id name').sort({ name: 1 }).lean()
+    res.json({
+      success: true,
+      tables: tables.map((table) => ({ id: String(table._id), name: String(table.name || '') }))
+    })
+  } catch (err) {
+    sendControllerError(res, err)
+  }
+}
+
+export const performRfAction = async (req, res) => {
+  try {
+    assertAuthenticatedDeviceRoute(req)
+    const action = String(req.body?.action || '').trim()
+    const tableId = String(req.body?.tableId || '').trim()
+    if (!['waiter_call', 'service_request', 'cancel'].includes(action)) {
+      throw error('invalid_request', 'Tuş işlemi tanınmıyor', 400)
+    }
+    if (!mongoose.isValidObjectId(tableId)) throw error('invalid_request', 'Geçerli bir masa seçilmelidir', 400)
+    const table = await Table.findOne({
+      _id: tableId,
+      tenantId: req.callAgentAuth.tenantId,
+      branchId: req.callAgentAuth.branchId,
+      isActive: true
+    }).select('_id name').lean()
+    if (!table) throw error('table_not_found', 'Seçilen masa bu cihaza bağlı şubede bulunamadı', 404)
+
+    if (action === 'cancel') {
+      const result = await cancelCallAgentCallsByTable({
+        tenantId: req.callAgentAuth.tenantId,
+        tableId: String(table._id),
+        callAgentDeviceId: req.callAgentAuth.deviceId
+      })
+      return res.json({ success: true, action, table: { id: String(table._id), name: table.name }, ...result })
+    }
+
+    const call = await createWaiterCall({
+      tenantId: req.callAgentAuth.tenantId,
+      tableId: String(table._id),
+      callType: action,
+      source: 'call_agent',
+      callAgentDeviceId: req.callAgentAuth.deviceId
+    })
+    return res.json({ success: true, action, table: { id: String(table._id), name: table.name }, call })
   } catch (err) {
     sendControllerError(res, err)
   }

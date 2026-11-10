@@ -1,7 +1,7 @@
 import { toast } from './toast.js'
 import { getSubscriptionUpgradePath, isSubscriptionAllowedPath } from './subscription.js'
 import { getAuthToken, removeAuthToken } from './authStorage.js'
-import { resolveApiBase } from './runtimeApi.js'
+import { isLocalDevHostname, resolveApiBase } from './runtimeApi.js'
 
 const inflight = new Map()
 const cache = new Map()
@@ -183,7 +183,13 @@ export const api = async (path, options = {}) => {
 
   const attemptRequest = async (attempt) => {
     const normalizedPath = normalizeApiPath(path)
-    const urlRaw = /^https?:\/\//i.test(normalizedPath) ? normalizedPath : `${base}${normalizedPath}`
+    const isLocalCallAgentDevRequest = import.meta.env.DEV
+      && normalizedPath.startsWith('/api/call-agents')
+      && typeof window !== 'undefined'
+      && isLocalDevHostname(window.location?.hostname)
+    const urlRaw = /^https?:\/\//i.test(normalizedPath)
+      ? normalizedPath
+      : (isLocalCallAgentDevRequest ? `${window.location.origin}${normalizedPath}` : `${base}${normalizedPath}`)
     let url = urlRaw
     try {
       if (requestParams && typeof requestParams === 'object') {
@@ -193,7 +199,7 @@ export const api = async (path, options = {}) => {
         })
         url = /^https?:\/\//i.test(urlRaw) ? parsed.toString() : `${parsed.pathname}${parsed.search}`
       }
-      if (import.meta.env.DEV && /^https?:\/\//i.test(urlRaw)) {
+      if (import.meta.env.DEV && !isLocalCallAgentDevRequest && /^https?:\/\//i.test(urlRaw)) {
         const u = new URL(url)
         u.port = '4000'
         url = u.toString()

@@ -1,6 +1,6 @@
 {
   "name": "penpos-call-agent",
-  "version": "0.1.0",
+  "version": "0.1.13",
   "private": true,
   "description": "PenPOS Çağrı Ajanı masaüstü uygulaması",
   "main": "electron/main.js",
@@ -28,6 +28,14 @@
   "build": {
     "appId": "com.penpos.callagent",
     "productName": "PenPOS Çağrı Ajanı",
+    "protocols": [
+      {
+        "name": "PenPOS Çağrı Ajanı eşleştirme",
+        "schemes": [
+          "penpos-call-agent"
+        ]
+      }
+    ],
     "directories": {
       "output": "release"
     },
@@ -35,6 +43,12 @@
       "electron/**/*",
       "dist/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/serialPortReader.ps1",
+        "to": "serialPortReader.ps1"
+      }
     ],
     "asar": true,
     "win": {

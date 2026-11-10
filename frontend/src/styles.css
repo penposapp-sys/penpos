@@ -16017,8 +16017,8 @@ body.pos-app-layout .modal-backdrop * {
   font-family: var(--app-font-family);
 }
 
-body.pos-app-layout #root :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *):not(.kasaProductCardCompactValue),
-body.pos-app-layout .modal-backdrop :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *) {
+body.pos-app-layout #root :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *):not(.kasaProductCardCompactValue):not(.waiter-call-card__message):not(.waiter-call-card__time),
+body.pos-app-layout .modal-backdrop :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(svg):not(path):not([role="heading"]):not(.pos-page-heading):not(.settings-card-title):not(.settings-page-title):not(.qr-ref-section-title):not(.page-title):not(.pageTitle):not(.hero-title):not(.pos-sidebar nav):not(.pos-sidebar nav *):not(.waiter-call-card__message):not(.waiter-call-card__time) {
   font-size: var(--app-font-size) !important;
 }
 

@@ -199,7 +199,7 @@ export const sendPushToUsers = async (users = [], payload = {}) => {
   return result
 }
 
-export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName = '', waiterCallId = '' } = {}) => {
+export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName = '', waiterCallId = '', callType = 'waiter_call' } = {}) => {
   const users = await User.find({
     tenantId,
     isDeleted: { $ne: true },
@@ -218,11 +218,14 @@ export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName
   })
 
   return sendPushToUsers(visibleUsers, {
-    title: 'Garson Cagrisi',
-    body: tableName ? `${tableName} masasi garson cagiriyor.` : 'Yeni garson cagrisi var.',
+    title: callType === 'service_request' ? 'Servis Talebi' : 'Garson Cagrisi',
+    body: tableName
+      ? (callType === 'service_request' ? `${tableName} masasi servis istiyor.` : `${tableName} masasi garson cagiriyor.`)
+      : (callType === 'service_request' ? 'Yeni servis talebi var.' : 'Yeni garson cagrisi var.'),
     channelId: 'penpos-alerts',
     data: {
       type: 'waiter_call',
+      callType: callType === 'service_request' ? 'service_request' : 'waiter_call',
       waiterCallId,
       branchId: String(branchId || ''),
       tableName: tableName || '',

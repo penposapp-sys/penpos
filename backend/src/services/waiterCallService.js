@@ -10,13 +10,20 @@ const toDto = (call) => ({
   tableId: call?.tableId ? String(call.tableId) : '',
   branchId: call?.branchId ? String(call.branchId) : '',
   tableName: String(call?.tableName || ''),
+  callType: String(call?.callType || 'waiter_call'),
   status: String(call?.status || 'open'),
   source: String(call?.source || 'public_qr_menu'),
   createdAt: call?.createdAt || null,
   resolvedAt: call?.resolvedAt || null,
 })
 
-export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '' }) => {
+export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '', callType = 'waiter_call', source = 'public_qr_menu', callAgentDeviceId = '' }) => {
+  const normalizedCallType = ['waiter_call', 'service_request'].includes(callType) ? callType : 'waiter_call'
+  const normalizedSource = ['public_qr_menu', 'call_agent'].includes(source) ? source : 'public_qr_menu'
+  const normalizedCallAgentDeviceId = normalizedSource === 'call_agent' ? String(callAgentDeviceId || '').trim() : ''
+  if (normalizedSource === 'call_agent' && !normalizedCallAgentDeviceId) {
+    throw error('invalid_request', 'Cihaz kimliği gerekli', 400)
+  }
   const normalizedTableId = String(tableId || '').trim()
   let resolvedTableName = String(tableName || '').trim()
   let resolvedTableId = null
@@ -53,6 +60,11 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '' 
   const existing = await WaiterCall.findOne({
     tenantId,
     status: 'open',
+    source: normalizedSource,
+    ...(normalizedSource === 'call_agent' ? { callAgentDeviceId: normalizedCallAgentDeviceId } : {}),
+    ...(normalizedCallType === 'waiter_call'
+      ? { $or: [{ callType: 'waiter_call' }, { callType: { $exists: false } }] }
+      : { callType: normalizedCallType }),
     ...(resolvedTableId ? { tableId: resolvedTableId } : { tableName: resolvedTableName }),
   }).sort({ createdAt: -1 })
 
@@ -63,7 +75,9 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '' 
     tableId: resolvedTableId,
     branchId: resolvedBranchId || null,
     tableName: resolvedTableName,
-    source: 'public_qr_menu',
+    callType: normalizedCallType,
+    source: normalizedSource,
+    ...(normalizedSource === 'call_agent' ? { callAgentDeviceId: normalizedCallAgentDeviceId } : {}),
     status: 'open',
   })
 
@@ -72,13 +86,28 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '' 
       tenantId,
       branchId: resolvedBranchId,
       tableName: resolvedTableName,
-      waiterCallId: String(created?._id || '')
+      waiterCallId: String(created?._id || ''),
+      callType: normalizedCallType
     })
   } catch (notificationError) {
     console.error('Waiter call push notification failed', notificationError)
   }
 
   return toDto(created)
+}
+
+export const cancelCallAgentCallsByTable = async ({ tenantId, tableId, callAgentDeviceId }) => {
+  const normalizedTableId = String(tableId || '').trim()
+  const normalizedCallAgentDeviceId = String(callAgentDeviceId || '').trim()
+  if (!mongoose.Types.ObjectId.isValid(normalizedTableId)) {
+    throw error('invalid_request', 'Gecersiz masa secimi', 400)
+  }
+  if (!normalizedCallAgentDeviceId) throw error('invalid_request', 'Cihaz kimliği gerekli', 400)
+  const result = await WaiterCall.updateMany(
+    { tenantId, tableId: normalizedTableId, source: 'call_agent', callAgentDeviceId: normalizedCallAgentDeviceId, status: 'open' },
+    { $set: { status: 'resolved', resolvedAt: new Date() } }
+  )
+  return { cancelledCount: Number(result?.modifiedCount || 0) }
 }
 
 const buildBranchScopeFilter = async (tenantId, branchIds) => {
