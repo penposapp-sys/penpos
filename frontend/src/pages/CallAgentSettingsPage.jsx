@@ -124,7 +124,7 @@ export default function CallAgentSettingsPage() {
               href="/public/downloads/call-agent/PenPOS-Cagri-Ajani-Setup.exe?v=0.1.13"
               download="PenPOS-Cagri-Ajani-Setup-0.1.13.exe"
             >
-              EXE İndir · 0.1.13
+              Çağrı Ajanını İndir
             </a>
             <span className="call-agent-settings-tag">HTTPS EŞLEŞTİRME</span>
           </div>

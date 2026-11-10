@@ -80,14 +80,22 @@
   align-items: center;
   justify-content: center;
   padding: 0 13px;
-  border: 1px solid var(--settings-accent, #385ec8);
+  border: 1px solid #385ec8;
   border-radius: 9px;
-  color: var(--settings-accent-text, #fff);
-  background: var(--settings-accent, #385ec8);
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+  background: #385ec8;
   font-size: 12px;
   font-weight: 800;
-  text-decoration: none;
+  line-height: 1.2;
+  text-decoration: none !important;
   white-space: nowrap;
+}
+
+.call-agent-download-button:hover {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+  background: #294bb0;
 }
 
 .call-agent-settings-refresh,
