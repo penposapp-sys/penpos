@@ -55,6 +55,39 @@ export default function CallAgentSettingsPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    if (!createdPairing?.deviceId) return undefined
+
+    const checkAgentConnection = async () => {
+      try {
+        const response = await api('/api/call-agents/devices', {
+          silent: true,
+          skipBranchHeader: true,
+          cacheMode: 'no-store'
+        })
+        if (!response.ok || !Array.isArray(response.devices)) return
+
+        const activeDevices = response.devices.filter((device) => device.status === 'active')
+        setDevices(activeDevices)
+        const connected = activeDevices.some((device) => (
+          device.deviceId === createdPairing.deviceId && device.lastHeartbeatAt
+        ))
+
+        if (connected) {
+          setCreatedPairing(null)
+          sessionStorage.removeItem('penpos-call-agent-pairing')
+          setNotice('Çağrı ajanı bağlandı. Eşleştirme bilgileri gizlendi.')
+        }
+      } catch {
+        // Bağlantı geçici olarak kontrol edilemezse eşleştirme bilgisini koru.
+      }
+    }
+
+    const intervalId = window.setInterval(checkAgentConnection, 3000)
+    checkAgentConnection()
+    return () => window.clearInterval(intervalId)
+  }, [createdPairing])
+
   const createPairing = async () => {
     setBusy(true)
     setError('')
