@@ -13,14 +13,15 @@ export default function NativePushBridge() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const lastTokenRef = useRef('')
-  const knownWaiterCallIdsRef = useRef(new Set())
+  const knownWaiterCallRevisionsRef = useRef(new Map())
   const waiterCallsInitializedRef = useRef(false)
   const { playAlert } = useKitchenAlertSound({ debounceMs: 1200 })
 
-  const notifyWaiterCall = (id, title, body) => {
+  const notifyWaiterCall = (id, title, body, revisionAt = '') => {
     const callId = String(id || '').trim()
-    if (callId && knownWaiterCallIdsRef.current.has(callId)) return
-    if (callId) knownWaiterCallIdsRef.current.add(callId)
+    const revision = String(revisionAt || '').trim()
+    if (callId && knownWaiterCallRevisionsRef.current.get(callId) === revision) return
+    if (callId) knownWaiterCallRevisionsRef.current.set(callId, revision)
     playAlert()
     toast.info([title || 'Garson çağrısı', body].filter(Boolean).join(' - '))
   }
@@ -55,25 +56,31 @@ export default function NativePushBridge() {
         if (waiterCallsInitializedRef.current) {
           calls.forEach((call) => {
             const id = String(call?.id || '')
-            if (id && !knownWaiterCallIdsRef.current.has(id)) {
+            const revision = String(call?.createdAt || '')
+            if (id && knownWaiterCallRevisionsRef.current.get(id) !== revision) {
               notifyWaiterCall(
                 id,
                 call.callType === 'service_request' ? 'Servis talebi' : 'Garson çağrısı',
                 call.callType === 'service_request'
                   ? `${call.tableName || 'Masa'} servis istiyor.`
-                  : `${call.tableName || 'Masa'} garson çağırıyor.`
+                  : `${call.tableName || 'Masa'} garson çağırıyor.`,
+                revision
               )
             }
+            if (id) knownWaiterCallRevisionsRef.current.set(id, revision)
           })
         } else {
           waiterCallsInitializedRef.current = true
+          calls.forEach((call) => {
+            const id = String(call?.id || '')
+            if (id) knownWaiterCallRevisionsRef.current.set(id, String(call?.createdAt || ''))
+          })
         }
 
         // Prune resolved calls so a later new call can be announced normally.
-        knownWaiterCallIdsRef.current = new Set(
-          [...knownWaiterCallIdsRef.current].filter((id) => currentIds.has(id))
+        knownWaiterCallRevisionsRef.current = new Map(
+          [...knownWaiterCallRevisionsRef.current].filter(([id]) => currentIds.has(id))
         )
-        currentIds.forEach((id) => knownWaiterCallIdsRef.current.add(id))
       } catch {
         // Push remains the primary delivery path; polling is a quiet fallback.
       }
@@ -180,7 +187,7 @@ export default function NativePushBridge() {
             const body = String(notification?.body || '').trim()
             const data = notification?.data || {}
             if (String(data.type || '').trim() === 'waiter_call') {
-              notifyWaiterCall(data.waiterCallId, title, body)
+              notifyWaiterCall(data.waiterCallId, title, body, data.callRevisionAt)
               return
             }
             if (title || body) toast.success([title, body].filter(Boolean).join(' - '))

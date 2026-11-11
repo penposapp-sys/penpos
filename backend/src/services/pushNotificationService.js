@@ -199,7 +199,7 @@ export const sendPushToUsers = async (users = [], payload = {}) => {
   return result
 }
 
-export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName = '', waiterCallId = '', callType = 'waiter_call' } = {}) => {
+export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName = '', waiterCallId = '', callType = 'waiter_call', callRevisionAt = '' } = {}) => {
   const users = await User.find({
     tenantId,
     isDeleted: { $ne: true },
@@ -227,6 +227,7 @@ export const notifyWaiterCallUsers = async ({ tenantId, branchId = '', tableName
       type: 'waiter_call',
       callType: callType === 'service_request' ? 'service_request' : 'waiter_call',
       waiterCallId,
+      callRevisionAt,
       branchId: String(branchId || ''),
       tableName: tableName || '',
       targetPath: '/kermes/app/waiter-calls'

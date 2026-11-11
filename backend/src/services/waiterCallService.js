@@ -83,7 +83,8 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '',
           branchId: resolvedBranchId || String(refreshed.branchId || ''),
           tableName: resolvedTableName,
           waiterCallId: String(refreshed._id || ''),
-          callType: normalizedCallType
+          callType: normalizedCallType,
+          callRevisionAt: now.toISOString()
         })
       } catch (notificationError) {
         console.error('Waiter call push notification failed', notificationError)
@@ -115,7 +116,8 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '',
       branchId: resolvedBranchId,
       tableName: resolvedTableName,
       waiterCallId: String(created?._id || ''),
-      callType: normalizedCallType
+      callType: normalizedCallType,
+      callRevisionAt: now.toISOString()
     })
   } catch (notificationError) {
     console.error('Waiter call push notification failed', notificationError)
