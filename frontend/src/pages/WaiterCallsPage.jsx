@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
+import { useKitchenAlertSound } from '../lib/useKitchenAlertSound.js'
 import './WaiterCallsPage.css'
 
 const formatRelativeTime = (value, now) => {
@@ -23,6 +24,9 @@ export default function WaiterCallsPage() {
   const [calls, setCalls] = useState([])
   const [busyId, setBusyId] = useState('')
   const [now, setNow] = useState(Date.now())
+  const callsInitializedRef = useRef(false)
+  const callRevisionsRef = useRef(new Map())
+  const { playAlert } = useKitchenAlertSound({ debounceMs: 500, storageKey: 'waiterCallSoundEnabled' })
 
   const load = async () => {
     try {
@@ -35,7 +39,23 @@ export default function WaiterCallsPage() {
         toast.error(res?.message || 'Garson çağrıları yüklenemedi')
         return
       }
-      setCalls(Array.isArray(res?.calls) ? res.calls : [])
+      const nextCalls = Array.isArray(res?.calls) ? res.calls : []
+      if (callsInitializedRef.current) {
+        const hasNewOrRefreshedCall = nextCalls.some((call) => {
+          const id = String(call?.id || '')
+          const revision = String(call?.createdAt || '')
+          return id && callRevisionsRef.current.get(id) !== revision
+        })
+        if (hasNewOrRefreshedCall) playAlert()
+      } else {
+        callsInitializedRef.current = true
+      }
+      callRevisionsRef.current = new Map(
+        nextCalls
+          .map((call) => [String(call?.id || ''), String(call?.createdAt || '')])
+          .filter(([id]) => id)
+      )
+      setCalls(nextCalls)
     } catch (err) {
       toast.error(err?.message || 'Garson çağrıları yüklenemedi')
     }
@@ -49,7 +69,7 @@ export default function WaiterCallsPage() {
       window.clearInterval(timer)
       window.clearInterval(clock)
     }
-  }, [])
+  }, [playAlert])
 
   const resolveCall = async (call) => {
     if (!call?.id || busyId) return

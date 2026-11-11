@@ -3,14 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 const STORAGE_KEY = 'kitchenSoundEnabled'
 const SOUND_SRC = '/sounds/kitchen-alert.mp3'
 
-export function useKitchenAlertSound({ debounceMs = 5000 } = {}) {
+export function useKitchenAlertSound({ debounceMs = 5000, storageKey = STORAGE_KEY } = {}) {
   const audioRef = useRef(null)
   const unlockedRef = useRef(false)
   const lastPlayedRef = useRef(0)
 
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
+      const raw = localStorage.getItem(storageKey)
       if (raw == null) return true
       return raw === '1' || raw === 'true'
     } catch {
@@ -77,9 +77,9 @@ export function useKitchenAlertSound({ debounceMs = 5000 } = {}) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, soundEnabled ? '1' : '0')
+      localStorage.setItem(storageKey, soundEnabled ? '1' : '0')
     } catch {}
-  }, [soundEnabled])
+  }, [soundEnabled, storageKey])
 
   useEffect(() => {
     if (!soundEnabled) return undefined

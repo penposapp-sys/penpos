@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../lib/apiClient.js'
 import { toast } from '../lib/toast.js'
@@ -12,17 +12,20 @@ const normalizeToken = (token) => String(token || '').trim()
 export default function NativePushBridge() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const lastTokenRef = useRef('')
   const knownWaiterCallRevisionsRef = useRef(new Map())
   const waiterCallsInitializedRef = useRef(false)
-  const { playAlert } = useKitchenAlertSound({ debounceMs: 1200 })
+  const { playAlert } = useKitchenAlertSound({ debounceMs: 500, storageKey: 'waiterCallSoundEnabled' })
 
   const notifyWaiterCall = (id, title, body, revisionAt = '') => {
     const callId = String(id || '').trim()
     const revision = String(revisionAt || '').trim()
     if (callId && knownWaiterCallRevisionsRef.current.get(callId) === revision) return
     if (callId) knownWaiterCallRevisionsRef.current.set(callId, revision)
-    playAlert()
+    // The waiter-call screen owns its own sound so its polling and push events
+    // cannot play the same alert twice.
+    if (!location.pathname.endsWith('/app/waiter-calls')) playAlert()
     toast.info([title || 'Garson çağrısı', body].filter(Boolean).join(' - '))
   }
 
@@ -92,7 +95,7 @@ export default function NativePushBridge() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [canPollWaiterCalls, user?.id, user?.tenantId, playAlert])
+  }, [canPollWaiterCalls, user?.id, user?.tenantId, playAlert, location.pathname])
 
   useEffect(() => {
     if (!user || !isCapacitorNativePlatform()) return undefined
