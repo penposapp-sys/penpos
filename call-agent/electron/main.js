@@ -271,6 +271,8 @@ const connectSerialPort = async (selectedPath) => {
   const portProcess = spawn('powershell.exe', [
     '-NoProfile',
     '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
     '-File',
     app.isPackaged
       ? path.join(process.resourcesPath, 'serialPortReader.ps1')

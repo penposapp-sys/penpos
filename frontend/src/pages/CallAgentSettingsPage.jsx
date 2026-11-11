@@ -156,8 +156,8 @@ export default function CallAgentSettingsPage() {
           <div className="call-agent-settings-quick-actions">
             <a
               className="call-agent-download-button"
-              href="/public/downloads/call-agent/PenPOS-Cagri-Ajani-Setup.exe?v=0.1.15"
-              download="PenPOS-Call-Agent-Setup-0.1.15.exe"
+              href="/public/downloads/call-agent/PenPOS-Cagri-Ajani-Setup.exe?v=0.1.16"
+              download="PenPOS-Call-Agent-Setup-0.1.16.exe"
             >
               Çağrı Ajanını İndir
             </a>
