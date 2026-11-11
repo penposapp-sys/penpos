@@ -34,6 +34,7 @@ export const requireCallAgentAuth = async (req, res, next) => {
       deviceRecordId: String(device._id),
       tenantId: String(device.tenantId),
       branchId: String(device.branchId),
+      branchIds: (device.branchIds?.length ? device.branchIds : [device.branchId]).map(String),
       tokenSessionId: String(tokenSession._id)
     }
     next()

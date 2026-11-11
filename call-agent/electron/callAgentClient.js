@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import packageJson from '../package.json' with { type: 'json' }
 
 const DEVICE_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 const PAIRING_ID_PATTERN = /^[a-f\d]{24}$/i
@@ -590,7 +591,7 @@ export class CallAgentClient {
     try {
       const heartbeatResult = await this.request(`/devices/${encodeURIComponent(this.deviceId)}/heartbeat`, {
         headers: { Authorization: `Bearer ${this.tokens.accessToken}` },
-        body: { hostname: os.hostname(), version: '0.1.0' }
+        body: { hostname: os.hostname(), version: packageJson.version }
       })
       this.setState({
         connectionStatus: 'connected',
@@ -599,7 +600,9 @@ export class CallAgentClient {
         tenantId: String(heartbeatResult.tenant?.id || this.state.tenantId),
         tenantName: String(heartbeatResult.tenant?.name || this.state.tenantName),
         branchId: String(heartbeatResult.branch?.id || this.state.branchId),
-        branchName: String(heartbeatResult.branch?.name || this.state.branchName),
+        branchName: Array.isArray(heartbeatResult.branches) && heartbeatResult.branches.length > 1
+          ? `Tüm Şubeler (${heartbeatResult.branches.length})`
+          : String(heartbeatResult.branch?.name || this.state.branchName),
         lastError: ''
       })
     } catch (error) {

@@ -253,7 +253,7 @@ function RfTablePage({ connection, tables, selectedTableIds, onToggle, onRefresh
               const selected = selectedTableIds.includes(table.id)
               return (
                 <button type="button" className={`rf-table-option ${selected ? 'selected' : ''}`} key={table.id} onClick={() => onToggle(table.id)} aria-pressed={selected}>
-                  <span><strong>{table.name}</strong><small>{selected ? 'Tuş tanımlaması açık' : 'Tuş tanımlaması kapalı'}</small></span>
+                  <span><strong>{table.name}</strong><small>{[table.branchName, selected ? 'Tuş tanımlaması açık' : 'Tuş tanımlaması kapalı'].filter(Boolean).join(' · ')}</small></span>
                   <span className={`rf-toggle ${selected ? 'on' : ''}`} aria-hidden="true"><i /></span>
                 </button>
               )
@@ -288,7 +288,7 @@ function ButtonDefinitionPage({ portState, tables, selectedTableIds, profiles, p
       <div className="rf-table-profile-list">
         {tables.filter((table) => selectedTableIds.includes(table.id)).map((table) => (
           <section className="rf-table-profile" key={table.id}>
-            <div className="section-heading"><div><h3>{table.name}</h3><p>Bu masaya ait bağımsız kumanda tuşları</p></div><span className="simulator-badge">3 TUŞ</span></div>
+            <div className="section-heading"><div><h3>{table.name}</h3><p>{[table.branchName, 'Bu masaya ait bağımsız kumanda tuşları'].filter(Boolean).join(' · ')}</p></div><span className="simulator-badge">3 TUŞ</span></div>
             <div className="rf-button-grid">
               {RF_BUTTON_ACTIONS.map(({ label, actionName }) => {
                 const key = `${table.id}:${label}`
@@ -321,7 +321,7 @@ function ButtonSettingsPage({ tables, selectedTableIds, profiles }) {
   return (
     <section className="panel connection-panel">
       <div className="section-heading"><div><h3>Çağrı tuşlarının davranışı</h3><p>Bu kumanda için etkin işlem eşlemesi.</p></div></div>
-      {tables.filter((table) => selectedTableIds.includes(table.id)).map((table) => <div className="rf-settings-row" key={table.id}><strong>{table.name}</strong><span>{RF_BUTTON_ACTIONS.map(({ label }) => `${label}: ${profiles?.[`${table.id}:${label}`] ? 'Tanımlı' : 'Boş'}`).join(' · ')}</span></div>)}
+      {tables.filter((table) => selectedTableIds.includes(table.id)).map((table) => <div className="rf-settings-row" key={table.id}><strong>{[table.branchName, table.name].filter(Boolean).join(' · ')}</strong><span>{RF_BUTTON_ACTIONS.map(({ label }) => `${label}: ${profiles?.[`${table.id}:${label}`] ? 'Tanımlı' : 'Boş'}`).join(' · ')}</span></div>)}
       <div className="notice-box"><span className="notice-icon">i</span><p>Her sinyal en az üç tekrar ve %80 benzerlik eşiğiyle denetlenir; birden fazla masaya benzer eşleşme çıkarsa yanlış çağrıyı önlemek için işlem yapılmaz.</p></div>
     </section>
   )

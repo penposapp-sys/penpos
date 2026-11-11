@@ -26,10 +26,13 @@ export const safeHashEqual = (left, right) => {
 }
 
 export const validateDeviceScope = async (device) => {
-  const [tenant, branch] = await Promise.all([
+  const branchIds = (Array.isArray(device.branchIds) && device.branchIds.length
+    ? device.branchIds
+    : [device.branchId]).map(String)
+  const [tenant, branches] = await Promise.all([
     Tenant.findOne({ _id: device.tenantId, status: 'active', isActive: { $ne: false } }).select('_id').lean(),
-    Branch.findOne({
-      _id: device.branchId,
+    Branch.find({
+      _id: { $in: branchIds },
       tenantId: device.tenantId,
       isActive: true,
       active: { $ne: false },
@@ -37,7 +40,7 @@ export const validateDeviceScope = async (device) => {
       status: { $nin: ['inactive', 'deleted'] }
     }).select('_id').lean()
   ])
-  if (!tenant || !branch) throw error('device_scope_inactive', 'Cihazın işletmesi veya şubesi etkin değil', 403)
+  if (!tenant || !branches.length) throw error('device_scope_inactive', 'Cihazın işletmesi veya şubesi etkin değil', 403)
 }
 
 export const createPairingCode = () =>
@@ -89,8 +92,10 @@ export const createPairingSession = async ({ deviceId, deviceName }) => {
   }
 }
 
-export const approvePairingSession = async ({ session, code, tenantId, branchId, userId, deviceName }) => {
+export const approvePairingSession = async ({ session, code, tenantId, branchId, branchIds = [branchId], userId, deviceName }) => {
   const now = new Date()
+  const normalizedBranchIds = [...new Set((branchIds || [branchId]).map(String).filter(Boolean))]
+  if (!normalizedBranchIds.includes(String(branchId))) normalizedBranchIds.unshift(String(branchId))
   const submittedHash = hashPairingCode(code, session.codeSalt)
   if (!safeHashEqual(submittedHash, session.codeHash)) {
     if (session.status === 'pending') {
@@ -109,8 +114,10 @@ export const approvePairingSession = async ({ session, code, tenantId, branchId,
     throw error('invalid_pairing_code', 'Eşleştirme kodu geçersiz', 400)
   }
   if (session.status === 'approved' && String(session.tenantId) === String(tenantId)
-      && String(session.branchId) === String(branchId) && String(session.approvedBy) === String(userId)) {
-    return ensureApprovedDevice(session, { tenantId, branchId, userId, deviceName, now })
+      && String(session.branchId) === String(branchId)
+      && String(session.approvedBy) === String(userId)
+      && normalizedBranchIds.join(',') === [...(session.branchIds?.length ? session.branchIds : [session.branchId])].map(String).join(',')) {
+    return ensureApprovedDevice(session, { tenantId, branchId, branchIds: normalizedBranchIds, userId, deviceName, now })
   }
   if (session.status !== 'pending' || new Date(session.expiresAt).getTime() <= now.getTime()) {
     throw error('pairing_expired', 'Eşleştirme kodunun süresi doldu veya kod kullanılamıyor', 410)
@@ -137,6 +144,7 @@ export const approvePairingSession = async ({ session, code, tenantId, branchId,
         status: 'approved',
         tenantId,
         branchId,
+        branchIds: normalizedBranchIds,
         approvedBy: userId,
         approvedAt: now,
         expiresAt: new Date(now.getTime() + 5 * 60 * 1000)
@@ -145,10 +153,10 @@ export const approvePairingSession = async ({ session, code, tenantId, branchId,
     { new: true }
   )
   if (!approved) throw error('pairing_unavailable', 'Eşleştirme isteği artık kullanılamıyor', 409)
-  return ensureApprovedDevice(approved, { tenantId, branchId, userId, deviceName, now })
+  return ensureApprovedDevice(approved, { tenantId, branchId, branchIds: normalizedBranchIds, userId, deviceName, now })
 }
 
-const ensureApprovedDevice = async (session, { tenantId, branchId, userId, deviceName, now }) => {
+const ensureApprovedDevice = async (session, { tenantId, branchId, branchIds = [branchId], userId, deviceName, now }) => {
   let device = await CallAgentDevice.findOne({ deviceId: session.deviceId })
   if (device && String(device.pairingSessionId) !== String(session._id)) {
     if (device.status !== 'revoked') {
@@ -161,6 +169,7 @@ const ensureApprovedDevice = async (session, { tenantId, branchId, userId, devic
           pairingSessionId: session._id,
           tenantId,
           branchId,
+          branchIds,
           name: String(deviceName || session.deviceName || 'PenPOS Çağrı Ajanı').trim(),
           status: 'active',
           pairedBy: userId,
@@ -181,6 +190,7 @@ const ensureApprovedDevice = async (session, { tenantId, branchId, userId, devic
         pairingSessionId: session._id,
         tenantId,
         branchId,
+        branchIds,
         name: String(deviceName || session.deviceName || 'PenPOS Çağrı Ajanı').trim(),
         status: 'active',
         pairedBy: userId,

@@ -13,6 +13,7 @@ const schema = new mongoose.Schema(
     deleteAt: { type: Date, required: true },
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    branchIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }], default: [] },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     approvedAt: { type: Date, default: null },
     tokenSessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'CallAgentTokenSession', default: null },

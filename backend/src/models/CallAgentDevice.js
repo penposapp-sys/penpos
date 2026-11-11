@@ -6,6 +6,7 @@ const schema = new mongoose.Schema(
     pairingSessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'CallAgentPairingSession', required: true },
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
+    branchIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }], default: [] },
     name: { type: String, required: true, trim: true, maxlength: 100 },
     status: { type: String, enum: ['active', 'revoked'], default: 'active', index: true },
     pairedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

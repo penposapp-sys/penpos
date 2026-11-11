@@ -7,6 +7,7 @@ const formatDate = (value) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? 'Bilinmiyor' : date.toLocaleString('tr-TR')
 }
+const ALL_BRANCHES = '__all__'
 
 export default function CallAgentSettingsPage() {
   const [branches, setBranches] = useState([])
@@ -38,7 +39,7 @@ export default function CallAgentSettingsPage() {
       if (!deviceResponse.ok) throw new Error(deviceResponse.message || 'Çağrı ajanı cihazları yüklenemedi.')
       const activeBranches = (branchResponse.branches || []).filter((branch) => branch.isActive !== false)
       setBranches(activeBranches)
-      setBranchId((current) => activeBranches.some((branch) => String(branch._id) === current)
+      setBranchId((current) => current === ALL_BRANCHES || activeBranches.some((branch) => String(branch._id) === current)
         ? current
         : String(activeBranches[0]?._id || ''))
       setDevices(Array.isArray(deviceResponse.devices)
@@ -95,7 +96,10 @@ export default function CallAgentSettingsPage() {
     try {
       const response = await api('/api/call-agents/dashboard/pairings', {
         method: 'POST',
-        data: { branchId, deviceName: deviceName.trim() },
+        data: {
+          ...(branchId === ALL_BRANCHES ? { allBranches: true } : { branchId }),
+          deviceName: deviceName.trim()
+        },
         silent: true,
         skipBranchHeader: true,
         suppressAuthRedirect: true
@@ -151,13 +155,13 @@ export default function CallAgentSettingsPage() {
         <div className="call-agent-settings-card-heading">
           <div>
             <h2>Cihaz eşleştir</h2>
-            <p>PenPOS sunucusu sabittir: https://penpos.cloud. Ajan uygulaması bu eşleştirme bilgilerini kullanarak otomatik bağlanır.</p>
+          <p>PenPOS sunucusu sabittir: https://penpos.cloud. Ajan uygulaması bu eşleştirme bilgilerini kullanarak otomatik bağlanır.</p>
           </div>
           <div className="call-agent-settings-quick-actions">
             <a
               className="call-agent-download-button"
-              href="/public/downloads/call-agent/PenPOS-Cagri-Ajani-Setup.exe?v=0.1.16"
-              download="PenPOS-Call-Agent-Setup-0.1.16.exe"
+              href="/public/downloads/call-agent/PenPOS-Cagri-Ajani-Setup-0.1.17.exe?v=0.1.17"
+              download="PenPOS-Cagri-Ajani-Setup-0.1.17.exe"
             >
               Çağrı Ajanını İndir
             </a>
@@ -169,6 +173,7 @@ export default function CallAgentSettingsPage() {
             Şube
             <select value={branchId} onChange={(event) => setBranchId(event.target.value)} required disabled={loading}>
               {branches.length === 0 && <option value="">Erişilebilir etkin şube yok</option>}
+              {branches.length > 1 && <option value={ALL_BRANCHES}>Tüm Şubeler</option>}
               {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
             </select>
           </label>
@@ -183,7 +188,7 @@ export default function CallAgentSettingsPage() {
             />
           </label>
           <div className="call-agent-pairing-actions">
-            <p>Buton cihaz kimliği ve kodu oluşturup cihazı seçili şubeye bağlar. Ardından “Çağrı ajanını aç” bağlantısına basın.</p>
+            <p>Buton cihaz kimliği ve kodu oluşturup cihazı {branchId === ALL_BRANCHES ? 'erişiminiz olan tüm şubelere' : 'seçili şubeye'} bağlar. Ardından “Çağrı ajanını aç” bağlantısına basın.</p>
             <button type="button" onClick={createPairing} disabled={busy || loading || !branches.length}>
               {busy ? 'Oluşturuluyor…' : 'Cihaz Eşleştir'}
             </button>
@@ -224,7 +229,11 @@ export default function CallAgentSettingsPage() {
             : (
               <div className="call-agent-device-list">
                 {devices.map((device) => {
-                  const branch = branches.find((item) => String(item._id) === String(device.branchId))
+                  const deviceBranchIds = (device.branchIds?.length ? device.branchIds : [device.branchId]).map(String)
+                  const deviceBranches = branches.filter((item) => deviceBranchIds.includes(String(item._id)))
+                  const branchLabel = deviceBranchIds.length > 1
+                    ? `Tüm Şubeler (${deviceBranchIds.length})`
+                    : deviceBranches[0]?.name || 'Erişilebilir şube listesinde yok'
                   return (
                     <article className="call-agent-device" key={device.deviceId}>
                       <div className="call-agent-device-main">
@@ -236,7 +245,7 @@ export default function CallAgentSettingsPage() {
                         </div>
                         <span className="call-agent-device-id">{device.deviceId}</span>
                         <div className="call-agent-device-meta">
-                          <span>Şube: {branch?.name || 'Erişilebilir şube listesinde yok'}</span>
+                          <span>Şube: {branchLabel}</span>
                           <span>Son heartbeat: {formatDate(device.lastHeartbeatAt)}</span>
                         </div>
                       </div>

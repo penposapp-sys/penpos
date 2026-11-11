@@ -1,6 +1,6 @@
 {
   "name": "penpos-call-agent",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "private": true,
   "description": "PenPOS Çağrı Ajanı masaüstü uygulaması",
   "main": "electron/main.js",
