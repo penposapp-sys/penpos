@@ -13,7 +13,7 @@ const toDto = (call) => ({
   callType: String(call?.callType || 'waiter_call'),
   status: String(call?.status || 'open'),
   source: String(call?.source || 'public_qr_menu'),
-  createdAt: call?.createdAt || null,
+  createdAt: call?.lastCalledAt || call?.createdAt || null,
   resolvedAt: call?.resolvedAt || null,
 })
 
@@ -68,8 +68,35 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '',
     ...(resolvedTableId ? { tableId: resolvedTableId } : { tableName: resolvedTableName }),
   }).sort({ createdAt: -1 })
 
-  if (existing) return toDto(existing)
+  if (existing) {
+    const now = new Date()
+    const refreshed = await WaiterCall.findOneAndUpdate(
+      { _id: existing._id, status: 'open' },
+      { $set: { lastCalledAt: now } },
+      { new: true }
+    ).lean()
 
+    if (refreshed) {
+      try {
+        await notifyWaiterCallUsers({
+          tenantId,
+          branchId: resolvedBranchId || String(refreshed.branchId || ''),
+          tableName: resolvedTableName,
+          waiterCallId: String(refreshed._id || ''),
+          callType: normalizedCallType
+        })
+      } catch (notificationError) {
+        console.error('Waiter call push notification failed', notificationError)
+      }
+      return toDto(refreshed)
+    }
+
+    // The call may have been closed while this request was running.
+    const latestOpenCall = await WaiterCall.findOne({ _id: existing._id, status: 'open' }).lean()
+    if (latestOpenCall) return toDto(latestOpenCall)
+  }
+
+  const now = new Date()
   const created = await WaiterCall.create({
     tenantId,
     tableId: resolvedTableId,
@@ -79,6 +106,7 @@ export const createWaiterCall = async ({ tenantId, tableId = '', tableName = '',
     source: normalizedSource,
     ...(normalizedSource === 'call_agent' ? { callAgentDeviceId: normalizedCallAgentDeviceId } : {}),
     status: 'open',
+    lastCalledAt: now,
   })
 
   try {
@@ -120,7 +148,7 @@ const buildBranchScopeFilter = async (tenantId, branchIds) => {
 export const listWaiterCalls = async (tenantId, { status = 'open', branchIds } = {}) => {
   const filter = { tenantId, ...(await buildBranchScopeFilter(tenantId, branchIds)) }
   if (status) filter.status = status
-  const items = await WaiterCall.find(filter).sort({ createdAt: -1 }).lean()
+  const items = await WaiterCall.find(filter).sort({ lastCalledAt: -1, createdAt: -1 }).lean()
   return items.map(toDto)
 }
 

@@ -10,6 +10,7 @@ const waiterCallSchema = new mongoose.Schema(
     source: { type: String, enum: ['public_qr_menu', 'call_agent'], default: 'public_qr_menu' },
     callAgentDeviceId: { type: String, default: '', index: true },
     status: { type: String, enum: ['open', 'resolved'], default: 'open', index: true },
+    lastCalledAt: { type: Date, default: null, index: true },
     resolvedAt: { type: Date, default: null },
     resolvedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
