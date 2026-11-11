@@ -10,18 +10,12 @@ if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProces
   $pnputilPath = Join-Path $env:SystemRoot 'Sysnative\pnputil.exe'
 }
 
-# Skip elevation if the Silicon Labs package is already present in the driver store.
+# Skip installation if the Silicon Labs package is already present in the driver store.
 $existingDrivers = & $pnputilPath /enum-drivers 2>$null
 if ($LASTEXITCODE -eq 0 -and ($existingDrivers -match '(?i)silabser\.inf')) {
   exit 0
 }
 
-$quotedInfPath = '"' + $infPath + '"'
-$argumentLine = "/add-driver $quotedInfPath /install"
-try {
-  $process = Start-Process -FilePath $pnputilPath -ArgumentList $argumentLine -Verb RunAs -Wait -PassThru
-  exit $process.ExitCode
-} catch {
-  # Includes a user declining the standard Windows administrator prompt.
-  exit 1
-}
+# The NSIS installer is configured per-machine and already has administrator rights.
+& $pnputilPath /add-driver $infPath /install | Out-Null
+exit $LASTEXITCODE
