@@ -1,6 +1,6 @@
 {
   "name": "penpos-call-agent",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "private": true,
   "description": "PenPOS Çağrı Ajanı masaüstü uygulaması",
   "main": "electron/main.js",
@@ -48,6 +48,10 @@
       {
         "from": "electron/serialPortReader.ps1",
         "to": "serialPortReader.ps1"
+      },
+      {
+        "from": "resources/cp210x",
+        "to": "cp210x"
       }
     ],
     "asar": true,
@@ -59,6 +63,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
